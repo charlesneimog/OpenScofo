@@ -97,7 +97,6 @@ static void oscofo_score(PdOScofo *x, t_symbol *s) {
     std::string LuaCode = x->OpenScofo->GetLuaCode();
     bool result = x->OpenScofo->LuaExecute(LuaCode.c_str());
 
-
     if (!result) {
         std::string error = x->OpenScofo->LuaGetError();
         pd_error(x, "[o.scofo~] Lua error");
@@ -322,7 +321,7 @@ static void oscofo_adddsp(PdOScofo *x, t_signal **sp) {
 // }
 
 // ─────────────────────────────────────
-static void *oscofo_new(void){
+static void *oscofo_new(void) {
     PdOScofo *x = (PdOScofo *)pd_new(OScofoObj);
     if (!x) {
         pd_error(x, "[o.scofo~] Error creating object");
