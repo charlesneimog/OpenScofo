@@ -510,6 +510,9 @@ std::vector<double> MDP::GetInitialDistribution() {
     double Sum = 0;
 
     for (int i = 0; i < Size; i++) {
+        if (m_CurrentStateIndex + i < 0) {
+            continue;
+        }
         double DurProb = exp(-1 * (Dur / m_BeatsAhead));
         InitialProb[i] = DurProb;
         Dur += m_States[m_CurrentStateIndex + i].Duration; // Accumulate duration
@@ -701,6 +704,7 @@ int MDP::GetEvent(Description &Desc) {
         return m_States[m_CurrentStateIndex].ScorePos;
     }
 
+    // just one first event block of the current event
     if (m_Tau == 0) {
         std::vector<double> InitialProb = GetInitialDistribution();
         for (int j = m_CurrentStateIndex; j < m_MaxScoreState; j++) {
@@ -716,7 +720,7 @@ int MDP::GetEvent(Description &Desc) {
     if (StateIndex == -1) {
         return 0;
     }
-    m_PsiN = UpdatePsiN(StateIndex); // Time Update
+    m_PsiN = UpdatePsiN(StateIndex); // Time Model Update
 
     // Return Score Position
     if (m_CurrentStateIndex == StateIndex) {
@@ -724,12 +728,9 @@ int MDP::GetEvent(Description &Desc) {
         return m_States[StateIndex].ScorePos;
     } else {
         m_CurrentStateIndex = StateIndex;
-
-        // Config
         m_MinEntropy = m_States[StateIndex].Entropy;
         m_SyncStrength = m_States[StateIndex].SyncStrength;
         m_PhaseCoupling = m_States[StateIndex].PhaseCoupling;
-
         return m_States[StateIndex].ScorePos;
     }
 }
