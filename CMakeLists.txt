@@ -3,11 +3,13 @@ project(OScofo)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(BUILD_PY_MODULE "Build Python Module" OFF)
+option(BUILD_PY_MODULE "Build Python Module" ON)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
 option(BUILD_MAX_OBJECT "Build Max Object" OFF)
-option(BUILD_ALL "Build Python Module and PureData Object" OFF)
+option(BUILD_ALL "Build Python Module and PureData Object" ON)
 option(BUILD_WITH_LUA "Build Lua Module embbeded on OScofo" ON)
 option(UPDATE_OSCOFO_LANGUAGE "Update OScofo language grammar.js" OFF)
 
@@ -23,6 +25,7 @@ if(BUILD_ALL)
     if(NOT LINUX)
         set(BUILD_MAX_OBJECT ON)
     endif()
+    set(BUILD_TESTS ON)
 endif()
 
 if(BUILD_ALL_OBJECTS)
@@ -33,42 +36,34 @@ if(BUILD_ALL_OBJECTS)
 endif()
 
 if(BUILD_PD_OBJECT)
-    set(PDCMAKE_DIR
-        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/pd.cmake/"
-        CACHE PATH "Path to pd.cmake")
-    include(${PDCMAKE_DIR}/pd.cmake)
+    set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
+    set(PDCMAKE_VERSION "v0.2.11")
+    if(NOT EXISTS "${PDCMAKE_FILE}")
+        file(DOWNLOAD https://github.com/pure-data/pd.cmake/releases/download/v2.0.11/pd.cmake
+             ${PDCMAKE_FILE})
+    endif()
+    include(${PDCMAKE_FILE})
 endif()
 
 # ╭──────────────────────────────────────╮
-# │                FFTW3                 │
+# │             CPM Package              │
 # ╰──────────────────────────────────────╯
-cmake_policy(SET CMP0135 NEW)
-option(BUILD_SHARED_LIBS OFF)
-option(BUILD_TESTS OFF)
-set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz)
-if(NOT EXISTS ${FFTW3_FILE})
-    message(STATUS "Downloading FFTW3")
-    file(
-        DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE}
-        SHOW_PROGRESS
-        STATUS DOWNLOAD_STATUS)
+set(CPM_FILE ${CMAKE_BINARY_DIR}/CPM.cmake)
+set(CPM_VERSION "0.42.0")
+if(NOT EXISTS "${CPM_FILE}")
+    file(DOWNLOAD
+         "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_VERSION}/CPM.cmake"
+         ${CPM_FILE})
 endif()
-
-file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz DESTINATION
-     ${CMAKE_CURRENT_SOURCE_DIR}/Libraries/)
-
-add_subdirectory(Libraries/fftw-3.3.10 EXCLUDE_FROM_ALL)
-set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+include(${CPM_FILE})
 
 # ╭──────────────────────────────────────╮
 # │             Tree-Sitter              │
 # ╰──────────────────────────────────────╯
 set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(Libraries/tree-sitter/lib/ EXCLUDE_FROM_ALL)
 set(PARSER_OUTPUT_C ${CMAKE_CURRENT_SOURCE_DIR}/Resources/tree-sitter-scofo/src/parser.c)
-
 if(UPDATE_OSCOFO_LANGUAGE)
+    add_subdirectory(Libraries/tree-sitter/lib/ EXCLUDE_FROM_ALL)
     find_program(TREE_SITTER_EXECUTABLE tree-sitter)
     set(TREE_SITTER_WORKING_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Resources/tree-sitter-scofo)
     if(TREE_SITTER_EXECUTABLE AND NOT MINGW)
@@ -99,16 +94,75 @@ target_include_directories(score_parser PUBLIC Libraries/tree-sitter/lib/include
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
 if(BUILD_WITH_LUA)
-    if(NOT TARGET lua)
-        add_library(lua STATIC "${LIB_DIR}/lua/onelua.c")
-        set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON C_STANDARD 99)
-        target_compile_definitions(lua PUBLIC "-DMAKE_LIB")
-        target_include_directories(lua PUBLIC "${LIB_DIR}/lua")
+    cpmaddpackage(
+        NAME
+        lua
+        GIT_REPOSITORY
+        https://github.com/lua/lua.git
+        VERSION
+        5.3.5
+        DOWNLOAD_ONLY
+        YES)
+
+    if(lua_ADDED)
+        file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
+        list(REMOVE_ITEM lua_sources "${lua_SOURCE_DIR}/lua.c" "${lua_SOURCE_DIR}/luac.c")
+        add_library(lua STATIC ${lua_sources})
+        target_include_directories(lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
     endif()
-    add_definitions(-DOSCOFO_LUA)
 
 else()
     message(STATUS "Lua not included")
+endif()
+
+# ╭──────────────────────────────────────╮
+# │                FFTW3                 │
+# ╰──────────────────────────────────────╯
+set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz)
+if(NOT EXISTS ${FFTW3_FILE})
+    message(STATUS "Downloading FFTW3")
+    file(
+        DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE}
+        SHOW_PROGRESS
+        STATUS DOWNLOAD_STATUS)
+endif()
+
+set(BUILD_SHARED_LIBS
+    OFF
+    CACHE BOOL "Build static libs" FORCE)
+set(BUILD_TESTS
+    OFF
+    CACHE BOOL "Disable FFTW tests" FORCE)
+set(ENABLE_FLOAT
+    OFF
+    CACHE BOOL "Enable single precision" FORCE)
+
+file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz DESTINATION ${CMAKE_BINARY_DIR}/)
+add_subdirectory(${CMAKE_BINARY_DIR}/fftw-3.3.10 ${CMAKE_BINARY_DIR}/fftw3 EXCLUDE_FROM_ALL)
+set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ╭──────────────────────────────────────╮
+# │             Tree Sitter              │
+# ╰──────────────────────────────────────╯
+cpmaddpackage("gh:tree-sitter/tree-sitter#v0.26.3")
+
+# ╭──────────────────────────────────────╮
+# │                Boost                 │
+# ╰──────────────────────────────────────╯
+
+if(NOT EMSCRIPTEN)
+    set(BOOST_VERSION "1.89.0")
+    cpmaddpackage(
+        NAME
+        Boost
+        VERSION
+        ${BOOST_VERSION}
+        URL
+        "https://github.com/boostorg/boost/releases/download/boost-${BOOST_VERSION}/boost-${BOOST_VERSION}-cmake.tar.xz"
+        OPTIONS
+        "BOOST_ENABLE_CMAKE ON"
+        "BUILD_SHARED_LIBS OFF")
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -131,18 +185,6 @@ set_target_properties(OScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OScofo PUBLIC fftw3 tree-sitter score_parser lua)
 
 # Boost Libraries
-if(NOT EMSCRIPTEN)
-    include(FetchContent)
-    set(BOOST_URL "https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.bz2")
-    set(BOOST_TAR "${CMAKE_BINARY_DIR}/boost_1_87_0.tar.bz2")
-    if(NOT EXISTS ${BOOST_TAR})
-        message(STATUS "Downloading Boost...")
-        file(DOWNLOAD ${BOOST_URL} ${BOOST_TAR} SHOW_PROGRESS)
-    endif()
-    FetchContent_Declare(boost URL file://${BOOST_TAR})
-    FetchContent_MakeAvailable(boost)
-    include_directories(${boost_SOURCE_DIR})
-endif()
 
 if(LINUX)
     target_compile_options(OScofo PUBLIC -static-libstdc++ -Wl,--exclude-libs,ALL)
@@ -170,6 +212,14 @@ if(NOT EMSCRIPTEN AND NOT MSVC)
                 >)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_compile_options(
+        $<$<CONFIG:Debug>:-g> $<$<CONFIG:Debug>:-O0> $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        $<$<CONFIG:Debug>:-fno-inline> $<$<CONFIG:Debug>:-fno-inline-functions>)
+
+    add_link_options($<$<CONFIG:Debug>:-g> $<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
+endif()
+
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
@@ -187,6 +237,13 @@ endif()
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
-if(BUILD_MAX_OBJECT)
+if(BUILD_MAX_OBJECT AND NOT LINUX)
     add_subdirectory(Sources/Max)
+endif()
+
+# ╭──────────────────────────────────────╮
+# │                Tests                 │
+# ╰──────────────────────────────────────╯
+if(BUILD_TESTS)
+    add_subdirectory(Tests)
 endif()
