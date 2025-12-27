@@ -62,3 +62,11 @@ Resources/Online-Editor/patch
 Sources/Max/o.scofo~.mxo/
 Resources/tests/o.scofo~.mxo
 o.scofo~
+ProcessBlock.svg
+Sketch.rnote
+out.folded
+perf.data
+perf.data.old
+perf.json
+perf.svg
+test.csv
