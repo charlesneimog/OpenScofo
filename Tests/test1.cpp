@@ -6,7 +6,7 @@
 #include <OScofo.hpp>
 
 // ─────────────────────────────────────
-std::vector<float> load_mp3_as_wave(const char *path, int &sr, int &ch) {
+std::vector<double> load_mp3_as_wave(const char *path, int &sr, int &ch) {
     mp3dec_t dec;
     mp3dec_file_info_t info;
     mp3dec_init(&dec);
@@ -17,10 +17,15 @@ std::vector<float> load_mp3_as_wave(const char *path, int &sr, int &ch) {
     sr = info.hz;
     ch = info.channels;
 
-    std::vector<float> wave(info.samples);
+    constexpr double inv = 1.0 / 32768.0;
+    std::vector<double> wave(info.samples);
     for (int i = 0; i < info.samples; i++) {
-        wave[i] = info.buffer[i];
+        wave[i] = static_cast<double>(info.buffer[i]) * inv;
     }
+
+    double maxAbs = 0.0;
+    for (double s : wave)
+        maxAbs = std::max(maxAbs, std::abs(s));
 
     free(info.buffer);
     return wave;
@@ -34,7 +39,7 @@ int main(int argc, char *argv[]) {
     }
 
     const int WINDOW = 4096;
-    const int HOP = 512;
+    const int HOP = 1024;
     const char *audio_path = argv[1];
     const char *score_path = argv[2];
     int sr = 0;
@@ -50,7 +55,7 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    std::vector<float> samples = load_mp3_as_wave(audio_path, sr, ch);
+    std::vector<double> samples = load_mp3_as_wave(audio_path, sr, ch);
     if (sr != 48000) {
         std::cerr << "warning: samplerate = " << sr << "\n";
     }
