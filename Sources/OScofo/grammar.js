@@ -9,39 +9,30 @@ module.exports = grammar({
         //╭─────────────────────────────────────╮
         //│                 LUA                 │
         //╰─────────────────────────────────────╯
-        LUA: ($) =>
-            seq(alias(token("LUA"), $.identifier), "{", optional($.lua_body), "}"),
-        lua_body: ($) =>
-            repeat1(
-                choice(/[^{}`]+/, seq("{", optional($.lua_body), "}"), $.lua_comment),
-            ),
-        lua_call: ($) =>
-            field(
-                "lua_call",
-                repeat1(choice(/[^()`]+/, seq("(", optional($.lua_call), ")"))),
-            ),
+        LUA: ($) => seq(alias(token("LUA"), $.identifier), "{", optional($.lua_body), "}"),
+        lua_body: ($) => repeat1(choice(/[^{}`]+/, seq("{", optional($.lua_body), "}"), $.lua_comment)),
+        lua_call: ($) => field("lua_call", repeat1(choice(/[^()`]+/, seq("(", optional($.lua_call), ")")))),
         lua_function: ($) => $.keyword,
         lua_comment: (_) => /--[^\n]*/,
 
         //╭─────────────────────────────────────╮
         //│               Config                │
         //╰─────────────────────────────────────╯
-        CONFIG: ($) => choice($.numberConfig),
-        configId: ($) =>
+        CONFIG: ($) => choice($.numberConfig, $.symbolConfig, $.pathConfig),
+
+        numberConfigId: ($) =>
             field(
                 "configId",
                 choice(
-                    // Time Configuration
+                    // Time
                     alias(token("BPM"), $.keyword),
                     alias(token("PhaseCoupling"), $.keyword),
-                    alias(token("PhaseCoupling"), $.keyword),
-
                     alias(token("SyncStrength"), $.keyword),
 
                     // Score
                     alias(token("TRANSPOSE"), $.keyword),
 
-                    // Listening module
+                    // Listening
                     alias(choice(token("ENTROPY"), token("Entropy")), $.keyword),
                     alias(choice(token("PitchSigma"), token("VARIANCE")), $.keyword),
 
@@ -50,8 +41,14 @@ module.exports = grammar({
                     alias(token("HopSize"), $.keyword),
                 ),
             ),
-        numberConfig: ($) => seq($.configId, $.numberSet),
-        numberSet: ($) => $.number,
+
+        symbolConfigId: ($) => field("configId", choice()),
+        pathConfigId: ($) => field("configId", choice(alias(token("TIMBREMODEL"), $.keyword))),
+
+        // types
+        numberConfig: ($) => seq($.numberConfigId, $.number),
+        symbolConfig: ($) => seq($.symbolConfigId, $.symbol),
+        pathConfig: ($) => seq($.pathConfigId, $.path),
 
         //╭─────────────────────────────────────╮
         //│               Events                │
@@ -69,8 +66,7 @@ module.exports = grammar({
         restEventId: ($) => seq(alias(token("REST"), $.keyword)),
         timeEventId: ($) => seq(alias(token("EVENT"), $.keyword)),
 
-        pitchEvent: ($) =>
-            seq($.pitchEventId, choice($.pitches, $.pitch), $.duration, repeat($.ACTION)),
+        pitchEvent: ($) => seq($.pitchEventId, choice($.pitches, $.pitch), $.duration, repeat($.ACTION)),
         restEvent: ($) => seq($.restEventId, $.duration, repeat($.ACTION)),
         freeEvent: ($) => seq($.timeEventId, $.eventId, $.duration, repeat1($.ACTION)),
 
@@ -103,13 +99,7 @@ module.exports = grammar({
             ),
 
         timedAction: ($) =>
-            choice(
-                seq(
-                    field("actionKey", token("delay")),
-                    field("value", $.number),
-                    field("timeUnit", $.timeUnit),
-                ),
-            ),
+            choice(seq(field("actionKey", token("delay")), field("value", $.number), field("timeUnit", $.timeUnit))),
 
         actionKeyword: ($) => choice($.lua_function, $.keyword),
 
@@ -120,10 +110,7 @@ module.exports = grammar({
                     field("receiver", $.receiver),
                     optional(field("pdargs", $.pdargs)),
                 ),
-                seq(
-                    field("keyword", token("luacall")),
-                    field("luabody", seq("(", $.lua_call, ")")),
-                ),
+                seq(field("keyword", token("luacall")), field("luabody", seq("(", $.lua_call, ")"))),
             ),
 
         pdargs: ($) => seq("[", repeat1($.pdarg), "]"),
@@ -134,16 +121,11 @@ module.exports = grammar({
         //╭─────────────────────────────────────╮
         //│                ATOMS                │
         //╰─────────────────────────────────────╯
-        number: (_) => choice(/-?[0-9]+/, /-?[0-9]+\.[0-9]+/),
-        symbol: (_) => /[a-zA-Z][a-zA-Z0-9_]*/,
+        number: (_) => token(choice(/-?[0-9]+/, /-?[0-9]+\.[0-9]+/)),
+        symbol: (_) => token(/[a-zA-Z][a-zA-Z0-9_]*/),
+        path: (_) => token(choice(seq('"', /[^"]+/, '"'), /[a-zA-Z0-9_.\-\\/]+/)),
 
-        comment: (_) =>
-            token(
-                choice(
-                    seq("//", /(\\+(.|\r?\n)|[^\\\n])*/),
-                    seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"),
-                ),
-            ),
+        comment: (_) => token(choice(seq("//", /(\\+(.|\r?\n)|[^\\\n])*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),
         timeUnit: (_) => field("timeUnit", choice("tempo", "sec", "ms")),
     },
     extras: ($) => [/\s|\\\r?\n/, $.comment],
