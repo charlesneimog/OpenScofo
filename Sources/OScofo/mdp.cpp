@@ -433,39 +433,31 @@ void MDP::GetAudioObservations(int FirstStateIndex, int LastStateIndex, int T) {
         MacroState &StateJ = m_States[j];
         int BufferIndex = (T % m_BufferSize);
         if (StateJ.Type == NOTE) {
-            // TODO: Need to rethink this
             double KL = 0;
-            for (AudioState AudioState : StateJ.SubStates) {
+            for (AudioState &AudioState : StateJ.SubStates) {
                 if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
                     AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
-                    KL = PitchObs[AudioState.Freq];
                     continue;
                 }
                 if (AudioState.Type == NOTE) {
-                    KL = GetPitchSimilarity(AudioState.Freq);
+                    KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
                     PitchObs[AudioState.Freq] = KL;
                     AudioState.Obs[BufferIndex] = KL;
                 }
             }
-            StateJ.Obs[BufferIndex] = KL;
 
         } else if (StateJ.Type == REST) {
-            // StateJ.Obs[BufferIndex] = Desc.Amp;
-
+            StateJ.SubStates[0].Obs[BufferIndex] = m_Desc.SilenceProb;
+            StateJ.SubStates[1].Obs[BufferIndex] = m_Desc.SilenceProb;
         } else if (StateJ.Type == TRILL) {
-            double bestProb = 0;
-            for (AudioState AudioState : StateJ.SubStates) {
+            for (AudioState &AudioState : StateJ.SubStates) {
                 if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
                     AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
                     continue;
                 }
-                double KL = GetPitchSimilarity(AudioState.Freq);
-                if (KL > bestProb) {
-                    bestProb = KL;
-                }
+                double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
                 AudioState.Obs[BufferIndex] = KL;
             }
-            StateJ.Obs[BufferIndex] = bestProb;
         }
     }
 }
@@ -538,13 +530,12 @@ double MDP::GetTransProbability(int i, int j) {
 }
 
 // ─────────────────────────────────────
-double MDP::GetSojournTime(MacroState &State, int u) {
-    double T = m_LastTn + (m_BlockDur * u);
-    double Duration = State.Duration;
-    double Sojourn = std::exp(-(T - m_LastTn) / (m_PsiN1 * Duration));
-    return Sojourn;
+double MDP::GetOccupancyDistribution(MacroState &State, int u) {
+    // u: number of time steps spent in current state
+    double time_in_seconds = u * m_BlockDur;
+    double expected_duration = m_PsiN1 * State.Duration;
+    return std::exp(-time_in_seconds / expected_duration);
 }
-
 // ─────────────────────────────────────
 int MDP::GetMaxUForJ(MacroState &StateJ) {
     double MaxU = StateJ.Duration / m_BlockDur;
@@ -555,17 +546,22 @@ int MDP::GetMaxUForJ(MacroState &StateJ) {
 // ─────────────────────────────────────
 double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
     if (T == 0) {
-        return StateJ.Obs[bufferIndex] * GetSojournTime(StateJ, T + 1) * StateJ.InitProb;
+        int SubStateIndex = StateJ.SubStateIndex;
+        return StateJ.SubStates[SubStateIndex].Obs[bufferIndex] * GetOccupancyDistribution(StateJ, T + 1) * StateJ.InitProb;
     } else {
-        double Obs = StateJ.Obs[bufferIndex];
+        int SubStateIndex = StateJ.SubStateIndex;
+        double Obs = StateJ.SubStates[SubStateIndex].Obs[bufferIndex];
         double MaxAlpha = -std::numeric_limits<double>::infinity();
+
         for (int u = 1; u <= std::min(T, GetMaxUForJ(StateJ)); u++) {
             double ProbPrevObs = 1.0;
             for (int v = 1; v < u; v++) {
                 int PrevIndex = (bufferIndex - v + m_BufferSize) % m_BufferSize;
-                ProbPrevObs *= StateJ.Obs[PrevIndex];
+                ProbPrevObs *= StateJ.SubStates[SubStateIndex].Obs[PrevIndex];
             }
-            double Sur = GetSojournTime(StateJ, u);
+            double Sur = GetOccupancyDistribution(StateJ, u);
+
+            // Audio States
             double MaxTrans = -std::numeric_limits<double>::infinity();
             for (int i = CurrentState; i <= j; i++) {
                 if (i < 0) {
@@ -576,15 +572,7 @@ double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int b
                 if (i != j) {
                     MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
                 } else {
-                    // for (AudioState &SubState : StateJ.SubStates) {
-
-                    // if (SubState.Markov == MARKOV) {
-                    //     int StateSize = StateJ.SubStates.size();
-                    //     // SubState.Forward[bufferIndex] = Markov(SubState, CurrentState, j, T, bufferIndex);
-                    // }
-                    // }
-
-                    MaxTrans = std::max(MaxTrans, StateJ.Forward[PrevIndex]);
+                    MaxTrans = std::max(MaxTrans, StateI.Forward[PrevIndex]);
                 }
             }
 
@@ -597,20 +585,16 @@ double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int b
 
 // ─────────────────────────────────────
 double MDP::Markov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
-    if (T == 0) {
-        return StateJ.Obs[bufferIndex] * StateJ.InitProb;
-    } else {
-        double Obs = StateJ.Obs[bufferIndex];
-        double MaxAlpha = -std::numeric_limits<double>::infinity();
-        for (int i = CurrentState; i <= j; i++) {
-            if (i >= 0) {
-                int prevIndex = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
-                double Value = GetTransProbability(i, j) * m_States[i].Forward[prevIndex];
-                MaxAlpha = std::max(MaxAlpha, Value);
-            }
+    double Obs = StateJ.Obs[bufferIndex];
+    double MaxAlpha = -std::numeric_limits<double>::infinity();
+    for (int i = CurrentState; i <= j; i++) {
+        if (i >= 0) {
+            int prevIndex = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
+            double Value = GetTransProbability(i, j) * m_States[i].Forward[prevIndex];
+            MaxAlpha = std::max(MaxAlpha, Value);
         }
-        return Obs * MaxAlpha;
     }
+    return Obs * MaxAlpha;
 }
 
 // ─────────────────────────────────────
@@ -631,22 +615,11 @@ int MDP::Inference(int CurrentState, int MaxState, int T) {
     int bufferIndex = T % m_BufferSize;
 
     for (int j = CurrentState; j <= MaxState; j++) {
-        if ((j < 0) || ((size_t)j >= m_States.size()))
+        if ((j < 0) || ((size_t)j >= m_States.size())) {
             continue;
-        MacroState &StateJ = m_States[j];
-        // for (AudioState &SubState : StateJ.SubStates) {
-        // if (SubState.Markov == MARKOV) {
-        //     int StateSize = StateJ.SubStates.size();
-        //
-        //     // SubState.Forward[bufferIndex] = Markov(SubState, CurrentState, j, T, bufferIndex);
-        // }
-        // }
-
-        if (StateJ.Markov == SEMIMARKOV) {
-            StateJ.Forward[bufferIndex] = SemiMarkov(StateJ, CurrentState, j, T, bufferIndex);
-        } else if (StateJ.Markov == MARKOV) {
-            StateJ.Forward[bufferIndex] = Markov(StateJ, CurrentState, j, T, bufferIndex);
         }
+        MacroState &StateJ = m_States[j];
+        StateJ.Forward[bufferIndex] = SemiMarkov(StateJ, CurrentState, j, T, bufferIndex);
     }
 
     // Sum
@@ -676,18 +649,19 @@ int MDP::Inference(int CurrentState, int MaxState, int T) {
     }
 
     // TODO: Implement Cuvillier (2016)
-    double Entropy = CalculateEntropy(Probs);
-    double maxEntropy = log(Probs.size());
-    double Conf = 1.0 - (Entropy / maxEntropy);
-    // printf("config: %d, %f, %f\n", BestState, entropy, confidence);
+    // double Entropy = CalculateEntropy(Probs);
+    // double maxEntropy = log(Probs.size());
+    // double Conf = 1.0 - (Entropy / maxEntropy);
+    // // printf("config: %d, %f, %f\n", BestState, entropy, confidence);
+    //
+    // if (m_MinEntropy > 0) {
+    //     if (Conf > m_MinEntropy) {
+    //         return BestState;
+    //     } else {
+    //         return CurrentState;
+    //     }
+    // }
 
-    if (m_MinEntropy > 0) {
-        if (Conf > m_MinEntropy) {
-            return BestState;
-        } else {
-            return CurrentState;
-        }
-    }
     return BestState;
 }
 

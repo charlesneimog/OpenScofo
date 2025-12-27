@@ -183,9 +183,7 @@ double Score::PitchNode2Freq(const std::string ScoreStr, TSNode node) {
         }
     }
     int midi = classNote + 12 + (12 * std::stoi(octave));
-
     midi = midi + m_Transpose;
-
     return m_Tunning * pow(2, (midi - 69.0) / 12);
 }
 
@@ -256,30 +254,62 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
                 SetError("Invalid pitch event on line " + std::to_string(Pos.row + 1));
                 return Event;
             }
-
         } else if (type == "pitch") {
             AudioState SubState;
             SubState.Markov = MARKOV;
             SubState.Type = NOTE;
             SubState.Freq = PitchNode2Freq(ScoreStr, child);
+
+            AudioState Middle;
+            Middle.Markov = MARKOV;
+            Middle.Type = NOTE;
+            Middle.Freq = PitchNode2Freq(ScoreStr, child);
+
+            AudioState Silence;
+            Silence.Markov = MARKOV;
+            Silence.Type = REST;
+            Silence.Freq = 0;
+
             Event.SubStates.push_back(SubState);
+            Event.SubStates.push_back(Middle);
+            Event.SubStates.push_back(Silence);
+
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
                 TSNode eventPitch = ts_node_child(child, j);
                 std::string eventPitchId = ts_node_type(eventPitch);
                 if (eventPitchId == "pitch") {
-                    AudioState SubState;
-                    SubState.Markov = MARKOV;
-                    SubState.Type = NOTE;
-                    SubState.Freq = PitchNode2Freq(ScoreStr, eventPitch);
-                    Event.SubStates.push_back(SubState);
+                    AudioState Start;
+                    Start.Markov = MARKOV;
+                    Start.Type = NOTE;
+                    Start.Freq = PitchNode2Freq(ScoreStr, eventPitch);
+                    Start.Index = 0;
+
+                    // Middle
+                    AudioState Middle;
+                    Middle.Markov = MARKOV;
+                    Middle.Type = NOTE;
+                    Middle.Freq = PitchNode2Freq(ScoreStr, eventPitch);
+                    Start.Index = 1;
+
+                    // Silence
+                    AudioState Silence;
+                    Silence.Markov = MARKOV;
+                    Silence.Type = REST;
+                    Silence.Freq = 0;
+                    Start.Index = 2;
+
+                    Event.SubStates.push_back(Start);
+                    Event.SubStates.push_back(Middle);
+                    Event.SubStates.push_back(Silence);
                 }
             }
 
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
+            m_MinimalDuration = std::min(m_MinimalDuration, duration);
         } else if (type == "ACTION") {
             ProcessAction(ScoreStr, child, Event);
         } else {
@@ -288,6 +318,7 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
             return Event;
         }
     }
+
     ProcessEventTime(Event);
     return Event;
 }
@@ -347,41 +378,83 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
     }
 }
 
+std::string GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
+    uint32_t count = ts_node_child_count(parent);
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(parent, i);
+
+        if (!ts_node_is_named(child))
+            continue;
+
+        if (wanted_type == ts_node_type(child)) {
+            uint32_t start = ts_node_start_byte(child);
+            uint32_t end = ts_node_end_byte(child);
+            return source.substr(start, end - start);
+        }
+    }
+    return {};
+}
+
 // ─────────────────────────────────────
-void Score::ProcessConfig(const std::string &ScoreStr, TSNode Node) {
-    MacroState Event;
-    uint32_t child_count = ts_node_child_count(Node);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(Node, i);
+void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
+    uint32_t child_count = ts_node_child_count(node);
+
+    for (uint32_t i = 0; i < child_count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        if (ts_node_has_error(child) || ts_node_is_error(child)) {
+            SetError("Error found on score");
+            return;
+        }
         std::string type = ts_node_type(child);
+        TSPoint pos = ts_node_start_point(child);
+
         if (type == "numberConfig") {
-            std::string configType = GetChildStringFromField(ScoreStr, child, "configId");
-            std::string number = GetChildStringFromField(ScoreStr, child, "numberSet");
-            TSPoint Pos = ts_node_start_point(child);
-            if (configType == "BPM") {
-                m_CurrentBPM = std::stof(number);
-            } else if (configType == "TRANSPOSE") {
-                m_Transpose = std::stof(number);
-                if (m_Transpose < -36 || m_Transpose > 36) {
-                    SetError("Invalid transpose value, must be between -36 and 36 on line " + std::to_string(Pos.row + 1));
+            std::string id = GetChildStringFromType(ScoreStr, child, "numberConfigId");
+            std::string value = GetChildStringFromType(ScoreStr, child, "number");
+            float v = std::stof(value);
+
+            if (id == "BPM") {
+                m_CurrentBPM = v;
+            } else if (id == "TRANSPOSE") {
+                if (v < -36 || v > 36) {
+                    SetError("Invalid transpose value on line " + std::to_string(pos.row + 1));
                     return;
                 }
-            } else if (configType == "ENTROPY" || configType == "Entropy") {
-                m_Entropy = std::stof(number);
-            } else if (configType == "PhaseCoupling") {
-                m_PhaseCoupling = std::stof(number);
-            } else if (configType == "SyncStrength") {
-                m_SyncStrength = std::stof(number);
-            } else if (configType == "PitchTemplateSigma" || configType == "VARIANCE") {
-                m_PitchTemplateSigma = std::stof(number);
-            } else if (configType == "FFTSize") {
-                m_FFTSize = std::stof(number);
-            } else if (configType == "HopSize") {
-                m_HopSize = std::stof(number);
+                m_Transpose = v;
+            } else if (id == "ENTROPY" || id == "Entropy") {
+                m_Entropy = v;
+            } else if (id == "PhaseCoupling") {
+                m_PhaseCoupling = v;
+            } else if (id == "SyncStrength") {
+                m_SyncStrength = v;
+            } else if (id == "PitchSigma" || id == "VARIANCE") {
+                m_PitchTemplateSigma = v;
+            } else if (id == "FFTSize") {
+                m_FFTSize = (int)v;
+            } else if (id == "HopSize") {
+                m_HopSize = (int)v;
             }
+        } else if (type == "pathConfig") {
+            std::string id = GetChildStringFromField(ScoreStr, child, "pathConfigId");
+            std::string path = GetChildStringFromType(ScoreStr, child, "path");
+            if (!path.empty() && path.front() == '"') {
+                path = path.substr(1, path.size() - 2);
+            }
+
+            if (id == "TIMBREMODEL") {
+                m_TimbreModel = m_ScoreRootPath / fs::path(path);
+                if (!fs::exists(m_TimbreModel)) {
+                    SetError("Timbre Model not found");
+                }
+            }
+
+        } else if (type == "symbolConfig") {
+            std::string id = GetChildStringFromField(ScoreStr, child, "configId");
+            std::string symbol = GetChildStringFromType(ScoreStr, child, "symbol");
         }
     }
 }
+
 // ─────────────────────────────────────
 void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MacroState &Event) {
     Action NewAction;
@@ -502,11 +575,18 @@ States Score::Parse(std::string ScoreFile) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
 
+    fs::path ScoreFilePath = fs::path(ScoreFile);
+    if (!fs::exists(ScoreFilePath)) {
+        SetError("Score File not found");
+        return {};
+    }
+    m_ScoreRootPath = ScoreFilePath.parent_path();
+
     // Open the score file for reading
     std::ifstream File(ScoreFile, std::ios::binary);
     if (!File.is_open()) {
-        SetError("Score File not found or could not be opened");
-        return m_ScoreStates;
+        SetError("Not possible to open score file");
+        return {};
     }
 
     File.clear(); // Clear error flags

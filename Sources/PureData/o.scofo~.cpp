@@ -27,13 +27,25 @@ class PdOScofo {
     t_canvas *Canvas;
     std::string PatchDir;
 
+    enum MIR {
+        MFCC = 0,
+        LOUDNESS,
+        RMS,
+        POWER,
+        SILENCE,
+    };
+
     // Clock
     t_clock *ClockEvent;
-    t_clock *ClockInfo;
     t_clock *ClockActions;
+    t_clock *ClockInfo;
 
     // Actions
     std::vector<Action> Actions;
+
+    // Mir
+    std::vector<MIR> RequestMIR;
+    bool MirOutput = false;
 
     // OScofo
     OScofo::OScofo *OpenScofo;
@@ -52,7 +64,7 @@ class PdOScofo {
     // Outlet
     t_outlet *EventOut;
     t_outlet *TempoOut;
-    t_outlet *InfoOut;
+    t_outlet *DescOut;
 };
 
 // ─────────────────────────────────────
@@ -223,6 +235,42 @@ static void oscofo_tickactions(PdOScofo *x) {
 }
 
 // ─────────────────────────────────────
+static void oscofo_tickinfo(PdOScofo *x) {
+    if (x->MirOutput) {
+        OScofo::Description Desc = x->OpenScofo->GetDescription();
+        for (PdOScofo::MIR v : x->RequestMIR) {
+            if (v == PdOScofo::MIR::MFCC) {
+                size_t mfccSize = Desc.MFCC.size();
+                std::vector<t_atom> mfccAtoms(mfccSize);
+                for (size_t i = 0; i < mfccSize; ++i) {
+                    SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
+                }
+                outlet_anything(x->DescOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
+            } else if (v == PdOScofo::MIR::POWER) {
+                size_t mfccSize = Desc.Power.size();
+                std::vector<t_atom> mfccAtoms(mfccSize);
+                for (size_t i = 0; i < mfccSize; ++i) {
+                    SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
+                }
+                outlet_anything(x->DescOut, gensym("power"), mfccSize, mfccAtoms.data());
+            } else if (v == PdOScofo::MIR::LOUDNESS) {
+                std::vector<t_atom> mfccAtoms(1);
+                SETFLOAT(&mfccAtoms[0], (t_float)Desc.Loudness);
+                outlet_anything(x->DescOut, gensym("loudness"), 1, mfccAtoms.data());
+            } else if (v == PdOScofo::MIR::RMS) {
+                std::vector<t_atom> mfccAtoms(1);
+                SETFLOAT(&mfccAtoms[0], (t_float)Desc.RMS);
+                outlet_anything(x->DescOut, gensym("rms"), 1, mfccAtoms.data());
+            } else if (v == PdOScofo::MIR::SILENCE) {
+                std::vector<t_atom> mfccAtoms(1);
+                SETFLOAT(&mfccAtoms[0], (t_float)Desc.SilenceProb);
+                outlet_anything(x->DescOut, gensym("silence"), 1, mfccAtoms.data());
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────
 static void oscofo_ticknewevent(PdOScofo *x) {
     int PrevEvent = x->Event;
     x->Event = x->OpenScofo->GetEventIndex();
@@ -292,6 +340,7 @@ static t_int *oscofo_perform(t_int *w) {
 
     clock_delay(x->ClockActions, 0);
     clock_delay(x->ClockEvent, 0);
+    clock_delay(x->ClockInfo, 0);
     return (w + 4);
 }
 
@@ -321,7 +370,7 @@ static void oscofo_adddsp(PdOScofo *x, t_signal **sp) {
 // }
 
 // ─────────────────────────────────────
-static void *oscofo_new(void) {
+static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     PdOScofo *x = (PdOScofo *)pd_new(OScofoObj);
     if (!x) {
         pd_error(x, "[o.scofo~] Error creating object");
@@ -335,17 +384,41 @@ static void *oscofo_new(void) {
     x->Following = false;
     x->Event = -1;
 
-    // Args
-    // oscofo_processargv(x, argc, argv);
-
     // Outlets
     x->EventOut = outlet_new(&x->PdObject, &s_float);
     x->TempoOut = outlet_new(&x->PdObject, &s_float);
-    // x->InfoOut = outlet_new(&x->PdObject, &s_anything);
+
+    // Args
+    bool DescOut = false;
+    while (argc) {
+        if ((argv)->a_type == A_SYMBOL) {
+            t_symbol *sym = atom_getsymbol(argv);
+            if (strcmp(sym->s_name, "mfcc") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOScofo::MIR::MFCC);
+            } else if (strcmp(sym->s_name, "rms") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOScofo::MIR::RMS);
+            } else if (strcmp(sym->s_name, "loudness") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOScofo::MIR::LOUDNESS);
+            } else if (strcmp(sym->s_name, "silence") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOScofo::MIR::SILENCE);
+            }
+        }
+        argc--, argv++;
+    }
+
+    if (DescOut) {
+        x->DescOut = outlet_new(&x->PdObject, &s_list);
+        x->MirOutput = true;
+    }
 
     // Schedule
     x->ClockEvent = clock_new(x, (t_method)oscofo_ticknewevent);
     x->ClockActions = clock_new(x, (t_method)oscofo_tickactions);
+    x->ClockInfo = clock_new(x, (t_method)oscofo_tickinfo);
 
     // Current Dir
     x->Canvas = canvas_getcurrent();
@@ -366,7 +439,7 @@ static void *oscofo_new(void) {
     x->OpenScofo->LuaAddPath(x->PatchDir);
     x->OpenScofo->LuaAddPointer(x, "_pdobj");
 #endif
-    return (x);
+    return (void *)x;
 }
 
 // ─────────────────────────────────────
@@ -376,9 +449,9 @@ static void oscofo_free(PdOScofo *x) {
 
 // ─────────────────────────────────────
 extern "C" void setup_o0x2escofo_tilde(void) {
-    OScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOScofo), CLASS_DEFAULT, A_NULL);
+    OScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
+    post("[o.scofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
 
     // message methods
     class_addmethod(OScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);

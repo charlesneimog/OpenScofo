@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include "states.hpp"
 #include <tree_sitter/api.h>
@@ -11,6 +12,8 @@ namespace OScofo {
 #ifndef TWO_PI
 #define TWO_PI (2 * M_PI)
 #endif
+
+namespace fs = std::filesystem;
 
 // ╭─────────────────────────────────────╮
 // │                Score                │
@@ -29,6 +32,18 @@ class Score {
     double GetPitchTemplateSigma();
     double GetPhaseCoupling();
     double GetSyncStrength();
+
+    // AI
+    bool HasTimbreModel() {
+        if (m_TimbreModel.empty()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    fs::path GetTimbreModel() {
+        return m_TimbreModel;
+    }
 
     // Errors
     bool HasErrors();
@@ -87,6 +102,10 @@ class Score {
     double m_FFTSize = 4096;
     double m_HopSize = 1024;
 
+    // Paths
+    fs::path m_ScoreRootPath;
+    fs::path m_TimbreModel;
+
     // Variables
     int m_ScorePosition = 1;
     int m_LineCount = 0;
@@ -96,6 +115,7 @@ class Score {
     double m_PrevDuration;
     double m_Tunning = 440;
     bool m_ScoreLoaded = false;
+    double m_MinimalDuration = std::numeric_limits<double>::infinity();
 
     // Errors
     bool m_HasErrors = false;

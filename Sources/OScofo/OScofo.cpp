@@ -61,8 +61,13 @@ std::vector<std::string> OScofo::GetErrorMessage() {
 
 // ─────────────────────────────────────
 void OScofo::SetError(const std::string &message) {
-    m_HasErrors = true;
-    m_Errors.push_back(message);
+    if (m_ErrorCallback) {
+        m_HasErrors = true;
+        m_ErrorCallback(message);
+    } else {
+        m_HasErrors = true;
+        m_Errors.push_back(message);
+    }
 }
 
 // ─────────────────────────────────────
@@ -228,6 +233,7 @@ double OScofo::GetPitchProb(double f) {
 std::string OScofo::GetLuaCode() {
     return m_Score.GetLuaCode();
 }
+
 // ╭─────────────────────────────────────╮
 // │          Helpers Functions          │
 // ╰─────────────────────────────────────╯
@@ -270,6 +276,7 @@ double OScofo::GetHopSize() {
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
 bool OScofo::ParseScore(std::string ScorePath) {
+    m_Score = Score();
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
     if (m_Score.HasErrors()) {
@@ -278,6 +285,14 @@ bool OScofo::ParseScore(std::string ScorePath) {
             m_Score.ClearError();
         }
         return false;
+    }
+
+    // Time coherence
+    m_MIR.BuildTimeCoherenceTemplate(m_States);
+
+    // Timbre detection
+    if (m_Score.HasTimbreModel()) {
+        m_MIR.LoadONNXModel(m_Score.GetTimbreModel());
     }
 
     m_FFTSize = m_Score.GetFFTSize();
@@ -293,8 +308,29 @@ bool OScofo::ParseScore(std::string ScorePath) {
 }
 
 // ─────────────────────────────────────
+Description OScofo::GetDescription() {
+    return m_Desc;
+}
+
+// ─────────────────────────────────────
+Description OScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
+    if (m_FFTSize != AudioBuffer.size()) {
+        SetError("AudioBuffer size differ from FFT Size");
+    }
+
+    SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
+    m_MIR.GetDescription(AudioBuffer, m_Desc);
+    return m_Desc;
+}
+
+// ─────────────────────────────────────
 bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     if (!m_Score.ScoreIsLoaded()) {
+        return false;
+    }
+
+    if (m_FFTSize != AudioBuffer.size()) {
+        SetError("AudioBuffer size differ from FFT Size");
         return false;
     }
 

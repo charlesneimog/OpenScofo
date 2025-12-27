@@ -15,7 +15,30 @@ extern "C" {
 
 #define OSCOFO_VERSION_MAJOR 0
 #define OSCOFO_VERSION_MINOR 1
-#define OSCOFO_VERSION_PATCH 3
+#define OSCOFO_VERSION_PATCH 4
+
+#include <chrono>
+#include <iostream>
+#include <functional>
+#include <vector>
+
+class Timer {
+  public:
+    Timer(const std::string &name = "") : m_Name(name), m_Start(std::chrono::high_resolution_clock::now()) {
+    }
+
+    ~Timer() {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - m_Start).count();
+        if (!m_Name.empty())
+            std::cout << m_Name << " ";
+        std::cout << "Time elapsed: " << duration << " µs" << std::endl;
+    }
+
+  private:
+    std::string m_Name;
+    std::chrono::high_resolution_clock::time_point m_Start;
+};
 
 namespace OScofo {
 
@@ -56,6 +79,14 @@ class OScofo {
     double GetFFTSize();
     double GetHopSize();
 
+    void SetErrorCallBack(std::function<void(const std::string &)> cb) {
+        m_ErrorCallback = cb;
+    }
+
+    // Help & Test functions
+    Description GetAudioDescription(std::vector<double> &AudioBuffer);
+    Description GetDescription();
+
 #if defined(OSCOFO_LUA)
     void InitLua();
     bool LuaExecute(std::string code);
@@ -91,6 +122,7 @@ class OScofo {
     // Errors
     bool m_HasErrors = false;
     std::vector<std::string> m_Errors;
+    std::function<void(const std::string &)> m_ErrorCallback = nullptr;
 };
 
 } // namespace OScofo

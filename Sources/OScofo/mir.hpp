@@ -1,9 +1,18 @@
 #pragma once
 
+#include <math.h>
 #include <vector>
+#include <array>
+#include <filesystem>
+#include <unordered_map>
+
+#include <fstream>
 
 #include <fftw3.h>
+#include <onnx.h>
+#include <onsetsds.h>
 
+#define CURRENT_ONNX_OPSET 24
 #include "log.hpp"
 #include "states.hpp"
 namespace OScofo {
@@ -11,6 +20,11 @@ namespace OScofo {
 #ifndef TWO_PI
 #define TWO_PI (2 * M_PI)
 #endif
+
+namespace fs = std::filesystem;
+
+using Spectrum = std::vector<std::complex<double>>;
+using Matrix = std::vector<std::vector<double>>; // row-major: rows x cols
 
 // ╭─────────────────────────────────────╮
 // │     Music Information Retrieval     │
@@ -22,8 +36,13 @@ class MIR {
 
     void SetdBTreshold(double dB);
     void GetDescription(std::vector<double> &In, Description &Desc);
-    void GetLoudness(std::vector<double> &In, Description &Desc);
     double GetdB();
+
+    // AI
+    void LoadONNXModel(fs::path path);
+
+    // Time coherence
+    void BuildTimeCoherenceTemplate(States &States);
 
     // Error handling
     bool HasErrors();
@@ -44,13 +63,41 @@ class MIR {
     fftw_plan m_FFTPlan;
     void GetFFTDescriptions(std::vector<double> &In, Description &Desc);
 
+    // MFCC
+    void MFCCInit();
+    void MFCCExec(Description &Desc);
+    int m_MFCCMels = 40;
+    int m_MFCC = 13;
+    std::vector<std::vector<double>> m_MFCCFilter;
+    std::vector<std::vector<double>> m_DCTBasis;
+    std::vector<double> m_MFCCEnergy;
+
+    // Time coherence
+    void BuildSingleEventPdf(MacroState &ev, double dt);
+
+    // Onsets
+    bool m_OnsetInit = false;
+    void OnsetInit();
+    void OnsetExec(Description &Desc);
+    OnsetsDS *m_ODS = nullptr;
+    float *m_ODSData = nullptr;
+    int m_OnsetFFTSize = 512;
+    int m_MedSpan = 20;
+    int m_Accum = 0;
+
+    // Machine Learning
+    bool m_ONNXModelLoaded = false;
+    struct onnx_context_t *m_OnnxCTX;
+    int m_TensorCount;
+    std::unordered_map<std::string, float> m_ONNXResults;
+
     // Env
     double m_dBTreshold = -50;
-    void GetRMS(std::vector<double> &In, Description &Desc);
+    void GetSignalPower(std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
 
     // Audio
-    float m_FftSize;
+    float m_FFTSize;
     float m_BlockSize;
     float m_HopSize;
     float m_Sr;
