@@ -38,6 +38,7 @@ class AudioState {
     double Freq;
     std::vector<double> Obs;
     std::vector<double> Forward;
+    unsigned Index;
 };
 
 // ─────────────────────────────────────
@@ -45,6 +46,7 @@ class MacroState {
   public:
     int Index;
     int ScorePos;
+    int SubStateIndex = 0;
     EventType Type;
     HMMType Markov;
     int MarkovIndex = -1;
@@ -60,8 +62,15 @@ class MacroState {
     double InitProb;
     std::vector<double> Obs;
     std::vector<double> Forward;
-    // std::vector<double> Norm;
-    // std::vector<double> In;
+
+    // Time
+    double OnsetTime;
+    // double Duration;
+
+    double Sigma;
+    double PdfStartTime;
+    std::vector<double> Pdf;
+    std::vector<double> Context;
 
     // Audio Obs
     std::vector<double> Freqs;
@@ -103,20 +112,22 @@ using States = std::vector<MacroState>;
 class Description {
   public:
     bool Silence;
-    double WindowSize;
-    double Sr;
-    double Freq;
-    double Midi;
+    bool Onset;
+    double SilenceProb;
+
     double dB;
-    double Amp;
-    std::vector<double> SpectralPower;
-    std::vector<double> NormSpectralPower;
-    // double TotalPower;
+    double RMS;
     double MaxAmp;
-    double SpectralFlatness;
     double Loudness;
+
+    double SpectralFlatness;
     double SpectralFlux;
     double StdDev;
+
+    std::vector<double> Power;
+    std::vector<double> SpectralPower;
+    std::vector<double> NormSpectralPower;
+    std::vector<double> MFCC;
 };
 
 } // namespace OScofo

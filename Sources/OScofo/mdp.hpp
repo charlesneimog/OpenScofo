@@ -105,7 +105,7 @@ class MDP {
     double InverseA2(double r);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
-    double GetSojournTime(MacroState &State, int u);
+    double GetOccupancyDistribution(MacroState &State, int u);
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);
