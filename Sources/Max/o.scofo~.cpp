@@ -192,7 +192,7 @@ static void oscofo_luaexecute(MaxOScofo *x, std::string code) {
 static void oscofo_maxsend(MaxOScofo *x, std::string r, int argc, t_atom *argv) {
     t_symbol *sym = gensym(r.c_str());
     t_object *receiver = sym->s_thing;
-    if (receiver == nullptr){
+    if (receiver == nullptr) {
         object_error((t_object *)x, "Receiver '%s' not found", r.c_str());
         return;
     }
@@ -354,7 +354,7 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
     }
 
 #ifdef OSCOFO_LUA
-    x->OpenScofo->LuaAddModule("max", luaopen_max);   
+    x->OpenScofo->LuaAddModule("max", luaopen_max);
     x->OpenScofo->LuaAddPath(x->PatchDir);
     x->OpenScofo->LuaAddPointer(x, "_maxobj");
 #endif
