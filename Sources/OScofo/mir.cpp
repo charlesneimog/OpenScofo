@@ -1,6 +1,5 @@
 #include "mir.hpp"
 
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <algorithm>
 #include <math.h>
@@ -37,11 +36,11 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
 #ifdef __EMSCRIPTEN__
     m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FftSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
 #else
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_MEASURE);
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
 #endif
 
     // hanning
-    m_WindowingFunc.resize((size_t)m_FFTSize);
+    m_WindowingFunc.resize(m_FFTSize);
     for (size_t i = 0; i < (size_t)m_FFTSize; i++) {
         m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * M_PI * i / (m_FFTSize - 1)));
     }
@@ -49,6 +48,7 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
     // Init Onset
     OnsetInit();
     MFCCInit();
+    CQTInit();
 }
 
 // ─────────────────────────────────────
@@ -128,6 +128,11 @@ double MIR::Freq2Bin(double Freq, double n, double sr) {
 // ╰─────────────────────────────────────╯
 void MIR::SetdBTreshold(double dB) {
     m_dBTreshold = dB;
+}
+
+// ─────────────────────────────────────
+std::vector<std::pair<int, int>> MIR::GetCQT() {
+    return m_FakeCQT;
 }
 
 // ╭─────────────────────────────────────╮
@@ -317,15 +322,46 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
 }
 
 // ─────────────────────────────────────
+void MIR::CQTInit() {
+    int binsPerOctave = 48;
+    int nOctaves = 6;
+    double fMin = 55.0;
+
+    double Q = 1.0 / (std::pow(2.0, 1.0 / binsPerOctave) - 1.0);
+    int nCQTbins = binsPerOctave * nOctaves;
+
+    m_FakeCQT.clear();
+    m_FakeCQT.reserve(nCQTbins);
+
+    for (int k = 0; k < nCQTbins; ++k) {
+        double fk = fMin * std::pow(2.0, k / double(binsPerOctave));
+        if (fk >= 0.5 * m_Sr)
+            break;
+
+        double bw = fk / Q;
+
+        int b0 = int((fk - 0.5 * bw) * m_FFTSize / m_Sr);
+        int b1 = int((fk + 0.5 * bw) * m_FFTSize / m_Sr);
+
+        b0 = std::max(b0, 0);
+        b1 = std::min(b1, int(m_FFTSize / 2 - 1));
+
+        if (b1 > b0)
+            m_FakeCQT.emplace_back(b0, b1);
+    }
+}
+
+// ─────────────────────────────────────
 void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     // real audio analisys
     size_t N = In.size();
-    size_t NHalf = N / 2 + 1; // include Nyquist to match rfft/librosa
+    size_t NHalf = N / 2; // include Nyquist to match rfft/librosa
 
     if (NHalf != Desc.Power.size()) {
         Desc.Power.resize(NHalf);
         Desc.SpectralPower.resize(NHalf);
         Desc.NormSpectralPower.resize(NHalf);
+        m_PreviousSpectralPower.resize(NHalf);
     }
 
     std::copy(In.begin(), In.end(), m_FFTIn);
@@ -345,17 +381,27 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
         Desc.MaxAmp = std::max(Desc.MaxAmp, sp);
     }
 
-    OnsetExec(Desc);
-    MFCCExec(Desc);
-
     // Normalize Spectral Power
     double SumPower = std::accumulate(Desc.SpectralPower.begin(), Desc.SpectralPower.end(), 0.0);
-
     for (size_t i = 0; i < NHalf; i++) {
         Desc.NormSpectralPower[i] = (Desc.SpectralPower[i] + 1e-12) / (SumPower + 1e-12);
     }
 
-    const double Mean = 1.0 / NHalf; // Sum is 1.0, so mean = 1/N
+    // Fake CQT
+    if (m_FakeCQT.size() != Desc.PseudoCQT.size()) {
+        Desc.PseudoCQT.resize(m_FakeCQT.size());
+    }
+
+    for (size_t k = 0; k < m_FakeCQT.size(); ++k) {
+        auto [b0, b1] = m_FakeCQT[k];
+        double sum = 0.0;
+        for (int i = b0; i <= b1; i++) {
+            sum += Desc.SpectralPower[i];
+        }
+        Desc.PseudoCQT[k] = sum / double(b1 - b0 + 1);
+    }
+
+    const double Mean = 1.0 / NHalf;
     double Variance = 0.0;
     for (size_t i = 0; i < NHalf; i++) {
         double Diff = Desc.NormSpectralPower[i] - Mean;
@@ -363,6 +409,14 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     }
     Variance /= NHalf;
     Desc.StdDev = std::sqrt(Variance);
+
+    // Executable
+    OnsetExec(Desc);
+    MFCCExec(Desc);
+
+    SpectralFluxExec(Desc);
+    SpectralFlatnessExec(Desc);
+    SpectralHarmonicityExec(Desc);
 }
 
 // ╭─────────────────────────────────────╮
@@ -413,7 +467,7 @@ void MIR::MFCCInit() {
     }
 
     // Triangular Slaney mel filters normalized to match librosa
-    m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
+    m_MFCCFilter.assign(m_MFCCMels, std::vector<float>(n_f, 0.0));
     for (int m = 0; m < m_MFCCMels; m++) {
         const double f_left = hz_pts[m];
         const double f_center = hz_pts[m + 1];
@@ -433,7 +487,7 @@ void MIR::MFCCInit() {
     }
 
     // Orthonormal DCT-II basis (librosa dct_type=2, norm="ortho")
-    m_DCTBasis.assign(m_MFCC, std::vector<double>(m_MFCCMels));
+    m_DCTBasis.assign(m_MFCC, std::vector<float>(m_MFCCMels));
     const double scale0 = std::sqrt(1.0 / m_MFCCMels);
     const double scale = std::sqrt(2.0 / m_MFCCMels);
     for (int k = 0; k < m_MFCC; k++) {
@@ -451,54 +505,124 @@ void MIR::MFCCExec(Description &Desc) {
     const int n_mels = m_MFCCMels;
     const int n_mfcc = m_MFCC;
 
-    // Mel energies from power spectrum (librosa: np.maximum(..., 1e-30))
+    constexpr double kEps = 1e-30;
+    constexpr double kLog10 = 10.0;
+    constexpr double kDR = 80.0;
+
+    /* Mel filterbank */
+    const double *power = Desc.Power.data();
     for (int m = 0; m < n_mels; m++) {
+        const float *filter = m_MFCCFilter[m].data();
         double sum = 0.0;
         for (int k = 0; k < n_f; k++) {
-            sum += m_MFCCFilter[m][k] * Desc.Power[k];
+            sum += filter[k] * power[k];
         }
-        m_MFCCEnergy[m] = std::max(sum, 1e-30);
+        m_MFCCEnergy[m] = std::max(sum, kEps);
     }
 
-    // Power to dB and dynamic range compression (80 dB)
-    double max_log = -1e30;
-    for (int m = 0; m < n_mels; m++) {
-        const double v = 10.0 * std::log10(m_MFCCEnergy[m]);
+    /* Power -> dB + dynamic range */
+    double maxLog = -1e300;
+    for (int m = 0; m < n_mels; ++m) {
+        double v = kLog10 * std::log10(m_MFCCEnergy[m]);
         m_MFCCEnergy[m] = v;
-        if (v > max_log) {
-            max_log = v;
-        }
+        if (v > maxLog)
+            maxLog = v;
     }
 
-    const double floor = max_log - 80.0;
-    for (int m = 0; m < n_mels; m++) {
-        if (m_MFCCEnergy[m] < floor) {
+    const double floor = maxLog - kDR;
+    for (int m = 0; m < n_mels; ++m) {
+        if (m_MFCCEnergy[m] < floor)
             m_MFCCEnergy[m] = floor;
-        }
     }
 
-    if (static_cast<int>(Desc.MFCC.size()) != n_mfcc) {
+    /* Resize once */
+    if ((int)Desc.MFCC.size() != n_mfcc) {
         Desc.MFCC.resize(n_mfcc);
     }
 
-    // DCT-II with ortho normalization (librosa dct_type=2)
-    for (int k = 0; k < n_mfcc; k++) {
+    /* DCT-II */
+    for (int k = 0; k < n_mfcc; ++k) {
+        std::vector<float> &basis = m_DCTBasis[k];
         double sum = 0.0;
-        for (int n = 0; n < n_mels; n++) {
-            sum += m_DCTBasis[k][n] * m_MFCCEnergy[n];
+        for (int n = 0; n < n_mels; ++n) {
+            sum += basis[n] * m_MFCCEnergy[n];
         }
         Desc.MFCC[k] = sum;
     }
 }
 
 // ╭─────────────────────────────────────╮
+// │        Spectral Descriptions        │
+// ╰─────────────────────────────────────╯
+void MIR::SpectralFluxExec(Description &Desc) {
+    const auto &S = Desc.SpectralPower;
+    const size_t N = S.size();
+
+    if (m_PreviousSpectralPower.size() != N) {
+        m_PreviousSpectralPower.assign(N, 0.0);
+    }
+
+    double flux = 0.0;
+    for (size_t k = 1; k < N; ++k) {
+        double diff = S[k] - m_PreviousSpectralPower[k];
+        if (diff > 0.0) {
+            flux += diff;
+        }
+        m_PreviousSpectralPower[k] = S[k];
+    }
+    Desc.SpectralFlux = flux;
+}
+
+// ─────────────────────────────────────
+void MIR::SpectralFlatnessExec(Description &Desc) {
+    const auto &S = Desc.SpectralPower;
+    const size_t N = S.size();
+
+    constexpr double eps = 1e-12;
+    double logSum = 0.0;
+    double linSum = 0.0;
+
+    // skip DC
+    for (size_t k = 1; k < N; ++k) {
+        double v = S[k] + eps;
+        logSum += std::log(v);
+        linSum += v;
+    }
+
+    double geoMean = std::exp(logSum / (N - 1));
+    double arithMean = linSum / (N - 1);
+
+    Desc.SpectralFlatness = geoMean / arithMean;
+}
+
+// ─────────────────────────────────────
+void MIR::SpectralHarmonicityExec(Description &Desc) {
+    const auto &S = Desc.SpectralPower;
+    const size_t N = S.size();
+
+    double sum = 0.0;
+    double peak = 0.0;
+
+    // skip DC
+    for (size_t k = 1; k < N; ++k) {
+        double v = S[k];
+        sum += v;
+        if (v > peak)
+            peak = v;
+    }
+
+    constexpr double eps = 1e-12;
+    Desc.Harmonicity = peak / (sum + eps);
+}
+
+// ╭─────────────────────────────────────╮
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
-void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
-    // apply windowing function
-    for (size_t i = 0; i < (size_t)m_FFTSize; i++) {
-        In[i] *= m_WindowingFunc[i];
-    }
+void MIR::GetDescription(std::vector<double> &In, Description &Desc, States &ScoreStates) {
+    double *x = In.data();
+    const double *w = m_WindowingFunc.data();
+    for (size_t i = 0; i < m_FFTSize; ++i)
+        x[i] *= w[i];
 
     GetSignalPower(In, Desc);
     GetFFTDescriptions(In, Desc);
