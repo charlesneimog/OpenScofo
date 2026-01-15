@@ -11,12 +11,14 @@ int luaopen_oscofo(lua_State *L);
 #endif
 
 //  ─────────────────────────────────────
-OScofo::OScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize) {
+OScofo::OScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
     m_States = States();
     m_Desc = Description();
     m_Sr = Sr;
     m_FFTSize = FftSize;
     m_HopSize = HopSize;
+    m_InBuffer.reserve(FftSize);
+    m_BlockIndex = 0;
 
     if (m_MIR.HasErrors() || m_MDP.HasErrors()) {
         for (auto &error : m_MIR.GetErrorMessage()) {
@@ -171,6 +173,11 @@ void OScofo::SetPitchTemplateSigma(double Sigma) {
 }
 
 // ─────────────────────────────────────
+void OScofo::SetAmplitudeDecay(double decay) {
+    m_MDP.SetAmplitudeDecay(decay);
+}
+
+// ─────────────────────────────────────
 void OScofo::SetMinEntropy(double EntropyValue) {
     m_MDP.SetMinEntropy(EntropyValue);
 }
@@ -253,13 +260,38 @@ States OScofo::GetStates() {
 }
 
 // ─────────────────────────────────────
-std::unordered_map<double, PitchTemplateArray> OScofo::GetPitchTemplate() {
-    return m_MDP.GetPitchTemplate();
+std::vector<double> OScofo::GetPitchTemplate(double Freq) {
+    return m_MDP.GetPitchTemplate(Freq);
+}
+
+// ─────────────────────────────────────
+std::vector<double> OScofo::GetCQTTemplate(double Freq) {
+    PitchTemplateArray p = m_MDP.GetPitchTemplate(Freq);
+    std::vector<std::pair<int, int>> cqt = m_MIR.GetCQT();
+
+    std::vector<double> cqt_template;
+    cqt_template.resize(cqt.size());
+
+    for (size_t k = 0; k < cqt.size(); ++k) {
+        auto [b0, b1] = cqt[k];
+        double sum = 0.0;
+        for (int i = b0; i <= b1; i++) {
+            sum += p[i];
+        }
+        cqt_template[k] = sum / double(b1 - b0 + 1);
+    }
+
+    return cqt_template;
 }
 
 // ─────────────────────────────────────
 std::vector<double> OScofo::GetSpectrumPower() {
     return m_Desc.NormSpectralPower;
+}
+
+// ─────────────────────────────────────
+double OScofo::GetSr() {
+    return m_Sr;
 }
 
 // ─────────────────────────────────────
@@ -276,7 +308,7 @@ double OScofo::GetHopSize() {
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
 bool OScofo::ParseScore(std::string ScorePath) {
-    m_Score = Score();
+    m_Score = Score(m_FFTSize, m_HopSize);
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
     if (m_Score.HasErrors()) {
@@ -315,11 +347,13 @@ Description OScofo::GetDescription() {
 // ─────────────────────────────────────
 Description OScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
     if (m_FFTSize != AudioBuffer.size()) {
-        SetError("AudioBuffer size differ from FFT Size");
+        SetError(std::format("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize));
+        return {};
     }
 
     SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
-    m_MIR.GetDescription(AudioBuffer, m_Desc);
+    States GoodStates = m_MDP.GetStatesForProcessing();
+    m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
     return m_Desc;
 }
 
@@ -329,12 +363,8 @@ bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
         return false;
     }
 
-    if (m_FFTSize != AudioBuffer.size()) {
-        SetError("AudioBuffer size differ from FFT Size");
-        return false;
-    }
-
-    m_MIR.GetDescription(AudioBuffer, m_Desc);
+    States GoodStates = m_MDP.GetStatesForProcessing();
+    m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
 
     if (m_MDP.HasErrors()) {
@@ -346,5 +376,36 @@ bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     }
     return true;
 }
+
+// bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
+//     // move accumation to here buffer
+//     size_t n = AudioBuffer.size();
+//     memcpy(m_InBuffer.data() + m_BlockIndex, AudioBuffer.data(), n * sizeof(double));
+//     m_BlockIndex += n;
+//
+//     if (m_BlockIndex > m_FFTSize) {
+//         SetError("The configuration of OScofo is wrong, please review");
+//         return false;
+//     }
+//
+//     if (m_FFTSize != m_BlockIndex) {
+//         return true;
+//     }
+//
+//     States GoodStates = m_MDP.GetStatesForProcessing();
+//     m_MIR.GetDescription(m_InBuffer, m_Desc, GoodStates);
+//     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
+//
+//     if (m_MDP.HasErrors()) {
+//         for (auto &error : m_MDP.GetErrorMessage()) {
+//             SetError(error);
+//         }
+//         m_MDP.ClearError();
+//         return false;
+//     }
+//
+//     m_BlockIndex = 0;
+//     return true;
+// }
 
 } // namespace OScofo
