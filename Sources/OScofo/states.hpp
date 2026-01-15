@@ -3,11 +3,20 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <span>
 
 namespace OScofo {
 
+enum AudioDescType {
+    PITCH,
+    SILENCE,
+    ONSET,
+    LABEL,
+};
+
 // ─────────────────────────────────────
 enum EventType {
+    BEGIN, // First state of score
     REST,  // Markov state
     NOTE,  // MacroState, Semimarkov with Markov inside
     CHORD, // MacroState,
@@ -33,8 +42,7 @@ using ActionVec = std::vector<Action>;
 // ─────────────────────────────────────
 class AudioState {
   public:
-    EventType Type;
-    HMMType Markov;
+    AudioDescType Type;
     double Freq;
     std::vector<double> Obs;
     std::vector<double> Forward;
@@ -56,11 +64,11 @@ class MacroState {
 
     // States Actions
     ActionVec Actions;
-    std::vector<AudioState> SubStates;
+    std::vector<AudioState> AudioStates;
 
     // Forward Algorithm
     double InitProb;
-    std::vector<double> Obs;
+    // std::vector<double> Obs;
     std::vector<double> Forward;
 
     // Time
@@ -71,9 +79,6 @@ class MacroState {
     double PdfStartTime;
     std::vector<double> Pdf;
     std::vector<double> Context;
-
-    // Audio Obs
-    std::vector<double> Freqs;
 
     // Time
     int UpperBound;
@@ -95,9 +100,7 @@ class MacroState {
 
     std::string __repr__() const {
         std::string oss;
-        oss = "<<State(Index=";
-        oss += std::to_string(Index);
-        oss += ", ScorePosition=";
+        oss = "<<State(ScorePosition=";
         oss += std::to_string(ScorePos);
         oss += ", BPMExpected=";
         oss += std::to_string(BPMExpected);
@@ -120,6 +123,7 @@ class Description {
     double MaxAmp;
     double Loudness;
 
+    double Harmonicity;
     double SpectralFlatness;
     double SpectralFlux;
     double StdDev;
@@ -127,6 +131,9 @@ class Description {
     std::vector<double> Power;
     std::vector<double> SpectralPower;
     std::vector<double> NormSpectralPower;
+
+    // HPSS (Harmonic–Percussive Source Separation)
+    std::vector<double> PseudoCQT;
     std::vector<double> MFCC;
 };
 
