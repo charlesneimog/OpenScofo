@@ -93,9 +93,9 @@ void MDP::SetScoreStates(States ScoreStates) {
     m_States = ScoreStates;
 
     for (MacroState &State : m_States) {
-        State.Obs.resize(m_BufferSize + 1, 0);
+        // State.Obs.resize(m_BufferSize + 1, 0);
         State.Forward.resize(m_BufferSize + 1, 0);
-        for (AudioState &MicroState : State.SubStates) {
+        for (AudioState &MicroState : State.AudioStates) {
             MicroState.Obs.resize(m_BufferSize + 1, 0);
             MicroState.Forward.resize(m_BufferSize + 1, 0);
         }
@@ -104,9 +104,9 @@ void MDP::SetScoreStates(States ScoreStates) {
     m_CurrentStateIndex = -1;
     m_Kappa = 1;
     m_BPM = m_States[0].BPMExpected;
-    m_PsiN = (double)60.0f / m_States[0].BPMExpected;
-    m_PsiN1 = (double)60.0f / m_States[0].BPMExpected;
-    m_LastPsiN = (double)60.0f / m_States[0].BPMExpected;
+    m_PsiN = 60.0f / m_States[0].BPMExpected;
+    m_PsiN1 = 60.0f / m_States[0].BPMExpected;
+    m_LastPsiN = 60.0f / m_States[0].BPMExpected;
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_CurrentStateIndex = -1;
     m_SyncStr = 0;
@@ -116,37 +116,141 @@ void MDP::SetScoreStates(States ScoreStates) {
 }
 
 // ─────────────────────────────────────
-void MDP::BuildPitchTemplate(double Freq) {
-    // Following Gong (2015), eq 5 and 6
-    const double sigmaSemitons = m_PitchTemplateSigma;
-    const double sigmaLog = sigmaSemitons / 12.0;
-    const double beta = 0.5;
+// void MDP::GetPitchTemplate(double Freq) {
+//     // Following Gong (2015), eq 5 and 6
+//     const double sigmaLog = m_PitchTemplateSigma / 12.0;
+//     const double beta = m_PitchTemplateAmplitudeDecay;
+//
+//     double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
+//     if (m_PitchTemplates.find(rootBinFreq) != m_PitchTemplates.end()) {
+//         return;
+//     }
+//
+//     m_PitchTemplates[rootBinFreq].resize(m_FFTSize / 2, 0.0);
+//     for (int k = 1; k <= m_Harmonics; k++) {
+//         double harmonicFreqHz = Freq * k;
+//         double sigmaHz = harmonicFreqHz * (std::pow(2.0, sigmaLog) - 1.0);
+//         double envelope = std::exp(-beta * (k - 1));
+//         for (size_t i = 0; i < m_FFTSize / 2; i++) {
+//             double binFreq = i * (m_Sr / m_FFTSize);
+//             double exponent = -0.5 * std::pow((binFreq - harmonicFreqHz) / sigmaHz, 2);
+//             double gaussian = (1.0 / (sigmaHz * std::sqrt(2 * M_PI))) * std::exp(exponent);
+//             m_PitchTemplates[rootBinFreq][i] += envelope * gaussian;
+//         }
+//     }
+//
+//     // Normalize template to sum to 1 (probability distribution)
+//     double sum = std::accumulate(m_PitchTemplates[rootBinFreq].begin(), m_PitchTemplates[rootBinFreq].end(), 0.0);
+//     if (sum > 0) {
+//         for (auto &val : m_PitchTemplates[rootBinFreq]) {
+//             val = (val + 1e-24) / (sum + 1e-24); // Avoid zero probabilities
+//         }
+//     }
+// }
 
-    double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
+// ─────────────────────────────────────
+void MDP::BuildPitchTemplate(double Freq) {
+    // 1. Setup Constants
+    // ------------------
+    const double m_MinHarmonicDecay = 0.2;
+    const double m_MaxHarmonicDecay = 1.8;
+    const double binWidth = m_Sr / m_FFTSize;
+
+    if (Freq > m_Sr / 2.0 || Freq <= 0)
+        return;
+
+    // 2. Determine Beta (Harmonic Decay)
+    // ------------------
+    double m_MinF0 = 32.70;
+    double m_MaxF0 = 4186.0;
+    double f0Norm = std::log2(Freq / m_MinF0) / std::log2(m_MaxF0 / m_MinF0);
+    f0Norm = std::clamp(f0Norm, 0.0, 1.0);
+
+    double pitchDecayCurve = m_PitchTemplateAmplitudeDecay;
+    double shaped = std::pow(1.0 - f0Norm, pitchDecayCurve);
+    double beta = m_MaxHarmonicDecay - shaped * (m_MaxHarmonicDecay - m_MinHarmonicDecay);
+
+    // 3. Template Initialization
+    // ------------------
+    double rootBinFreq = round(Freq / binWidth);
+
     if (m_PitchTemplates.find(rootBinFreq) != m_PitchTemplates.end()) {
         return;
     }
 
-    m_PitchTemplates[rootBinFreq].resize(m_FFTSize / 2, 0.0);
+    std::vector<double> templateBins(m_FFTSize / 2, 1e-24);
+
+    // 4. Build Harmonics
+    // ------------------
+    const double sigmaLog = m_PitchTemplateSigma / 12.0;
+    const double sigmaConst = std::pow(2.0, sigmaLog) - 1.0;
+
+    // Inharmonicity factor (B): typical for piano/strings is 0.0001
+    // If your library is purely electronic, set to 0.0
+    const double B = 0.0001;
+
     for (int k = 1; k <= m_Harmonics; ++k) {
-        double harmonicFreqHz = Freq * k;
-        double sigmaHz = harmonicFreqHz * (std::pow(2.0, sigmaLog) - 1.0);
+        // Apply inharmonicity stretch: f_k = k * f0 * sqrt(1 + B * k^2)
+        double stretch = std::sqrt(1.0 + B * k * k);
+        double harmonicFreqHz = Freq * k * stretch;
+
+        if (harmonicFreqHz >= m_Sr / 2.0)
+            break;
+
+        // A. Calculate Sigma
+        double sigmaHz = harmonicFreqHz * sigmaConst;
+
+        // Sigma Floor to prevent "picket fence" logic errors
+        if (sigmaHz < binWidth * 0.75) {
+            sigmaHz = binWidth * 0.75;
+        }
+
+        // B. Calculate Amplitude Envelope with Harmonic Boost
         double envelope = std::exp(-beta * (k - 1));
-        for (size_t i = 0; i < m_FFTSize / 2; ++i) {
-            double binFreq = i * (m_Sr / static_cast<double>(m_FFTSize));
-            double exponent = -0.5 * std::pow((binFreq - harmonicFreqHz) / sigmaHz, 2);
-            double gaussian = (1.0 / (sigmaHz * std::sqrt(2 * M_PI))) * std::exp(exponent);
-            m_PitchTemplates[rootBinFreq][i] += envelope * gaussian;
+
+        // INTERVENTION: Boost higher harmonics.
+        // Real-world instruments often have a "formant" or resonance
+        // that makes harmonics 2-6 stronger than the fundamental.
+        if (k > 1) {
+            envelope *= 1.25;
+        }
+
+        if (envelope < 1e-5)
+            break;
+
+        // C. Optimized Loop Bounds
+        double rangeHz = 4.0 * sigmaHz;
+        int minBin = static_cast<int>(std::floor((harmonicFreqHz - rangeHz) / binWidth));
+        int maxBin = static_cast<int>(std::ceil((harmonicFreqHz + rangeHz) / binWidth));
+
+        minBin = std::max(0, minBin);
+        maxBin = std::min(static_cast<int>(m_FFTSize / 2) - 1, maxBin);
+
+        double twoSigmaSq = 2.0 * sigmaHz * sigmaHz;
+        double normalizationFactor = 1.0 / (sigmaHz * std::sqrt(2.0 * M_PI));
+
+        for (int i = minBin; i <= maxBin; ++i) {
+            double binFreq = i * binWidth;
+            double diff = binFreq - harmonicFreqHz;
+            double exponent = -(diff * diff) / twoSigmaSq;
+            double gaussian = normalizationFactor * std::exp(exponent);
+
+            templateBins[i] += envelope * gaussian;
         }
     }
 
-    // Normalize template to sum to 1 (probability distribution)
-    double sum = std::accumulate(m_PitchTemplates[rootBinFreq].begin(), m_PitchTemplates[rootBinFreq].end(), 0.0);
-    if (sum > 0) {
-        for (auto &val : m_PitchTemplates[rootBinFreq]) {
-            val = (val + 1e-12) / (sum + 1e-12); // Avoid zero probabilities
+    // 5. Normalization
+    // ------------------
+    double sum = std::accumulate(templateBins.begin(), templateBins.end(), 0.0);
+
+    if (sum > 1e-12) {
+        double invSum = 1.0 / sum;
+        for (auto &val : templateBins) {
+            val *= invSum;
         }
     }
+
+    m_PitchTemplates[rootBinFreq] = std::move(templateBins);
 }
 
 // ─────────────────────────────────────
@@ -156,8 +260,8 @@ void MDP::UpdateAudioTemplate() {
 
     for (int h = 0; h < StateSize; h++) {
         if (m_States[h].Type == NOTE || m_States[h].Type == TRILL) {
-            for (AudioState &SubState : m_States[h].SubStates) {
-                if (SubState.Type == NOTE) {
+            for (AudioState &SubState : m_States[h].AudioStates) {
+                if (SubState.Type == PITCH) {
                     BuildPitchTemplate(SubState.Freq);
                 }
             }
@@ -166,12 +270,10 @@ void MDP::UpdateAudioTemplate() {
 }
 
 // ─────────────────────────────────────
-std::unordered_map<double, PitchTemplateArray> MDP::GetPitchTemplate() {
-    if (m_PitchTemplates.size() == 0) {
-        SetError("PitchTemplates is empty, please report this issue");
-        return m_PitchTemplates;
-    }
-    return m_PitchTemplates;
+PitchTemplateArray MDP::GetPitchTemplate(double Freq) {
+    BuildPitchTemplate(Freq);
+    double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
+    return m_PitchTemplates[rootBinFreq];
 }
 
 // ─────────────────────────────────────
@@ -220,6 +322,11 @@ void MDP::SetMinEntropy(double EntropyValue) {
 }
 
 // ─────────────────────────────────────
+void MDP::SetAmplitudeDecay(double decay) {
+    m_PitchTemplateAmplitudeDecay = decay;
+}
+
+// ─────────────────────────────────────
 int MDP::GetTunning() {
     return m_Tunning;
 }
@@ -234,10 +341,12 @@ void MDP::SetCurrentEvent(int Event) {
 int MDP::GetStatesSize() {
     return m_States.size();
 }
+
 // ─────────────────────────────────────
 void MDP::AddState(MacroState State) {
     m_States.push_back(State);
 }
+
 // ─────────────────────────────────────
 MacroState MDP::GetState(int Index) {
     return m_States[Index];
@@ -269,8 +378,9 @@ double MDP::InverseA2(double SyncStrength) {
 
     // In my tests I never reached more than 100 iterations.
     int i;
-    for (i = 0; i < 1000; ++i) {
+    for (i = 0; i < 1000; i++) {
         Mid = (Low + High) / 2.0;
+        // TODO: Some way to avoid to use boost?
         double I1 = boost::math::cyl_bessel_i(1, Mid);
         double I0 = boost::math::cyl_bessel_i(0, Mid);
         double A2Mid = I1 / I0;
@@ -308,13 +418,30 @@ double MDP::ModPhases(double Phase) {
 }
 
 // ─────────────────────────────────────
+States MDP::GetStatesForProcessing() {
+    if (m_CurrentStateIndex < 0)
+        m_CurrentStateIndex = 0;
+
+    double EventOnset = m_States[m_CurrentStateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
+    size_t begin = m_CurrentStateIndex + 1;
+    size_t end = begin;
+
+    for (; end < m_States.size(); ++end) {
+        if (EventOnset > m_SecondsAhead)
+            break;
+
+        EventOnset += m_States[end].Duration;
+    }
+
+    return States(m_States.begin() + begin, m_States.begin() + end);
+}
+
+// ─────────────────────────────────────
 int MDP::GetMaxJIndex(int StateIndex) {
     if (StateIndex == -1) {
         return 1;
     }
-
-    double TimeInCurrEvt = m_States[StateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
-    double EventOnset = TimeInCurrEvt;
+    double EventOnset = m_States[StateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
     int MaxJ = StateIndex + 1;
     for (size_t i = StateIndex + 1; i < m_States.size(); i++) {
         if (EventOnset > m_SecondsAhead) {
@@ -433,30 +560,49 @@ void MDP::GetAudioObservations(int FirstStateIndex, int LastStateIndex, int T) {
         MacroState &StateJ = m_States[j];
         int BufferIndex = (T % m_BufferSize);
         if (StateJ.Type == NOTE) {
-            double KL = 0;
-            for (AudioState &AudioState : StateJ.SubStates) {
-                if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
-                    AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
-                    continue;
-                }
-                if (AudioState.Type == NOTE) {
-                    KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
+            for (AudioState &AudioState : StateJ.AudioStates) {
+                switch (AudioState.Type) {
+                case PITCH: {
+                    if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
+                        AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
+                        continue;
+                    }
+                    double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
                     PitchObs[AudioState.Freq] = KL;
                     AudioState.Obs[BufferIndex] = KL;
+                    break;
+                }
+                case SILENCE: {
+                    AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
+                    break;
+                }
+                default:
+                    SetError("Not implemented yet!");
                 }
             }
-
         } else if (StateJ.Type == REST) {
-            StateJ.SubStates[0].Obs[BufferIndex] = m_Desc.SilenceProb;
-            StateJ.SubStates[1].Obs[BufferIndex] = m_Desc.SilenceProb;
+            for (AudioState &AudioState : StateJ.AudioStates) {
+                AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
+            }
         } else if (StateJ.Type == TRILL) {
-            for (AudioState &AudioState : StateJ.SubStates) {
-                if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
-                    AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
-                    continue;
+            for (AudioState &AudioState : StateJ.AudioStates) {
+                switch (AudioState.Type) {
+                case PITCH: {
+                    if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
+                        AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
+                        continue;
+                    }
+                    double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
+                    AudioState.Obs[BufferIndex] = KL;
+                    break;
                 }
-                double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
-                AudioState.Obs[BufferIndex] = KL;
+                case SILENCE: {
+                    AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
+                    break;
+                }
+                default:
+                    SetError("Not implemented yet!");
+                }
             }
         }
     }
@@ -544,60 +690,6 @@ int MDP::GetMaxUForJ(MacroState &StateJ) {
 }
 
 // ─────────────────────────────────────
-double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
-    if (T == 0) {
-        int SubStateIndex = StateJ.SubStateIndex;
-        return StateJ.SubStates[SubStateIndex].Obs[bufferIndex] * GetOccupancyDistribution(StateJ, T + 1) * StateJ.InitProb;
-    } else {
-        int SubStateIndex = StateJ.SubStateIndex;
-        double Obs = StateJ.SubStates[SubStateIndex].Obs[bufferIndex];
-        double MaxAlpha = -std::numeric_limits<double>::infinity();
-
-        for (int u = 1; u <= std::min(T, GetMaxUForJ(StateJ)); u++) {
-            double ProbPrevObs = 1.0;
-            for (int v = 1; v < u; v++) {
-                int PrevIndex = (bufferIndex - v + m_BufferSize) % m_BufferSize;
-                ProbPrevObs *= StateJ.SubStates[SubStateIndex].Obs[PrevIndex];
-            }
-            double Sur = GetOccupancyDistribution(StateJ, u);
-
-            // Audio States
-            double MaxTrans = -std::numeric_limits<double>::infinity();
-            for (int i = CurrentState; i <= j; i++) {
-                if (i < 0) {
-                    continue;
-                }
-                MacroState &StateI = m_States[i];
-                int PrevIndex = (T - u) % m_BufferSize;
-                if (i != j) {
-                    MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
-                } else {
-                    MaxTrans = std::max(MaxTrans, StateI.Forward[PrevIndex]);
-                }
-            }
-
-            double MaxResult = ProbPrevObs * Sur * MaxTrans;
-            MaxAlpha = std::max(MaxAlpha, MaxResult);
-        }
-        return Obs * MaxAlpha;
-    }
-}
-
-// ─────────────────────────────────────
-double MDP::Markov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
-    double Obs = StateJ.Obs[bufferIndex];
-    double MaxAlpha = -std::numeric_limits<double>::infinity();
-    for (int i = CurrentState; i <= j; i++) {
-        if (i >= 0) {
-            int prevIndex = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
-            double Value = GetTransProbability(i, j) * m_States[i].Forward[prevIndex];
-            MaxAlpha = std::max(MaxAlpha, Value);
-        }
-    }
-    return Obs * MaxAlpha;
-}
-
-// ─────────────────────────────────────
 double CalculateEntropy(const std::vector<double> &probs) {
     double entropy = 0.0;
     for (double prob : probs) {
@@ -609,23 +701,65 @@ double CalculateEntropy(const std::vector<double> &probs) {
 }
 
 // ─────────────────────────────────────
+double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
+    if (T == 0) {
+        double Obs = 0;
+        for (AudioState &AudioState : StateJ.AudioStates) {
+            Obs = std::max(Obs, AudioState.Obs[bufferIndex]);
+        }
+        return Obs * GetOccupancyDistribution(StateJ, T + 1) * StateJ.InitProb;
+    } else {
+        auto bestIt = std::max_element(StateJ.AudioStates.begin(), StateJ.AudioStates.end(),
+                                       [bufferIndex](const AudioState &a, const AudioState &b) { return a.Obs[bufferIndex] < b.Obs[bufferIndex]; });
+        AudioState BestAudioDescription = *bestIt;
+        double Obs = bestIt->Obs[bufferIndex];
+        double MaxAlpha = 0;
+        for (int u = 1; u <= std::min(T, GetMaxUForJ(StateJ)); u++) {
+            double ProbPrevObs = 1.0;
+            for (int v = 1; v < u; v++) {
+                int PrevIndex = (bufferIndex - v + m_BufferSize) % m_BufferSize;
+                ProbPrevObs *= BestAudioDescription.Obs[PrevIndex];
+            }
+            double Sur = GetOccupancyDistribution(StateJ, u);
+            double MaxTrans = 0;
+            for (int i = CurrentState; i <= j; i++) {
+                if (i < 0) {
+                    continue;
+                }
+                MacroState &StateI = m_States[i];
+                int PrevIndex = (T - u) % m_BufferSize;
+                if (i != j) {
+                    MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
+                } else {
+                    MaxTrans = std::max(MaxTrans, StateJ.Forward[PrevIndex]);
+                }
+            }
+
+            double MaxResult = ProbPrevObs * Sur * MaxTrans;
+            MaxAlpha = std::max(MaxAlpha, MaxResult);
+        }
+        return Obs * MaxAlpha;
+    }
+}
+
+// ─────────────────────────────────────
 int MDP::Inference(int CurrentState, int MaxState, int T) {
-    double MaxValue = -std::numeric_limits<double>::infinity();
+    double MaxValue = 0;
     int BestState = CurrentState;
     int bufferIndex = T % m_BufferSize;
 
     for (int j = CurrentState; j <= MaxState; j++) {
-        if ((j < 0) || ((size_t)j >= m_States.size())) {
+        if ((j < 0) || (j >= (int)m_States.size() - 1)) {
             continue;
         }
         MacroState &StateJ = m_States[j];
         StateJ.Forward[bufferIndex] = SemiMarkov(StateJ, CurrentState, j, T, bufferIndex);
     }
 
-    // Sum
+    // Sum To Normalize
     double SumForward = 0;
     for (int j = CurrentState; j <= MaxState; j++) {
-        if ((j < 0) || ((size_t)j >= m_States.size()))
+        if ((j < 0) || (j >= (int)m_States.size() - 1))
             continue;
         SumForward += m_States[j].Forward[bufferIndex];
     }
@@ -647,20 +781,6 @@ int MDP::Inference(int CurrentState, int MaxState, int T) {
         }
         Probs.push_back(StateJ.Forward[bufferIndex]);
     }
-
-    // TODO: Implement Cuvillier (2016)
-    // double Entropy = CalculateEntropy(Probs);
-    // double maxEntropy = log(Probs.size());
-    // double Conf = 1.0 - (Entropy / maxEntropy);
-    // // printf("config: %d, %f, %f\n", BestState, entropy, confidence);
-    //
-    // if (m_MinEntropy > 0) {
-    //     if (Conf > m_MinEntropy) {
-    //         return BestState;
-    //     } else {
-    //         return CurrentState;
-    //     }
-    // }
 
     return BestState;
 }
