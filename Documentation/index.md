@@ -15,10 +15,8 @@ hide:
 
 ---
 
-<h4 align="center"> Welcome to the <code>OScofo</code> documentation! </h4>
-
 <p align="center" markdown>
-  ![Image title](./assets/oscofo.svg){ width="15%" }
+  ![Image title](./assets/logo.svg){ width="25%" }
 </p>
 
 ---
