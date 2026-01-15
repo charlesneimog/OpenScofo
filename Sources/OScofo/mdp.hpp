@@ -22,39 +22,42 @@ class MDP {
 
     // Init Functions
     void SetScoreStates(States States);
-    void SetMinEntropy(double EntropyValue);
 
     void UpdateAudioTemplate();
     void UpdatePhaseValues();
 
-    // Config Functions
+    // Set
     void SetPitchTemplateSigma(double f);
     void SetHarmonics(int i);
     void SetBPM(double Bpm);
+    void SetMinEntropy(double EntropyValue);
+    void SetAmplitudeDecay(double decay);
+    void SetTunning(double Tunning);
+    void SetCurrentEvent(int Event);
+    void SetdBTreshold(double dB);
+
+    // Get
     double GetLiveBPM();
     void ResetLiveBpm();
-    void SetdBTreshold(double dB);
 
     // Get Functions
     int GetTunning();
     ActionVec GetEventActions(int Index);
-
     std::vector<MacroState> GetStates();
     MacroState GetState(int Index);
     double GetKappa();
     void AddState(MacroState state);
-    void ClearStates();
 
     int GetStatesSize();
     int GetEvent(Description &Desc);
     double GetPitchSimilarity(double Freq);
+    States GetStatesForProcessing();
 
     // Python For Research
-    std::unordered_map<double, PitchTemplateArray> GetPitchTemplate();
+    PitchTemplateArray GetPitchTemplate(double Freq);
 
     // Set Variables
-    void SetTunning(double Tunning);
-    void SetCurrentEvent(int Event);
+    void ClearStates();
 
     // Errors
     bool HasErrors();
@@ -70,13 +73,17 @@ class MDP {
     double m_Sr;
     double m_FFTSize;
     double m_HopSize;
-    double m_Harmonics = 5;
     double m_dBTreshold = -55;
     int m_BufferSize = 1000;
 
+    // Pitch Template
+    double m_Harmonics = 8;
+    double m_PitchTemplateSigma = 0.387;
+    double m_PitchTemplateAmplitudeDecay = 0.87270;
+
     // Events
     double m_Tunning = 440;
-    int m_CurrentStateIndex = -1;
+    int m_CurrentStateIndex = 0;
 
     // Time
     double m_SyncStrength = 0.5;
@@ -115,13 +122,14 @@ class MDP {
 
     // Pitch
     std::vector<MacroState> m_States;
-    double m_PitchTemplateSigma = 0.5;
-    double m_PitchScalingFactor = 0.5; // TODO: How should I call this?
+    double m_PitchScalingFactor = 0.5;
+
     std::unordered_map<double, PitchTemplateArray> m_PitchTemplates;
+    std::unordered_map<double, PitchTemplateArray> m_PitchCQTTemplates;
+    void BuildPitchTemplate(double Freq);
 
     // Audio Observations
     void GetAudioObservations(int FirstStateIndex, int LastStateIndex, int T);
-    void BuildPitchTemplate(double Freq);
     Description m_Desc;
 
     // Markov
