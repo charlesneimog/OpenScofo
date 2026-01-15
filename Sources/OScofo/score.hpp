@@ -21,6 +21,11 @@ namespace fs = std::filesystem;
 
 class Score {
   public:
+    Score(float FftSize, float HopSize) {
+        m_FFTSize = FftSize;
+        m_HopSize = HopSize;
+    }
+
     States Parse(std::string ScoreFile);
     void SetTunning(double Tunning);
     bool ScoreIsLoaded();
@@ -99,8 +104,8 @@ class Score {
     double m_PitchTemplateSigma = 0.5;
     double m_SyncStrength = 0.5;
     double m_PhaseCoupling = 0.5;
-    double m_FFTSize = 4096;
-    double m_HopSize = 1024;
+    double m_FFTSize;
+    double m_HopSize;
 
     // Paths
     fs::path m_ScoreRootPath;
