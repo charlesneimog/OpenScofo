@@ -600,6 +600,8 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
         Desc.Power.resize(NHalf);
         Desc.SpectralPower.resize(NHalf);
         Desc.NormSpectralPower.resize(NHalf);
+        Desc.NormSpectralPower.resize(NHalf);
+        Desc.ReverbSpectralPower.resize(NHalf);
         m_PreviousSpectralPower.resize(NHalf);
     }
 
@@ -852,6 +854,13 @@ void MIR::SpectralHarmonicityExec(Description &Desc) {
 
     constexpr double eps = 1e-12;
     Desc.Harmonicity = peak / (sum + eps);
+}
+
+// ─────────────────────────────────────
+void MIR::AddReverb(Description &Desc, double decay) {
+    for (size_t i = 0; i < Desc.NormSpectralPower.size(); i++) {
+        Desc.ReverbSpectralPower[i] = 0; //(Desc.ReverbSpectralPower[i] * decay) * (Desc.NormSpectralPower[i] * decay);
+    }
 }
 
 // ╭─────────────────────────────────────╮

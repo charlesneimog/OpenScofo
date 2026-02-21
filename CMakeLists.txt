@@ -7,11 +7,11 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
 
-option(BUILD_PY_MODULE "Build Python Module" ON)
+option(BUILD_PY_MODULE "Build Python Module" OFF)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
 option(BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(BUILD_ALL "Build Python Module and PureData Object" ON)
-option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
+option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" OFF)
 option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
 
 # check if it is EMSCRIPTEN

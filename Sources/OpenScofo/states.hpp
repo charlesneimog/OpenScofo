@@ -131,6 +131,7 @@ class Description {
     std::vector<double> Power;
     std::vector<double> SpectralPower;
     std::vector<double> NormSpectralPower;
+    std::vector<double> ReverbSpectralPower;
 
     // HPSS (Harmonic–Percussive Source Separation)
     std::vector<double> PseudoCQT;

@@ -549,7 +549,7 @@ double MDP::GetPitchSimilarity(double Freq) {
     }
 
     for (size_t i = 0; i < m_FFTSize / 2; i++) {
-        double P = PitchTemplate[i];
+        double P = PitchTemplate[i] + m_Desc.ReverbSpectralPower[i];
         double Q = m_Desc.NormSpectralPower[i];
         if (P > 0 && Q > 0) {
             KLDiv += P * log(P / Q);
