@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("/home/neimog/Documents/Git/OScofo/Resources/Research/TimeCoherence/bwv-1013.csv")
+df = pd.read_csv("/home/neimog/Documents/Git/OpenScofo/Resources/Research/TimeCoherence/bwv-1013.csv")
 
 plt.figure(figsize=(10, 4))
 plt.plot(df["time"], df["probability"])

@@ -32,7 +32,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/max-sdk-base/script/max-pretarget.cmake)
 set("${PROJECT_NAME}_EXTERN_OUTPUT_NAME" "o.scofo~")
 
 add_library(${PROJECT_NAME} MODULE "o.scofo~.cpp;maxlua.cpp")
-target_link_libraries(${PROJECT_NAME} PRIVATE OScofo)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenScofo)
 target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_INCLUDES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_MSP_INCLUDES})
 

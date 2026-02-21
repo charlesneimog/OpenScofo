@@ -4,7 +4,7 @@
 #X declare -lib neimog;
 #X declare -lib xlab;
 #X obj 10 290 s event;
-#X text 229 175 Check charlesneimog.github.io/OScofo to Documentation about the Score Languague., f 44;
+#X text 229 175 Check charlesneimog.github.io/OpenScofo to Documentation about the Score Languague., f 44;
 #X text 135 245 BPM;
 #X text 14 265 Event Index;
 #X floatatom 83 245 8 0 0 0 - - - 0;
@@ -13,7 +13,7 @@
 #X text 224 126 1);
 #X floatatom 10 245 8 0 0 0 - - - 0;
 #X msg 108 190 start;
-#X msg 233 211 browse https://charlesneimog.github.io/OScofo/score/intro/, f 33;
+#X msg 233 211 browse https://charlesneimog.github.io/OpenScofo/score/intro/, f 33;
 #X obj 233 260 pdcontrol;
 #X text 107 96 <= Require ELSE library;
 #X msg 72 126 score tests/bwv-1013.txt;

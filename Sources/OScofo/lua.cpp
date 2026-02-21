@@ -1,43 +1,43 @@
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 #include <sol/sol.hpp>
 
 #if defined(OSCOFO_LUA)
 
-namespace OScofo {
+namespace OpenScofo {
 
 int luaopen_oscofo(lua_State *L) {
     sol::state_view lua(L);
     sol::table m = lua.create_table();
-    sol::usertype<OScofo> oscofo_type = lua.new_usertype<OScofo>("OScofo", sol::constructors<OScofo(float, float, float)>());
+    sol::usertype<OpenScofo> oscofo_type = lua.new_usertype<OpenScofo>("OpenScofo", sol::constructors<OpenScofo(float, float, float)>());
 
     // Error callback example
     oscofo_type.set(sol::call_constructor, [](float sr, float fft_size, float hop) {
-        auto obj = new OScofo(sr, fft_size, hop);
+        auto obj = new OpenScofo(sr, fft_size, hop);
         obj->SetErrorCallBack([](const std::string &msg) { throw std::runtime_error(msg); });
         return obj;
     });
 
     // Methods (same as pybind11)
-    oscofo_type["set_db_threshold"] = &OScofo::SetdBTreshold;
-    oscofo_type["set_tuning"] = &OScofo::SetTunning;
-    oscofo_type["set_current_event"] = &OScofo::SetCurrentEvent;
-    oscofo_type["set_amplitude_decay"] = &OScofo::SetAmplitudeDecay;
-    oscofo_type["set_harmonics"] = &OScofo::SetHarmonics;
-    oscofo_type["set_pitch_template_sigma"] = &OScofo::SetPitchTemplateSigma;
-    oscofo_type["get_live_bpm"] = &OScofo::GetLiveBPM;
-    oscofo_type["get_event_index"] = &OScofo::GetEventIndex;
-    oscofo_type["get_error"] = &OScofo::GetErrorMessage;
-    oscofo_type["get_states"] = &OScofo::GetStates;
-    oscofo_type["get_pitch_template"] = &OScofo::GetPitchTemplate;
-    oscofo_type["get_cqt_template"] = &OScofo::GetCQTTemplate;
-    oscofo_type["get_audio_description"] = &OScofo::GetAudioDescription;
+    oscofo_type["set_db_threshold"] = &OpenScofo::SetdBTreshold;
+    oscofo_type["set_tuning"] = &OpenScofo::SetTunning;
+    oscofo_type["set_current_event"] = &OpenScofo::SetCurrentEvent;
+    oscofo_type["set_amplitude_decay"] = &OpenScofo::SetAmplitudeDecay;
+    oscofo_type["set_harmonics"] = &OpenScofo::SetHarmonics;
+    oscofo_type["set_pitch_template_sigma"] = &OpenScofo::SetPitchTemplateSigma;
+    oscofo_type["get_live_bpm"] = &OpenScofo::GetLiveBPM;
+    oscofo_type["get_event_index"] = &OpenScofo::GetEventIndex;
+    oscofo_type["get_error"] = &OpenScofo::GetErrorMessage;
+    oscofo_type["get_states"] = &OpenScofo::GetStates;
+    oscofo_type["get_pitch_template"] = &OpenScofo::GetPitchTemplate;
+    oscofo_type["get_cqt_template"] = &OpenScofo::GetCQTTemplate;
+    oscofo_type["get_audio_description"] = &OpenScofo::GetAudioDescription;
     oscofo_type["get_time_coherence_template"] = sol::overload(
-        [](OScofo &self, int pos) { return self.GetTimeCoherenceTemplate(pos, 0); },
-        [](OScofo &self, int pos, int time_in_event) { return self.GetTimeCoherenceTemplate(pos, time_in_event); }
+        [](OpenScofo &self, int pos) { return self.GetTimeCoherenceTemplate(pos, 0); },
+        [](OpenScofo &self, int pos, int time_in_event) { return self.GetTimeCoherenceTemplate(pos, time_in_event); }
     );
-    oscofo_type["get_time_coherence_confiability"] = &OScofo::GetTimeCoherenceConfiability;
+    oscofo_type["get_time_coherence_confiability"] = &OpenScofo::GetTimeCoherenceConfiability;
 
-    m["OScofo"] = oscofo_type;
+    m["OpenScofo"] = oscofo_type;
 
     // ─── Description class ───
     sol::usertype<Description> desc_type = lua.new_usertype<Description>("Description", sol::constructors<Description()>());
@@ -86,6 +86,6 @@ int luaopen_oscofo(lua_State *L) {
     return 1;
 }
 
-} // namespace OScofo
+} // namespace OpenScofo
 
 #endif

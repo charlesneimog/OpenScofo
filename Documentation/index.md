@@ -21,7 +21,7 @@ hide:
 
 ---
 
-`OScofo` is a OpenSource Score Follower designed with focus on contemporary music. It is based on the research of Arshia Cont and `Antescofo` team at Ircam. I am developing `OScofo` because of the possibility to run PureData Patches inside browsers using [pd4web](https://charlesneimog.github.io/pd4web/).
+`OpenScofo` is a OpenSource Score Follower designed with focus on contemporary music. It is based on the research of Arshia Cont and `Antescofo` team at Ircam. I am developing `OpenScofo` because of the possibility to run PureData Patches inside browsers using [pd4web](https://charlesneimog.github.io/pd4web/).
 
 With `pd4web`, I believe that will be possible decrease the complexity of the setups for live-eletronics music and allows more performers to, at least, taste live-eletronics pieces.
 

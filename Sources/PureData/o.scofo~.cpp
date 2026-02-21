@@ -1,9 +1,9 @@
 #include <filesystem>
 
 #include <m_pd.h>
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 
-static t_class *OScofoObj;
+static t_class *OpenScofoObj;
 
 #ifdef OSCOFO_LUA
 int luaopen_pd(lua_State *L);
@@ -20,7 +20,7 @@ struct Action {
 };
 
 // ─────────────────────────────────────
-class PdOScofo {
+class PdOpenScofo {
   public:
     t_object PdObject;
     t_sample Sample;
@@ -48,8 +48,8 @@ class PdOScofo {
     std::vector<MIR> RequestMIR;
     bool MirOutput = false;
 
-    // OScofo
-    OScofo::OScofo *OpenScofo;
+    // OpenScofo
+    OpenScofo::OpenScofo *OpenScofo;
     int Event;
     float Tempo;
     bool Following;
@@ -69,7 +69,7 @@ class PdOScofo {
 };
 
 // ─────────────────────────────────────
-static void oscofo_score(PdOScofo *x, t_symbol *s) {
+static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     // check if file exists
     if (!s) {
         pd_error(x, "[o.scofo~] No score file provided");
@@ -120,7 +120,7 @@ static void oscofo_score(PdOScofo *x, t_symbol *s) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_start(PdOScofo *x) {
+static void oscofo_start(PdOpenScofo *x) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
         pd_error(nullptr, "[o.scofo~] Score not loaded");
         return;
@@ -138,7 +138,7 @@ static void oscofo_start(PdOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_set(PdOScofo *x, t_symbol *s, int argc, t_atom *argv) {
+static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     if (argv[0].a_type != A_SYMBOL) {
         pd_error(x, "[o.scofo~] First argument of set method must be a symbol");
         return;
@@ -157,7 +157,7 @@ static void oscofo_set(PdOScofo *x, t_symbol *s, int argc, t_atom *argv) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_following(PdOScofo *x, t_float f) {
+static void oscofo_following(PdOpenScofo *x, t_float f) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
         pd_error(x, "[o.scofo~] Score not loaded");
         return;
@@ -169,7 +169,7 @@ static void oscofo_following(PdOScofo *x, t_float f) {
     }
 }
 // ─────────────────────────────────────
-static void oscofo_luaexecute(PdOScofo *x, std::string code) {
+static void oscofo_luaexecute(PdOpenScofo *x, std::string code) {
 #if OSCOFO_LUA
     if (!x->OpenScofo->LuaExecute(code)) {
         std::string error = x->OpenScofo->LuaGetError();
@@ -180,7 +180,7 @@ static void oscofo_luaexecute(PdOScofo *x, std::string code) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_pdsend(PdOScofo *x, std::string r, int argc, t_atom *argv) {
+static void oscofo_pdsend(PdOpenScofo *x, std::string r, int argc, t_atom *argv) {
     t_pd *receiver = gensym(r.c_str())->s_thing;
     if (!receiver) {
         pd_error(x, "[o.scofo~] Receiver %s not found", r.c_str());
@@ -195,7 +195,7 @@ static void oscofo_pdsend(PdOScofo *x, std::string r, int argc, t_atom *argv) {
 }
 
 // ─────────────────────────────────────
-static t_atom *oscofo_convertargs(PdOScofo *x, OScofo::Action &action) {
+static t_atom *oscofo_convertargs(PdOpenScofo *x, OpenScofo::Action &action) {
     int size = action.Args.size();
     t_atom *PdArgs = new t_atom[size];
 
@@ -213,7 +213,7 @@ static t_atom *oscofo_convertargs(PdOScofo *x, OScofo::Action &action) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_tickactions(PdOScofo *x) {
+static void oscofo_tickactions(PdOpenScofo *x) {
     const double CurrentTime = clock_getlogicaltime();
     const double nextBlock = 1000.0 / x->Sr * x->BlockSize;
     const double NextTime = clock_getsystimeafter(nextBlock);
@@ -236,40 +236,40 @@ static void oscofo_tickactions(PdOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_tickinfo(PdOScofo *x) {
+static void oscofo_tickinfo(PdOpenScofo *x) {
     if (x->MirOutput) {
-        OScofo::Description Desc = x->OpenScofo->GetDescription();
-        for (PdOScofo::MIR v : x->RequestMIR) {
-            if (v == PdOScofo::MIR::MFCC) {
+        OpenScofo::Description Desc = x->OpenScofo->GetDescription();
+        for (PdOpenScofo::MIR v : x->RequestMIR) {
+            if (v == PdOpenScofo::MIR::MFCC) {
                 size_t mfccSize = Desc.MFCC.size();
                 std::vector<t_atom> mfccAtoms(mfccSize);
                 for (size_t i = 0; i < mfccSize; ++i) {
                     SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
                 }
                 outlet_anything(x->DescOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
-            } else if (v == PdOScofo::MIR::CQT) {
+            } else if (v == PdOpenScofo::MIR::CQT) {
                 size_t mfccSize = Desc.PseudoCQT.size();
                 std::vector<t_atom> Atoms(mfccSize);
                 for (size_t i = 0; i < mfccSize; ++i) {
                     SETFLOAT(&Atoms[i], (t_float)Desc.PseudoCQT[i]);
                 }
                 outlet_anything(x->DescOut, gensym("cqt"), mfccSize, Atoms.data());
-            } else if (v == PdOScofo::MIR::POWER) {
+            } else if (v == PdOpenScofo::MIR::POWER) {
                 size_t mfccSize = Desc.Power.size();
                 std::vector<t_atom> mfccAtoms(mfccSize);
                 for (size_t i = 0; i < mfccSize; ++i) {
                     SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
                 }
                 outlet_anything(x->DescOut, gensym("power"), mfccSize, mfccAtoms.data());
-            } else if (v == PdOScofo::MIR::LOUDNESS) {
+            } else if (v == PdOpenScofo::MIR::LOUDNESS) {
                 std::vector<t_atom> mfccAtoms(1);
                 SETFLOAT(&mfccAtoms[0], (t_float)Desc.Loudness);
                 outlet_anything(x->DescOut, gensym("loudness"), 1, mfccAtoms.data());
-            } else if (v == PdOScofo::MIR::RMS) {
+            } else if (v == PdOpenScofo::MIR::RMS) {
                 std::vector<t_atom> mfccAtoms(1);
                 SETFLOAT(&mfccAtoms[0], (t_float)Desc.RMS);
                 outlet_anything(x->DescOut, gensym("rms"), 1, mfccAtoms.data());
-            } else if (v == PdOScofo::MIR::SILENCE) {
+            } else if (v == PdOpenScofo::MIR::SILENCE) {
                 std::vector<t_atom> mfccAtoms(1);
                 SETFLOAT(&mfccAtoms[0], (t_float)Desc.SilenceProb);
                 outlet_anything(x->DescOut, gensym("silence"), 1, mfccAtoms.data());
@@ -279,7 +279,7 @@ static void oscofo_tickinfo(PdOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_ticknewevent(PdOScofo *x) {
+static void oscofo_ticknewevent(PdOpenScofo *x) {
     int PrevEvent = x->Event;
     x->Event = x->OpenScofo->GetEventIndex();
     if (PrevEvent == x->Event || x->Event == 0) {
@@ -288,9 +288,9 @@ static void oscofo_ticknewevent(PdOScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
-    OScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
+    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
 
-    for (OScofo::Action &Act : Actions) {
+    for (OpenScofo::Action &Act : Actions) {
         double time = Act.Time;
         if (!Act.AbsoluteTime) {
             Act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * Act.Time * 1000;
@@ -318,7 +318,7 @@ static void oscofo_ticknewevent(PdOScofo *x) {
 
 // ─────────────────────────────────────
 static t_int *oscofo_perform(t_int *w) {
-    PdOScofo *x = (PdOScofo *)(w[1]);
+    PdOpenScofo *x = (PdOpenScofo *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
     int n = static_cast<int>(w[3]);
 
@@ -353,7 +353,7 @@ static t_int *oscofo_perform(t_int *w) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_adddsp(PdOScofo *x, t_signal **sp) {
+static void oscofo_adddsp(PdOpenScofo *x, t_signal **sp) {
     x->BlockSize = sp[0]->s_n;
     x->BlockIndex = 0;
     x->inBuffer.resize((size_t)x->FFTSize, (double)0.0f);
@@ -361,7 +361,7 @@ static void oscofo_adddsp(PdOScofo *x, t_signal **sp) {
 }
 
 // ─────────────────────────────────────
-// static void oscofo_processargv(PdOScofo *x, int argc, t_atom *argv) {
+// static void oscofo_processargv(PdOpenScofo *x, int argc, t_atom *argv) {
 //     for (int i = 0; i < argc; i++) {
 //         if (argv[i].a_type == A_SYMBOL) {
 //             std::string arg = atom_getsymbol(argv + i)->s_name;
@@ -379,7 +379,7 @@ static void oscofo_adddsp(PdOScofo *x, t_signal **sp) {
 
 // ─────────────────────────────────────
 static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
-    PdOScofo *x = (PdOScofo *)pd_new(OScofoObj);
+    PdOpenScofo *x = (PdOpenScofo *)pd_new(OpenScofoObj);
     if (!x) {
         pd_error(x, "[o.scofo~] Error creating object");
         return nullptr;
@@ -403,19 +403,19 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
             t_symbol *sym = atom_getsymbol(argv);
             if (strcmp(sym->s_name, "mfcc") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOScofo::MIR::MFCC);
+                x->RequestMIR.push_back(PdOpenScofo::MIR::MFCC);
             } else if (strcmp(sym->s_name, "rms") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOScofo::MIR::RMS);
+                x->RequestMIR.push_back(PdOpenScofo::MIR::RMS);
             } else if (strcmp(sym->s_name, "loudness") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOScofo::MIR::LOUDNESS);
+                x->RequestMIR.push_back(PdOpenScofo::MIR::LOUDNESS);
             } else if (strcmp(sym->s_name, "silence") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOScofo::MIR::SILENCE);
+                x->RequestMIR.push_back(PdOpenScofo::MIR::SILENCE);
             } else if (strcmp(sym->s_name, "cqt") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOScofo::MIR::CQT);
+                x->RequestMIR.push_back(PdOpenScofo::MIR::CQT);
             }
         }
         argc--, argv++;
@@ -435,8 +435,8 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->Canvas = canvas_getcurrent();
     x->PatchDir = canvas_getdir(x->Canvas)->s_name;
 
-    // OScofo Library
-    x->OpenScofo = new OScofo::OScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
+    // OpenScofo Library
+    x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
 
     if (x->OpenScofo->HasErrors()) {
         for (auto &error : x->OpenScofo->GetErrorMessage()) {
@@ -454,23 +454,23 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_free(PdOScofo *x) {
+static void oscofo_free(PdOpenScofo *x) {
     delete x->OpenScofo;
 }
 
 // ─────────────────────────────────────
 extern "C" void setup_o0x2escofo_tilde(void) {
-    OScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
+    OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
     post("[o.scofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
 
     // message methods
-    class_addmethod(OScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);
-    class_addmethod(OScofoObj, (t_method)oscofo_start, gensym("start"), A_NULL, 0);
-    class_addmethod(OScofoObj, (t_method)oscofo_following, gensym("follow"), A_FLOAT, 0);
-    class_addmethod(OScofoObj, (t_method)oscofo_set, gensym("set"), A_GIMME, 0);
+    class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);
+    class_addmethod(OpenScofoObj, (t_method)oscofo_start, gensym("start"), A_NULL, 0);
+    class_addmethod(OpenScofoObj, (t_method)oscofo_following, gensym("follow"), A_FLOAT, 0);
+    class_addmethod(OpenScofoObj, (t_method)oscofo_set, gensym("set"), A_GIMME, 0);
 
     // dsp
-    CLASS_MAINSIGNALIN(OScofoObj, PdOScofo, Sample);
-    class_addmethod(OScofoObj, (t_method)oscofo_adddsp, gensym("dsp"), A_CANT, 0);
+    CLASS_MAINSIGNALIN(OpenScofoObj, PdOpenScofo, Sample);
+    class_addmethod(OpenScofoObj, (t_method)oscofo_adddsp, gensym("dsp"), A_CANT, 0);
 }

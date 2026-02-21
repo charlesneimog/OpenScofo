@@ -1,6 +1,6 @@
 //#ifdef OSCOFO_LUA
 
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 #include <ext.h>
 #include <z_dsp.h>
 

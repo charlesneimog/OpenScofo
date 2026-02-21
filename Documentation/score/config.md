@@ -1,9 +1,9 @@
 # Score Configuration
 
-I chose to make all the configuration from `OScofo` using the score, this make easier to use the object on different programs. For example, instead of create a lot of code to handle the configuration for `Pd` object, and another object for `Max`, I can create a simple one where the composer can config the `OScofo` using the score. This allows that I use my time to develop the object itself, not the bridge between `OScofo` and `Pd`, `Max` or others.
+I chose to make all the configuration from `OpenScofo` using the score, this make easier to use the object on different programs. For example, instead of create a lot of code to handle the configuration for `Pd` object, and another object for `Max`, I can create a simple one where the composer can config the `OpenScofo` using the score. This allows that I use my time to develop the object itself, not the bridge between `OpenScofo` and `Pd`, `Max` or others.
 
-!!! tip "Always try on `OScofo` Editor"
-    Always try the examples on `OScofo` Online Editor, with highlight this becomes much easier.
+!!! tip "Always try on `OpenScofo` Editor"
+    Always try the examples on `OpenScofo` Online Editor, with highlight this becomes much easier.
 
 
 ---

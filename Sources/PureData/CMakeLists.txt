@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "14")
 
 file(GLOB_RECURSE OBJ_SOURCES "*.cpp" "*.h")
-pd_add_external(o.scofo~ "${OBJ_SOURCES}" LINK_LIBRARIES OScofo)
+pd_add_external(o.scofo~ "${OBJ_SOURCES}" LINK_LIBRARIES OpenScofo)
 
 # ╭──────────────────────────────────────╮
 # │           PureData Objects           │

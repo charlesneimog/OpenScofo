@@ -3,7 +3,7 @@ import librosa
 from matplotlib import pyplot as plt
 
 
-from OScofo import OScofo
+from OpenScofo import OpenScofo
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -16,7 +16,7 @@ for piece_file in all_music:
         HOP_SIZE = 1024 
         y, sr = librosa.load(piece_file, sr=None)
         score_file = piece_file.replace('.mp3', '.txt')
-        follower = OScofo(sr, FFT_SIZE, HOP_SIZE)
+        follower = OpenScofo(sr, FFT_SIZE, HOP_SIZE)
         ok = follower.ParseScore(score_file)
         if not ok:
             print('Error parsing score file')

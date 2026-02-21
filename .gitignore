@@ -44,10 +44,10 @@ Tests/__pycache__
 .cmake-format.yaml
 dist
 poetry.lock
-Sources/Python/OScofo.egg-info
+Sources/Python/OpenScofo.egg-info
 .build
-OScofo.egg-info
-Resources/OScofo/__pycache__
+OpenScofo.egg-info
+Resources/OpenScofo/__pycache__
 Tests/.ipynb_checkpoints
 .editorconfig
 .gitattributes

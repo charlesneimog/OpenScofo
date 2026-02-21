@@ -280,7 +280,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 25.0, 450.0, 490.0, 22.0 ],
-					"text" : "https://charlesneimog.github.io/OScofo/score/intro/",
+					"text" : "https://charlesneimog.github.io/OpenScofo/score/intro/",
 					"textjustification" : 1
 				}
 
@@ -310,7 +310,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 42.0, 407.0, 456.0, 38.0 ],
-					"text" : "Check charlesneimog.github.io/OScofo to Documentation about the Score Languague.",
+					"text" : "Check charlesneimog.github.io/OpenScofo to Documentation about the Score Languague.",
 					"textjustification" : 1
 				}
 

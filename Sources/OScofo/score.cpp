@@ -1,4 +1,4 @@
-#include "OScofo.hpp"
+#include "OpenScofo.hpp"
 #include "tree_sitter/api.h"
 
 #ifndef M_PI
@@ -7,7 +7,7 @@
 
 extern "C" TSLanguage *tree_sitter_scofo();
 
-namespace OScofo {
+namespace OpenScofo {
 
 // ╭─────────────────────────────────────╮
 // │               Errors                │
@@ -613,4 +613,4 @@ States Score::Parse(std::string ScoreFile) {
 
     return m_ScoreStates;
 }
-} // namespace OScofo
+} // namespace OpenScofo

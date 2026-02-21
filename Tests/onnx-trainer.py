@@ -1,4 +1,4 @@
-import OScofo
+import OpenScofo
 import numpy as np
 import matplotlib.pyplot as plt
 import music21

@@ -16,7 +16,7 @@
 #define CURRENT_ONNX_OPSET 24
 #include "log.hpp"
 #include "states.hpp"
-namespace OScofo {
+namespace OpenScofo {
 
 #ifndef TWO_PI
 #define TWO_PI (2 * M_PI)
@@ -135,4 +135,4 @@ class MIR {
     // Time coherence peak kernels (keyed by quantized sigma+dt)
     mutable std::unordered_map<std::uint64_t, std::vector<float>> m_TimeCoherenceKernelCache;
 };
-} // namespace OScofo
+} // namespace OpenScofo

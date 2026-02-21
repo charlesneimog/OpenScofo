@@ -3,7 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-import OScofo
+import OpenScofo
 
 # --- Configuration ---
 sr = 48000
@@ -14,8 +14,8 @@ eps = 1e-12  # Safety epsilon to avoid log(0) or division by zero
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
-# --- Initialize OScofo ---
-scofo = OScofo.OScofo(sr, fft_size, hop)
+# --- Initialize OpenScofo ---
+scofo = OpenScofo.OpenScofo(sr, fft_size, hop)
 ok = scofo.parse_score("../Resources/tests/canticos.txt")
 
 if not ok:

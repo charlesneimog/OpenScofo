@@ -2,7 +2,7 @@
 
 #include <ext.h>
 #include <z_dsp.h>
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 
 static t_class *oscofo_class = nullptr;
 #ifdef OSCOFO_LUA
@@ -20,7 +20,7 @@ struct Action {
 };
 
 // ─────────────────────────────────────
-class MaxOScofo {
+class MaxOpenScofo {
   public:
     t_pxobject MaxObject;
     t_sample Sample;
@@ -34,8 +34,8 @@ class MaxOScofo {
     // Actions
     std::vector<Action> Actions;
 
-    // OScofo
-    OScofo::OScofo *OpenScofo;
+    // OpenScofo
+    OpenScofo::OpenScofo *OpenScofo;
     int Event;
     float Tempo;
     bool Following;
@@ -55,7 +55,7 @@ class MaxOScofo {
 };
 
 // ─────────────────────────────────────
-static void oscofo_assist(MaxOScofo *x, void *b, long m, long a, char *s) {
+static void oscofo_assist(MaxOpenScofo *x, void *b, long m, long a, char *s) {
     if (m == ASSIST_OUTLET) {
         switch (a) {
         case 0:
@@ -78,7 +78,7 @@ static void oscofo_assist(MaxOScofo *x, void *b, long m, long a, char *s) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_score(MaxOScofo *x, t_symbol *s) {
+static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
     // check if file exists
     if (!s) {
         object_error((t_object *)x, "No score file provided");
@@ -127,7 +127,7 @@ static void oscofo_score(MaxOScofo *x, t_symbol *s) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_start(MaxOScofo *x) {
+static void oscofo_start(MaxOpenScofo *x) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
         object_error((t_object *)x, "Score not loaded");
         return;
@@ -145,7 +145,7 @@ static void oscofo_start(MaxOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_set(MaxOScofo *x, t_symbol *s, long argc, t_atom *argv) {
+static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
     if (argv[0].a_type != A_SYM) {
         object_error((t_object *)x, "First argument must be a symbol");
         return;
@@ -163,7 +163,7 @@ static void oscofo_set(MaxOScofo *x, t_symbol *s, long argc, t_atom *argv) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_following(MaxOScofo *x, long f) {
+static void oscofo_following(MaxOpenScofo *x, long f) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
         object_error((t_object *)x, "Score not loaded");
         return;
@@ -178,7 +178,7 @@ static void oscofo_following(MaxOScofo *x, long f) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_luaexecute(MaxOScofo *x, std::string code) {
+static void oscofo_luaexecute(MaxOpenScofo *x, std::string code) {
 #ifdef OSCOFO_LUA
     if (!x->OpenScofo->LuaExecute(code)) {
         std::string error = x->OpenScofo->LuaGetError();
@@ -189,7 +189,7 @@ static void oscofo_luaexecute(MaxOScofo *x, std::string code) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_maxsend(MaxOScofo *x, std::string r, int argc, t_atom *argv) {
+static void oscofo_maxsend(MaxOpenScofo *x, std::string r, int argc, t_atom *argv) {
     t_symbol *sym = gensym(r.c_str());
     t_object *receiver = sym->s_thing;
     if (receiver == nullptr) {
@@ -204,7 +204,7 @@ static void oscofo_maxsend(MaxOScofo *x, std::string r, int argc, t_atom *argv) 
     }
 }
 // ─────────────────────────────────────
-static t_atom *oscofo_convertargs(MaxOScofo *x, OScofo::Action &action) {
+static t_atom *oscofo_convertargs(MaxOpenScofo *x, OpenScofo::Action &action) {
     int size = action.Args.size();
     t_atom *MaxArgs = new t_atom[size];
 
@@ -222,7 +222,7 @@ static t_atom *oscofo_convertargs(MaxOScofo *x, OScofo::Action &action) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_tickactions(MaxOScofo *x) {
+static void oscofo_tickactions(MaxOpenScofo *x) {
     const double CurrentTime = gettime();
     const double nextBlock = 1000.0 / x->Sr * x->BlockSize;
     const double NextTime = CurrentTime + nextBlock;
@@ -245,7 +245,7 @@ static void oscofo_tickactions(MaxOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_ticknewevent(MaxOScofo *x) {
+static void oscofo_ticknewevent(MaxOpenScofo *x) {
     int PrevEvent = x->Event;
     x->Event = x->OpenScofo->GetEventIndex();
     if (PrevEvent == x->Event || x->Event == 0) {
@@ -254,9 +254,9 @@ static void oscofo_ticknewevent(MaxOScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
-    OScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
+    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
 
-    for (OScofo::Action &Act : Actions) {
+    for (OpenScofo::Action &Act : Actions) {
         double time = Act.Time;
         if (!Act.AbsoluteTime) {
             Act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * Act.Time * 1000;
@@ -282,7 +282,7 @@ static void oscofo_ticknewevent(MaxOScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_perform64(MaxOScofo *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags,
+static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags,
                              void *userparam) {
     if (!x->OpenScofo->ScoreIsLoaded() || !x->Following) {
         return;
@@ -311,7 +311,7 @@ static void oscofo_perform64(MaxOScofo *x, t_object *dsp64, double **ins, long n
 }
 
 // ─────────────────────────────────────
-static void oscofo_dsp64(MaxOScofo *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags) {
+static void oscofo_dsp64(MaxOpenScofo *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags) {
     x->BlockSize = maxvectorsize;
     x->BlockIndex = 0;
     x->Sr = samplerate;
@@ -321,7 +321,7 @@ static void oscofo_dsp64(MaxOScofo *x, t_object *dsp64, short *count, double sam
 
 // ─────────────────────────────────────
 static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
-    MaxOScofo *x = (MaxOScofo *)object_alloc(oscofo_class);
+    MaxOpenScofo *x = (MaxOpenScofo *)object_alloc(oscofo_class);
     if (!x) {
         object_error((t_object *)x, "Error creating object");
         return nullptr;
@@ -345,7 +345,7 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
     path_toabsolutesystempath(PathId, NULL, PatchPath);
     x->PatchDir = PatchPath;
 
-    x->OpenScofo = new OScofo::OScofo(x->Sr, x->FFTSize, x->HopSize);
+    x->OpenScofo = new OpenScofo::OpenScofo(x->Sr, x->FFTSize, x->HopSize);
     if (x->OpenScofo->HasErrors()) {
         for (auto &error : x->OpenScofo->GetErrorMessage()) {
             object_error((t_object *)x, "%s", error.c_str());
@@ -363,13 +363,13 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_free(MaxOScofo *x) {
+static void oscofo_free(MaxOpenScofo *x) {
     delete x->OpenScofo;
 }
 
 // ─────────────────────────────────────
 void ext_main(void *r) {
-    t_class *c = class_new("o.scofo~", (method)oscofo_new, (method)dsp_free, (long)sizeof(MaxOScofo), 0L, A_GIMME, 0);
+    t_class *c = class_new("o.scofo~", (method)oscofo_new, (method)dsp_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
     object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
     // message methods
     class_addmethod(c, (method)oscofo_set, "set", A_GIMME, 0);
