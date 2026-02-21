@@ -37,6 +37,8 @@ class MIR {
 
     void SetdBTreshold(double dB);
     void GetDescription(std::vector<double> &In, Description &Desc, States &States);
+    void AddReverb(Description &Desc, double decay);
+
     std::vector<float> GetTimeCoherenceTemplate(States &ScoreStates, int pos, int timeInEvent = 0);
     double GetTimeCoherenceConfiability(const std::vector<double> &eventValues) const;
     double GetTimeCoherenceConfiability(const std::vector<float> &eventValues) const;
