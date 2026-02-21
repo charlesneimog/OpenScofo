@@ -18,15 +18,24 @@ PYBIND11_MODULE(_OScofo, m) {
             return obj;
         }))
 
+        // Python
+        .def("__repr__",
+             [](OScofo::OScofo &self) {
+                 return std::format("<OScofo(sr={}, fft_size={}, hop={})>", self.GetSr(), self.GetFFTSize(), self.GetHopSize());
+             })
+
         // Score
         .def("parse_score", &OScofo::OScofo::ParseScore)
 
         // Config
-        .def("set_pitch_template_sigma", &OScofo::OScofo::SetPitchTemplateSigma)
-        .def("set_harmonics", &OScofo::OScofo::SetHarmonics)
         .def("set_db_threshold", &OScofo::OScofo::SetdBTreshold)
         .def("set_tuning", &OScofo::OScofo::SetTunning)
         .def("set_current_event", &OScofo::OScofo::SetCurrentEvent)
+
+        // pitch template
+        .def("set_amplitude_decay", &OScofo::OScofo::SetAmplitudeDecay)
+        .def("set_harmonics", &OScofo::OScofo::SetHarmonics)
+        .def("set_pitch_template_sigma", &OScofo::OScofo::SetPitchTemplateSigma)
 
         // Get Info
         .def("get_live_bpm", &OScofo::OScofo::GetLiveBPM)
@@ -34,9 +43,19 @@ PYBIND11_MODULE(_OScofo, m) {
         .def("get_error", &OScofo::OScofo::GetErrorMessage)
         .def("get_states", &OScofo::OScofo::GetStates)
         .def("get_pitch_template", &OScofo::OScofo::GetPitchTemplate)
+        .def("get_cqt_template", &OScofo::OScofo::GetCQTTemplate)
 
         // Help & Test Functions
         .def("get_audio_description", &OScofo::OScofo::GetAudioDescription)
+
+        // Time Template
+           .def("get_time_coherence_template",
+               &OScofo::OScofo::GetTimeCoherenceTemplate,
+               py::arg("pos"),
+               py::arg("time_in_event") = 0)
+           .def("get_time_coherence_confiability",
+               &OScofo::OScofo::GetTimeCoherenceConfiability,
+               py::arg("event_values"))
 
         // Process
         .def("process_block", [](OScofo::OScofo &self, py::array_t<double> audio) {
@@ -56,9 +75,12 @@ PYBIND11_MODULE(_OScofo, m) {
         .def_readwrite("silence_prob", &OScofo::Description::SilenceProb)
         .def_readwrite("spectral_power", &OScofo::Description::SpectralPower)
         .def_readwrite("norm_spectral_power", &OScofo::Description::NormSpectralPower)
+        .def_readwrite("pseudo_cqt", &OScofo::Description::PseudoCQT)
 
         .def_readwrite("loudness", &OScofo::Description::Loudness)
         .def_readwrite("spectral_flux", &OScofo::Description::SpectralFlux)
+        .def_readwrite("spectral_flatness", &OScofo::Description::SpectralFlatness)
+        .def_readwrite("harmonicity", &OScofo::Description::Harmonicity)
 
         .def_readwrite("db", &OScofo::Description::dB)
         .def_readwrite("rms", &OScofo::Description::RMS)
@@ -68,12 +90,9 @@ PYBIND11_MODULE(_OScofo, m) {
     // State Class
     py::class_<OScofo::MacroState>(m, "State")
         .def(py::init<>())
-        .def_readwrite("index", &OScofo::MacroState::Index)
         .def_readwrite("position", &OScofo::MacroState::ScorePos)
         .def_readwrite("type", &OScofo::MacroState::Type)
         .def_readwrite("markov", &OScofo::MacroState::Markov)
-        .def_readwrite("freqs", &OScofo::MacroState::Freqs)
-        .def_readwrite("kl_div", &OScofo::MacroState::Obs)
         .def_readwrite("forward", &OScofo::MacroState::Forward)
         .def_readwrite("bpm_expected", &OScofo::MacroState::BPMExpected)
         .def_readwrite("bpm_observed", &OScofo::MacroState::BPMObserved)
@@ -83,8 +102,14 @@ PYBIND11_MODULE(_OScofo, m) {
         .def_readwrite("phase_observed", &OScofo::MacroState::PhaseObserved)
         .def_readwrite("ioi_phi_n", &OScofo::MacroState::IOIPhiN)
         .def_readwrite("ioi_hat_phi_n", &OScofo::MacroState::IOIHatPhiN)
+        .def_readwrite("audiostates", &OScofo::MacroState::AudioStates)
         .def_readwrite("duration", &OScofo::MacroState::Duration)
         .def_readwrite("line", &OScofo::MacroState::Line)
         .def("__repr__", &OScofo::MacroState::__repr__)
         .def("__str__", &OScofo::MacroState::__repr__);
+
+    py::class_<OScofo::AudioState>(m, "AudioState")
+        .def(py::init<>())
+        .def_readwrite("freq", &OScofo::AudioState::Freq)
+        .def_readwrite("index", &OScofo::AudioState::Index);
 }

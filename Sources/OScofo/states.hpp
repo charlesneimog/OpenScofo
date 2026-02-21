@@ -75,7 +75,7 @@ class MacroState {
     double OnsetTime;
     // double Duration;
 
-    double Sigma;
+    double Sigma = 0.0;
     double PdfStartTime;
     std::vector<double> Pdf;
     std::vector<double> Context;
@@ -84,13 +84,13 @@ class MacroState {
     int UpperBound;
     double BPMExpected;
     double BPMObserved = 0;
-    double OnsetExpected;
+    double OnsetExpected = 0.0;
     double OnsetObserved = 0;
     double PhaseExpected;
     double PhaseObserved = 0;
     double IOIPhiN;
     double IOIHatPhiN;
-    double Duration;
+    double Duration = 0.0;
 
     double PhaseCoupling;
     double SyncStrength;

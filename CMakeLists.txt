@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(BUILD_SHARED_LIBS OFF)
 
 option(BUILD_PY_MODULE "Build Python Module" ON)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
@@ -37,10 +38,12 @@ endif()
 
 if(BUILD_PD_OBJECT)
     set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
-    set(PDCMAKE_VERSION "v0.2.11")
+    set(PDCMAKE_VERSION "v0.2.12")
     if(NOT EXISTS "${PDCMAKE_FILE}")
-        file(DOWNLOAD https://github.com/pure-data/pd.cmake/releases/download/v2.0.11/pd.cmake
-             ${PDCMAKE_FILE})
+        file(
+            DOWNLOAD
+            https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/naming-conventions/pd.cmake
+            ${PDCMAKE_FILE})
     endif()
     include(${PDCMAKE_FILE})
 endif()
@@ -60,57 +63,58 @@ include(${CPM_FILE})
 # ╭──────────────────────────────────────╮
 # │             Tree-Sitter              │
 # ╰──────────────────────────────────────╯
-set(BUILD_SHARED_LIBS OFF)
-set(PARSER_OUTPUT_C ${CMAKE_CURRENT_SOURCE_DIR}/Resources/tree-sitter-scofo/src/parser.c)
-if(UPDATE_OSCOFO_LANGUAGE)
-    add_subdirectory(Libraries/tree-sitter/lib/ EXCLUDE_FROM_ALL)
-    find_program(TREE_SITTER_EXECUTABLE tree-sitter)
-    set(TREE_SITTER_WORKING_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Resources/tree-sitter-scofo)
-    if(TREE_SITTER_EXECUTABLE AND NOT MINGW)
-        add_custom_command(
-            OUTPUT ${PARSER_OUTPUT_C}
-            COMMAND ${TREE_SITTER_EXECUTABLE} generate --no-bindings
-            WORKING_DIRECTORY ${TREE_SITTER_WORKING_DIR}
-            COMMENT "Generating Tree-sitter parser..."
-            VERBATIM)
-        add_library(score_parser STATIC ${PARSER_OUTPUT_C})
-        add_custom_target(generate_tree_sitter_parser DEPENDS ${PARSER_OUTPUT_C})
-        add_dependencies(score_parser generate_tree_sitter_parser)
-    else()
-        message(
-            WARNING
-                "Tree-sitter executable not found. Parser generation skipped. Please install tree-sitter-cli."
-        )
-        add_library(score_parser STATIC ${PARSER_OUTPUT_C})
-    endif()
-else()
-    add_library(score_parser STATIC ${PARSER_OUTPUT_C})
+cpmaddpackage("gh:tree-sitter/tree-sitter#v0.26.3")
+
+find_program(
+    TREE_SITTER_EXECUTABLE
+    NAMES tree-sitter
+    DOC "tree-sitter CLI executable")
+if(NOT TREE_SITTER_EXECUTABLE)
+    message(
+        FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
 endif()
 
+set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/oscofo_grammar")
+set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OScofo/grammar.js")
+set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
+set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
+set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
+
+add_custom_command(
+    OUTPUT "${PARSER_OUTPUT}"
+    BYPRODUCTS "${PARSER_BYPRODUCTS}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}/src"
+    COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JS_SRC}" "${GRAMMAR_JS_BUILD}"
+    COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} generate
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    DEPENDS "${GRAMMAR_JS_SRC}"
+    COMMENT "Copying grammar.js and generating Tree-sitter parser..."
+    VERBATIM)
+
+# Target custom
+add_custom_target(generate_tree_sitter_parser DEPENDS "${PARSER_OUTPUT}")
+
+# Biblioteca
+add_library(score_parser STATIC "${PARSER_OUTPUT}")
 set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(score_parser PUBLIC Libraries/tree-sitter/lib/include)
+
+add_dependencies(score_parser generate_tree_sitter_parser)
 
 # ╭──────────────────────────────────────╮
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
 if(BUILD_WITH_LUA)
-    cpmaddpackage(
-        NAME
-        lua
-        GIT_REPOSITORY
-        https://github.com/lua/lua.git
-        VERSION
-        5.3.5
-        DOWNLOAD_ONLY
-        YES)
-
+    cpmaddpackage("gh:lua/lua@5.4.0")
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
-        list(REMOVE_ITEM lua_sources "${lua_SOURCE_DIR}/lua.c" "${lua_SOURCE_DIR}/luac.c")
-        add_library(lua STATIC ${lua_sources})
+        add_library(lua STATIC "${lua_SOURCE_DIR}/onelua.c")
+        add_definitions("-DMAKE_LIB")
+        target_compile_definitions(lua PUBLIC MAKE_LIB)
         target_include_directories(lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
+        set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
-
+    add_definitions(-DOSCOFO_LUA)
 else()
     message(STATUS "Lua not included")
 endif()
@@ -123,7 +127,6 @@ if(NOT EXISTS ${FFTW3_FILE})
     message(STATUS "Downloading FFTW3")
     file(
         DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE}
-        SHOW_PROGRESS
         STATUS DOWNLOAD_STATUS)
 endif()
 
@@ -143,27 +146,11 @@ set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_D
 set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ╭──────────────────────────────────────╮
-# │             Tree Sitter              │
+# │               LibONNX                │
 # ╰──────────────────────────────────────╯
-cpmaddpackage("gh:tree-sitter/tree-sitter#v0.26.3")
-
-# ╭──────────────────────────────────────╮
-# │                Boost                 │
-# ╰──────────────────────────────────────╯
-
-if(NOT EMSCRIPTEN)
-    set(BOOST_VERSION "1.89.0")
-    cpmaddpackage(
-        NAME
-        Boost
-        VERSION
-        ${BOOST_VERSION}
-        URL
-        "https://github.com/boostorg/boost/releases/download/boost-${BOOST_VERSION}/boost-${BOOST_VERSION}-cmake.tar.xz"
-        OPTIONS
-        "BOOST_ENABLE_CMAKE ON"
-        "BUILD_SHARED_LIBS OFF")
-endif()
+cpmaddpackage("gh:charlesneimog/libonnx#master")
+cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
+cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
 
 # ╭──────────────────────────────────────╮
 # │                OScofo                │
@@ -175,49 +162,43 @@ list(APPEND ScofoSrc Sources/OScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OScofo/OScofo.cpp)
 add_library(OScofo STATIC ${ScofoSrc})
 
-target_include_directories(OScofo
-                           PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/tree-sitter-score/src")
-target_include_directories(OScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Libraries/lua")
-target_include_directories(OScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Libraries/fftw-3.3.10/api")
 target_include_directories(OScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
-
 set_target_properties(OScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(OScofo PUBLIC fftw3 tree-sitter score_parser lua)
-
-# Boost Libraries
+target_link_libraries(
+    OScofo
+    PUBLIC sol2
+           fftw3
+           tree-sitter
+           score_parser
+           lua
+           onnx
+           onsetsds)
 
 if(LINUX)
-    target_compile_options(OScofo PUBLIC -static-libstdc++ -Wl,--exclude-libs,ALL)
+    target_link_options(OScofo PRIVATE -static-libstdc++ -Wl,--exclude-libs,ALL -static,)
 endif()
 
 if(NOT EMSCRIPTEN AND NOT MSVC)
     target_compile_options(
         OScofo
         PRIVATE -Wall # Enable all common warnings
-                -Wextra # Enable extra warnings -Wpedantic # Enforce strict compliance with
-                        # standards
-                -Wno-unused-parameter # Suppress unused parameter warnings
+                -Wextra # Enable extra warnings
                 -Wshadow # Warn about shadowed variable declarations
                 -Wformat=2 # Enable stricter format string checks
                 -Wnull-dereference # Warn on dereferences of null pointers
+                -march=native
                 # Debug
                 $<$<CONFIG:Debug>:
+                -O2
                 -g
-                -O0
+                -fno-omit-frame-pointer
                 >
                 # Release
                 $<$<CONFIG:Release>:
-                -O3
                 -DNDEBUG
+                -O3
+                -march=native
                 >)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    add_compile_options(
-        $<$<CONFIG:Debug>:-g> $<$<CONFIG:Debug>:-O0> $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-        $<$<CONFIG:Debug>:-fno-inline> $<$<CONFIG:Debug>:-fno-inline-functions>)
-
-    add_link_options($<$<CONFIG:Debug>:-g> $<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
 endif()
 
 # ╭──────────────────────────────────────╮

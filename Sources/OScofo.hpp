@@ -4,6 +4,7 @@
 #include <OScofo/mir.hpp>
 #include <OScofo/score.hpp>
 #include <OScofo/states.hpp>
+#include <OScofo/log.hpp>
 
 #if defined(OSCOFO_LUA)
 extern "C" {
@@ -17,10 +18,17 @@ extern "C" {
 #define OSCOFO_VERSION_MINOR 1
 #define OSCOFO_VERSION_PATCH 4
 
+// vector
+#include <vector>
+#include <functional>
+
+// log
 #include <chrono>
 #include <iostream>
-#include <functional>
-#include <vector>
+
+#include <boost/math/special_functions/bessel.hpp>
+#include <cmath>
+#include <numeric>
 
 class Timer {
   public:
@@ -47,10 +55,14 @@ class OScofo;
 class OScofo {
   public:
     OScofo(float Sr, float WindowSize, float HopSize);
+    // Main Functions
+    bool ParseScore(std::string ScorePath);
+    bool ProcessBlock(std::vector<double> &AudioBuffer);
 
     bool ScoreIsLoaded();
 
     // Set Functions
+    void SetAmplitudeDecay(double decay);
     void SetPitchTemplateSigma(double Sigma);
     void SetHarmonics(int Harmonics);
     void SetdBTreshold(double dB);
@@ -67,25 +79,22 @@ class OScofo {
     ActionVec GetEventActions(int Index);
     std::string GetLuaCode();
     double GetPitchProb(double f);
-
-    // Main Functions
-    bool ParseScore(std::string ScorePath);
-    bool ProcessBlock(std::vector<double> &AudioBuffer);
-
-    // Python Function for Research
     States GetStates();
-    std::unordered_map<double, PitchTemplateArray> GetPitchTemplate();
-    std::vector<double> GetSpectrumPower();
+    PitchTemplateArray GetPitchTemplate(double Freq);
+    std::vector<double> GetSpectrumPower() const;
+    double GetSr();
     double GetFFTSize();
     double GetHopSize();
+    Description GetAudioDescription(std::vector<double> &AudioBuffer);
+    Description GetDescription();
+    std::vector<double> GetCQTTemplate(double Freq);
+    std::vector<float> GetTimeCoherenceTemplate(int pos, int timeInEvent = 0);
+    double GetTimeCoherenceConfiability(const std::vector<double> &eventValues);
 
+    // Config
     void SetErrorCallBack(std::function<void(const std::string &)> cb) {
         m_ErrorCallback = cb;
     }
-
-    // Help & Test functions
-    Description GetAudioDescription(std::vector<double> &AudioBuffer);
-    Description GetDescription();
 
 #if defined(OSCOFO_LUA)
     void InitLua();
@@ -118,11 +127,13 @@ class OScofo {
     double m_Sr;
     double m_FFTSize;
     double m_HopSize;
+    unsigned m_BlockIndex;
 
     // Errors
     bool m_HasErrors = false;
     std::vector<std::string> m_Errors;
     std::function<void(const std::string &)> m_ErrorCallback = nullptr;
+    std::vector<double> m_InBuffer;
 };
 
 } // namespace OScofo

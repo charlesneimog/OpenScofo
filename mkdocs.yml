@@ -1,12 +1,12 @@
 ---
-site_name: OScofo
+site_name: Open-Source Score Follower
 docs_dir: Documentation
 copyright: Copyright &copy 2024 | Charles K. Neimog | University of São Paulo.
 theme:
-  logo: assets/logo.svg
+  logo: assets/favicon.svg
   custom_dir: Documentation/overrides
-  logo_dark_mode: assets/logo.svg
-  logo_light_mode: assets/logo.svg
+  logo_dark_mode: assets/favicon.svg
+  logo_light_mode: assets/favicon.svg
   favicon: assets/favicon.png
   name: material
   features:
@@ -82,6 +82,7 @@ nav:
       - Events Configuration: score/events.md
       - Actions Configuration: score/actions.md
       - Lua Tutorial: score/lua.md
+  - Python: python.md
   - OScofo Online Editor: Editor/
   - Downloads: https://github.com/charlesneimog/OScofo/releases/latest
 extra:

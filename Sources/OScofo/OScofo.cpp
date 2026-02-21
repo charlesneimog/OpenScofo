@@ -1,5 +1,4 @@
 #include <OScofo.hpp>
-#include <cmath>
 
 // ╭─────────────────────────────────────╮
 // │     Construstor and Destructor      │
@@ -285,7 +284,7 @@ std::vector<double> OScofo::GetCQTTemplate(double Freq) {
 }
 
 // ─────────────────────────────────────
-std::vector<double> OScofo::GetSpectrumPower() {
+std::vector<double> OScofo::GetSpectrumPower() const {
     return m_Desc.NormSpectralPower;
 }
 
@@ -302,6 +301,16 @@ double OScofo::GetFFTSize() {
 // ─────────────────────────────────────
 double OScofo::GetHopSize() {
     return m_HopSize;
+}
+
+// ─────────────────────────────────────
+std::vector<float> OScofo::GetTimeCoherenceTemplate(int pos, int timeInEvent) {
+    return m_MIR.GetTimeCoherenceTemplate(m_States, pos, timeInEvent);
+}
+
+// ─────────────────────────────────────
+double OScofo::GetTimeCoherenceConfiability(const std::vector<double> &eventValues) {
+    return m_MIR.GetTimeCoherenceConfiability(eventValues);
 }
 
 // ╭─────────────────────────────────────╮
