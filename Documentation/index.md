@@ -16,7 +16,7 @@ hide:
 ---
 
 <p align="center" markdown>
-  ![Image title](./assets/logo.svg){ width="25%" }
+  ![Image title](./assets/logo.svg)
 </p>
 
 ---
@@ -31,16 +31,18 @@ With `pd4web`, I believe that will be possible decrease the complexity of the se
 -------------------------
 
 <div class="container">
-  <div class="card">
-    <hr>
-    <img
-      src="./assets/pieces/001-canticos.png"
-      class="card-img"
-      style="width: 80%; object-fit: cover; object-position: left;"
-    />
-    <p><i>Part of my PhD Thesis, will be published soon!</i></p>
-    <hr>
-  </div>
+    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+      <div class="card">
+        <hr>
+        <img
+          src="./assets/pieces/001-canticos.png"
+          class="card-img"
+          style="width: 80%; object-fit: cover; object-position: left;"
+        />
+        <p><i>Part of my PhD Thesis, will be published soon!</i></p>
+        <hr>
+      </div>
+    </a>
 
   <div class="card">
     <hr>
