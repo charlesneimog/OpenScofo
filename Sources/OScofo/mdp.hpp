@@ -83,7 +83,7 @@ class MDP {
 
     // Events
     double m_Tunning = 440;
-    int m_CurrentStateIndex = 0;
+    size_t m_CurrentStateIndex = 0;
 
     // Time
     double m_SyncStrength = 0.5;
@@ -108,7 +108,7 @@ class MDP {
     double m_SecondsAhead = 2;
 
     // Time
-    double UpdatePsiN(int StateIndex);
+    double UpdatePsiN(size_t StateIndex);
     double InverseA2(double r);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
@@ -129,14 +129,14 @@ class MDP {
     void BuildPitchTemplate(double Freq);
 
     // Audio Observations
-    void GetAudioObservations(int FirstStateIndex, int LastStateIndex, int T);
+    void GetAudioObservations(size_t FirstStateIndex, size_t LastStateIndex, int T);
     Description m_Desc;
 
     // Markov
     bool m_EventDetected = false;
     double GetBestEvent();
     int GetMaxJIndex(int StateIndex);
-    int Inference(int CurrentState, int j, int T);
+    int Inference(size_t CurrentState, size_t j, int T);
     double SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex);
     double Markov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex);
 

@@ -1,12 +1,4 @@
-#include <cmath>
-#include <cstdint>
-#include <fstream>
-#include <iostream>
-#include <sstream> // Add this line
-
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include "score.hpp"
+#include "OScofo.hpp"
 #include "tree_sitter/api.h"
 
 #ifndef M_PI
@@ -227,6 +219,24 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+MacroState Score::GetFirstEvent() {
+    MacroState Event;
+    Event.Markov = MARKOV;
+    Event.Type = REST;
+    Event.ScorePos = 0;
+    Event.Index = m_ScoreStates.size();
+
+    AudioState Silence;
+    Silence.Type = SILENCE;
+    Silence.Freq = 0;
+    Silence.Index = 0;
+
+    Event.AudioStates.emplace_back(Silence);
+
+    return Event;
+}
+
+// ─────────────────────────────────────
 MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -235,7 +245,7 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
     Event.Markov = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
-    Event.Entropy = m_Entropy;
+    // Event.Entropy = m_Entropy;
 
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -256,56 +266,33 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
             }
         } else if (type == "pitch") {
             AudioState SubState;
-            SubState.Markov = MARKOV;
-            SubState.Type = NOTE;
+            SubState.Type = PITCH;
             SubState.Freq = PitchNode2Freq(ScoreStr, child);
 
-            AudioState Middle;
-            Middle.Markov = MARKOV;
-            Middle.Type = NOTE;
-            Middle.Freq = PitchNode2Freq(ScoreStr, child);
-
             AudioState Silence;
-            Silence.Markov = MARKOV;
-            Silence.Type = REST;
+            Silence.Type = SILENCE;
             Silence.Freq = 0;
 
-            Event.SubStates.push_back(SubState);
-            Event.SubStates.push_back(Middle);
-            Event.SubStates.push_back(Silence);
-
+            Event.AudioStates.push_back(SubState);
+            Event.AudioStates.push_back(Silence);
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
                 TSNode eventPitch = ts_node_child(child, j);
                 std::string eventPitchId = ts_node_type(eventPitch);
                 if (eventPitchId == "pitch") {
-                    AudioState Start;
-                    Start.Markov = MARKOV;
-                    Start.Type = NOTE;
-                    Start.Freq = PitchNode2Freq(ScoreStr, eventPitch);
-                    Start.Index = 0;
-
-                    // Middle
-                    AudioState Middle;
-                    Middle.Markov = MARKOV;
-                    Middle.Type = NOTE;
-                    Middle.Freq = PitchNode2Freq(ScoreStr, eventPitch);
-                    Start.Index = 1;
+                    AudioState Pitch;
+                    Pitch.Type = PITCH;
+                    Pitch.Freq = PitchNode2Freq(ScoreStr, eventPitch);
 
                     // Silence
-                    AudioState Silence;
-                    Silence.Markov = MARKOV;
-                    Silence.Type = REST;
-                    Silence.Freq = 0;
-                    Start.Index = 2;
-
-                    Event.SubStates.push_back(Start);
-                    Event.SubStates.push_back(Middle);
-                    Event.SubStates.push_back(Silence);
+                    Event.AudioStates.push_back(Pitch);
                 }
             }
-
+            AudioState Silence;
+            Silence.Type = SILENCE;
+            Silence.Freq = 0;
+            Event.AudioStates.push_back(Silence);
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
@@ -329,11 +316,14 @@ void Score::ProcessEventTime(MacroState &Event) {
     if (Event.Index != 0) {
         int Index = Event.Index;
         double PsiK = 60.0f / m_ScoreStates[Index - 1].BPMExpected;
+        double PrevDur = m_ScoreStates[Index - 1].Duration;
         double Tn = m_ScoreStates[Index - 1].OnsetExpected;
-        double Tn1 = Event.OnsetExpected;
+        double Tn1 = Tn + Event.Duration * PsiK;
+
         double PhiN0 = Event.PhaseExpected;
         double PhiN1 = PhiN0 + ((Tn1 - Tn) / PsiK);
         PhiN1 = ModPhases(PhiN1);
+        Event.OnsetExpected = Tn + PrevDur;
         Event.PhaseExpected = PhiN1;
         Event.IOIHatPhiN = (Tn1 - Tn) / PsiK;
         Event.IOIPhiN = (Tn1 - Tn) / PsiK;
@@ -341,6 +331,7 @@ void Score::ProcessEventTime(MacroState &Event) {
         Event.PhaseExpected = 0;
         Event.IOIHatPhiN = 0;
         Event.IOIPhiN = 0;
+        Event.OnsetExpected = 0;
     }
     Event.PhaseCoupling = m_PhaseCoupling;
     Event.SyncStrength = m_SyncStrength;
@@ -373,11 +364,12 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
             Event = PitchEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
-            m_ScoreStates.push_back(Event);
+            m_ScoreStates.emplace_back(Event);
         }
     }
 }
 
+// ─────────────────────────────────────
 std::string GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
     uint32_t count = ts_node_child_count(parent);
     for (uint32_t i = 0; i < count; ++i) {
@@ -415,6 +407,9 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
 
             if (id == "BPM") {
                 m_CurrentBPM = v;
+                MacroState Begin = GetFirstEvent();
+                Begin.BPMExpected = v;
+                m_ScoreStates.emplace_back(Begin);
             } else if (id == "TRANSPOSE") {
                 if (v < -36 || v > 36) {
                     SetError("Invalid transpose value on line " + std::to_string(pos.row + 1));

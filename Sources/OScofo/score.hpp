@@ -89,6 +89,7 @@ class Score {
     MacroState TrillEvent(const std::string &Score, TSNode Node);
 
     // Add events
+    MacroState GetFirstEvent();
     MacroState AddNote(std::vector<std::string> Tokens);
     MacroState AddChord(std::vector<std::string> Tokens);
     MacroState AddTrill(std::vector<std::string> Tokens);

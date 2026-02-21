@@ -33,6 +33,7 @@ class PdOScofo {
         RMS,
         POWER,
         SILENCE,
+        CQT,
     };
 
     // Clock
@@ -124,8 +125,8 @@ static void oscofo_start(PdOScofo *x) {
         pd_error(nullptr, "[o.scofo~] Score not loaded");
         return;
     }
-    x->OpenScofo->SetCurrentEvent(-1);
-    x->Event = -1;
+    x->OpenScofo->SetCurrentEvent(0);
+    x->Event = 0;
 
     // clear all actions
     x->Actions.clear();
@@ -246,6 +247,13 @@ static void oscofo_tickinfo(PdOScofo *x) {
                     SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
                 }
                 outlet_anything(x->DescOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
+            } else if (v == PdOScofo::MIR::CQT) {
+                size_t mfccSize = Desc.PseudoCQT.size();
+                std::vector<t_atom> Atoms(mfccSize);
+                for (size_t i = 0; i < mfccSize; ++i) {
+                    SETFLOAT(&Atoms[i], (t_float)Desc.PseudoCQT[i]);
+                }
+                outlet_anything(x->DescOut, gensym("cqt"), mfccSize, Atoms.data());
             } else if (v == PdOScofo::MIR::POWER) {
                 size_t mfccSize = Desc.Power.size();
                 std::vector<t_atom> mfccAtoms(mfccSize);
@@ -405,6 +413,9 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
             } else if (strcmp(sym->s_name, "silence") == 0) {
                 DescOut = true;
                 x->RequestMIR.push_back(PdOScofo::MIR::SILENCE);
+            } else if (strcmp(sym->s_name, "cqt") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOScofo::MIR::CQT);
             }
         }
         argc--, argv++;

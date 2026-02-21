@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <unordered_map>
+#include <cstdint>
 
 #include <fstream>
 
@@ -36,6 +37,9 @@ class MIR {
 
     void SetdBTreshold(double dB);
     void GetDescription(std::vector<double> &In, Description &Desc, States &States);
+    std::vector<float> GetTimeCoherenceTemplate(States &ScoreStates, int pos, int timeInEvent = 0);
+    double GetTimeCoherenceConfiability(const std::vector<double> &eventValues) const;
+    double GetTimeCoherenceConfiability(const std::vector<float> &eventValues) const;
 
     double GetdB();
     void LoadONNXModel(fs::path path);
@@ -58,6 +62,8 @@ class MIR {
     void MFCCExec(Description &Desc);
     // Time coherence
     void BuildSingleEventPdf(MacroState &ev, double dt);
+
+    const std::vector<float> &GetTimeCoherenceGaussianKernel(double sigmaSeconds, double dt, int templateMax) const;
     // Onset
     void OnsetInit();
     void OnsetExec(Description &Desc);
@@ -120,9 +126,13 @@ class MIR {
 
     // Time
     double m_EventTimeElapsed = 0.0; // ms
+    unsigned m_TimeCoherenceTemplateSize = 1024;
 
     // Errors
     bool m_HasErrors = false;
     std::vector<std::string> m_Errors;
+
+    // Time coherence peak kernels (keyed by quantized sigma+dt)
+    mutable std::unordered_map<std::uint64_t, std::vector<float>> m_TimeCoherenceKernelCache;
 };
 } // namespace OScofo
