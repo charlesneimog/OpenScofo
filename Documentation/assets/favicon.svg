@@ -8,7 +8,7 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
-   sodipodi:docname="logo.svg"
+   sodipodi:docname="favicon.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -23,9 +23,9 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     inkscape:zoom="1.2616344"
-     inkscape:cx="260.77285"
-     inkscape:cy="586.14445"
+     inkscape:zoom="4.0731378"
+     inkscape:cx="105.69247"
+     inkscape:cy="29.093049"
      inkscape:window-width="1860"
      inkscape:window-height="1164"
      inkscape:window-x="0"
@@ -50,17 +50,17 @@
      transform="translate(-49.382713,-98.978881)">
     <text
        xml:space="preserve"
-       style="font-size:11.2889px;writing-mode:lr-tb;direction:ltr;fill:#003380;stroke-width:0.264583"
-       x="48.996861"
-       y="106.63527"
+       style="font-size:7.22104px;writing-mode:lr-tb;direction:ltr;fill:#003380;stroke-width:0.169243"
+       x="49.602913"
+       y="104.66008"
        id="text1"
        inkscape:export-filename="logo.png"
        inkscape:export-xdpi="900"
        inkscape:export-ydpi="900"><tspan
          sodipodi:role="line"
          id="tspan1"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:11.2889px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#003380;stroke-width:0.264583"
-         x="48.996861"
-         y="106.63527">OpenScofo</tspan></text>
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:7.22104px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#003380;stroke-width:0.169243"
+         x="49.602913"
+         y="104.66008">OpenScofo</tspan></text>
   </g>
 </svg>

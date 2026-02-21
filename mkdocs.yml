@@ -1,7 +1,7 @@
 ---
-site_name: Open-Source Score Follower
+site_name: OpenScofo
 docs_dir: Documentation
-copyright: Copyright &copy 2024 | Charles K. Neimog | University of São Paulo.
+copyright: Copyright &copy 2026 | Charles K. Neimog
 theme:
   logo: assets/favicon.svg
   custom_dir: Documentation/overrides
@@ -64,7 +64,7 @@ markdown_extensions:
   - pymdownx.superfences
   - footnotes
   - pymdownx.keys
-  - pymdownx.critic
+  # - pymdownx.critic
   - pymdownx.caret
   - pymdownx.keys
   - pymdownx.mark
