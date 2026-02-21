@@ -14,7 +14,7 @@ import librosa
 from sklearn.metrics import classification_report
 from catboost import CatBoostClassifier
 
-import OScofo
+import OpenScofo
 
 
 # ----------------------------
@@ -97,7 +97,7 @@ def pitch_from_filename(filename):
 
 
 def extract_features(frame):
-    scofo = OScofo.OScofo(SR, FFT, HOP)
+    scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     desc = scofo.get_audio_description(frame)
     return np.asarray(desc.pseudo_cqt, dtype=np.float32)
 

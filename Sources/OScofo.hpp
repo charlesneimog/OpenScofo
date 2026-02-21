@@ -1,10 +1,10 @@
 #pragma once
 
-#include <OScofo/mdp.hpp>
-#include <OScofo/mir.hpp>
-#include <OScofo/score.hpp>
-#include <OScofo/states.hpp>
-#include <OScofo/log.hpp>
+#include <OpenScofo/mdp.hpp>
+#include <OpenScofo/mir.hpp>
+#include <OpenScofo/score.hpp>
+#include <OpenScofo/states.hpp>
+#include <OpenScofo/log.hpp>
 
 #if defined(OSCOFO_LUA)
 extern "C" {
@@ -48,13 +48,13 @@ class Timer {
     std::chrono::high_resolution_clock::time_point m_Start;
 };
 
-namespace OScofo {
+namespace OpenScofo {
 
-class OScofo;
+class OpenScofo;
 
-class OScofo {
+class OpenScofo {
   public:
-    OScofo(float Sr, float WindowSize, float HopSize);
+    OpenScofo(float Sr, float WindowSize, float HopSize);
     // Main Functions
     bool ParseScore(std::string ScorePath);
     bool ProcessBlock(std::vector<double> &AudioBuffer);
@@ -136,4 +136,4 @@ class OScofo {
     std::vector<double> m_InBuffer;
 };
 
-} // namespace OScofo
+} // namespace OpenScofo

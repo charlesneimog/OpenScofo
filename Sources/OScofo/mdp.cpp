@@ -1,6 +1,6 @@
-#include "OScofo.hpp"
+#include "OpenScofo.hpp"
 
-namespace OScofo {
+namespace OpenScofo {
 
 /*
     // ──────────────────────────────── REFERENCES ───────────────────────────────────────
@@ -784,4 +784,4 @@ int MDP::GetEvent(Description &Desc) {
         return m_States[StateIndex].ScorePos;
     }
 }
-} // namespace OScofo
+} // namespace OpenScofo

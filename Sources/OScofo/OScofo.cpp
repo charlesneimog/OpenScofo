@@ -1,16 +1,16 @@
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 
 // ╭─────────────────────────────────────╮
 // │     Construstor and Destructor      │
 // ╰─────────────────────────────────────╯
-namespace OScofo {
+namespace OpenScofo {
 
 #if defined(OSCOFO_LUA)
 int luaopen_oscofo(lua_State *L);
 #endif
 
 //  ─────────────────────────────────────
-OScofo::OScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
+OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
     m_States = States();
     m_Desc = Description();
     m_Sr = Sr;
@@ -37,7 +37,7 @@ OScofo::OScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopS
 }
 
 //  ─────────────────────────────────────
-void OScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
+void OpenScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
     if (m_FFTSize == FftSize && m_HopSize == HopSize && m_Sr == Sr) {
         return;
     }
@@ -51,17 +51,17 @@ void OScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
 // ╭─────────────────────────────────────╮
 // │               Errors                │
 // ╰─────────────────────────────────────╯
-bool OScofo::HasErrors() {
+bool OpenScofo::HasErrors() {
     return m_HasErrors;
 }
 
 // ─────────────────────────────────────
-std::vector<std::string> OScofo::GetErrorMessage() {
+std::vector<std::string> OpenScofo::GetErrorMessage() {
     return m_Errors;
 }
 
 // ─────────────────────────────────────
-void OScofo::SetError(const std::string &message) {
+void OpenScofo::SetError(const std::string &message) {
     if (m_ErrorCallback) {
         m_HasErrors = true;
         m_ErrorCallback(message);
@@ -72,7 +72,7 @@ void OScofo::SetError(const std::string &message) {
 }
 
 // ─────────────────────────────────────
-void OScofo::ClearError() {
+void OpenScofo::ClearError() {
     m_HasErrors = false;
     m_Errors.clear();
 }
@@ -81,18 +81,18 @@ void OScofo::ClearError() {
 // │                 Lua                 │
 // ╰─────────────────────────────────────╯
 #if defined(OSCOFO_LUA)
-void OScofo::InitLua() {
+void OpenScofo::InitLua() {
     m_LuaState = luaL_newstate();
     luaL_openlibs(m_LuaState); // NOTE: Rethink if I load all functions
     lua_newtable(m_LuaState);
     lua_pushlightuserdata(m_LuaState, this);
     lua_setfield(m_LuaState, -2, "pointer");
-    lua_setglobal(m_LuaState, "_OScofo");
+    lua_setglobal(m_LuaState, "_OpenScofo");
     luaL_requiref(m_LuaState, "oscofo", luaopen_oscofo, 1);
 }
 
 // ─────────────────────────────────────
-bool OScofo::LuaAddModule(std::string name, lua_CFunction func) {
+bool OpenScofo::LuaAddModule(std::string name, lua_CFunction func) {
     if (m_LuaState == nullptr) {
         return false;
     }
@@ -104,7 +104,7 @@ bool OScofo::LuaAddModule(std::string name, lua_CFunction func) {
 }
 
 // ─────────────────────────────────────
-bool OScofo::LuaExecute(std::string code) {
+bool OpenScofo::LuaExecute(std::string code) {
     if (m_LuaState == nullptr) {
         return false;
     }
@@ -121,7 +121,7 @@ bool OScofo::LuaExecute(std::string code) {
 }
 
 // ─────────────────────────────────────
-bool OScofo::LuaAddPointer(void *pointer, const char *name) {
+bool OpenScofo::LuaAddPointer(void *pointer, const char *name) {
     if (m_LuaState == nullptr) {
         return false;
     }
@@ -131,7 +131,7 @@ bool OScofo::LuaAddPointer(void *pointer, const char *name) {
 }
 
 // ─────────────────────────────────────
-void OScofo::LuaAddPath(std::string path) {
+void OpenScofo::LuaAddPath(std::string path) {
     if (m_LuaState == nullptr) {
         return;
     }
@@ -150,7 +150,7 @@ void OScofo::LuaAddPath(std::string path) {
 }
 
 // ─────────────────────────────────────
-std::string OScofo::LuaGetError() {
+std::string OpenScofo::LuaGetError() {
     if (m_LuaState == nullptr) {
         return "m_LuaState is null";
     }
@@ -166,91 +166,91 @@ std::string OScofo::LuaGetError() {
 // ╭─────────────────────────────────────╮
 // │            Set Functions            │
 // ╰─────────────────────────────────────╯
-void OScofo::SetPitchTemplateSigma(double Sigma) {
+void OpenScofo::SetPitchTemplateSigma(double Sigma) {
     m_MDP.SetPitchTemplateSigma(Sigma);
     m_MDP.UpdateAudioTemplate();
 }
 
 // ─────────────────────────────────────
-void OScofo::SetAmplitudeDecay(double decay) {
+void OpenScofo::SetAmplitudeDecay(double decay) {
     m_MDP.SetAmplitudeDecay(decay);
 }
 
 // ─────────────────────────────────────
-void OScofo::SetMinEntropy(double EntropyValue) {
+void OpenScofo::SetMinEntropy(double EntropyValue) {
     m_MDP.SetMinEntropy(EntropyValue);
 }
 
 // ─────────────────────────────────────
-void OScofo::SetHarmonics(int Harmonics) {
+void OpenScofo::SetHarmonics(int Harmonics) {
     m_MDP.SetHarmonics(Harmonics);
     m_MDP.UpdateAudioTemplate();
 }
 
 // ─────────────────────────────────────
-double OScofo::GetdBValue() {
+double OpenScofo::GetdBValue() {
     return 0;
 }
 
 // ─────────────────────────────────────
-void OScofo::SetdBTreshold(double dB) {
+void OpenScofo::SetdBTreshold(double dB) {
     m_MDP.SetdBTreshold(dB);
     m_MIR.SetdBTreshold(dB);
 }
 
 // ─────────────────────────────────────
-void OScofo::SetTunning(double Tunning) {
+void OpenScofo::SetTunning(double Tunning) {
     m_Score.SetTunning(Tunning);
 }
 
 // ─────────────────────────────────────
-void OScofo::SetCurrentEvent(int Event) {
+void OpenScofo::SetCurrentEvent(int Event) {
     m_MDP.SetCurrentEvent(Event);
 }
 
 // ╭─────────────────────────────────────╮
 // │            Get Functions            │
 // ╰─────────────────────────────────────╯
-int OScofo::GetEventIndex() {
+int OpenScofo::GetEventIndex() {
     return m_CurrentScorePosition; // TODO: Implement yet
 }
 
 // ─────────────────────────────────────
-double OScofo::GetLiveBPM() {
+double OpenScofo::GetLiveBPM() {
     return m_MDP.GetLiveBPM();
 }
 
 // ─────────────────────────────────────
-ActionVec OScofo::GetEventActions(int Index) {
+ActionVec OpenScofo::GetEventActions(int Index) {
     return m_MDP.GetEventActions(Index);
 }
 
 // ─────────────────────────────────────
-double OScofo::GetKappa() {
+double OpenScofo::GetKappa() {
     return m_MDP.GetKappa();
 }
 
 // ─────────────────────────────────────
-double OScofo::GetPitchProb(double f) {
+double OpenScofo::GetPitchProb(double f) {
     return m_MDP.GetPitchSimilarity(f);
 }
 
 // ─────────────────────────────────────
-std::string OScofo::GetLuaCode() {
+std::string OpenScofo::GetLuaCode() {
     return m_Score.GetLuaCode();
 }
 
 // ╭─────────────────────────────────────╮
 // │          Helpers Functions          │
 // ╰─────────────────────────────────────╯
-bool OScofo::ScoreIsLoaded() {
+bool OpenScofo::ScoreIsLoaded() {
     return m_Score.ScoreIsLoaded();
 }
 
 // ╭─────────────────────────────────────╮
 // │ Python Research and Test Functions  │
 // ╰─────────────────────────────────────╯
-States OScofo::GetStates() {
+States OpenScofo::GetStates() {
     if (m_States.size() != 0) {
         return m_States;
     }
@@ -259,12 +259,12 @@ States OScofo::GetStates() {
 }
 
 // ─────────────────────────────────────
-std::vector<double> OScofo::GetPitchTemplate(double Freq) {
+std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
     return m_MDP.GetPitchTemplate(Freq);
 }
 
 // ─────────────────────────────────────
-std::vector<double> OScofo::GetCQTTemplate(double Freq) {
+std::vector<double> OpenScofo::GetCQTTemplate(double Freq) {
     PitchTemplateArray p = m_MDP.GetPitchTemplate(Freq);
     std::vector<std::pair<int, int>> cqt = m_MIR.GetCQT();
 
@@ -284,39 +284,39 @@ std::vector<double> OScofo::GetCQTTemplate(double Freq) {
 }
 
 // ─────────────────────────────────────
-std::vector<double> OScofo::GetSpectrumPower() const {
+std::vector<double> OpenScofo::GetSpectrumPower() const {
     return m_Desc.NormSpectralPower;
 }
 
 // ─────────────────────────────────────
-double OScofo::GetSr() {
+double OpenScofo::GetSr() {
     return m_Sr;
 }
 
 // ─────────────────────────────────────
-double OScofo::GetFFTSize() {
+double OpenScofo::GetFFTSize() {
     return m_FFTSize;
 }
 
 // ─────────────────────────────────────
-double OScofo::GetHopSize() {
+double OpenScofo::GetHopSize() {
     return m_HopSize;
 }
 
 // ─────────────────────────────────────
-std::vector<float> OScofo::GetTimeCoherenceTemplate(int pos, int timeInEvent) {
+std::vector<float> OpenScofo::GetTimeCoherenceTemplate(int pos, int timeInEvent) {
     return m_MIR.GetTimeCoherenceTemplate(m_States, pos, timeInEvent);
 }
 
 // ─────────────────────────────────────
-double OScofo::GetTimeCoherenceConfiability(const std::vector<double> &eventValues) {
+double OpenScofo::GetTimeCoherenceConfiability(const std::vector<double> &eventValues) {
     return m_MIR.GetTimeCoherenceConfiability(eventValues);
 }
 
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
-bool OScofo::ParseScore(std::string ScorePath) {
+bool OpenScofo::ParseScore(std::string ScorePath) {
     m_Score = Score(m_FFTSize, m_HopSize);
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
@@ -349,12 +349,12 @@ bool OScofo::ParseScore(std::string ScorePath) {
 }
 
 // ─────────────────────────────────────
-Description OScofo::GetDescription() {
+Description OpenScofo::GetDescription() {
     return m_Desc;
 }
 
 // ─────────────────────────────────────
-Description OScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
+Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
     if (m_FFTSize != AudioBuffer.size()) {
         SetError(std::format("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize));
         return {};
@@ -367,7 +367,7 @@ Description OScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 }
 
 // ─────────────────────────────────────
-bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
+bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     if (!m_Score.ScoreIsLoaded()) {
         return false;
     }
@@ -386,14 +386,14 @@ bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     return true;
 }
 
-// bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
+// bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
 //     // move accumation to here buffer
 //     size_t n = AudioBuffer.size();
 //     memcpy(m_InBuffer.data() + m_BlockIndex, AudioBuffer.data(), n * sizeof(double));
 //     m_BlockIndex += n;
 //
 //     if (m_BlockIndex > m_FFTSize) {
-//         SetError("The configuration of OScofo is wrong, please review");
+//         SetError("The configuration of OpenScofo is wrong, please review");
 //         return false;
 //     }
 //
@@ -417,4 +417,4 @@ bool OScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
 //     return true;
 // }
 
-} // namespace OScofo
+} // namespace OpenScofo

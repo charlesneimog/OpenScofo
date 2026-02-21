@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(OScofo)
+project(OpenScofo)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,8 +11,8 @@ option(BUILD_PY_MODULE "Build Python Module" ON)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
 option(BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(BUILD_ALL "Build Python Module and PureData Object" ON)
-option(BUILD_WITH_LUA "Build Lua Module embbeded on OScofo" ON)
-option(UPDATE_OSCOFO_LANGUAGE "Update OScofo language grammar.js" OFF)
+option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
+option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
 
 # check if it is EMSCRIPTEN
 if(EMSCRIPTEN)
@@ -75,7 +75,7 @@ if(NOT TREE_SITTER_EXECUTABLE)
 endif()
 
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/oscofo_grammar")
-set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OScofo/grammar.js")
+set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
 set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
@@ -153,19 +153,19 @@ cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
 
 # ╭──────────────────────────────────────╮
-# │                OScofo                │
+# │                OpenScofo                │
 # ╰──────────────────────────────────────╯
-list(APPEND ScofoSrc Sources/OScofo/mdp.cpp)
-list(APPEND ScofoSrc Sources/OScofo/mir.cpp)
-list(APPEND ScofoSrc Sources/OScofo/score.cpp)
-list(APPEND ScofoSrc Sources/OScofo/lua.cpp)
-list(APPEND ScofoSrc Sources/OScofo/OScofo.cpp)
-add_library(OScofo STATIC ${ScofoSrc})
+list(APPEND ScofoSrc Sources/OpenScofo/mdp.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/mir.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
+add_library(OpenScofo STATIC ${ScofoSrc})
 
-target_include_directories(OScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
-set_target_properties(OScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
+set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(
-    OScofo
+    OpenScofo
     PUBLIC sol2
            fftw3
            tree-sitter
@@ -175,12 +175,12 @@ target_link_libraries(
            onsetsds)
 
 if(LINUX)
-    target_link_options(OScofo PRIVATE -static-libstdc++ -Wl,--exclude-libs,ALL -static,)
+    target_link_options(OpenScofo PRIVATE -static-libstdc++ -Wl,--exclude-libs,ALL -static,)
 endif()
 
 if(NOT EMSCRIPTEN AND NOT MSVC)
     target_compile_options(
-        OScofo
+        OpenScofo
         PRIVATE -Wall # Enable all common warnings
                 -Wextra # Enable extra warnings
                 -Wshadow # Warn about shadowed variable declarations

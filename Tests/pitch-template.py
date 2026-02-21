@@ -1,4 +1,4 @@
-import OScofo
+import OpenScofo
 import numpy as np
 import librosa
 import music21
@@ -43,7 +43,7 @@ def get_audioanalisys(path, scofo):
 def process_file(args):
     f, amplitude_decay, harmonics, sigma = args
 
-    scofo = OScofo.OScofo(SR, FFT_SIZE, HOP_SIZE)
+    scofo = OpenScofo.OpenScofo(SR, FFT_SIZE, HOP_SIZE)
     scofo.parse_score("../Resources/tests/canticos.txt")
     scofo.set_amplitude_decay(amplitude_decay)
     scofo.set_harmonics(int(harmonics))

@@ -1,4 +1,4 @@
-import OScofo
+import OpenScofo
 import numpy as np
 import librosa
 import music21
@@ -37,7 +37,7 @@ def get_audioanalisys(path, scofo):
 allnotes = {}
 files = sorted(p for p in root.rglob("ordinario/**/*.wav"))
 
-scofo = OScofo.OScofo(SR, FFT_SIZE, HOP_SIZE)
+scofo = OpenScofo.OpenScofo(SR, FFT_SIZE, HOP_SIZE)
 scofo.parse_score("../Resources/tests/canticos.txt")
 
 # for f in files:

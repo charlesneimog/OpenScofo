@@ -1,6 +1,6 @@
-#include "OScofo.hpp"
+#include "OpenScofo.hpp"
 
-namespace OScofo {
+namespace OpenScofo {
 
 // ─────────────────────────────────────
 static std::uint64_t TimeCoherenceKernelKey(double sigmaSeconds, double dtSeconds) {
@@ -45,7 +45,7 @@ const std::vector<float> &MIR::GetTimeCoherenceGaussianKernel(double sigmaSecond
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
 MIR::MIR(float Sr, float FftSize, float HopSize) {
-    LOGE() << "OScofoMIR::OScofoMIR";
+    LOGE() << "OpenScofoMIR::OpenScofoMIR";
 
     m_HopSize = HopSize;
     m_FFTSize = FftSize;
@@ -54,14 +54,14 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
     float WindowHalf = FftSize / 2;
     m_FFTIn = (double *)fftw_alloc_real((size_t)FftSize);
     if (!m_FFTIn) {
-        SetError("OScofoMIR::OScofoMIR fftw_alloc_real failed");
+        SetError("OpenScofoMIR::OpenScofoMIR fftw_alloc_real failed");
         return;
     }
 
     m_FFTOut = (fftw_complex *)fftw_alloc_complex((size_t)WindowHalf + 1);
     if (!m_FFTOut) {
         fftw_free(m_FFTIn); // Free previously allocated memory
-        SetError("OScofoMIR::OScofoMIR fftw_alloc_complex failed");
+        SetError("OpenScofoMIR::OpenScofoMIR fftw_alloc_complex failed");
         return;
     }
 
@@ -416,7 +416,7 @@ void MIR::LoadONNXModel(fs::path path) {
     }
 
     if (!TreeEnsembleClassifierFound) {
-        SetError("TreeEnsembleClassifier not found in model, please use py.train to train models for OScofo");
+        SetError("TreeEnsembleClassifier not found in model, please use py.train to train models for OpenScofo");
         return;
     }
 
@@ -866,4 +866,4 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc, States &Sco
     GetSignalPower(In, Desc);
     GetFFTDescriptions(In, Desc);
 }
-} // namespace OScofo
+} // namespace OpenScofo

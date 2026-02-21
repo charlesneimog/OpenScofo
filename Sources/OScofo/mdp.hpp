@@ -5,7 +5,7 @@
 
 #include "states.hpp"
 
-namespace OScofo {
+namespace OpenScofo {
 
 #ifndef TWO_PI
 #define TWO_PI (2 * M_PI)
@@ -144,4 +144,4 @@ class MDP {
     bool m_HasErrors = false;
     std::vector<std::string> m_Errors;
 };
-} // namespace OScofo
+} // namespace OpenScofo

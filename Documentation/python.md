@@ -1,16 +1,16 @@
 # Python
 
-`OScofo` also provides a Python module, which is primarily used for development and research purposes. In addition, this module can be employed for validation tasks, prototyping, and other auxiliary applications, such as experimental evaluation and rapid testing of algorithmic components.
+`OpenScofo` also provides a Python module, which is primarily used for development and research purposes. In addition, this module can be employed for validation tasks, prototyping, and other auxiliary applications, such as experimental evaluation and rapid testing of algorithmic components.
 
 
-## OScofo Class
+## OpenScofo Class
 
-### `OScofo`
+### `OpenScofo`
 
 ``` py
-from OScofo import OScofo
+from OpenScofo import OpenScofo
 
-scofo = OScofo(48000, 4096, 1024)
+scofo = OpenScofo(48000, 4096, 1024)
 
 ```
 

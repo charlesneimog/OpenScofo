@@ -1,6 +1,6 @@
 #ifdef OSCOFO_LUA
 
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 #include <m_pd.h>
 
 static int pd_Post(lua_State *L) {

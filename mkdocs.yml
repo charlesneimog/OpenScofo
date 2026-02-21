@@ -69,13 +69,13 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.mark
   - pymdownx.tilde
-repo_url: https://github.com/charlesneimog/OScofo
+repo_url: https://github.com/charlesneimog/OpenScofo
 extra_css: [extra/extra.css]
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 nav:
-  - OScofo: index.md
+  - OpenScofo: index.md
   - Score:
       - Intro: score/intro.md
       - Score Configuration: score/config.md
@@ -83,8 +83,8 @@ nav:
       - Actions Configuration: score/actions.md
       - Lua Tutorial: score/lua.md
   - Python: python.md
-  - OScofo Online Editor: Editor/
-  - Downloads: https://github.com/charlesneimog/OScofo/releases/latest
+  - OpenScofo Online Editor: Editor/
+  - Downloads: https://github.com/charlesneimog/OpenScofo/releases/latest
 extra:
   social:
     - icon: fontawesome/brands/instagram

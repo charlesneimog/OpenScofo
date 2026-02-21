@@ -1,5 +1,5 @@
 
-`OScofo` support actions as consequences of `EVENTS`, these actions are very tied with the program where `OScofo` is running and for now just are supported on `PureData`. 
+`OpenScofo` support actions as consequences of `EVENTS`, these actions are very tied with the program where `OpenScofo` is running and for now just are supported on `PureData`. 
 
 The actions can be run immediately after the `EVENT` detection or after some delay specified using the `delay` keyword. There are two types of actions for now `sendto` and `luacall`. Both functions can be delay specified as followed: 
 
@@ -49,7 +49,7 @@ Relative time are music time, they change if the performer plays your must faste
 
 ---
 !!! warning "Advanced Users"
-    This is designed for advances users, but if you are starting you can ask questions using the `OScofo` Github Discussions.
+    This is designed for advances users, but if you are starting you can ask questions using the `OpenScofo` Github Discussions.
 
 ---
 

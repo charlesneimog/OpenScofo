@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <vector>
-#include <OScofo.hpp>
+#include <OpenScofo.hpp>
 
 // ─────────────────────────────────────
 std::vector<double> load_mp3_as_wave(const char *path, int &sr, int &ch) {
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     int sr = 0;
     int ch = 0;
 
-    OScofo::OScofo scofo(48000, 4096, 512);
+    OpenScofo::OpenScofo scofo(48000, 4096, 512);
     bool ok = scofo.ParseScore(score_path);
     if (!ok) {
         std::vector<std::string> Errors = scofo.GetErrorMessage();

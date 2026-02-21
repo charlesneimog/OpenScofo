@@ -1,7 +1,7 @@
 import numpy as np
 import librosa
 
-import OScofo
+import OpenScofo
 
 # Parameters
 sr = 48000
@@ -12,16 +12,16 @@ hop = 1024
 freq = 440.0
 duration = 1.0
 
-# OScofo internal config
+# OpenScofo internal config
 n_mfcc = 13
 n_mels = 40
 fmin = 0.0
 fmax = sr * 0.5
 
 # ╭──────────────────────────────────────╮
-# │                OScofo                │
+# │                OpenScofo                │
 # ╰──────────────────────────────────────╯
-scofo = OScofo.OScofo(sr, fft_size, hop)
+scofo = OpenScofo.OpenScofo(sr, fft_size, hop)
 t = np.arange(int(fft_size * duration)) / sr
 audio = np.sin(2 * np.pi * freq * t).astype(np.float64)
 oscofo_desc = scofo.get_audio_description(audio)

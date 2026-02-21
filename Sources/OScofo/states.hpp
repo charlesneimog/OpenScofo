@@ -5,7 +5,7 @@
 #include <variant>
 #include <span>
 
-namespace OScofo {
+namespace OpenScofo {
 
 enum AudioDescType {
     PITCH,
@@ -137,4 +137,4 @@ class Description {
     std::vector<double> MFCC;
 };
 
-} // namespace OScofo
+} // namespace OpenScofo

@@ -1,9 +1,9 @@
 # Events
 
-`OScofo` for now supports four events, `NOTE`, `TRILL`, `CHORD` and `REST`. Before define then, I need to explain how to represent `PITCHES` and `DURATIONS`.
+`OpenScofo` for now supports four events, `NOTE`, `TRILL`, `CHORD` and `REST`. Before define then, I need to explain how to represent `PITCHES` and `DURATIONS`.
 
 !!! tip "Check the MusicXML Importer"
-    `OScofo` has a [MusicXML importer](../../Editor), it is very accurate and tested on MuseScore and Sibelius (but should work for all major programs). 
+    `OpenScofo` has a [MusicXML importer](../../Editor), it is very accurate and tested on MuseScore and Sibelius (but should work for all major programs). 
 
 
 --- 
@@ -11,7 +11,7 @@
 
 ### `PITCH`
 
-On OScofo pitches are represented by `name` or `MIDI`.
+On OpenScofo pitches are represented by `name` or `MIDI`.
 
 - `NOTENAME`: Things like `C4`, `Db5`, `C#5`, `Gb5`, etc...
 - `MIDI`: Normal `MIDI`. 60 for `C4`, 67 for `G4`, etc...
@@ -19,11 +19,11 @@ On OScofo pitches are represented by `name` or `MIDI`.
 ---
 ### `DURATION`
 
-Different from `Antescofo`, on `OScofo` you just represent `<DURATION>` using number of **tempos**.
+Different from `Antescofo`, on `OpenScofo` you just represent `<DURATION>` using number of **tempos**.
 
 So _fraction representation is not support_, mainly because something like `1` is ambiguous with `1/1`. And, for me, in fraction will be necessary to define the Time Unity to be a more precise language.
 
-Because that `OScofo` uses time representation relative to the value of `BPM` define previously. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
+Because that `OpenScofo` uses time representation relative to the value of `BPM` define previously. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
 
 - :material-music-note-half: duration value is `2`;
 - :material-music-note-quarter: duration value is `1`;
