@@ -61,6 +61,7 @@ class Score {
     std::string m_LuaCode;
 
     // Helpers
+    MacroState AddDummySilence();
     double ModPhases(double Phase);
     MacroState AddTransState(MacroState &State, int ScoreEvent, int BPM);
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
@@ -85,7 +86,7 @@ class Score {
     std::string GetChildStringFromField(const std::string &Score, TSNode node, std::string id);
 
     // Events
-    MacroState PitchEvent(const std::string &Score, TSNode Node);
+    MacroState NewPitchEvent(const std::string &Score, TSNode Node);
     MacroState TrillEvent(const std::string &Score, TSNode Node);
 
     // Add events

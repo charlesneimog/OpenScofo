@@ -3,7 +3,7 @@
 BPM 80
 
 // Measure number 1
-REST 0.25
+
 NOTE E5 0.25
 NOTE A5 0.25
 NOTE G#5 0.25

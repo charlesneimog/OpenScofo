@@ -43,12 +43,18 @@ module.exports = grammar({
             ),
 
         symbolConfigId: ($) => field("configId", choice()),
-        pathConfigId: ($) => field("configId", choice(alias(token("TIMBREMODEL"), $.keyword))),
+        pathConfigId: ($) =>
+            field(
+                "configId",
+                choice(alias(token("TIMBREMODEL"), $.keyword)),
+                // alias(token("TIMBREMODEL"), $.keyword))
+                // alias(token("TIMBREMODEL"), $.keyword))
+            ),
 
         // types
         numberConfig: ($) => seq($.numberConfigId, $.number),
         symbolConfig: ($) => seq($.symbolConfigId, $.symbol),
-        pathConfig: ($) => seq($.pathConfigId, $.path),
+        pathConfig: ($) => seq($.pathConfigId, $.symbol),
 
         //╭─────────────────────────────────────╮
         //│               Events                │

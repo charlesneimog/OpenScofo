@@ -462,7 +462,8 @@ static void oscofo_free(PdOpenScofo *x) {
 extern "C" void setup_o0x2escofo_tilde(void) {
     OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[o.scofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
+    post("[o.scofo~] version %d.%d.%d (%s %s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH, __DATE__,
+         __TIME__);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);

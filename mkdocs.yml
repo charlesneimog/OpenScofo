@@ -1,11 +1,11 @@
 ---
 site_name: OpenScofo
 docs_dir: Documentation
-copyright: Copyright &copy 2026 | Charles K. Neimog
+copyright: Copyright &copy 2026 | Charles K. Neimog 
 theme:
   logo: assets/favicon.svg
   custom_dir: Documentation/overrides
-  logo_dark_mode: assets/favicon.svg
+  logo_dark_mode: assets/favicon-dark.svg
   logo_light_mode: assets/favicon.svg
   favicon: assets/favicon.png
   name: material

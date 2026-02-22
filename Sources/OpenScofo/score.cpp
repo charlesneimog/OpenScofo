@@ -123,7 +123,6 @@ double Score::PitchNode2Freq(const std::string ScoreStr, TSNode node) {
     if (type == "midi") {
         int midi = std::stof(GetCodeStr(ScoreStr, pitch));
         return m_Tunning * pow(2, (midi - 69.0) / 12);
-
     } else if (type != "noteName") {
         TSPoint Pos = ts_node_start_point(pitch);
         SetError("Invalid pitch type on line " + std::to_string(Pos.row + 1));
@@ -219,9 +218,26 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+MacroState Score::AddDummySilence() {
+    MacroState Event;
+    Event.HSMMType = MARKOV;
+    Event.Type = REST;
+    Event.ScorePos = m_ScorePosition;
+    Event.Index = m_ScoreStates.size();
+
+    AudioState Silence;
+    Silence.Type = SILENCE;
+    Silence.Index = m_ScoreStates.size();
+    Silence.Freq = 0;
+
+    Event.AudioStates.emplace_back(Silence);
+    return Event;
+}
+
+// ─────────────────────────────────────
 MacroState Score::GetFirstEvent() {
     MacroState Event;
-    Event.Markov = MARKOV;
+    Event.HSMMType = MARKOV;
     Event.Type = REST;
     Event.ScorePos = 0;
     Event.Index = m_ScoreStates.size();
@@ -237,15 +253,14 @@ MacroState Score::GetFirstEvent() {
 }
 
 // ─────────────────────────────────────
-MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
+MacroState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
     MacroState Event;
     Event.Line = m_LineCount;
-    Event.Markov = SEMIMARKOV;
+    Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
-    // Event.Entropy = m_Entropy;
 
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -257,8 +272,8 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
                 Event.Type = NOTE;
             } else if (id == "TRILL") {
                 Event.Type = TRILL;
-            } else if (id == "CHORD") {
-                Event.Type = CHORD;
+                // } else if (id == "CHORD") {
+                //     Event.Type = CHORD;
             } else {
                 TSPoint Pos = ts_node_start_point(child);
                 SetError("Invalid pitch event on line " + std::to_string(Pos.row + 1));
@@ -268,13 +283,7 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
             AudioState SubState;
             SubState.Type = PITCH;
             SubState.Freq = PitchNode2Freq(ScoreStr, child);
-
-            AudioState Silence;
-            Silence.Type = SILENCE;
-            Silence.Freq = 0;
-
             Event.AudioStates.push_back(SubState);
-            Event.AudioStates.push_back(Silence);
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
@@ -289,10 +298,7 @@ MacroState Score::PitchEvent(const std::string &ScoreStr, TSNode Node) {
                     Event.AudioStates.push_back(Pitch);
                 }
             }
-            AudioState Silence;
-            Silence.Type = SILENCE;
-            Silence.Freq = 0;
-            Event.AudioStates.push_back(Silence);
+
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
@@ -361,7 +367,7 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
         TSPoint Pos = ts_node_start_point(child);
         Event.Line = Pos.row + 1;
         if (type == "pitchEvent") {
-            Event = PitchEvent(ScoreStr, child);
+            Event = NewPitchEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
             m_ScoreStates.emplace_back(Event);
@@ -410,34 +416,44 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
                 MacroState Begin = GetFirstEvent();
                 Begin.BPMExpected = v;
                 m_ScoreStates.emplace_back(Begin);
+                std::cout << "Set BPM " << v << std::endl;
             } else if (id == "TRANSPOSE") {
                 if (v < -36 || v > 36) {
                     SetError("Invalid transpose value on line " + std::to_string(pos.row + 1));
                     return;
                 }
                 m_Transpose = v;
+                std::cout << "Set Transpose " << v << std::endl;
             } else if (id == "ENTROPY" || id == "Entropy") {
                 m_Entropy = v;
+                std::cout << "Set Entropy " << v << std::endl;
             } else if (id == "PhaseCoupling") {
                 m_PhaseCoupling = v;
+                std::cout << "Set Phase Coupling " << v << std::endl;
             } else if (id == "SyncStrength") {
                 m_SyncStrength = v;
+                std::cout << "Set Sync Strength " << v << std::endl;
             } else if (id == "PitchSigma" || id == "VARIANCE") {
                 m_PitchTemplateSigma = v;
+                std::cout << "Set Pitch Sigma " << v << std::endl;
             } else if (id == "FFTSize") {
                 m_FFTSize = (int)v;
+                std::cout << "Set FFT Size " << v << std::endl;
             } else if (id == "HopSize") {
                 m_HopSize = (int)v;
+                std::cout << "Set Hop Size " << v << std::endl;
             }
         } else if (type == "pathConfig") {
             std::string id = GetChildStringFromField(ScoreStr, child, "pathConfigId");
-            std::string path = GetChildStringFromType(ScoreStr, child, "path");
+            std::string path = GetChildStringFromType(ScoreStr, child, "symbol");
             if (!path.empty() && path.front() == '"') {
                 path = path.substr(1, path.size() - 2);
             }
 
             if (id == "TIMBREMODEL") {
                 m_TimbreModel = m_ScoreRootPath / fs::path(path);
+                std::cout << m_TimbreModel << std::endl;
+                std::cout << "Set Timbre Model " << m_TimbreModel.string() << std::endl;
                 if (!fs::exists(m_TimbreModel)) {
                     SetError("Timbre Model not found");
                 }
@@ -535,37 +551,6 @@ void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MacroState &
 }
 
 // ─────────────────────────────────────
-void Score::ParseInput(const std::string &ScoreStr) {
-    TSParser *parser = ts_parser_new();
-    ts_parser_set_language(parser, tree_sitter_scofo());
-    TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
-    TSNode rootNode = ts_tree_root_node(tree);
-
-    uint32_t child_count = ts_node_child_count(rootNode);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(rootNode, i);
-        std::string type = ts_node_type(child);
-        if (type == "EVENT") {
-            if (m_CurrentBPM == -1) {
-                SetError("BPM is not defined");
-                return;
-            }
-            ProcessEvent(ScoreStr, child);
-        } else if (type == "CONFIG") {
-            ProcessConfig(ScoreStr, child);
-        } else if (type == "LUA") {
-            std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
-            lua_body += "\n\n";
-            m_LuaCode += lua_body;
-        }
-    }
-
-    // Cleanup
-    ts_tree_delete(tree);
-    ts_parser_delete(parser);
-}
-
-// ─────────────────────────────────────
 States Score::Parse(std::string ScoreFile) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
@@ -605,7 +590,33 @@ States Score::Parse(std::string ScoreFile) {
     std::string Line;
 
     // read and process score
-    ParseInput(ScoreStr);
+    TSParser *parser = ts_parser_new();
+    ts_parser_set_language(parser, tree_sitter_scofo());
+    TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
+    TSNode rootNode = ts_tree_root_node(tree);
+
+    uint32_t child_count = ts_node_child_count(rootNode);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(rootNode, i);
+        std::string type = ts_node_type(child);
+        if (type == "EVENT") {
+            if (m_CurrentBPM == -1) {
+                SetError("BPM is not defined");
+                return {};
+            }
+            ProcessEvent(ScoreStr, child);
+        } else if (type == "CONFIG") {
+            ProcessConfig(ScoreStr, child);
+        } else if (type == "LUA") {
+            std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
+            lua_body += "\n\n";
+            m_LuaCode += lua_body;
+        }
+    }
+
+    // Cleanup
+    ts_tree_delete(tree);
+    ts_parser_delete(parser);
 
     if (!HasErrors()) {
         m_ScoreLoaded = true;
