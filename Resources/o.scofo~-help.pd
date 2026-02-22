@@ -36,6 +36,8 @@
 #X msg 76 148 score Tests/canticos.txt;
 #X msg 29 59 open bwv-1007.mp3 \, 1;
 #X msg 87 171 score Tests/bwv-1007.txt;
+#X msg 50 87 0;
+#X obj 10 185 *~ 1;
 #X connect 8 0 0 0;
 #X connect 9 0 18 0;
 #X connect 10 0 11 0;
@@ -45,10 +47,12 @@
 #X connect 18 1 4 0;
 #X connect 19 0 23 0;
 #X connect 20 0 21 0;
-#X connect 23 0 24 0;
 #X connect 23 0 25 0;
+#X connect 23 0 31 0;
 #X connect 24 0 18 0;
 #X connect 26 0 18 0;
 #X connect 27 0 18 0;
 #X connect 28 0 23 0;
 #X connect 29 0 18 0;
+#X connect 30 0 23 0;
+#X connect 31 0 24 0;

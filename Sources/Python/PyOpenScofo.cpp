@@ -92,7 +92,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def(py::init<>())
         .def_readwrite("position", &OpenScofo::MacroState::ScorePos)
         .def_readwrite("type", &OpenScofo::MacroState::Type)
-        .def_readwrite("markov", &OpenScofo::MacroState::Markov)
+        .def_readwrite("markov", &OpenScofo::MacroState::HSMMType)
         .def_readwrite("forward", &OpenScofo::MacroState::Forward)
         .def_readwrite("bpm_expected", &OpenScofo::MacroState::BPMExpected)
         .def_readwrite("bpm_observed", &OpenScofo::MacroState::BPMObserved)

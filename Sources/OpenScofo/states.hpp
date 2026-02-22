@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <variant>
-#include <span>
 
 namespace OpenScofo {
 
@@ -16,12 +15,12 @@ enum AudioDescType {
 
 // ─────────────────────────────────────
 enum EventType {
-    BEGIN, // First state of score
     REST,  // Markov state
     NOTE,  // MacroState, Semimarkov with Markov inside
-    CHORD, // MacroState,
     TRILL, // MacroState, SemiMarkov with Markov inside
-    MULTI, // MacroState,
+
+    // CHORD, // MacroState,
+    // MULTI, // MacroState,
 };
 
 enum HMMType { SEMIMARKOV, MARKOV };
@@ -44,8 +43,7 @@ class AudioState {
   public:
     AudioDescType Type;
     double Freq;
-    std::vector<double> Obs;
-    std::vector<double> Forward;
+    std::string Label;
     unsigned Index;
 };
 
@@ -56,7 +54,7 @@ class MacroState {
     int ScorePos;
     int SubStateIndex = 0;
     EventType Type;
-    HMMType Markov;
+    HMMType HSMMType;
     int MarkovIndex = -1;
 
     // Configs
@@ -68,7 +66,7 @@ class MacroState {
 
     // Forward Algorithm
     double InitProb;
-    // std::vector<double> Obs;
+    std::vector<double> Obs;
     std::vector<double> Forward;
 
     // Time

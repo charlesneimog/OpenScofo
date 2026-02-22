@@ -113,6 +113,13 @@ if(BUILD_WITH_LUA)
         target_compile_definitions(lua PUBLIC MAKE_LIB)
         target_include_directories(lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
         set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+        if(LINUX)
+            target_compile_definitions(lua PUBLIC LUA_USE_LINUX)
+        elseif(APPLE)
+            target_compile_definitions(lua PUBLIC LUA_USE_MACOSX)
+        endif()
+
     endif()
     add_definitions(-DOSCOFO_LUA)
 else()
@@ -125,9 +132,7 @@ endif()
 set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz)
 if(NOT EXISTS ${FFTW3_FILE})
     message(STATUS "Downloading FFTW3")
-    file(
-        DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE}
-        STATUS DOWNLOAD_STATUS)
+    file(DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE} STATUS DOWNLOAD_STATUS)
 endif()
 
 set(BUILD_SHARED_LIBS

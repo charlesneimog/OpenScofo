@@ -60,7 +60,7 @@ int luaopen_oscofo(lua_State *L) {
     sol::usertype<MacroState> state_type = lua.new_usertype<MacroState>("State", sol::constructors<MacroState()>());
     state_type["position"] = &MacroState::ScorePos;
     state_type["type"] = &MacroState::Type;
-    state_type["markov"] = &MacroState::Markov;
+    state_type["markov"] = &MacroState::HSMMType;
     state_type["forward"] = &MacroState::Forward;
     state_type["bpm_expected"] = &MacroState::BPMExpected;
     state_type["bpm_observed"] = &MacroState::BPMObserved;

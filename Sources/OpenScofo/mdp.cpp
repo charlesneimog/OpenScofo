@@ -15,6 +15,8 @@ namespace OpenScofo {
 
     * CONT, A. Improvement of Observation Modeling for Score Following. 2004.
 
+    * CUVILLIER, P; CONT, A.. “Coherent Time Modeling of Semi-Markov Models with Application to Real-Time Audio-to-Score Alignment.” 2014.
+
     * GUÉDON, Y. Hidden Hybrid Markov/Semi-Markov Chains. Computational Statistics & Data
         Analysis, [S.l.], v.49, n.3, p.663–688, 2005.
 
@@ -87,12 +89,8 @@ void MDP::SetScoreStates(States ScoreStates) {
     m_States = ScoreStates;
 
     for (MacroState &State : m_States) {
-        // State.Obs.resize(m_BufferSize + 1, 0);
+        State.Obs.resize(m_BufferSize + 1, 0);
         State.Forward.resize(m_BufferSize + 1, 0);
-        for (AudioState &MicroState : State.AudioStates) {
-            MicroState.Obs.resize(m_BufferSize + 1, 0);
-            MicroState.Forward.resize(m_BufferSize + 1, 0);
-        }
     }
 
     m_CurrentStateIndex = -1;
@@ -487,52 +485,33 @@ void MDP::GetAudioObservations(size_t FirstStateIndex, size_t LastStateIndex, in
         MacroState &StateJ = m_States[j];
         int BufferIndex = (T % m_BufferSize);
         if (StateJ.Type == NOTE) {
-            for (AudioState &AudioState : StateJ.AudioStates) {
-                switch (AudioState.Type) {
-                case PITCH: {
-                    if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
-                        AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
-                        continue;
-                    }
-                    double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
-                    PitchObs[AudioState.Freq] = KL;
-                    AudioState.Obs[BufferIndex] = KL;
-                    break;
-                }
-                case SILENCE: {
-                    AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
-                    break;
-                }
-                default:
-                    SetError("Not implemented yet!");
-                }
+            AudioState &AudioState = StateJ.AudioStates[0];
+            if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
+                StateJ.Obs[BufferIndex] = std::max(StateJ.Obs[BufferIndex], PitchObs[AudioState.Freq]);
+                continue;
             }
+            double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
+            PitchObs[AudioState.Freq] = KL;
+            StateJ.Obs[BufferIndex] = std::max(StateJ.Obs[BufferIndex], KL);
+            break;
         } else if (StateJ.Type == REST) {
-            for (AudioState &AudioState : StateJ.AudioStates) {
-                AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
-            }
+            StateJ.Obs[BufferIndex] = std::max(StateJ.Obs[BufferIndex], m_Desc.SilenceProb);
         } else if (StateJ.Type == TRILL) {
             for (AudioState &AudioState : StateJ.AudioStates) {
-                switch (AudioState.Type) {
-                case PITCH: {
-                    if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
-                        AudioState.Obs[BufferIndex] = PitchObs[AudioState.Freq];
-                        continue;
-                    }
-                    double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
-                    AudioState.Obs[BufferIndex] = KL;
-                    break;
+                if (PitchObs.find(AudioState.Freq) != PitchObs.end()) {
+                    StateJ.Obs[BufferIndex] = std::max(StateJ.Obs[BufferIndex], PitchObs[AudioState.Freq]);
+                    continue;
                 }
-                case SILENCE: {
-                    AudioState.Obs[BufferIndex] = m_Desc.SilenceProb;
-                    break;
-                }
-                default:
-                    SetError("Not implemented yet!");
-                }
+                double KL = GetPitchSimilarity(AudioState.Freq) * (1 - m_Desc.SilenceProb);
+                PitchObs[AudioState.Freq] = KL;
+                StateJ.Obs[BufferIndex] = std::max(StateJ.Obs[BufferIndex], KL);
+                break;
             }
         }
+
+        std::cout << StateJ.Obs[BufferIndex] << std::endl;
     }
+    std::cout << std::endl;
 }
 
 // ─────────────────────────────────────
@@ -590,6 +569,7 @@ std::vector<double> MDP::GetInitialDistribution() {
 }
 
 // ─────────────────────────────────────
+// (CUVILLIER; CONT, 2014, p. 3)
 double MDP::GetTransProbability(int i, int j) {
     // simplest markov
     if (i + 1 == j) {
@@ -614,31 +594,10 @@ int MDP::GetMaxUForJ(MacroState &StateJ) {
 }
 
 // ─────────────────────────────────────
-double CalculateEntropy(const std::vector<double> &probs) {
-    double entropy = 0.0;
-    for (double prob : probs) {
-        if (prob > 0) { // Avoid log(0) which is undefined
-            entropy -= prob * log(prob);
-        }
-    }
-    return entropy;
-}
-
-// ─────────────────────────────────────
 double MDP::Markov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
     if (T == 0) {
-        double Obs = 0;
-        for (AudioState &AudioState : StateJ.AudioStates) {
-            Obs = std::max(Obs, AudioState.Obs[bufferIndex]);
-        }
-        return Obs * StateJ.InitProb;
+        return StateJ.Obs[bufferIndex] * StateJ.InitProb;
     } else {
-        double Obs = 0;
-        for (AudioState &AudioState : StateJ.AudioStates) {
-            Obs = std::max(Obs, AudioState.Obs[bufferIndex]);
-        }
-
-        // previous
         double MaxTrans = 0;
         for (int i = CurrentState; i <= j; i++) {
             if (i < 0) {
@@ -646,52 +605,44 @@ double MDP::Markov(MacroState &StateJ, int CurrentState, int j, int T, int buffe
             }
             MacroState &StateI = m_States[i];
             int PrevIndex = (T - 1) % m_BufferSize;
-            MaxTrans = std::max(MaxTrans, StateI.Forward[PrevIndex]);
+            MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
         }
-        return Obs * MaxTrans;
+        return StateJ.Obs[bufferIndex] * MaxTrans;
     }
 }
 
 // ─────────────────────────────────────
 double MDP::SemiMarkov(MacroState &StateJ, int CurrentState, int j, int T, int bufferIndex) {
     if (T == 0) {
-        double Obs = 0;
-        for (AudioState &AudioState : StateJ.AudioStates) {
-            Obs = std::max(Obs, AudioState.Obs[bufferIndex]);
-        }
-        return Obs * GetOccupancyDistribution(StateJ, T + 1) * StateJ.InitProb;
+        return StateJ.Obs[bufferIndex] * GetOccupancyDistribution(StateJ, T + 1) * StateJ.InitProb;
     } else {
-        double MaxJProb = 0;
-        for (AudioState AudioState : StateJ.AudioStates) {
-            double Obs = AudioState.Obs[bufferIndex];
-            double MaxAlpha = 0;
-            for (int u = 1; u <= std::min(T, GetMaxUForJ(StateJ)); u++) {
-                double ProbPrevObs = 1.0;
-                for (int v = 1; v < u; v++) {
-                    int PrevIndex = (bufferIndex - v + m_BufferSize) % m_BufferSize;
-                    ProbPrevObs *= AudioState.Obs[PrevIndex];
-                }
-                double Sur = GetOccupancyDistribution(StateJ, u);
-                double MaxTrans = 0;
-                for (int i = CurrentState; i <= j; i++) {
-                    if (i < 0) {
-                        continue;
-                    }
-                    MacroState &StateI = m_States[i];
-                    int PrevIndex = (T - u) % m_BufferSize;
-                    if (i != j) {
-                        MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
-                    } else {
-                        MaxTrans = std::max(MaxTrans, StateJ.Forward[PrevIndex]);
-                    }
-                }
-
-                double MaxResult = ProbPrevObs * Sur * MaxTrans;
-                MaxAlpha = std::max(MaxAlpha, MaxResult);
+        double Obs = StateJ.Obs[bufferIndex];
+        double MaxAlpha = 0;
+        for (int u = 1; u <= std::min(T, GetMaxUForJ(StateJ)); u++) {
+            double ProbPrevObs = 1.0;
+            for (int v = 1; v < u; v++) {
+                int PrevIndex = (bufferIndex - v + m_BufferSize) % m_BufferSize;
+                ProbPrevObs *= StateJ.Obs[PrevIndex];
             }
-            MaxJProb = std::max(MaxJProb, Obs * MaxAlpha);
+            double Sur = GetOccupancyDistribution(StateJ, u);
+            double MaxTrans = 0;
+            for (int i = CurrentState; i <= j; i++) {
+                if (i < 0) {
+                    continue;
+                }
+                MacroState &StateI = m_States[i];
+                int PrevIndex = (T - u) % m_BufferSize;
+                if (i != j) {
+                    MaxTrans = std::max(MaxTrans, GetTransProbability(i, j) * StateI.Forward[PrevIndex]);
+                } else {
+                    MaxTrans = std::max(MaxTrans, StateI.Forward[PrevIndex]);
+                }
+            }
+
+            double MaxResult = ProbPrevObs * Sur * MaxTrans;
+            MaxAlpha = std::max(MaxAlpha, MaxResult);
         }
-        return MaxJProb;
+        return Obs * MaxAlpha;
     }
 }
 
@@ -706,7 +657,7 @@ int MDP::Inference(size_t CurrentState, size_t MaxState, int T) {
             break;
         }
         MacroState &StateJ = m_States[j];
-        switch (StateJ.Markov) {
+        switch (StateJ.HSMMType) {
         case SEMIMARKOV:
             StateJ.Forward[bufferIndex] = SemiMarkov(StateJ, CurrentState, j, T, bufferIndex);
             break;
@@ -737,12 +688,15 @@ int MDP::Inference(size_t CurrentState, size_t MaxState, int T) {
             double Forward = StateJ.Forward[bufferIndex];
             StateJ.Forward[bufferIndex] = Forward / SumForward;
         }
+
+        //
         if (StateJ.Forward[bufferIndex] > MaxValue) {
             MaxValue = StateJ.Forward[bufferIndex];
             BestState = j;
         }
         Probs.push_back(StateJ.Forward[bufferIndex]);
     }
+    // std::cout << std::endl;
 
     return BestState;
 }

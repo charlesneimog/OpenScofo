@@ -375,7 +375,7 @@ bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     States GoodStates = m_MDP.GetStatesForProcessing();
     m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
-    m_MIR.AddReverb(m_Desc, 0.001);
+    m_MIR.AddReverb(m_Desc, 0.01);
 
     if (m_MDP.HasErrors()) {
         for (auto &error : m_MDP.GetErrorMessage()) {
