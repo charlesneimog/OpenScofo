@@ -16,14 +16,15 @@ hide:
 ---
 
 <p align="center" markdown>
-  ![Image title](./assets/logo.svg)
+  ![Image title](./assets/logo.svg#only-light){ width="15%" }
+  ![Image title](./assets/logo-dark.svg#only-dark){ width="15%" }
 </p>
 
 ---
 
-`OpenScofo` is a OpenSource Score Follower designed with focus on contemporary music. It is based on the research of Arshia Cont and `Antescofo` team at Ircam. I am developing `OpenScofo` because of the possibility to run PureData Patches inside browsers using [pd4web](https://charlesneimog.github.io/pd4web/).
+`OpenScofo` is an open-source score-following system specifically designed for contemporary music. Its development builds upon the research conducted by Arshia Cont and the `Antescofo` team at IRCAM. Current efforts in the development of `OpenScofo` focus on extending its capabilities to accommodate extended instrumental techniques. It should be noted that the software remains in an alpha stage of development.
 
-With `pd4web`, I believe that will be possible decrease the complexity of the setups for live-eletronics music and allows more performers to, at least, taste live-eletronics pieces.
+`OpenScofo` was initially developed as a highly minimal score-following system, designed to be fully compatible with the execution of Pure Data patches within web browsers via [pd4web](https://charlesneimog.github.io/pd4web/). Leveraging `pd4web` is expected to reduce the complexity of live-electronics setups, thereby enabling a broader range of performers to engage with, and gain experiential insight into, live-electronics compositions.
 
 
 -------------------------
@@ -44,16 +45,18 @@ With `pd4web`, I believe that will be possible decrease the complexity of the se
       </div>
     </a>
 
-  <div class="card">
-    <hr>
-    <img
-      src="./assets/pieces/002-fragmentos.png"
-      class="card-img"
-      style="width: 80%; object-fit: cover; object-position: left;"
-    />
-    <p> <i>Composing it yet!</i> </p>
-    <hr>
-  </div>
+    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+      <div class="card">
+        <hr>
+        <img
+          src="./assets/pieces/001-canticos.png"
+          class="card-img"
+          style="width: 80%; object-fit: cover; object-position: left;"
+        />
+        <p><i>Part of my PhD Thesis, will be published soon!</i></p>
+        <hr>
+      </div>
+    </a>
   
 </div>
 

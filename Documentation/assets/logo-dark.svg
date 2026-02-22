@@ -8,7 +8,7 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
-   sodipodi:docname="logo.svg"
+   sodipodi:docname="logo-dark.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -31,7 +31,7 @@
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="g1" />
+     inkscape:current-layer="g4" />
   <defs
      id="defs1" />
   <g
@@ -47,34 +47,36 @@
         <path
            d="m 110.79402,88.785184 v -2.40775 H 54.362627 v 2.40775 z m 0,-18.810468 V 67.566979 H 54.362627 v 2.407737 z m 0,-18.810461 V 48.756518 H 54.362627 v 2.407737 z m 0,-18.810461 V 29.946051 H 54.362627 v 2.407743 z m 0,-18.81047 V 11.135587 H 54.362627 v 2.407737 z"
            id="path1-2-1"
-           style="stroke-width:0.0752416" />
+           style="stroke-width:0.0752416;fill:#ffffff" />
         <g
            id="g2"
-           transform="translate(-3.5630553)">
+           transform="translate(-3.5630553)"
+           style="fill:#ffffff">
           <path
              d="M 64.457353,88.824797 V 86.417054 H 8.0259642 v 2.407743 z m 0,-18.810465 V 67.606595 H 8.0259642 v 2.407737 z m 0,-18.810461 V 48.796134 H 8.0259642 v 2.407737 z m 0,-18.810461 V 29.985667 H 8.0259642 v 2.407743 z m 0,-18.81047 V 11.175203 H 8.0259642 v 2.407737 z"
              id="path1-2"
-             style="stroke-width:0.0752416" />
+             style="stroke-width:0.0752416;fill:#ffffff" />
           <path
              d="m 156.56253,88.747131 v -2.40775 h -56.43139 v 2.40775 z m 0,-18.810468 v -2.407737 h -56.43139 v 2.407737 z m 0,-18.810461 v -2.407737 h -56.43139 v 2.407737 z m 0,-18.810461 v -2.407743 h -56.43139 v 2.407743 z m 0,-18.81047 v -2.407737 h -56.43139 v 2.407737 z"
              id="path1-2-1-0"
-             style="stroke-width:0.0752416" />
+             style="stroke-width:0.0752416;fill:#ffffff" />
         </g>
         <g
            id="g3"
-           transform="translate(-21.382809)">
+           transform="translate(-21.382809)"
+           style="fill:#ffffff">
           <path
              d="m 107.08245,91.528764 c 0.28321,-0.283211 0.47202,-0.660828 0.47202,-1.132848 0,-0.566424 -0.47202,-1.321656 -1.22725,-1.321656 -0.18881,0 -0.47202,0.0944 -0.66083,0.283212 l -11.894909,9.912423 -11.7061,-9.912423 c -0.1888,-0.188808 -0.37761,-0.283212 -0.66082,-0.283212 -0.75524,0 -1.22726,0.660828 -1.22726,1.41606 0,0.377616 0.0944,0.755233 0.47202,1.038444 l 11.23408,9.345996 -11.23408,9.4404 c -0.28321,0.28321 -0.47202,0.75523 -0.47202,1.13285 0,0.56642 0.47202,1.22725 1.13285,1.22725 0.28321,0 0.56643,-0.0944 0.75523,-0.18881 l 11.7061,-9.91242 11.894909,9.91242 c 0.18881,0.0944 0.47202,0.18881 0.66083,0.18881 0.56642,0 1.22725,-0.56642 1.22725,-1.32166 0,-0.37761 -0.18881,-0.84963 -0.47202,-1.03844 l -11.234079,-9.4404 z"
              id="path1-5"
-             style="stroke-width:0.0944041" />
+             style="stroke-width:0.0944041;fill:#ffffff" />
           <path
              d="m 107.50521,58.833534 v -7.005922 c 5.45811,-0.162931 10.10156,-1.547819 12.54549,-3.747357 l -1.62928,-1.792207 c -2.03661,1.792207 -6.10982,2.932707 -10.91621,3.095638 V 18.916074 h -2.44392 V 49.302218 C 100.2549,49.139293 96.181687,47.91733 94.063617,46.125117 l -1.62928,1.792213 12.626953,11.975236 v 7.250315 c -5.458103,0.244394 -10.101563,1.629288 -12.626953,3.910283 l 1.62928,1.792213 c 2.11807,-1.792213 6.191283,-3.014176 10.997673,-3.25857 v 20.610445 h 2.44392 V 69.586807 c 4.80639,0.162931 8.8796,1.303425 10.91621,3.095639 l 1.62928,-1.792214 z m 0,8.309347 v -4.887852 l 5.78396,5.539565 c -1.79221,-0.407319 -3.74736,-0.570245 -5.78396,-0.651713 z M 99.277327,51.012969 c 1.710753,0.407324 3.665893,0.651712 5.783963,0.733181 v 4.806383 z"
              id="path1-8"
-             style="stroke-width:0.0814644" />
+             style="stroke-width:0.0814644;fill:#ffffff" />
         </g>
         <text
            xml:space="preserve"
-           style="font-size:28.8988px;writing-mode:lr-tb;direction:ltr;fill:#003380;stroke-width:0.677314"
+           style="font-size:28.8988px;writing-mode:lr-tb;direction:ltr;fill:#004dc6;stroke-width:0.677314;fill-opacity:1"
            x="5.7010465"
            y="144.55881"
            id="text1"
@@ -83,7 +85,7 @@
            inkscape:export-ydpi="900"><tspan
              sodipodi:role="line"
              id="tspan1"
-             style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:28.8988px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#003380;stroke-width:0.677314"
+             style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:28.8988px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#004dc6;stroke-width:0.677314;fill-opacity:1"
              x="5.7010465"
              y="144.55881">OpenScofo</tspan></text>
       </g>
