@@ -26,9 +26,9 @@ extern "C" {
 #include <chrono>
 #include <iostream>
 
-#include <boost/math/special_functions/bessel.hpp>
 #include <cmath>
 #include <numeric>
+#include <spdlog/spdlog.h>
 
 class Timer {
   public:

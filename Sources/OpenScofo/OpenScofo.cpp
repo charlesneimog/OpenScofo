@@ -34,6 +34,12 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize
 #if defined(OSCOFO_LUA)
     InitLua();
 #endif
+
+#ifndef NDEBUG
+    spdlog::set_level(spdlog::level::debug);
+#else
+    spdlog::set_level(spdlog::level::info);
+#endif
 }
 
 //  ─────────────────────────────────────
