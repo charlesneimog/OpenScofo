@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
+set(SPDLOG_BUILD_SHARED OFF)
 
 option(BUILD_PY_MODULE "Build Python Module" OFF)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
@@ -156,6 +157,9 @@ set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 cpmaddpackage("gh:charlesneimog/libonnx#master")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
+cpmaddpackage("gh:gabime/spdlog@1.17.0")
+
+set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ╭──────────────────────────────────────╮
 # │                OpenScofo                │
@@ -177,6 +181,7 @@ target_link_libraries(
            score_parser
            lua
            onnx
+           spdlog
            onsetsds)
 
 if(LINUX)

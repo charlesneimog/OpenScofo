@@ -94,7 +94,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
         return;
     }
 
-    x->OpenScofo->SetCurrentEvent(-1);
+    x->OpenScofo->SetCurrentEvent(0);
     x->Event = -1;
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, 0);

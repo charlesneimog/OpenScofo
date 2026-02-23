@@ -103,7 +103,7 @@ static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
         return;
     }
 
-    x->OpenScofo->SetCurrentEvent(-1);
+    x->OpenScofo->SetCurrentEvent(0);
     x->Event = -1;
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, 0);
@@ -132,7 +132,7 @@ static void oscofo_start(MaxOpenScofo *x) {
         object_error((t_object *)x, "Score not loaded");
         return;
     }
-    x->OpenScofo->SetCurrentEvent(-1);
+    x->OpenScofo->SetCurrentEvent(0);
     x->Event = -1;
 
     // clear actions

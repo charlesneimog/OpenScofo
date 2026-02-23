@@ -113,6 +113,7 @@ class MDP {
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
     double GetOccupancyDistribution(MacroState &State, int u);
+    void InitTimeDecoding();
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);
