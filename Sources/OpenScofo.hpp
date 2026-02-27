@@ -85,6 +85,7 @@ class OpenScofo {
     double GetSr();
     double GetFFTSize();
     double GetHopSize();
+    double GetBlockDuration();
     Description GetAudioDescription(std::vector<double> &AudioBuffer);
     Description GetDescription();
     std::vector<double> GetCQTTemplate(double Freq);

@@ -9,7 +9,7 @@
 #X text 14 446 Event Index;
 #X floatatom 85 426 8 0 0 0 - - - 0;
 #X text 139 9 3);
-#X text 149 257 2);
+#X text 153 295 2);
 #X text 224 126 1);
 #X floatatom 10 426 8 0 0 0 - - - 0;
 #X msg 108 371 start;
@@ -37,6 +37,8 @@
 #X msg 87 171 score Tests/bwv-1007.txt;
 #X obj 10 394 antescofo~, f 38;
 #X msg 76 295 verbosity 2;
+#X obj 10 259 *~ 4;
+#X msg 99 204 score Tests/test.txt;
 #X connect 8 0 0 0;
 #X connect 9 0 29 0;
 #X connect 10 0 11 0;
@@ -46,7 +48,7 @@
 #X connect 19 0 20 0;
 #X connect 22 0 23 0;
 #X connect 22 0 24 0;
-#X connect 23 0 29 0;
+#X connect 23 0 31 0;
 #X connect 25 0 29 0;
 #X connect 26 0 29 0;
 #X connect 27 0 22 0;
@@ -54,3 +56,5 @@
 #X connect 29 0 8 0;
 #X connect 29 1 4 0;
 #X connect 30 0 29 0;
+#X connect 31 0 29 0;
+#X connect 32 0 29 0;

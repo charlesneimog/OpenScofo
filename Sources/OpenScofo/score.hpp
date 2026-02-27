@@ -61,11 +61,11 @@ class Score {
     std::string m_LuaCode;
 
     // Helpers
-    MacroState AddDummySilence();
+    MarkovState AddDummySilence();
     double ModPhases(double Phase);
-    MacroState AddTransState(MacroState &State, int ScoreEvent, int BPM);
+    MarkovState AddTransState(MarkovState &State, int ScoreEvent, int BPM);
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
-    double PitchNode2Freq(const std::string Score, TSNode node);
+    void PitchNode2Freq(const std::string Score, TSNode node, AudioState &State);
     // bool SpaceTab(const std::string &line, int numSpaces);
     void ParseInput(const std::string &Score);
     void PrintTreeSitterNode(TSNode node, int indent = 0);
@@ -73,9 +73,9 @@ class Score {
     bool isNumber(std::string str);
 
     void ProcessEvent(const std::string &Score, TSNode Event);
-    void ProcessEventTime(MacroState &Event);
+    void ProcessEventTime(MarkovState &Event);
     void ProcessConfig(const std::string &Score, TSNode Node);
-    void ProcessAction(const std::string &Score, TSNode Node, MacroState &Event);
+    void ProcessAction(const std::string &Score, TSNode Node, MarkovState &Event);
 
     void ProcessNote(TSNode Note);
 
@@ -86,17 +86,18 @@ class Score {
     std::string GetChildStringFromField(const std::string &Score, TSNode node, std::string id);
 
     // Events
-    MacroState NewPitchEvent(const std::string &Score, TSNode Node);
-    MacroState TrillEvent(const std::string &Score, TSNode Node);
+    MarkovState NewRestEvent(const std::string &Score, TSNode Node);
+    MarkovState NewPitchEvent(const std::string &Score, TSNode Node);
+    MarkovState TrillEvent(const std::string &Score, TSNode Node);
 
     // Add events
-    MacroState GetFirstEvent();
-    MacroState AddNote(std::vector<std::string> Tokens);
-    MacroState AddChord(std::vector<std::string> Tokens);
-    MacroState AddTrill(std::vector<std::string> Tokens);
-    MacroState AddMulti(std::vector<std::string> Tokens);
-    MacroState AddDumpSilence();
-    MacroState AddRest(std::vector<std::string> Tokens);
+    MarkovState GetFirstEvent();
+    MarkovState AddNote(std::vector<std::string> Tokens);
+    MarkovState AddChord(std::vector<std::string> Tokens);
+    MarkovState AddTrill(std::vector<std::string> Tokens);
+    MarkovState AddMulti(std::vector<std::string> Tokens);
+    MarkovState AddDumpSilence();
+    MarkovState AddRest(std::vector<std::string> Tokens);
     void AddAction(std::vector<std::string> Tokens);
 
     // Some ScoreConfigs

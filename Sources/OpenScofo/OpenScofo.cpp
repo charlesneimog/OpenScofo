@@ -310,6 +310,11 @@ double OpenScofo::GetHopSize() {
 }
 
 // ─────────────────────────────────────
+double OpenScofo::GetBlockDuration() {
+    return m_MDP.GetBlockDuration();
+}
+
+// ─────────────────────────────────────
 std::vector<float> OpenScofo::GetTimeCoherenceTemplate(int pos, int timeInEvent) {
     return m_MIR.GetTimeCoherenceTemplate(m_States, pos, timeInEvent);
 }

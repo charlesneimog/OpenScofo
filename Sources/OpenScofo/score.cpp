@@ -117,17 +117,17 @@ bool Score::isNumber(std::string str) {
 }
 
 // ─────────────────────────────────────
-double Score::PitchNode2Freq(const std::string ScoreStr, TSNode node) {
+void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &State) {
     TSNode pitch = ts_node_child(node, 0);
     std::string type = ts_node_type(pitch);
     if (type == "midi") {
         int midi = std::stof(GetCodeStr(ScoreStr, pitch));
-        return m_Tunning * pow(2, (midi - 69.0) / 12);
-
+        State.Midi = midi;
+        State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);
     } else if (type != "noteName") {
         TSPoint Pos = ts_node_start_point(pitch);
         spdlog::error("Invalid pitch type on line {}", std::to_string(Pos.row + 1));
-        return 0;
+        return;
     }
 
     char pitchName = GetChildStringFromField(ScoreStr, pitch, "pitchname")[0];
@@ -160,7 +160,7 @@ double Score::PitchNode2Freq(const std::string ScoreStr, TSNode node) {
     default:
         TSPoint Pos = ts_node_start_point(pitch);
         spdlog::error("Invalid note name on line line {}", std::to_string(Pos.row + 1));
-        return 0;
+        return;
     }
 
     if (alt != "") {
@@ -174,9 +174,12 @@ double Score::PitchNode2Freq(const std::string ScoreStr, TSNode node) {
             classNote -= 2;
         }
     }
+
     int midi = classNote + 12 + (12 * std::stoi(octave));
     midi = midi + m_Transpose;
-    return m_Tunning * pow(2, (midi - 69.0) / 12);
+    State.Midi = midi;
+    State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);
+    State.Type = PITCH;
 }
 
 // ─────────────────────────────────────
@@ -219,16 +222,17 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-MacroState Score::AddDummySilence() {
-    MacroState Event;
+MarkovState Score::AddDummySilence() {
+    MarkovState Event;
     Event.HSMMType = MARKOV;
-    Event.Type = REST;
+    Event.Type = BEGIN;
     Event.ScorePos = m_ScorePosition;
     Event.Index = m_ScoreStates.size();
 
     AudioState Silence;
     Silence.Type = SILENCE;
     Silence.Freq = 0;
+    Silence.Midi = 0;
     Silence.Index = 0;
 
     Event.AudioStates.emplace_back(Silence);
@@ -236,8 +240,8 @@ MacroState Score::AddDummySilence() {
 }
 
 // ─────────────────────────────────────
-MacroState Score::GetFirstEvent() {
-    MacroState Event;
+MarkovState Score::GetFirstEvent() {
+    MarkovState Event;
     Event.HSMMType = MARKOV;
     Event.Type = REST;
     Event.ScorePos = 0;
@@ -246,6 +250,7 @@ MacroState Score::GetFirstEvent() {
     AudioState Silence;
     Silence.Type = SILENCE;
     Silence.Freq = 0;
+    Silence.Midi = 0;
     Silence.Index = 0;
 
     Event.AudioStates.emplace_back(Silence);
@@ -254,10 +259,10 @@ MacroState Score::GetFirstEvent() {
 }
 
 // ─────────────────────────────────────
-MacroState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
+MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    MacroState Event;
+    MarkovState Event;
     Event.Line = m_LineCount;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -282,16 +287,8 @@ MacroState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
             }
         } else if (type == "pitch") {
             AudioState SubState;
-            SubState.Type = PITCH;
-            SubState.Freq = PitchNode2Freq(ScoreStr, child);
-
-            AudioState Silence;
-            Silence.Type = SILENCE;
-            Silence.Freq = 0;
-
+            PitchNode2Freq(ScoreStr, child, SubState);
             Event.AudioStates.push_back(SubState);
-            Event.AudioStates.push_back(Silence);
-
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
@@ -299,19 +296,10 @@ MacroState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
                 std::string eventPitchId = ts_node_type(eventPitch);
                 if (eventPitchId == "pitch") {
                     AudioState Pitch;
-                    Pitch.Type = PITCH;
-                    Pitch.Freq = PitchNode2Freq(ScoreStr, eventPitch);
+                    PitchNode2Freq(ScoreStr, eventPitch, Pitch);
                     Event.AudioStates.push_back(Pitch);
-
-                    AudioState Silence;
-                    Silence.Type = SILENCE;
-                    Event.AudioStates.push_back(Silence);
                 }
             }
-            AudioState Silence;
-            Silence.Type = SILENCE;
-            Silence.Freq = 0;
-            Event.AudioStates.push_back(Silence);
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
@@ -330,7 +318,41 @@ MacroState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-void Score::ProcessEventTime(MacroState &Event) {
+MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    MarkovState Event;
+    Event.Line = m_LineCount;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
+
+    uint32_t child_count = ts_node_child_count(Node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(Node, i);
+        std::string type = ts_node_type(child);
+        if (type == "restEventId") {
+            continue;
+        } else if (type == "duration") {
+            double duration = GetDurationFromNode(ScoreStr, child);
+            Event.Duration = duration;
+            Event.Type = REST;
+
+            m_MinimalDuration = std::min(m_MinimalDuration, duration);
+
+            AudioState Silence;
+            Silence.Type = SILENCE;
+            Event.AudioStates.push_back(Silence);
+        } else {
+            spdlog::error("Rest TOKEN is not reconized on line {}", m_LineCount);
+        }
+    }
+    ProcessEventTime(Event);
+    return Event;
+}
+
+// ─────────────────────────────────────
+void Score::ProcessEventTime(MarkovState &Event) {
     // Time
     if (Event.Index != 0) {
         int Index = Event.Index;
@@ -377,7 +399,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
-        MacroState Event;
+        MarkovState Event;
         TSNode child = ts_node_child(Node, i);
         std::string type = ts_node_type(child);
         TSPoint Pos = ts_node_start_point(child);
@@ -387,9 +409,13 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
             m_ScoreStates.emplace_back(Event);
-
-            // BUG: Wrong
-            // m_ScoreStates.emplace_back(AddDummySilence());
+        } else if (type == "restEvent") {
+            Event = NewRestEvent(ScoreStr, child);
+            m_PrevDuration = Event.Duration;
+            m_LastOnset = Event.OnsetExpected;
+            m_ScoreStates.emplace_back(Event);
+        } else {
+            SetError("Type not implemented " + type);
         }
     }
 }
@@ -432,7 +458,7 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
 
             if (id == "BPM") {
                 m_CurrentBPM = v;
-                MacroState Begin = GetFirstEvent();
+                MarkovState Begin = GetFirstEvent();
                 ProcessEventTime(Begin);
                 Begin.BPMExpected = v;
                 m_ScoreStates.emplace_back(Begin);
@@ -477,7 +503,7 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
 }
 
 // ─────────────────────────────────────
-void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MacroState &Event) {
+void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
     Action NewAction;
     NewAction.AbsoluteTime = true;
     NewAction.Time = 0;

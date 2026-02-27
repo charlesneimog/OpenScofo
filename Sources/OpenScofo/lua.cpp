@@ -56,23 +56,23 @@ int luaopen_oscofo(lua_State *L) {
     desc_type["power"] = &Description::Power;
     m["Description"] = desc_type;
 
-    // ─── MacroState / State class ───
-    sol::usertype<MacroState> state_type = lua.new_usertype<MacroState>("State", sol::constructors<MacroState()>());
-    state_type["position"] = &MacroState::ScorePos;
-    state_type["type"] = &MacroState::Type;
-    state_type["markov"] = &MacroState::HSMMType;
-    state_type["forward"] = &MacroState::Forward;
-    state_type["bpm_expected"] = &MacroState::BPMExpected;
-    state_type["bpm_observed"] = &MacroState::BPMObserved;
-    state_type["onset_expected"] = &MacroState::OnsetExpected;
-    state_type["onset_observed"] = &MacroState::OnsetObserved;
-    state_type["phase_expected"] = &MacroState::PhaseExpected;
-    state_type["phase_observed"] = &MacroState::PhaseObserved;
-    state_type["ioi_phi_n"] = &MacroState::IOIPhiN;
-    state_type["ioi_hat_phi_n"] = &MacroState::IOIHatPhiN;
-    state_type["audiostates"] = &MacroState::AudioStates;
-    state_type["duration"] = &MacroState::Duration;
-    state_type["line"] = &MacroState::Line;
+    // ─── MarkovState / State class ───
+    sol::usertype<MarkovState> state_type = lua.new_usertype<MarkovState>("State", sol::constructors<MarkovState()>());
+    state_type["position"] = &MarkovState::ScorePos;
+    state_type["type"] = &MarkovState::Type;
+    state_type["markov"] = &MarkovState::HSMMType;
+    state_type["forward"] = &MarkovState::Forward;
+    state_type["bpm_expected"] = &MarkovState::BPMExpected;
+    state_type["bpm_observed"] = &MarkovState::BPMObserved;
+    state_type["onset_expected"] = &MarkovState::OnsetExpected;
+    state_type["onset_observed"] = &MarkovState::OnsetObserved;
+    state_type["phase_expected"] = &MarkovState::PhaseExpected;
+    state_type["phase_observed"] = &MarkovState::PhaseObserved;
+    state_type["ioi_phi_n"] = &MarkovState::IOIPhiN;
+    state_type["ioi_hat_phi_n"] = &MarkovState::IOIHatPhiN;
+    state_type["audiostates"] = &MarkovState::AudioStates;
+    state_type["duration"] = &MarkovState::Duration;
+    state_type["line"] = &MarkovState::Line;
     m["State"] = state_type;
 
     // ─── AudioState class ───
