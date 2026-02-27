@@ -6,22 +6,40 @@
 
 namespace py = pybind11;
 
+static void python_error_callback(const spdlog::details::log_msg &log, void *data) {
+    (void)data;
+    std::string text(log.payload.data(), log.payload.size());
+    switch (log.level) {
+    case spdlog::level::critical:
+        throw py::value_error(text);
+    case spdlog::level::err:
+        throw py::value_error(text);
+        break;
+    case spdlog::level::info:
+        py::print(text);
+        break;
+    case spdlog::level::debug:
+        py::print("\033[90m" + text + "\033[0m");
+        break;
+    default:
+        break;
+    }
+}
+
 PYBIND11_MODULE(_OpenScofo, m) {
 
     py::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
         .def(py::init([](float sr, float fft_size, float hop) {
             auto obj = new OpenScofo::OpenScofo(sr, fft_size, hop);
-            obj->SetErrorCallBack([](const std::string &msg) {
-                py::gil_scoped_acquire acquire;
-                throw py::value_error(msg);
-            });
+            obj->SetErrorCallback(python_error_callback);
             return obj;
         }))
 
         // Python
         .def("__repr__",
              [](OpenScofo::OpenScofo &self) {
-                 return std::format("<OpenScofo(sr={}, fft_size={}, hop={})>", self.GetSr(), self.GetFFTSize(), self.GetHopSize());
+                 return std::format("<OpenScofo(sr={}, fft_size={}, hop={})>", self.GetSr(), self.GetFFTSize(),
+                                    self.GetHopSize());
              })
 
         // Score
@@ -40,7 +58,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
         // Get Info
         .def("get_live_bpm", &OpenScofo::OpenScofo::GetLiveBPM)
         .def("get_event_index", &OpenScofo::OpenScofo::GetEventIndex)
-        .def("get_error", &OpenScofo::OpenScofo::GetErrorMessage)
         .def("get_states", &OpenScofo::OpenScofo::GetStates)
         .def("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
         .def("get_cqt_template", &OpenScofo::OpenScofo::GetCQTTemplate)
@@ -49,17 +66,14 @@ PYBIND11_MODULE(_OpenScofo, m) {
         // Help & Test Functions
         .def("get_audio_description", &OpenScofo::OpenScofo::GetAudioDescription)
 
-        // Time Template
-        .def("get_time_coherence_template", &OpenScofo::OpenScofo::GetTimeCoherenceTemplate, py::arg("pos"), py::arg("time_in_event") = 0)
-        .def("get_time_coherence_confiability", &OpenScofo::OpenScofo::GetTimeCoherenceConfiability, py::arg("event_values"))
-
         // Process
         .def("process_block", [](OpenScofo::OpenScofo &self, py::array_t<double> audio) {
             py::buffer_info bufInfo = audio.request();
             if (bufInfo.ndim != 1) {
                 throw std::runtime_error("Input array must be 1-dimensional");
             }
-            std::vector<double> cpp_audio(static_cast<double *>(bufInfo.ptr), static_cast<double *>(bufInfo.ptr) + bufInfo.shape[0]);
+            std::vector<double> cpp_audio(static_cast<double *>(bufInfo.ptr),
+                                          static_cast<double *>(bufInfo.ptr) + bufInfo.shape[0]);
             return self.ProcessBlock(cpp_audio);
         });
 

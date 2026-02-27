@@ -144,6 +144,7 @@ class Description {
     // HPSS (Harmonic–Percussive Source Separation)
     std::vector<double> PseudoCQT;
     std::vector<double> MFCC;
+    std::vector<double> Chroma; // size 12
 };
 
 } // namespace OpenScofo

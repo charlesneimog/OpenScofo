@@ -93,9 +93,7 @@ class OpenScofo {
     double GetTimeCoherenceConfiability(const std::vector<double> &eventValues);
 
     // Config
-    void SetErrorCallBack(std::function<void(const std::string &)> cb) {
-        m_ErrorCallback = cb;
-    }
+    void ClearErrors();
 
 #if defined(OSCOFO_LUA)
     void InitLua();
@@ -107,15 +105,14 @@ class OpenScofo {
 #endif
 
     // Errors
-    bool HasErrors();
-    std::vector<std::string> GetErrorMessage();
-    void SetError(const std::string &message);
-    void ClearError();
+    void SetErrorCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data = nullptr);
+    void SetLogLevel(spdlog::level::level_enum level);
 
   private:
     MDP m_MDP;
     MIR m_MIR;
     Score m_Score;
+    OpenScofoLog<std::mutex> m_Log;
 
 #if defined(OSCOFO_LUA)
     lua_State *m_LuaState;

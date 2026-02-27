@@ -31,11 +31,9 @@ int luaopen_oscofo(lua_State *L) {
     oscofo_type["get_pitch_template"] = &OpenScofo::GetPitchTemplate;
     oscofo_type["get_cqt_template"] = &OpenScofo::GetCQTTemplate;
     oscofo_type["get_audio_description"] = &OpenScofo::GetAudioDescription;
-    oscofo_type["get_time_coherence_template"] = sol::overload(
-        [](OpenScofo &self, int pos) { return self.GetTimeCoherenceTemplate(pos, 0); },
-        [](OpenScofo &self, int pos, int time_in_event) { return self.GetTimeCoherenceTemplate(pos, time_in_event); }
-    );
-    oscofo_type["get_time_coherence_confiability"] = &OpenScofo::GetTimeCoherenceConfiability;
+    oscofo_type["get_time_coherence_template"] =
+        sol::overload([](OpenScofo &self, int pos) { return self.GetTimeCoherenceTemplate(pos, 0); },
+                      [](OpenScofo &self, int pos, int time_in_event) { return self.GetTimeCoherenceTemplate(pos, time_in_event); });
 
     m["OpenScofo"] = oscofo_type;
 

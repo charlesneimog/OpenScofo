@@ -36,6 +36,8 @@
 #X msg 76 148 score Tests/canticos.txt \, start;
 #X msg 87 171 score Tests/bwv-1007.txt \, start;
 #X obj 10 185 *~ 8;
+#X obj 102 214 tgl 18 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 1;
+#X msg 102 241 set verbosity \$1;
 #X connect 7 0 0 0;
 #X connect 8 0 9 0;
 #X connect 11 0 21 0;
@@ -53,3 +55,5 @@
 #X connect 27 0 16 0;
 #X connect 28 0 16 0;
 #X connect 29 0 22 0;
+#X connect 30 0 31 0;
+#X connect 31 0 16 0;

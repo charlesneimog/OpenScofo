@@ -282,8 +282,8 @@ static void oscofo_ticknewevent(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags,
-                             void *userparam) {
+static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
+                             long sampleframes, long flags, void *userparam) {
     if (!x->OpenScofo->ScoreIsLoaded() || !x->Following) {
         return;
     }
@@ -311,7 +311,8 @@ static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, lon
 }
 
 // ─────────────────────────────────────
-static void oscofo_dsp64(MaxOpenScofo *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags) {
+static void oscofo_dsp64(MaxOpenScofo *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize,
+                         long flags) {
     x->BlockSize = maxvectorsize;
     x->BlockIndex = 0;
     x->Sr = samplerate;
@@ -369,8 +370,10 @@ static void oscofo_free(MaxOpenScofo *x) {
 
 // ─────────────────────────────────────
 void ext_main(void *r) {
-    t_class *c = class_new("o.scofo~", (method)oscofo_new, (method)dsp_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
-    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH);
+    t_class *c =
+        class_new("o.scofo~", (method)oscofo_new, (method)dsp_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
+    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
+                OSCOFO_VERSION_PATCH);
     // message methods
     class_addmethod(c, (method)oscofo_set, "set", A_GIMME, 0);
     class_addmethod(c, (method)oscofo_score, "score", A_SYM, 0);

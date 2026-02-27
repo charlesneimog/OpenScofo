@@ -2,51 +2,10 @@
 
 namespace OpenScofo {
 
-// ─────────────────────────────────────
-static std::uint64_t TimeCoherenceKernelKey(double sigmaSeconds, double dtSeconds) {
-    // Quantize to keep cache small while stable.
-    // sigma: milliseconds, dt: microseconds.
-    const std::int64_t qSigma = std::llround(sigmaSeconds * 1000.0);
-    const std::int64_t qDt = std::llround(dtSeconds * 1e6);
-    const std::uint64_t hi = static_cast<std::uint64_t>(static_cast<std::uint32_t>(qSigma));
-    const std::uint64_t lo = static_cast<std::uint64_t>(static_cast<std::uint32_t>(qDt));
-    return (hi << 32) | lo;
-}
-
-// ─────────────────────────────────────
-const std::vector<float> &MIR::GetTimeCoherenceGaussianKernel(double sigmaSeconds, double dt, int templateMax) const {
-    const std::uint64_t key = TimeCoherenceKernelKey(sigmaSeconds, dt);
-    auto it = m_TimeCoherenceKernelCache.find(key);
-    if (it != m_TimeCoherenceKernelCache.end()) {
-        return it->second;
-    }
-
-    int radius = static_cast<int>(std::ceil(3.0 * sigmaSeconds / dt));
-    radius = std::clamp(radius, 0, templateMax);
-
-    std::vector<float> kernel(static_cast<size_t>(2 * radius + 1));
-    const double inv2Sigma2 = 1.0 / (2.0 * sigmaSeconds * sigmaSeconds);
-    for (int k = -radius; k <= radius; ++k) {
-        const double t = static_cast<double>(k) * dt;
-        const double g = std::exp(-(t * t) * inv2Sigma2);
-        kernel[static_cast<size_t>(k + radius)] = static_cast<float>(g);
-    }
-
-    // Keep cache from rehashing frequently in the audio path.
-    if (m_TimeCoherenceKernelCache.bucket_count() < m_TimeCoherenceKernelCache.size() + 8) {
-        m_TimeCoherenceKernelCache.reserve(m_TimeCoherenceKernelCache.size() + 8);
-    }
-
-    auto [insIt, _] = m_TimeCoherenceKernelCache.emplace(key, std::move(kernel));
-    return insIt->second;
-}
-
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
 MIR::MIR(float Sr, float FftSize, float HopSize) {
-    LOGE() << "OpenScofoMIR::OpenScofoMIR";
-
     m_HopSize = HopSize;
     m_FFTSize = FftSize;
     m_Sr = Sr;
@@ -110,213 +69,6 @@ MIR::~MIR() {
             m_OnnxCTX = nullptr;
         }
     }
-}
-
-// ╭─────────────────────────────────────╮
-// │           Time Coherence            │
-// ╰─────────────────────────────────────╯
-std::vector<float> MIR::GetTimeCoherenceTemplate(States &ScoreStates, int pos, int timeInEvent) {
-
-    std::vector<float> timeTemplate(m_TimeCoherenceTemplateSize, 0.0f);
-
-    if (ScoreStates.empty()) {
-        return timeTemplate;
-    }
-
-    // One template sample per analysis hop.
-    const double dt = static_cast<double>(m_HopSize) / static_cast<double>(m_Sr);
-    if (!(dt > 0.0) || !std::isfinite(dt)) {
-        return timeTemplate;
-    }
-
-    // How many analysis frames we are inside the current (hypothesis) event.
-    // timeInEvent shifts the reference time forward, so the event onset peak moves back.
-    const int timeInEventFrames = std::max(0, timeInEvent);
-    const double timeInEventSeconds = static_cast<double>(timeInEventFrames) * dt;
-
-    // Find the hypothesis state (max ScorePos <= pos). Don't assume the vector is strictly sorted.
-    size_t hypoIdx = ScoreStates.size();
-    int bestScorePos = std::numeric_limits<int>::min();
-    for (size_t i = 0; i < ScoreStates.size(); ++i) {
-        const int sp = ScoreStates[i].ScorePos;
-        if (sp <= pos && sp >= bestScorePos) {
-            bestScorePos = sp;
-            hypoIdx = i;
-        }
-    }
-    if (hypoIdx >= ScoreStates.size()) {
-        return timeTemplate;
-    }
-
-    const double windowSeconds = static_cast<double>(m_TimeCoherenceTemplateSize - 1) * dt;
-    const bool hasExpectedOnsets = std::isfinite(ScoreStates[hypoIdx].OnsetExpected);
-
-    // Build a safe duration-based onset timeline up to hypoIdx (avoids NaNs from uninitialized Duration).
-    std::vector<double> onsetFromDur;
-    onsetFromDur.resize(hypoIdx + 1);
-    double onsetCursor = 0.0;
-    for (size_t i = 0; i <= hypoIdx; ++i) {
-        onsetFromDur[i] = onsetCursor;
-        const double d = ScoreStates[i].Duration;
-        if (std::isfinite(d) && d > 0.0) {
-            onsetCursor += d;
-        }
-    }
-
-    const double refOnset = hasExpectedOnsets ? ScoreStates[hypoIdx].OnsetExpected : onsetFromDur[hypoIdx];
-    if (!std::isfinite(refOnset)) {
-        return timeTemplate;
-    }
-
-    const double refTime = refOnset + timeInEventSeconds;
-    if (!std::isfinite(refTime)) {
-        return timeTemplate;
-    }
-
-    constexpr double kDefaultSigma = 0.25;
-    const int zeroIndex = m_TimeCoherenceTemplateSize - 1;
-    const int templateMax = zeroIndex;
-
-    // Add Gaussian peaks for all events up to the hypothesis.
-    for (size_t i = 0; i <= hypoIdx; ++i) {
-        const auto &state = ScoreStates[i];
-        if (state.Type == REST) {
-            continue;
-        }
-        const double onset = (hasExpectedOnsets && std::isfinite(state.OnsetExpected)) ? state.OnsetExpected : onsetFromDur[i];
-        if (!std::isfinite(onset)) {
-            continue;
-        }
-
-        const double relOnset = onset - refTime;
-        const double sigma = (std::isfinite(state.Sigma) && state.Sigma > 0.0) ? state.Sigma : kDefaultSigma;
-        if (!(sigma > 0.0) || !std::isfinite(sigma)) {
-            continue;
-        }
-
-        // Keep only what falls in the past window, with a small margin.
-        if (relOnset < -windowSeconds - 3.0 * sigma || relOnset > 3.0 * sigma) {
-            continue;
-        }
-
-        const int center = static_cast<int>(std::llround(relOnset / dt)) + zeroIndex;
-        const auto &kernel = GetTimeCoherenceGaussianKernel(sigma, dt, templateMax);
-        const int radius = static_cast<int>((kernel.size() - 1) / 2);
-
-        const int left = center - radius;
-        const int start = std::max(0, left);
-        const int end = std::min(templateMax, center + radius);
-        if (start > end) {
-            continue;
-        }
-
-        const int kernelStart = start - left;
-        float *out = timeTemplate.data();
-        for (int idx = start; idx <= end; ++idx) {
-            const float p = kernel[static_cast<size_t>(kernelStart + (idx - start))];
-            const float cur = out[idx];
-            const float v = cur + p - (cur * p);
-            out[idx] = (v < 1.0f) ? v : 1.0f;
-        }
-    }
-
-    // Sanitize any non-finite values (shouldn't happen, but protects Python bindings).
-    for (auto &v : timeTemplate) {
-        if (!std::isfinite(v)) {
-            v = 0.0f;
-        }
-    }
-
-    return timeTemplate;
-}
-
-// ─────────────────────────────────────
-double MIR::GetTimeCoherenceConfiability(const std::vector<double> &eventValues) const {
-    const size_t n = eventValues.size();
-    if (n == 0) {
-        return 0.0;
-    }
-    if (n == 1) {
-        return 1.0;
-    }
-
-    double sum = 0.0;
-    for (double v : eventValues) {
-        if (std::isfinite(v) && v > 0.0) {
-            sum += v;
-        }
-    }
-    if (!(sum > 0.0) || !std::isfinite(sum)) {
-        return 0.0;
-    }
-
-    // Normalized Shannon entropy => 0 (peaked) .. 1 (uniform)
-    double h = 0.0;
-    for (double v : eventValues) {
-        if (!(std::isfinite(v) && v > 0.0)) {
-            continue;
-        }
-        const double p = v / sum;
-        if (p > 0.0) {
-            h -= p * std::log(p);
-        }
-    }
-
-    const double hmax = std::log(static_cast<double>(n));
-    if (!(hmax > 0.0) || !std::isfinite(h)) {
-        return 0.0;
-    }
-
-    double confiability = 1.0 - (h / hmax);
-    if (!std::isfinite(confiability)) {
-        return 0.0;
-    }
-    return std::clamp(confiability, 0.0, 1.0);
-}
-
-// ─────────────────────────────────────
-double MIR::GetTimeCoherenceConfiability(const std::vector<float> &eventValues) const {
-    const size_t n = eventValues.size();
-    if (n == 0) {
-        return 0.0;
-    }
-    if (n == 1) {
-        return 1.0;
-    }
-
-    double sum = 0.0;
-    for (float vf : eventValues) {
-        const double v = static_cast<double>(vf);
-        if (std::isfinite(v) && v > 0.0) {
-            sum += v;
-        }
-    }
-    if (!(sum > 0.0) || !std::isfinite(sum)) {
-        return 0.0;
-    }
-
-    double h = 0.0;
-    for (float vf : eventValues) {
-        const double v = static_cast<double>(vf);
-        if (!(std::isfinite(v) && v > 0.0)) {
-            continue;
-        }
-        const double p = v / sum;
-        if (p > 0.0) {
-            h -= p * std::log(p);
-        }
-    }
-
-    const double hmax = std::log(static_cast<double>(n));
-    if (!(hmax > 0.0) || !std::isfinite(h)) {
-        return 0.0;
-    }
-
-    double confiability = 1.0 - (h / hmax);
-    if (!std::isfinite(confiability)) {
-        return 0.0;
-    }
-    return std::clamp(confiability, 0.0, 1.0);
 }
 
 // ╭─────────────────────────────────────╮
@@ -789,6 +541,61 @@ void MIR::MFCCExec(Description &Desc) {
             sum += basis[n] * m_MFCCEnergy[n];
         }
         Desc.MFCC[k] = sum;
+    }
+}
+
+// ╭─────────────────────────────────────╮
+// │               Chroma                │
+// ╰─────────────────────────────────────╯
+void MIR::SpectralChromaInit() {
+    size_t NHalf = m_FFTSize / 2;
+    m_ChromaBinMap.resize(NHalf);
+
+    const double A4 = 440.0;
+    const double invLog2 = 1.0 / std::log(2.0);
+
+    for (size_t k = 0; k < NHalf; ++k) {
+        double freq = (double(k) * m_Sr) / double(m_FFTSize);
+        if (freq < 20.0) {
+            m_ChromaBinMap[k] = -1;
+            continue;
+        }
+        double midi = 69.0 + 12.0 * std::log(freq / A4) * invLog2;
+        int pitchClass = int(std::round(midi)) % 12;
+        if (pitchClass < 0)
+            pitchClass += 12;
+
+        m_ChromaBinMap[k] = pitchClass;
+    }
+
+    spdlog::debug("Chroma: {}", VectorToString(m_ChromaBinMap));
+}
+
+// ─────────────────────────────────────
+void MIR::SpectralChromaExec(Description &Desc) {
+    size_t NHalf = Desc.SpectralPower.size();
+
+    if (Desc.Chroma.size() != m_ChromaSize)
+        Desc.Chroma.resize(m_ChromaSize);
+
+    std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
+
+    // Accumulate energy per pitch class
+    for (size_t k = 0; k < NHalf; ++k) {
+
+        int pc = m_ChromaBinMap[k];
+        if (pc < 0)
+            continue;
+
+        Desc.Chroma[pc] += Desc.SpectralPower[k];
+    }
+
+    // Normalize (L1 normalization)
+    double sum = std::accumulate(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
+
+    if (sum > 0.0) {
+        for (size_t i = 0; i < m_ChromaSize; ++i)
+            Desc.Chroma[i] /= sum;
     }
 }
 

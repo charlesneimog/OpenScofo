@@ -39,10 +39,6 @@ class MIR {
     void GetDescription(std::vector<double> &In, Description &Desc, States &States);
     void AddReverb(Description &Desc, double decay);
 
-    std::vector<float> GetTimeCoherenceTemplate(States &ScoreStates, int pos, int timeInEvent = 0);
-    double GetTimeCoherenceConfiability(const std::vector<double> &eventValues) const;
-    double GetTimeCoherenceConfiability(const std::vector<float> &eventValues) const;
-
     double GetdB();
     void LoadONNXModel(fs::path path);
     void BuildTimeCoherenceTemplate(States &States);
@@ -78,6 +74,9 @@ class MIR {
     // Harmonicity
     void SpectralHarmonicityInit();
     void SpectralHarmonicityExec(Description &Desc);
+    // Chroma
+    void SpectralChromaInit();
+    void SpectralChromaExec(Description &Desc);
 
     // CQT
     void CQTInit();
@@ -108,6 +107,10 @@ class MIR {
     std::vector<std::vector<float>> m_MFCCFilter;
     std::vector<std::vector<float>> m_DCTBasis;
     std::vector<float> m_MFCCEnergy;
+
+    // Chroma
+    std::vector<int> m_ChromaBinMap;
+    size_t m_ChromaSize = 12;
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;

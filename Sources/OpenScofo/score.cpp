@@ -1,5 +1,5 @@
 #include "OpenScofo.hpp"
-#include "tree_sitter/api.h"
+#include <tree_sitter/api.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -378,8 +378,10 @@ void Score::ProcessEventTime(MarkovState &Event) {
     Event.SyncStrength = m_SyncStrength;
     Event.BPMExpected = m_CurrentBPM;
 
-    spdlog::debug("Added Time for Event {}, PhaseCoupling {}, SyncStrength {}, BPM {}, PhaseExpected {}, Onset Expected {}", Event.ScorePos,
-                  Event.BPMExpected, Event.PhaseCoupling, Event.SyncStrength, Event.PhaseExpected, Event.OnsetExpected);
+    spdlog::debug("Added Time for Event {}, BPM {}, Phase PhaseCoupling {}, SyncStrength {}, "
+                  "PhaseExpected {}, Onset Expected {}",
+                  Event.ScorePos, Event.BPMExpected, Event.PhaseCoupling, Event.SyncStrength, Event.PhaseExpected,
+                  Event.OnsetExpected);
 }
 
 // ─────────────────────────────────────
@@ -572,7 +574,8 @@ void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState 
                                 number = std::stof(token);
                                 NewAction.Args.push_back(number);
                             } else {
-                                SetError("Invalid number argument on line " + std::to_string(ts_node_start_point(pdarg).row + 1));
+                                SetError("Invalid number argument on line " +
+                                         std::to_string(ts_node_start_point(pdarg).row + 1));
                                 return;
                             }
                         } else if (pdargType == "symbol") {
@@ -587,11 +590,35 @@ void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState 
 }
 
 // ─────────────────────────────────────
+void FindErrors(TSNode &root, TSNode &node, const std::string &source_code) {
+    if (!ts_node_is_null(node) && !ts_node_eq(root, node) && ts_node_has_error(node)) {
+        TSPoint start = ts_node_start_point(node);
+        uint32_t row = start.row + 1; // 1-based
+        uint32_t column = start.column + 1;
+        uint32_t byteStart = ts_node_start_byte(node);
+        uint32_t byteEnd = ts_node_end_byte(node);
+        std::string tokenText = source_code.substr(byteStart, byteEnd - byteStart);
+        spdlog::error("Fond Error {}, line: {}, column: {}, token: '{}'", ts_node_type(node), row, column, tokenText);
+    }
+
+    uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t i = 0; i < childCount; i++) {
+        TSNode child = ts_node_child(node, i);
+        FindErrors(root, child, source_code);
+    }
+}
+
+// ─────────────────────────────────────
 void Score::ParseInput(const std::string &ScoreStr) {
     TSParser *parser = ts_parser_new();
     ts_parser_set_language(parser, tree_sitter_scofo());
     TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
     TSNode rootNode = ts_tree_root_node(tree);
+
+    if (ts_node_has_error(rootNode)) {
+        spdlog::error("Found errors on the score");
+        FindErrors(rootNode, rootNode, ScoreStr);
+    }
 
     uint32_t child_count = ts_node_child_count(rootNode);
     for (uint32_t i = 0; i < child_count; i++) {
