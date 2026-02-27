@@ -360,6 +360,9 @@ Description OpenScofo::GetDescription() {
 
 // ─────────────────────────────────────
 Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
+    if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
+        return {};
+    }
     if (m_FFTSize != AudioBuffer.size()) {
         spdlog::error("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize);
         return {};
