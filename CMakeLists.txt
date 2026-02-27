@@ -162,7 +162,7 @@ cpmaddpackage("gh:gabime/spdlog@1.17.0")
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ╭──────────────────────────────────────╮
-# │                OpenScofo                │
+# │                OpenScofo             │
 # ╰──────────────────────────────────────╯
 list(APPEND ScofoSrc Sources/OpenScofo/mdp.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/mir.cpp)

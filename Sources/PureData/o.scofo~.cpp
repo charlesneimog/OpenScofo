@@ -41,6 +41,8 @@ class PdOpenScofo {
     t_clock *ClockActions;
     t_clock *ClockInfo;
 
+    spdlog::level::level_enum log;
+
     // Actions
     std::vector<Action> Actions;
 
@@ -86,16 +88,10 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     if (ok) {
         logpost(x, 2, "[o.scofo~] Score loaded");
     } else {
-        std::vector<std::string> Errors = x->OpenScofo->GetErrorMessage();
-        for (auto &error : Errors) {
-            pd_error(x, "[o.scofo~] %s", error.c_str());
-        }
-        x->OpenScofo->ClearError();
         return;
     }
 
-    x->OpenScofo->SetCurrentEvent(0);
-    x->Event = -1;
+    x->Event = 0;
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, 0);
 
@@ -122,7 +118,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
 // ─────────────────────────────────────
 static void oscofo_start(PdOpenScofo *x) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
-        pd_error(nullptr, "[o.scofo~] Score not loaded");
+        pd_error(x, "[o.scofo~] Score not loaded");
         return;
     }
     x->OpenScofo->SetCurrentEvent(0);
@@ -148,6 +144,24 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         int f = atom_getint(argv + 1);
         x->Event = f;
         x->OpenScofo->SetCurrentEvent(f);
+    } else if (method == "verbosity") {
+        int f = atom_getint(argv + 1);
+        switch (f) {
+        case 0: {
+            x->log = spdlog::level::warn;
+            break;
+        }
+        case 1:
+            x->log = spdlog::level::info;
+            break;
+        case 2:
+            x->log = spdlog::level::debug;
+            break;
+        case 3:
+            x->log = spdlog::level::trace;
+            break;
+        }
+
     } else if (method == "section") {
         // TODO: set thing like section A, section B, etc.
         pd_error(x, "[o.scofo~] Section method not implemented");
@@ -338,11 +352,6 @@ static t_int *oscofo_perform(t_int *w) {
     x->BlockIndex = 0;
     bool ok = x->OpenScofo->ProcessBlock(x->inBuffer);
     if (!ok) {
-        std::vector<std::string> Errors = x->OpenScofo->GetErrorMessage();
-        for (auto &error : Errors) {
-            pd_error(x, "[o.scofo~] %s", error.c_str());
-        }
-        x->OpenScofo->ClearError();
         return (w + 4);
     }
 
@@ -361,21 +370,30 @@ static void oscofo_adddsp(PdOpenScofo *x, t_signal **sp) {
 }
 
 // ─────────────────────────────────────
-// static void oscofo_processargv(PdOpenScofo *x, int argc, t_atom *argv) {
-//     for (int i = 0; i < argc; i++) {
-//         if (argv[i].a_type == A_SYMBOL) {
-//             std::string arg = atom_getsymbol(argv + i)->s_name;
-//             if (arg == "-fft") {
-//                 if (i + 2 < argc) {
-//                     x->FFTSize = (int)atom_getint(argv + i + 1);
-//                     x->HopSize = (int)atom_getint(argv + i + 2);
-//                 } else {
-//                     pd_error(x, "[o.scofo~] Window Size and Hop size must be provided");
-//                 }
-//             }
-//         }
-//     }
-// }
+static void oscofo_callback(const spdlog::details::log_msg &log, void *data) {
+    PdOpenScofo *x = static_cast<PdOpenScofo *>(data);
+    spdlog::level::level_enum pdlevel = x->log;
+    if (log.level < pdlevel) {
+        return;
+    }
+    std::string text(log.payload.data(), log.payload.size());
+    switch (log.level) {
+    case spdlog::level::critical:
+    case spdlog::level::err:
+        logpost(x, 1, "[o.scofo~] %s", text.c_str());
+        break;
+    case spdlog::level::info:
+    case spdlog::level::warn:
+        logpost(x, 2, "[o.scofo~] %s", text.c_str());
+        break;
+    case spdlog::level::debug:
+    case spdlog::level::trace:
+        logpost(x, 3, "[o.scofo~] %s", text.c_str());
+        break;
+    default:
+        break;
+    }
+}
 
 // ─────────────────────────────────────
 static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
@@ -437,13 +455,14 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
 
     // OpenScofo Library
     x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
+    x->OpenScofo->SetErrorCallback(oscofo_callback, static_cast<void *>(x));
 
-    if (x->OpenScofo->HasErrors()) {
-        for (auto &error : x->OpenScofo->GetErrorMessage()) {
-            pd_error(x, "[o.scofo~] %s", error.c_str());
-        }
-        x->OpenScofo->ClearError();
-    }
+    x->log = (spdlog::level::warn);
+
+#ifdef NDEBUG
+#else
+    // x->OpenScofo->SetLogLevel(spdlog::level::info);
+#endif
 
 #ifdef OSCOFO_LUA
     x->OpenScofo->LuaAddModule("pd", luaopen_pd);
@@ -460,10 +479,11 @@ static void oscofo_free(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 extern "C" void setup_o0x2escofo_tilde(void) {
-    OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
+    OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
+                             CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[o.scofo~] version %d.%d.%d (%s %s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH, __DATE__,
-         __TIME__);
+    post("[o.scofo~] version %d.%d.%d (%s %s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
+         OSCOFO_VERSION_PATCH, __DATE__, __TIME__);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);

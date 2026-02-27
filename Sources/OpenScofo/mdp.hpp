@@ -62,18 +62,42 @@ class MDP {
     // Set Variables
     void ClearStates();
 
-    // Errors
-    bool HasErrors();
-    std::vector<std::string> GetErrorMessage();
-    void SetError(const std::string &message);
-    void ClearError();
+  private:
+    void GetDecodeWindow();
+
+    // Time
+    double UpdatePsiN(int StateIndex);
+    double InverseA2(double r);
+    double ModPhases(double value);
+    double CouplingFunction(double Phi, double PhiMu, double Kappa);
+    double GetOccupancyDistribution(MarkovState &State, int u);
+    void InitTimeDecoding();
+
+    // Markov and Probabilities
+    double GetTransProbability(int i, int j);
+    std::vector<double> GetInitialDistribution();
+    int GetMaxUForJ(MarkovState &StateJ);
+
+    // Markov
+    double GetBestEvent();
+    int GetMaxJIndex(int StateIndex);
+
+    double Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    double SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    int Inference(int CurrentState);
+
+    // Pitch Template
+    void BuildPitchTemplate(double Freq);
+
+    // Get Audio Obs
+    void GetAudioObservations(int T);
 
   private:
+    // Test things
     int m_WinEnd;
     int m_WinStart;
     int m_EventWindowSize;
     std::vector<double> m_Normalization;
-    void GetDecodeWindow();
 
     // Config
     double m_MinEntropy = 0;
@@ -99,6 +123,7 @@ class MDP {
     double m_PhaseCoupling = 0.5;
     double m_SyncStr = 0;
     double m_TimeInPrevEvent = 0;
+    std::unordered_map<double, double> m_KappaArray;
 
     double m_LastTn = 0;
     double m_TauWithSound = 0;
@@ -119,43 +144,21 @@ class MDP {
     double m_SecondsAhead = 2;
 
     // Time
-    double UpdatePsiN(int StateIndex);
-    double InverseA2(double r);
-    double ModPhases(double value);
-    double CouplingFunction(double Phi, double PhiMu, double Kappa);
-    double GetOccupancyDistribution(MarkovState &State, int u);
-    void InitTimeDecoding();
-
-    // Markov and Probabilities
-    double GetTransProbability(int i, int j);
-    std::vector<double> GetInitialDistribution();
-
-    int GetMaxUForJ(MarkovState &StateJ);
+    std::unordered_map<double, PitchTemplateArray> m_PitchTemplates;
 
     // Pitch
     std::vector<MarkovState> m_States;
     double m_PitchScalingFactor = 0.5;
 
-    std::unordered_map<double, PitchTemplateArray> m_PitchTemplates;
     std::unordered_map<double, PitchTemplateArray> m_PitchCQTTemplates;
-    void BuildPitchTemplate(double Freq);
 
     // Audio Observations
-    void GetAudioObservations(int T);
     Description m_Desc;
 
     // Markov
     bool m_EventDetected = false;
-    double GetBestEvent();
-    int GetMaxJIndex(int StateIndex);
-    int Inference(int CurrentState);
-    // double SemiMarkov(MarkovState &StateJ, int CurrentState, int j, int T, int bufferIndex);
-    double SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
-    double Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
-    // double Markov(MarkovState &StateJ, int CurrentState, int j, int T, int bufferIndex);
 
     // Errors
     bool m_HasErrors = false;
-    std::vector<std::string> m_Errors;
 };
 } // namespace OpenScofo

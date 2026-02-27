@@ -48,10 +48,6 @@ int main(int argc, char *argv[]) {
     OpenScofo::OpenScofo scofo(48000, 4096, 512);
     bool ok = scofo.ParseScore(score_path);
     if (!ok) {
-        std::vector<std::string> Errors = scofo.GetErrorMessage();
-        for (auto &error : Errors) {
-            std::cerr << error.c_str() << "\n";
-        }
         exit(-1);
     }
 

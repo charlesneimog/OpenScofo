@@ -2,6 +2,6 @@ BasedOnStyle: LLVM
 IndentWidth: 4
 UseTab: Never
 TabWidth: 4
-ColumnLimit: 150
+ColumnLimit: 120
 AllowShortFunctionsOnASingleLine: None
 SortIncludes: false

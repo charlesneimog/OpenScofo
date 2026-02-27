@@ -10,7 +10,8 @@ int luaopen_oscofo(lua_State *L);
 #endif
 
 //  ─────────────────────────────────────
-OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
+OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
+    : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
     m_States = States();
     m_Desc = Description();
     m_Sr = Sr;
@@ -19,24 +20,13 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_MDP(Sr, FftSize
     m_InBuffer.reserve(FftSize);
     m_BlockIndex = 0;
 
-    if (m_MIR.HasErrors() || m_MDP.HasErrors()) {
-        for (auto &error : m_MIR.GetErrorMessage()) {
-            SetError(error);
-        }
-        m_MIR.ClearError();
-        for (auto &error : m_MDP.GetErrorMessage()) {
-            SetError(error);
-        }
-        m_MDP.ClearError();
-        return;
-    }
-
 #if defined(OSCOFO_LUA)
     InitLua();
 #endif
 
 #ifndef NDEBUG
     spdlog::set_level(spdlog::level::debug);
+    spdlog::enable_backtrace(32);
 #else
     spdlog::set_level(spdlog::level::info);
 #endif
@@ -57,30 +47,29 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
 // ╭─────────────────────────────────────╮
 // │               Errors                │
 // ╰─────────────────────────────────────╯
-bool OpenScofo::HasErrors() {
-    return m_HasErrors;
+void OpenScofo::SetErrorCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data) {
+    auto level = spdlog::default_logger()->level();
+
+    using PdSink = OpenScofoLog<std::mutex>;
+    auto pd_sink = std::make_shared<PdSink>();
+    pd_sink->SetCallback(cb, data, &m_HasErrors);
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    std::vector<spdlog::sink_ptr> sinks{pd_sink, console_sink};
+    pd_sink->set_pattern("%v");
+    auto logger = std::make_shared<spdlog::logger>("OpenScofo", sinks.begin(), sinks.end());
+    spdlog::set_default_logger(logger);
+    spdlog::set_level(level);
 }
 
 // ─────────────────────────────────────
-std::vector<std::string> OpenScofo::GetErrorMessage() {
-    return m_Errors;
+void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
+    auto logger = spdlog::default_logger();
+    spdlog::set_level(level);
 }
 
 // ─────────────────────────────────────
-void OpenScofo::SetError(const std::string &message) {
-    if (m_ErrorCallback) {
-        m_HasErrors = true;
-        m_ErrorCallback(message);
-    } else {
-        m_HasErrors = true;
-        m_Errors.push_back(message);
-    }
-}
-
-// ─────────────────────────────────────
-void OpenScofo::ClearError() {
+void OpenScofo::ClearErrors() {
     m_HasErrors = false;
-    m_Errors.clear();
 }
 
 // ╭─────────────────────────────────────╮
@@ -260,7 +249,7 @@ States OpenScofo::GetStates() {
     if (m_States.size() != 0) {
         return m_States;
     }
-    SetError("No states found, please use the ScoreParse first");
+    spdlog::error("No states found, please use the ScoreParse first");
     return m_States;
 }
 
@@ -314,30 +303,15 @@ double OpenScofo::GetBlockDuration() {
     return m_MDP.GetBlockDuration();
 }
 
-// ─────────────────────────────────────
-std::vector<float> OpenScofo::GetTimeCoherenceTemplate(int pos, int timeInEvent) {
-    return m_MIR.GetTimeCoherenceTemplate(m_States, pos, timeInEvent);
-}
-
-// ─────────────────────────────────────
-double OpenScofo::GetTimeCoherenceConfiability(const std::vector<double> &eventValues) {
-    return m_MIR.GetTimeCoherenceConfiability(eventValues);
-}
-
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
 bool OpenScofo::ParseScore(std::string ScorePath) {
+    ClearErrors();
+
     m_Score = Score(m_FFTSize, m_HopSize);
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
-    if (m_Score.HasErrors()) {
-        for (auto &error : m_Score.GetErrorMessage()) {
-            SetError(error);
-            m_Score.ClearError();
-        }
-        return false;
-    }
 
     // Time coherence
     m_MIR.BuildTimeCoherenceTemplate(m_States);
@@ -367,7 +341,7 @@ Description OpenScofo::GetDescription() {
 // ─────────────────────────────────────
 Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
     if (m_FFTSize != AudioBuffer.size()) {
-        SetError(std::format("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize));
+        spdlog::error("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize);
         return {};
     }
 
@@ -379,7 +353,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 
 // ─────────────────────────────────────
 bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
-    if (!m_Score.ScoreIsLoaded()) {
+    if (!m_Score.ScoreIsLoaded() || m_HasErrors) {
         return false;
     }
 
@@ -388,46 +362,7 @@ bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
     m_MIR.AddReverb(m_Desc, 0.01);
 
-    if (m_MDP.HasErrors()) {
-        for (auto &error : m_MDP.GetErrorMessage()) {
-            SetError(error);
-        }
-        m_MDP.ClearError();
-        return false;
-    }
-
     return true;
 }
-
-// bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
-//     // move accumation to here buffer
-//     size_t n = AudioBuffer.size();
-//     memcpy(m_InBuffer.data() + m_BlockIndex, AudioBuffer.data(), n * sizeof(double));
-//     m_BlockIndex += n;
-//
-//     if (m_BlockIndex > m_FFTSize) {
-//         SetError("The configuration of OpenScofo is wrong, please review");
-//         return false;
-//     }
-//
-//     if (m_FFTSize != m_BlockIndex) {
-//         return true;
-//     }
-//
-//     States GoodStates = m_MDP.GetStatesForProcessing();
-//     m_MIR.GetDescription(m_InBuffer, m_Desc, GoodStates);
-//     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
-//
-//     if (m_MDP.HasErrors()) {
-//         for (auto &error : m_MDP.GetErrorMessage()) {
-//             SetError(error);
-//         }
-//         m_MDP.ClearError();
-//         return false;
-//     }
-//
-//     m_BlockIndex = 0;
-//     return true;
-// }
 
 } // namespace OpenScofo

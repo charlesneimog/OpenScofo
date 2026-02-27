@@ -39,31 +39,11 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
     m_TimeInPrevEvent = 0;
     m_EventWindowSize = 20;
     SetTunning(440);
-}
 
-// ╭─────────────────────────────────────╮
-// │               Errors                │
-// ╰─────────────────────────────────────╯
-bool MDP::HasErrors() {
-    return m_HasErrors;
-}
-
-// ─────────────────────────────────────
-std::vector<std::string> MDP::GetErrorMessage() {
-    return m_Errors;
-}
-
-// ─────────────────────────────────────
-void MDP::SetError(const std::string &message) {
-    printf("Error: %s.\n", message.c_str());
-    m_HasErrors = true;
-    m_Errors.push_back(message);
-}
-
-// ─────────────────────────────────────
-void MDP::ClearError() {
-    m_HasErrors = false;
-    m_Errors.clear();
+    for (int i = 0; i <= 10000; ++i) { // 0.0000, 0.0001, 0.0002 ...
+        double key = i / 10000.0;
+        InverseA2(key);
+    }
 }
 
 // ─────────────────────────────────────
@@ -79,7 +59,6 @@ ActionVec MDP::GetEventActions(int Index) {
 // ─────────────────────────────────────
 void MDP::SetScoreStates(States ScoreStates) {
     if (ScoreStates.size() == 0) {
-        SetError("ScoreStates is empty, add some events to the score");
         return;
     }
 
@@ -273,8 +252,7 @@ int MDP::GetTunning() {
 
 // ─────────────────────────────────────
 void MDP::SetCurrentEvent(int Event) {
-    spdlog::info("Current event is {}", Event);
-
+    spdlog::debug("Current event is {}", Event);
     if (m_States.size() == 0) {
         spdlog::error("There is not Events on Score or the Score was no loaded");
         return;
@@ -288,6 +266,7 @@ void MDP::SetCurrentEvent(int Event) {
     m_T = 0;
     m_Tau = 0;
     m_TauWithSound = 0;
+    std::cout << "\n" << std::endl;
 }
 
 // ─────────────────────────────────────
@@ -331,22 +310,31 @@ double MDP::InverseA2(double SyncStrength) {
     if (SyncStrength < 0) {
         return 0;
     }
-    if (SyncStrength > 0.95) {
+
+    if (SyncStrength >= 0.95) {
         return 10.0f;
     }
 
+    double key = std::round(SyncStrength * 10000.0) / 10000.0;
+    auto it = m_KappaArray.find(key);
+    if (it != m_KappaArray.end()) {
+        return it->second;
+    }
+
     double Low = 0.0;
-    double Tol = 1e-16;
-    double High = std::max(SyncStrength, 10.0);
+    double Tol = 1e-10;
+    double High = std::max(SyncStrength, 11.0);
     double Mid;
 
     int i;
-    for (i = 0; i < 1000; i++) {
+    double A2Mid;
+    for (i = 0; i < 8192; i++) {
         Mid = (Low + High) / 2.0;
         double I1 = std::cyl_bessel_i(1, Mid);
         double I0 = std::cyl_bessel_i(0, Mid);
-        double A2Mid = I1 / I0;
+        A2Mid = I1 / I0;
         if (std::fabs(A2Mid - SyncStrength) < Tol) {
+            m_KappaArray[key] = Mid;
             return Mid;
         } else if (A2Mid < SyncStrength) {
             Low = Mid;
@@ -354,7 +342,10 @@ double MDP::InverseA2(double SyncStrength) {
             High = Mid;
         }
     }
-    LOGE() << "InverseA2 not converged after " << i << " iterations.";
+
+    m_KappaArray[key] = Mid;
+    spdlog::warn("Kappa for Sync Strength {:.4f} not converged after {} iterations. Returning {:.4f} for A2 = {:.4f}",
+                 SyncStrength, i, Mid, A2Mid);
     return Mid;
 }
 
@@ -513,7 +504,7 @@ void MDP::GetAudioObservations(int T) {
                     break;
                 }
                 default:
-                    SetError("Not implemented yet!");
+                    spdlog::error("Not implemented yet!");
                 }
             }
             ObsNoSound = std::max(ObsNoSound, BestObs);
@@ -591,7 +582,6 @@ std::vector<double> MDP::GetInitialDistribution() {
 
 // ─────────────────────────────────────
 double MDP::GetTransProbability(int i, int j) {
-    // Simple left-to-right: only direct successor transitions are allowed.
     return (i + 1 == j) ? 1.0 : 0.0;
 }
 
@@ -610,7 +600,7 @@ int MDP::GetMaxUForJ(MarkovState &StateJ) {
     return std::max(cap, 1);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────
 double MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
     if (T == 0) {
@@ -631,7 +621,7 @@ double MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     return bj * bestPrev;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────
 double MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
 
@@ -668,7 +658,8 @@ double MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 // ─────────────────────────────────────
 int MDP::Inference(int T) {
     int bufferIndex = T % m_BufferSize;
-    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappe {}", m_WinStart, m_WinEnd, bufferIndex, m_Tau, m_Kappa);
+    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappe {}", m_WinStart, m_WinEnd, bufferIndex,
+                  m_Tau, m_Kappa);
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         if (j < 0 || j >= (int)m_States.size())
@@ -699,13 +690,13 @@ int MDP::Inference(int T) {
             maxVal = fwd;
             bestStateIndex = j;
         }
-        spdlog::debug("State ({}) | ForwardLast {:.5f}, Obs = {:.5f}, Forward {:.5f}, Time Prob {:.5f}", StateJ.Index, StateJ.ForwardLast,
-                      StateJ.BestObs[bufferIndex], StateJ.Forward[bufferIndex], StateJ.TimeProb);
+        spdlog::debug("State ({}) | ForwardLast {:.5f}, Obs = {:.5f}, Forward {:.5f}, Time Prob {:.5f}", StateJ.Index,
+                      StateJ.ForwardLast, StateJ.BestObs[bufferIndex], StateJ.Forward[bufferIndex], StateJ.TimeProb);
     }
 
     MarkovState BestState = m_States[bestStateIndex];
-    spdlog::debug("State ({}) | ForwardLast {:.5f}, Obs = {:.5f}, Forward {:.5f}", BestState.Index, BestState.ForwardLast,
-                  BestState.BestObs[bufferIndex], BestState.Forward[bufferIndex]);
+    spdlog::debug("State ({}) | ForwardLast {:.5f}, Obs = {:.5f}, Forward {:.5f}", BestState.Index,
+                  BestState.ForwardLast, BestState.BestObs[bufferIndex], BestState.Forward[bufferIndex]);
 
     return bestStateIndex;
 }
