@@ -9,30 +9,6 @@ extern "C" TSLanguage *tree_sitter_scofo();
 
 namespace OpenScofo {
 
-// ╭─────────────────────────────────────╮
-// │               Errors                │
-// ╰─────────────────────────────────────╯
-bool Score::HasErrors() {
-    return m_HasErrors;
-}
-
-// ─────────────────────────────────────
-std::vector<std::string> Score::GetErrorMessage() {
-    return m_Errors;
-}
-
-// ─────────────────────────────────────
-void Score::SetError(const std::string &message) {
-    m_HasErrors = true;
-    m_Errors.push_back(message);
-}
-
-// ─────────────────────────────────────
-void Score::ClearError() {
-    m_HasErrors = false;
-    m_Errors.clear();
-}
-
 // ─────────────────────────────────────
 void Score::PrintTreeSitterNode(TSNode node, int indent) {
     const char *type = ts_node_type(node);
@@ -206,7 +182,7 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
     uint32_t count = ts_node_child_count(Node);
     if (count != 1) {
         TSPoint Pos = ts_node_start_point(Node);
-        SetError("Invalid duration count on line " + std::to_string(Pos.row + 1));
+        spdlog::error("Invalid duration count on line {}.", Pos.row + 1);
         return 0;
     }
 
@@ -217,7 +193,7 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
         return std::stof(dur_str);
     }
     TSPoint Pos = ts_node_start_point(dur);
-    SetError("Invalid duration type on line " + std::to_string(Pos.row + 1));
+    spdlog::error("Invalid duration type on line {}", Pos.row + 1);
     return 0;
 }
 
@@ -282,7 +258,7 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
                 Event.Type = CHORD;
             } else {
                 TSPoint Pos = ts_node_start_point(child);
-                SetError("Invalid pitch event on line " + std::to_string(Pos.row + 1));
+                spdlog::error("Invalid pitch event on line {}.", Pos.row + 1);
                 return Event;
             }
         } else if (type == "pitch") {
@@ -308,7 +284,7 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
             ProcessAction(ScoreStr, child, Event);
         } else {
             TSPoint Pos = ts_node_start_point(child);
-            SetError("Invalid note event on line " + std::to_string(Pos.row + 1));
+            spdlog::error("Invalid note event on line {}.", Pos.row + 1);
             return Event;
         }
     }
@@ -417,7 +393,7 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
             m_LastOnset = Event.OnsetExpected;
             m_ScoreStates.emplace_back(Event);
         } else {
-            SetError("Type not implemented " + type);
+            spdlog::error("Type not implemented {}.", type);
         }
     }
 }
@@ -446,10 +422,6 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
 
     for (uint32_t i = 0; i < child_count; ++i) {
         TSNode child = ts_node_child(node, i);
-        if (ts_node_has_error(child) || ts_node_is_error(child)) {
-            SetError("Error found on score");
-            return;
-        }
         std::string type = ts_node_type(child);
         TSPoint pos = ts_node_start_point(child);
 
@@ -466,7 +438,7 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
                 m_ScoreStates.emplace_back(Begin);
             } else if (id == "TRANSPOSE") {
                 if (v < -36 || v > 36) {
-                    SetError("Invalid transpose value on line " + std::to_string(pos.row + 1));
+                    spdlog::error("Invalid transpose value on line {}.", pos.row + 1);
                     return;
                 }
                 m_Transpose = v;
@@ -493,7 +465,7 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
             if (id == "TIMBREMODEL") {
                 m_TimbreModel = m_ScoreRootPath / fs::path(path);
                 if (!fs::exists(m_TimbreModel)) {
-                    SetError("Timbre Model not found");
+                    spdlog::error("Timbre Model not found");
                 }
             }
 
@@ -520,7 +492,7 @@ void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState 
             std::string keyStr = GetCodeStr(ScoreStr, key);
             TSPoint pos = ts_node_start_point(key);
             if (keyStr != "delay") {
-                SetError("Invalid action key on line " + std::to_string(pos.row + 1));
+                spdlog::error("Invalid action key on line {}.", std::to_string(pos.row + 1));
                 return;
             }
         }
@@ -574,8 +546,8 @@ void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState 
                                 number = std::stof(token);
                                 NewAction.Args.push_back(number);
                             } else {
-                                SetError("Invalid number argument on line " +
-                                         std::to_string(ts_node_start_point(pdarg).row + 1));
+                                spdlog::error("Invalid number argument on line {}.",
+                                              ts_node_start_point(pdarg).row + 1);
                                 return;
                             }
                         } else if (pdargType == "symbol") {
@@ -609,57 +581,21 @@ void FindErrors(TSNode &root, TSNode &node, const std::string &source_code) {
 }
 
 // ─────────────────────────────────────
-void Score::ParseInput(const std::string &ScoreStr) {
-    TSParser *parser = ts_parser_new();
-    ts_parser_set_language(parser, tree_sitter_scofo());
-    TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
-    TSNode rootNode = ts_tree_root_node(tree);
-
-    if (ts_node_has_error(rootNode)) {
-        spdlog::error("Found errors on the score");
-        FindErrors(rootNode, rootNode, ScoreStr);
-    }
-
-    uint32_t child_count = ts_node_child_count(rootNode);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(rootNode, i);
-        std::string type = ts_node_type(child);
-        if (type == "EVENT") {
-            if (m_CurrentBPM == -1) {
-                SetError("BPM is not defined");
-                return;
-            }
-            ProcessEvent(ScoreStr, child);
-        } else if (type == "CONFIG") {
-            ProcessConfig(ScoreStr, child);
-        } else if (type == "LUA") {
-            std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
-            lua_body += "\n\n";
-            m_LuaCode += lua_body;
-        }
-    }
-
-    // Cleanup
-    ts_tree_delete(tree);
-    ts_parser_delete(parser);
-}
-
-// ─────────────────────────────────────
 States Score::Parse(std::string ScoreFile) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
 
     fs::path ScoreFilePath = fs::path(ScoreFile);
-    if (!fs::exists(ScoreFilePath)) {
-        SetError("Score File not found");
+    if (fs::exists(ScoreFilePath) == false) {
+        spdlog::error("Score File not found");
         return {};
     }
     m_ScoreRootPath = ScoreFilePath.parent_path();
 
     // Open the score file for reading
     std::ifstream File(ScoreFile, std::ios::binary);
-    if (!File.is_open()) {
-        SetError("Not possible to open score file");
+    if (File.is_open() == false) {
+        spdlog::error("Not possible to open score file");
         return {};
     }
 
@@ -684,12 +620,39 @@ States Score::Parse(std::string ScoreFile) {
     std::string Line;
 
     // read and process score
-    ParseInput(ScoreStr);
+    TSParser *parser = ts_parser_new();
+    ts_parser_set_language(parser, tree_sitter_scofo());
+    TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
+    TSNode rootNode = ts_tree_root_node(tree);
 
-    if (!HasErrors()) {
-        m_ScoreLoaded = true;
+    if (ts_node_has_error(rootNode)) {
+        FindErrors(rootNode, rootNode, ScoreStr);
     }
 
+    uint32_t child_count = ts_node_child_count(rootNode);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(rootNode, i);
+        std::string type = ts_node_type(child);
+        if (type == "EVENT") {
+            if (m_CurrentBPM == -1) {
+                spdlog::error("BPM is not defined");
+                return {};
+            }
+            ProcessEvent(ScoreStr, child);
+        } else if (type == "CONFIG") {
+            ProcessConfig(ScoreStr, child);
+        } else if (type == "LUA") {
+            std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
+            lua_body += "\n\n";
+            m_LuaCode += lua_body;
+        }
+    }
+
+    // Cleanup
+    ts_tree_delete(tree);
+    ts_parser_delete(parser);
+
+    m_ScoreLoaded = true;
     return m_ScoreStates;
 }
 } // namespace OpenScofo

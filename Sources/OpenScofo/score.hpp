@@ -50,12 +50,6 @@ class Score {
         return m_TimbreModel;
     }
 
-    // Errors
-    bool HasErrors();
-    std::vector<std::string> GetErrorMessage();
-    void SetError(const std::string &message);
-    void ClearError();
-
   private:
     States m_ScoreStates;
     std::string m_LuaCode;
@@ -67,7 +61,6 @@ class Score {
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
     void PitchNode2Freq(const std::string Score, TSNode node, AudioState &State);
     // bool SpaceTab(const std::string &line, int numSpaces);
-    void ParseInput(const std::string &Score);
     void PrintTreeSitterNode(TSNode node, int indent = 0);
     TSNode GetField(TSNode Node, std::string s);
     bool isNumber(std::string str);
