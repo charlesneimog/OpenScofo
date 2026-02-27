@@ -555,7 +555,7 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
     }
 
     // Compute silence probability
-    const double L0 = -70.0;
+    const double L0 = -60.0;
     const double alpha = 0.25;
     Desc.SilenceProb = 1.0 / (1.0 + std::exp(alpha * (Desc.Loudness - L0)));
 }
@@ -858,6 +858,7 @@ void MIR::SpectralHarmonicityExec(Description &Desc) {
 
 // ─────────────────────────────────────
 void MIR::AddReverb(Description &Desc, double decay) {
+    (void)decay;
     for (size_t i = 0; i < Desc.NormSpectralPower.size(); i++) {
         Desc.ReverbSpectralPower[i] = 0; //(Desc.ReverbSpectralPower[i] * decay) * (Desc.NormSpectralPower[i] * decay);
     }
@@ -867,6 +868,7 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
 void MIR::GetDescription(std::vector<double> &In, Description &Desc, States &ScoreStates) {
+    (void)ScoreStates;
     double *x = In.data();
     const double *w = m_WindowingFunc.data();
     for (size_t i = 0; i < m_FFTSize; ++i)

@@ -18,10 +18,10 @@ enum AudioDescType {
 enum EventType {
     BEGIN, // First state of score
     REST,  // Markov state
-    NOTE,  // MacroState, Semimarkov with Markov inside
-    CHORD, // MacroState,
-    TRILL, // MacroState, SemiMarkov with Markov inside
-    MULTI, // MacroState,
+    NOTE,  // MarkovState, Semimarkov with Markov inside
+    CHORD, // MarkovState,
+    TRILL, // MarkovState, SemiMarkov with Markov inside
+    MULTI, // MarkovState,
 };
 
 enum HMMType { SEMIMARKOV, MARKOV };
@@ -44,13 +44,14 @@ class AudioState {
   public:
     AudioDescType Type;
     double Freq;
+    double Midi;
     std::vector<double> Obs;
     std::vector<double> Forward;
     unsigned Index;
 };
 
 // ─────────────────────────────────────
-class MacroState {
+class MarkovState {
   public:
     int Index;
     int ScorePos;
@@ -69,7 +70,14 @@ class MacroState {
     // Forward Algorithm
     double InitProb;
     // std::vector<double> Obs;
-    std::vector<double> Forward;
+    std::vector<double> Forward;       // ADD THIS
+    double ForwardLast;                // ADD THIS
+    std::vector<double> BestObs;       // ADD THIS
+    double SumIn = 0.0;                // si[j][t+1], updated each step
+    std::vector<double> SumIn_History; // circular buffer, same size as Forward
+
+    // In MDP — add a per-timestep normalisation buffer:
+    std::vector<double> m_Normalization; // size = m_BufferSize
 
     // Time
     double OnsetTime;
@@ -91,9 +99,9 @@ class MacroState {
     double IOIPhiN;
     double IOIHatPhiN;
     double Duration = 0.0;
-
     double PhaseCoupling;
     double SyncStrength;
+    double TimeProb;
 
     // Error Handling
     int Line;
@@ -109,7 +117,7 @@ class MacroState {
     }
 };
 
-using States = std::vector<MacroState>;
+using States = std::vector<MarkovState>;
 
 // ─────────────────────────────────────
 class Description {

@@ -63,7 +63,7 @@ class MIR {
     void MFCCInit();
     void MFCCExec(Description &Desc);
     // Time coherence
-    void BuildSingleEventPdf(MacroState &ev, double dt);
+    void BuildSingleEventPdf(MarkovState &ev, double dt);
 
     const std::vector<float> &GetTimeCoherenceGaussianKernel(double sigmaSeconds, double dt, int templateMax) const;
     // Onset
