@@ -75,7 +75,7 @@ class MDP {
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);
-    std::vector<double> GetInitialDistribution();
+    void GetInitialDistribution();
     int GetMaxUForJ(MarkovState &StateJ);
 
     // Markov

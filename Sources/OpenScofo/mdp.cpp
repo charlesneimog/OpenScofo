@@ -557,7 +557,7 @@ double MDP::GetPitchSimilarity(double Freq) {
 }
 
 // ─────────────────────────────────────
-std::vector<double> MDP::GetInitialDistribution() {
+void MDP::GetInitialDistribution() {
     int Size = m_WinEnd - m_CurrentStateIndex + 1;
     std::vector<double> InitialProb(Size);
 
@@ -577,7 +577,18 @@ std::vector<double> MDP::GetInitialDistribution() {
         }
     }
 
-    return InitialProb;
+    for (int j = m_WinStart; j <= m_WinEnd; j++) {
+        if (j < 0 || j >= (int)m_States.size())
+            continue;
+        int idx = j - m_CurrentStateIndex;
+        MarkovState &StateJ = m_States[j];
+        StateJ.InitProb = (idx < (int)InitialProb.size()) ? InitialProb[idx] : 0.0;
+        if (j < m_CurrentStateIndex) {
+            m_States[j].InitProb = 0.0;
+        }
+    }
+
+    return;
 }
 
 // ─────────────────────────────────────
@@ -658,7 +669,7 @@ double MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 // ─────────────────────────────────────
 int MDP::Inference(int T) {
     int bufferIndex = T % m_BufferSize;
-    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappe {}", m_WinStart, m_WinEnd, bufferIndex,
+    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappa {}", m_WinStart, m_WinEnd, bufferIndex,
                   m_Tau, m_Kappa);
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
@@ -717,20 +728,7 @@ int MDP::GetEvent(Description &Desc) {
     // ── On the very first frame of a new event: set initial distribution ─────
     if (m_T == 0) {
         // TODO:: Save this inside the loop
-        std::vector<double> InitialProb = GetInitialDistribution();
-        for (int j = m_CurrentStateIndex; j <= m_WinEnd; j++) {
-            if (j < 0 || j >= (int)m_States.size())
-                continue;
-            int idx = j - m_CurrentStateIndex;
-            MarkovState &StateJ = m_States[j];
-            StateJ.InitProb = (idx < (int)InitialProb.size()) ? InitialProb[idx] : 0.0;
-        }
-
-        // States before the current event in the window get zero initial mass.
-        for (int j = m_WinStart; j < m_CurrentStateIndex; j++) {
-            if (j >= 0 && j < (int)m_States.size())
-                m_States[j].InitProb = 0.0;
-        }
+        GetInitialDistribution();
     }
 
     // ── Run forward inference ────────────────────────────────────────────────
