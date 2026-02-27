@@ -67,17 +67,18 @@ class MarkovState {
     ActionVec Actions;
     std::vector<AudioState> AudioStates;
 
-    // Forward Algorithm
+    // Forward Algorithm — Right-Censored Forward (Cuvillier 2014)
+    // F_j(t) = sum_u obs_prod(u) * F_j^i(t-u) * D_j(u)
+    // F_j^o(t) = sum_u obs_prod(u) * F_j^i(t-u) * d_j(u)   [d_j = D_j(u)-D_j(u+1)]
+    // F_j^i(t) = sum_{i!=j} p_ij * F_i^o(t)                [= F_{j-1}^o(t) for linear chain]
+    // obs_prod(u) = prod_{v=0}^{u-1} b_j(x_{t-v}) / N(t-v)  [normalized, stable]
     double InitProb;
-    // std::vector<double> Obs;
-    std::vector<double> Forward;       // ADD THIS
-    double ForwardLast;                // ADD THIS
-    std::vector<double> BestObs;       // ADD THIS
-    double SumIn = 0.0;                // si[j][t+1], updated each step
-    std::vector<double> SumIn_History; // circular buffer, same size as Forward
-
-    // In MDP — add a per-timestep normalisation buffer:
-    std::vector<double> m_Normalization; // size = m_BufferSize
+    std::vector<double> Forward;  // F_j(t): current-state prob, circular buffer
+    std::vector<double> ExitProb; // F_j^o(t): exit prob, circular buffer
+    std::vector<double> BestObs;  // b_j(x_t): observation, circular buffer
+    double ForwardLast = 0.0;
+    double SumIn = 0.0;
+    std::vector<double> SumIn_History; // F_j^i(t): entry prob, circular buffer
 
     // Time
     double OnsetTime;

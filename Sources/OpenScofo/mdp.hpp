@@ -71,6 +71,7 @@ class MDP {
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
     double GetOccupancyDistribution(MarkovState &State, int u);
+    double GetSurvivorDistribution(MarkovState &State, int u);
     void InitTimeDecoding();
 
     // Markov and Probabilities
@@ -83,7 +84,9 @@ class MDP {
     int GetMaxJIndex(int StateIndex);
 
     double Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
-    double SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    // double SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    void SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+
     int Inference(int CurrentState);
 
     // Pitch Template
