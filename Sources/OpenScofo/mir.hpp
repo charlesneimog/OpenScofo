@@ -42,10 +42,6 @@ class MIR {
     double GetdB();
     void LoadONNXModel(fs::path path);
     void BuildTimeCoherenceTemplate(States &States);
-    bool HasErrors();
-    std::vector<std::string> GetErrorMessage();
-    void SetError(const std::string &message);
-    void ClearError();
 
     // Tests
     std::vector<std::pair<int, int>> GetCQT();

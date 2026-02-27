@@ -13,14 +13,14 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
     float WindowHalf = FftSize / 2;
     m_FFTIn = (double *)fftw_alloc_real((size_t)FftSize);
     if (!m_FFTIn) {
-        SetError("OpenScofoMIR::OpenScofoMIR fftw_alloc_real failed");
+        spdlog::critical("fftw_alloc_real failed");
         return;
     }
 
     m_FFTOut = (fftw_complex *)fftw_alloc_complex((size_t)WindowHalf + 1);
     if (!m_FFTOut) {
         fftw_free(m_FFTIn); // Free previously allocated memory
-        SetError("OpenScofoMIR::OpenScofoMIR fftw_alloc_complex failed");
+        spdlog::critical("fftw_alloc_complex failed");
         return;
     }
 
@@ -72,30 +72,6 @@ MIR::~MIR() {
 }
 
 // ╭─────────────────────────────────────╮
-// │               Errors                │
-// ╰─────────────────────────────────────╯
-bool MIR::HasErrors() {
-    return m_HasErrors;
-}
-
-// ─────────────────────────────────────
-std::vector<std::string> MIR::GetErrorMessage() {
-    return m_Errors;
-}
-
-// ─────────────────────────────────────
-void MIR::SetError(const std::string &message) {
-    m_HasErrors = true;
-    m_Errors.push_back(message);
-}
-
-// ─────────────────────────────────────
-void MIR::ClearError() {
-    m_HasErrors = false;
-    m_Errors.clear();
-}
-
-// ╭─────────────────────────────────────╮
 // │                Utils                │
 // ╰─────────────────────────────────────╯
 double MIR::Mtof(double note, double tunning) {
@@ -132,7 +108,7 @@ std::vector<std::pair<int, int>> MIR::GetCQT() {
 void MIR::LoadONNXModel(fs::path path) {
     m_OnnxCTX = onnx_context_alloc_from_file(path.c_str(), NULL, 0);
     if (m_OnnxCTX == nullptr) {
-        SetError("Failed to load ONNX model: " + path.string());
+        spdlog::error("Failed to load ONNX model: {}.", path.string());
         return;
     }
 
@@ -141,7 +117,8 @@ void MIR::LoadONNXModel(fs::path path) {
         for (int i = 0; i < g->nlen; i++) {
             struct onnx_node_t *n = &g->nodes[i];
             if (n->opset > CURRENT_ONNX_OPSET) {
-                SetError("Unsupported opset => " + std::string(n->proto->op_type) + " " + std::to_string(n->opset));
+                spdlog::error("Unsupported opset => {} {}.", n->proto->op_type, n->opset);
+                return;
             }
         }
     }
@@ -168,7 +145,7 @@ void MIR::LoadONNXModel(fs::path path) {
     }
 
     if (!TreeEnsembleClassifierFound) {
-        SetError("TreeEnsembleClassifier not found in model, please use py.train to train models for OpenScofo");
+        spdlog::error("TreeEnsembleClassifier not found in model, please use py.train to train models for OpenScofo");
         return;
     }
 

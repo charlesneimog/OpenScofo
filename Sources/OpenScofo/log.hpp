@@ -29,28 +29,34 @@ template <typename Mutex> class OpenScofoLog : public spdlog::sinks::base_sink<M
   private:
     std::function<void(const spdlog::details::log_msg &, void *)> m_Callback;
     void *m_Data = nullptr;
-    bool *m_Errors = nullptr;
+    spdlog::level::level_enum *m_Error = nullptr;
 
   public:
-    void SetCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data, bool *Errors) {
+    void SetCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data,
+                     spdlog::level::level_enum *Error) {
         m_Callback = std::move(cb);
         m_Data = data;
-        m_Errors = Errors;
+        m_Error = Error;
     }
 
   protected:
     void sink_it_(const spdlog::details::log_msg &msg) override {
-        if (!m_Callback)
-            return;
-
-        // Set error flag only if pointer is valid
-        if (m_Errors && (msg.level == spdlog::level::err || msg.level == spdlog::level::critical)) {
-            *m_Errors = true;
+        if (m_Error && (msg.level == spdlog::level::err || msg.level == spdlog::level::critical)) {
+            *m_Error = msg.level;
         }
 
-        m_Callback(msg, m_Data);
+        if (m_Callback) {
+            m_Callback(msg, m_Data);
+        } else {
+            // Caso não haja callback, imprime de forma "bonitinha"
+            spdlog::memory_buf_t formatted;
+            spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
+            fwrite(formatted.data(), 1, formatted.size(), stdout);
+            fflush(stdout);
+        }
     }
 
     void flush_() override {
+        fflush(stdout); // garante que tudo seja impresso
     }
 };

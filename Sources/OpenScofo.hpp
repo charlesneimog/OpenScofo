@@ -112,7 +112,7 @@ class OpenScofo {
     MDP m_MDP;
     MIR m_MIR;
     Score m_Score;
-    OpenScofoLog<std::mutex> m_Log;
+    std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
 
 #if defined(OSCOFO_LUA)
     lua_State *m_LuaState;
@@ -128,7 +128,7 @@ class OpenScofo {
     unsigned m_BlockIndex;
 
     // Errors
-    bool m_HasErrors = false;
+    spdlog::level::level_enum m_HasErrors;
     std::vector<std::string> m_Errors;
     std::function<void(const std::string &)> m_ErrorCallback = nullptr;
     std::vector<double> m_InBuffer;

@@ -24,12 +24,26 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     InitLua();
 #endif
 
-#ifndef NDEBUG
+#if defined(NDEBUG)
+    spdlog::set_level(spdlog::level::info);
+#else
     spdlog::set_level(spdlog::level::debug);
     spdlog::enable_backtrace(32);
-#else
-    spdlog::set_level(spdlog::level::info);
 #endif
+
+    // --- Create OpenScofoLog sink ---
+    m_Log = std::make_shared<OpenScofoLog<std::mutex>>();
+    m_Log->SetCallback(nullptr, nullptr, &m_HasErrors); // ensures error flag updates
+    std::vector<spdlog::sink_ptr> sinks{m_Log};
+
+#ifndef NDEBUG
+    // Add console sink in debug
+    auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    sinks.push_back(consoleSink);
+    m_Log->set_pattern("%v"); // keep only message for callback sink
+#endif
+    auto logger = std::make_shared<spdlog::logger>("OpenScofo", sinks.begin(), sinks.end());
+    spdlog::set_default_logger(logger);
 }
 
 //  ─────────────────────────────────────
@@ -48,17 +62,17 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
 // │               Errors                │
 // ╰─────────────────────────────────────╯
 void OpenScofo::SetErrorCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data) {
-    auto level = spdlog::default_logger()->level();
-
-    using PdSink = OpenScofoLog<std::mutex>;
-    auto pd_sink = std::make_shared<PdSink>();
-    pd_sink->SetCallback(cb, data, &m_HasErrors);
-    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    std::vector<spdlog::sink_ptr> sinks{pd_sink, console_sink};
-    pd_sink->set_pattern("%v");
-    auto logger = std::make_shared<spdlog::logger>("OpenScofo", sinks.begin(), sinks.end());
-    spdlog::set_default_logger(logger);
-    spdlog::set_level(level);
+    if (m_Log) {
+        m_Log->SetCallback(cb, data, &m_HasErrors);
+#if defined(NDEBUG)
+        spdlog::set_level(spdlog::level::info);
+#else
+        spdlog::set_level(spdlog::level::debug);
+#endif
+    } else {
+        std::cerr << "Not possible to create Log" << std::endl;
+        exit(-1);
+    }
 }
 
 // ─────────────────────────────────────
@@ -69,7 +83,13 @@ void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
 
 // ─────────────────────────────────────
 void OpenScofo::ClearErrors() {
-    m_HasErrors = false;
+    if (m_HasErrors == spdlog::level::critical) {
+        spdlog::error(
+            "Critical error encountered. Recovery is not possible. Please restart OpenScofo or report the error.");
+        return;
+    } else {
+        m_HasErrors = spdlog::level::off;
+    }
 }
 
 // ╭─────────────────────────────────────╮
@@ -353,7 +373,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 
 // ─────────────────────────────────────
 bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
-    if (!m_Score.ScoreIsLoaded() || m_HasErrors) {
+    if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         return false;
     }
 
