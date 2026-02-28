@@ -124,7 +124,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("index", &OpenScofo::AudioState::Index);
 
     py::enum_<OpenScofo::EventType>(m, "EventType")
-        .value("BEGIN", OpenScofo::BEGIN)
         .value("REST", OpenScofo::REST)
         .value("NOTE", OpenScofo::NOTE)
         .value("CHORD", OpenScofo::CHORD)

@@ -73,7 +73,7 @@ class MDP {
     double GetOccupancyDistribution(MarkovState &State, int u);
     double GetSurvivorDistribution(MarkovState &State, int u);
     void InitTimeDecoding();
-    void BuildDistributionCache(double expected_frames);
+    void BuildDistributionCache(double ExpectedFrames);
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);

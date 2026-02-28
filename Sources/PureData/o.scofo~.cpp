@@ -90,6 +90,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     } else {
         return;
     }
+    x->OpenScofo->SetCurrentEvent(0);
 
     x->Event = 0;
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
@@ -121,14 +122,12 @@ static void oscofo_start(PdOpenScofo *x) {
         pd_error(x, "[o.scofo~] Score not loaded");
         return;
     }
-    x->OpenScofo->SetCurrentEvent(0);
-    x->Event = 0;
-
-    // clear all actions
     x->Actions.clear();
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
-    outlet_float(x->EventOut, 0);
+    x->OpenScofo->SetCurrentEvent(0);
+    x->Event = 0;
+
     x->Following = true;
     logpost(x, 2, "[o.scofo~] Start following");
 }
@@ -163,7 +162,6 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         }
 
     } else if (method == "section") {
-        // TODO: set thing like section A, section B, etc.
         pd_error(x, "[o.scofo~] Section method not implemented");
     } else {
         pd_error(x, "[o.scofo~] Unknown method");
