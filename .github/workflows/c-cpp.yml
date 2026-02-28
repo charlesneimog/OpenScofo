@@ -63,6 +63,7 @@ jobs:
           brew install pd
           brew install pybind11
           brew install tree-sitter
+          npm install -g tree-sitter-cli
       - name: Build Object
         run: |
           mkdir -p max
@@ -104,8 +105,7 @@ jobs:
         compiler: [mingw]
         arch: [amd64]
         precision: [32, 64]  # pd double and single float
-        newTag: 
-          - ${{startsWith(github.ref, 'refs/tags/')}}
+        newTag: ["${{startsWith(github.ref, 'refs/tags/')}}"]
         exclude:
           - newTag: false
             precision: 64
@@ -121,8 +121,8 @@ jobs:
         with:
           msystem: mingw64
           update: false
-          install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-boost
-            mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-pybind11 zip
+          install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-tree-sitter
+            mingw-w64-x86_64-pybind11 zip
       - name: Install PureData Float 32
         if: matrix.compiler == 'mingw' && matrix.precision == '32'
         run: |
@@ -132,7 +132,7 @@ jobs:
         if: matrix.compiler == 'mingw' && matrix.precision == '64'
         run: |
           winget install -e --id MillerPuckette.Pd64 --accept-source-agreements
-          npm install tree-sitter-cli
+          npm install -g tree-sitter-cli
       - name: Configure and build Mingw
         shell: msys2 {0}
         if: matrix.compiler == 'mingw'
@@ -172,8 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        newTag: 
-          - ${{ startsWith(github.ref, 'refs/tags/') }}
+        newTag: ["${{ startsWith(github.ref, 'refs/tags/') }}"]
         arch: [amd64, aarch64, arm]
         precision: [32, 64]
         exclude:
@@ -204,7 +203,7 @@ jobs:
           sudo apt install puredata -y
           sudo apt install libboost-all-dev
           sudo apt install python3-pybind11 -y
-          npm install tree-sitter
+          npm install -g tree-sitter-cli
       - name: Install aarch64 gcc
         if: matrix.arch == 'aarch64'
         run: |
