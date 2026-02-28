@@ -589,6 +589,41 @@ void FindErrors(TSNode &root, TSNode &node, const std::string &source_code) {
 }
 
 // ─────────────────────────────────────
+bool ScoreIsText(const std::string &path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        return false;
+
+    constexpr std::size_t SampleSize = 4096;
+    std::vector<unsigned char> buffer(SampleSize);
+
+    file.read(reinterpret_cast<char *>(buffer.data()), SampleSize);
+    std::size_t bytesRead = static_cast<std::size_t>(file.gcount());
+
+    if (bytesRead == 0)
+        return true; // empty file → treat as text
+
+    std::size_t suspicious = 0;
+
+    for (std::size_t i = 0; i < bytesRead; ++i) {
+        unsigned char c = buffer[i];
+
+        // Null byte strongly indicates binary
+        if (c == 0)
+            return false;
+
+        // Allow printable ASCII and common whitespace
+        if (!(std::isprint(c) || c == '\n' || c == '\r' || c == '\t'))
+            suspicious++;
+    }
+
+    double ratio = static_cast<double>(suspicious) / bytesRead;
+
+    // Threshold: >5% suspicious bytes → likely binary
+    return ratio < 0.05;
+}
+
+// ─────────────────────────────────────
 States Score::Parse(std::string ScoreFile) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
@@ -604,6 +639,11 @@ States Score::Parse(std::string ScoreFile) {
     std::ifstream File(ScoreFile, std::ios::binary);
     if (File.is_open() == false) {
         spdlog::error("Not possible to open score file");
+        return {};
+    }
+
+    if (!ScoreIsText(ScoreFile)) {
+        spdlog::error("The Score file must be text files");
         return {};
     }
 

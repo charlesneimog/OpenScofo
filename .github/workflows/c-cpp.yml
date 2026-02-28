@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: 3.13
       - name: Mac Build
         if: runner.os == 'macOS'
         run: |
@@ -123,9 +123,6 @@ jobs:
           update: false
           install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-boost
             mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-pybind11 zip
-      - name: Install winget
-        if: matrix.compiler == 'mingw'
-        uses: Cyberboss/install-winget@v1
       - name: Install PureData Float 32
         if: matrix.compiler == 'mingw' && matrix.precision == '32'
         run: |

@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         bool ok = scofo.ProcessBlock(window);
         int event = scofo.GetEventIndex();
         if (event != currentEvent) {
-            std::cerr << "Current Event is " << event << "\n";
+            spdlog::info("Current Event is {}", event);
             currentEvent = event;
         }
         if (event > 100) {

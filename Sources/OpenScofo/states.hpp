@@ -16,7 +16,6 @@ enum AudioDescType {
 
 // ─────────────────────────────────────
 enum EventType {
-    BEGIN, // First state of score
     REST,  // Markov state
     NOTE,  // MarkovState, Semimarkov with Markov inside
     CHORD, // MarkovState,
@@ -45,8 +44,8 @@ class AudioState {
     AudioDescType Type;
     double Freq;
     double Midi;
-    std::vector<double> Obs;
-    std::vector<double> Forward;
+    // std::vector<double> Obs;
+    // std::vector<double> Forward;
     unsigned Index;
 };
 
@@ -59,9 +58,6 @@ class MarkovState {
     EventType Type;
     HMMType HSMMType;
     int MarkovIndex = -1;
-
-    // Configs
-    double Entropy;
 
     // States Actions
     ActionVec Actions;

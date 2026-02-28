@@ -40,13 +40,11 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
     m_EventWindowSize = 20;
     SetTunning(440);
 
-    for (int i = 0; i <= 10000; ++i) { // 0.0000, 0.0001, 0.0002 ...
+    double KappaPrecision = 10000;
+    for (int i = 0; i <= KappaPrecision; i++) {
         double key = i / 10000.0;
         InverseA2(key);
     }
-
-    std::cout << std::numeric_limits<double>::min() << "\n";
-    std::cout << std::numeric_limits<double>::denorm_min() << "\n";
 }
 
 // ─────────────────────────────────────
@@ -77,10 +75,10 @@ void MDP::SetScoreStates(States ScoreStates) {
         State.ExitProb.resize(m_BufferSize + 1, 0.0);      // F_j^o(t)
         State.SumIn_History.resize(m_BufferSize + 1, 0.0); // F_j^i(t)
         State.BestObs.resize(m_BufferSize + 1, 1e-300);    // b_j(x_t), floor avoids /0
-        for (AudioState &AS : State.AudioStates) {
-            AS.Obs.resize(m_BufferSize + 1, 0.0);
-            AS.Forward.resize(m_BufferSize + 1, 0.0);
-        }
+        // for (AudioState &AS : State.AudioStates) {
+        //     AS.Obs.resize(m_BufferSize + 1, 0.0);
+        //     AS.Forward.resize(m_BufferSize + 1, 0.0);
+        // }
     }
 
     m_CurrentStateIndex = 0; // ← was -1: caused GetInitialDistribution to index
@@ -314,34 +312,39 @@ void MDP::InitTimeDecoding(void) {
 }
 
 // ─────────────────────────────────────
-void MDP::BuildDistributionCache(double expected_frames) {
-    if (expected_frames < 1.0)
-        expected_frames = 1.0;
+void MDP::BuildDistributionCache(double ExpectedFrames) {
+    if (ExpectedFrames < 1.0)
+        ExpectedFrames = 1.0;
 
     // Round to 1 decimal place to create a cache key (e.g., 12.4 frames -> 124)
-    int key = static_cast<int>(std::round(expected_frames * 10.0));
+    int key = static_cast<int>(std::round(ExpectedFrames * 10.0));
 
     // If already computed, skip
     if (m_OccupancyCache.find(key) != m_OccupancyCache.end())
         return;
 
-    int max_u = static_cast<int>(std::ceil(5.0 * expected_frames));
-    std::vector<double> occ(max_u + 1, 0.0);
-    std::vector<double> surv(max_u + 1, 1.0);
+    int maxU = static_cast<int>(std::ceil(5.0 * ExpectedFrames));
+
+    std::vector<double> occ(maxU + 1, 0.0);
+    std::vector<double> surv(maxU + 1, 1.0);
+
+    if (occ.empty() || surv.empty())
+        return;
 
     double p = 0.5;
-    double r = expected_frames;
+    double r = ExpectedFrames;
 
     // Base case for u = 0
     occ[0] = std::pow(p, r);
     surv[0] = 1.0;
-    double current_surv = 1.0 - occ[0];
+
+    double currentSurv = 1.0 - occ[0];
 
     // Compute recursively (O(1) math per step)
-    for (int u = 1; u <= max_u; u++) {
+    for (int u = 1; u <= maxU; u++) {
         occ[u] = occ[u - 1] * ((u + r - 1.0) / (double)u) * (1.0 - p);
-        surv[u] = (current_surv > 0.0) ? current_surv : 0.0;
-        current_surv -= occ[u];
+        surv[u] = (currentSurv > 0.0) ? currentSurv : 0.0;
+        currentSurv -= occ[u];
     }
 
     m_OccupancyCache[key] = std::move(occ);
@@ -432,6 +435,13 @@ void MDP::GetDecodeWindow() {
     int half = m_EventWindowSize / 2;
     m_WinStart = std::max(0, (int)m_CurrentStateIndex - half);
     m_WinEnd = std::min((int)m_States.size() - 1, (int)m_CurrentStateIndex + half);
+
+    if (m_WinStart < 0 || m_WinEnd >= static_cast<int>(m_States.size())) {
+        spdlog::critical("MDP::GetDecodeWindow invariant violated: "
+                         "window out of bounds "
+                         "(winStart={}, winEnd={}, statesSize={}, currentIndex={}, eventWindowSize={})",
+                         m_WinStart, m_WinEnd, m_States.size(), m_CurrentStateIndex, m_EventWindowSize);
+    }
 }
 
 // ─────────────────────────────────────
@@ -439,7 +449,7 @@ double MDP::UpdatePsiN(int StateIndex) {
     m_Tau += 1;
     m_T += 1;
 
-    if (StateIndex == m_CurrentStateIndex) {
+    if (StateIndex == m_CurrentStateIndex || StateIndex < 2) {
         m_TimeInPrevEvent += m_BlockDur;
         return m_PsiN;
     } else {
@@ -522,39 +532,55 @@ void MDP::GetAudioObservations(int T) {
 
         MarkovState &StateJ = m_States[j];
         double BestObs = 1e-300;
-        // Keep this for now
-        StateJ.TimeProb = 1;
+        // StateJ.TimeProb = 1;
 
-        if (StateJ.Type == NOTE || StateJ.Type == TRILL) {
+        switch (StateJ.Type) {
+        case NOTE:
+        case TRILL: {
             for (AudioState &AS : StateJ.AudioStates) {
-                switch (AS.Type) {
-                case PITCH: {
-                    auto it = PitchObs.find(AS.Freq);
-                    if (it != PitchObs.end()) {
-                        AS.Obs[bufferIndex] = it->second;
-                        BestObs = std::max(BestObs, it->second);
-                    } else {
-                        double kl = GetPitchSimilarity(AS.Freq) * (1.0 - m_Desc.SilenceProb);
-                        PitchObs[AS.Freq] = kl;
-                        AS.Obs[bufferIndex] = kl;
-                        BestObs = std::max(BestObs, kl);
-                    }
-                    break;
+                if (AS.Type != PITCH) {
+                    spdlog::error("Memory error on creation of Audio States, please report");
                 }
-                default:
-                    spdlog::error("Not implemented yet!");
+                auto it = PitchObs.find(AS.Freq);
+                if (it != PitchObs.end()) {
+                    BestObs = std::max(BestObs, it->second);
+                } else {
+                    double kl = GetPitchSimilarity(AS.Freq) * (1.0 - m_Desc.SilenceProb);
+                    PitchObs[AS.Freq] = kl;
+                    BestObs = std::max(BestObs, kl);
                 }
             }
             ObsNoSound = std::max(ObsNoSound, BestObs);
-
-        } else if (StateJ.Type == REST) {
-            for (AudioState &AS : StateJ.AudioStates) {
-                AS.Obs[bufferIndex] = m_Desc.SilenceProb;
-                BestObs = std::max(BestObs, m_Desc.SilenceProb);
-            }
+            break;
         }
+        case CHORD: {
+            double ChordKLObs = 1e-300;
+            for (AudioState &AS : StateJ.AudioStates) {
+                if (AS.Type != PITCH) {
+                    spdlog::error("Memory error on creation of Audio States, please report");
+                }
 
-        StateJ.BestObs[bufferIndex] = BestObs * StateJ.TimeProb;
+                auto it = PitchObs.find(AS.Freq);
+                if (it != PitchObs.end()) {
+                    ChordKLObs += it->second;
+                } else {
+                    double kl = GetPitchSimilarity(AS.Freq) * (1.0 - m_Desc.SilenceProb);
+                    PitchObs[AS.Freq] = kl;
+                    ChordKLObs += kl;
+                }
+            }
+            BestObs = ChordKLObs / StateJ.AudioStates.size();
+            ObsNoSound = std::max(ObsNoSound, BestObs);
+            break;
+        }
+        case REST: {
+            BestObs = std::max(BestObs, m_Desc.SilenceProb);
+            break;
+        }
+        default:
+            spdlog::error("Observation type not implemented yet");
+        }
+        StateJ.BestObs[bufferIndex] = BestObs;
     }
 
     if (ObsNoSound > ObsSilence) {
@@ -636,17 +662,18 @@ double MDP::GetTransProbability(int i, int j) {
 
 // ─────────────────────────────────────
 double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
-    double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
-    if (expected_frames < 1.0)
-        expected_frames = 1.0;
+    double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
+    if (ExpectedFrames < 1.0)
+        ExpectedFrames = 1.0;
 
-    int key = static_cast<int>(std::round(expected_frames * 10.0));
-    BuildDistributionCache(expected_frames); // Builds only if missing
+    int key = static_cast<int>(std::round(ExpectedFrames * 10.0));
+    BuildDistributionCache(ExpectedFrames); // Builds only if missing
 
     if (u < static_cast<int>(m_OccupancyCache[key].size())) {
         return m_OccupancyCache[key][u];
     }
-    return 0.0; // u is beyond the tail
+
+    return 0.0;
 }
 
 // ─────────────────────────────────────
@@ -680,8 +707,8 @@ int MDP::GetMaxUForJ(MarkovState &StateJ) {
 // ─────────────────────────────────────
 void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
-
     double fj;
+
     if (T == 0) {
         fj = bj * StateJ.InitProb;
     } else {
@@ -707,20 +734,19 @@ void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 
 // ─────────────────────────────────────
 void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
-    double bj = StateJ.BestObs[bufferIndex]; // Factored out b_j(o_t)
+    double bj = StateJ.BestObs[bufferIndex];
 
-    double f_tilde_j = 0.0;  // \tilde{f}_j(t)
-    double f_tilde_jo = 0.0; // \tilde{f}_j^o(t)
-    double ObsProd = 1.0;    // b_j(o_{t-u+1}^{t-1})
+    double f_tilde_j = 0.0;
+    double f_tilde_jo = 0.0;
+    double ObsProd = 1.0;
 
     int maxU = GetMaxUForJ(StateJ);
 
     for (int u = 1; u <= T + 1; u++) {
-        double D_bar_ju = GetSurvivorDistribution(StateJ, u); // \overline{D}_j(u)
-        double d_ju = GetOccupancyDistribution(StateJ, u);    // d_j(u)
+        double D_bar_ju = GetSurvivorDistribution(StateJ, u);
+        double d_ju = GetOccupancyDistribution(StateJ, u);
 
         if (u == T + 1) {
-            // INIT TERM: \overline{D}_j(t+1) * b_j(o_0^t) * \pi(j)
             f_tilde_j += D_bar_ju * ObsProd * StateJ.InitProb;
             f_tilde_jo += d_ju * ObsProd * StateJ.InitProb;
             break;
@@ -728,22 +754,17 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 
         if (u <= maxU) {
             int entryBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-
             double transition_sum = 0.0;
-            for (int i = 0; i < (int)m_States.size(); i++) {
-                if (i != j) {
-                    double p_ij = GetTransProbability(i, j);
-                    if (p_ij > 0.0) {
-                        transition_sum += p_ij * m_States[i].ExitProb[entryBuf];
-                    }
-                }
+
+            if (j > 0) {
+                double p_ij = GetTransProbability(j - 1, j);
+                transition_sum += p_ij * m_States[j - 1].ExitProb[entryBuf];
             }
 
             f_tilde_j += D_bar_ju * ObsProd * transition_sum;
             f_tilde_jo += d_ju * ObsProd * transition_sum;
         }
 
-        // Advance scaled observation product to prevent floating-point underflow
         int prevBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double prevObs = StateJ.BestObs[prevBuf];
         double prevNorm = std::max(m_Normalization[prevBuf], 1e-300);
@@ -753,7 +774,6 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
             break;
     }
 
-    // Apply the factored-out current observation b_j(o_t)
     StateJ.Forward[bufferIndex] = bj * (f_tilde_j + 1e-300);
     StateJ.ExitProb[bufferIndex] = bj * (f_tilde_jo + 1e-300);
 }
@@ -764,57 +784,48 @@ int MDP::Inference(int T) {
     spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappa {}", m_WinStart, m_WinEnd, bIndex, m_Tau,
                   m_Kappa);
 
-    // ── STEP 1: Compute F_j(t) and F_j^o(t) for all states ─────────
+    // Compute \tilde{f}_j(t) and \tilde{f}_j^o(t)
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
         MarkovState &StateJ = m_States[j];
         if (StateJ.HSMMType == SEMIMARKOV)
-            SemiMarkov(StateJ, j, T, bIndex); // sets Forward and ExitProb
+            SemiMarkov(StateJ, j, T, bIndex);
         else
-            Markov(StateJ, j, T, bIndex); // sets Forward and ExitProb
+            Markov(StateJ, j, T, bIndex);
     }
 
+    // Calculate the Normalization Denominator
     double N = 0.0;
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
         N += m_States[j].Forward[bIndex];
     }
+
     if (N < 1e-300)
         N = 1e-300;
+
     m_Normalization[bIndex] = N;
 
+    // Apply Normalization
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
         m_States[j].Forward[bIndex] /= N;
-        m_States[j].Forward[bIndex] += 1e-300; // floor (reference C code line)
+        m_States[j].Forward[bIndex] += 1e-300;
+
         m_States[j].ExitProb[bIndex] /= N;
         m_States[j].ExitProb[bIndex] += 1e-300;
     }
 
-    for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
-        double entry = 0.0;
-        if (j > 0 && (j - 1) >= 0 && (j - 1) < (int)m_States.size()) {
-            entry = GetTransProbability(j - 1, j) * m_States[j - 1].ExitProb[bIndex];
-        }
-        m_States[j].SumIn_History[bIndex] = entry;
-    }
-
+    // Find the Argmax (Best State)
     double maxVal = 1e-300;
     int bestStateIndex = m_CurrentStateIndex;
+
     for (int j = m_CurrentStateIndex; j <= m_WinEnd; ++j) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
         MarkovState &StateJ = m_States[j];
         double fwd = StateJ.Forward[bIndex];
+
         if (fwd > maxVal) {
             maxVal = fwd;
             bestStateIndex = j;
         }
+
         spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
                       StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.ExitProb[bIndex]);
     }
