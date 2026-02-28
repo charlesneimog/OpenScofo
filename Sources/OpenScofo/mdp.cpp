@@ -44,6 +44,9 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
         double key = i / 10000.0;
         InverseA2(key);
     }
+
+    std::cout << std::numeric_limits<double>::min() << "\n";
+    std::cout << std::numeric_limits<double>::denorm_min() << "\n";
 }
 
 // ─────────────────────────────────────
@@ -70,10 +73,10 @@ void MDP::SetScoreStates(States ScoreStates) {
     m_Normalization.resize(m_BufferSize + 1, 1.0); // init to 1 so first-step division is safe
 
     for (MarkovState &State : m_States) {
-        State.Forward.resize(m_BufferSize + 1, 0.0);      // F_j(t)
-        State.ExitProb.resize(m_BufferSize + 1, 0.0);     // F_j^o(t)
+        State.Forward.resize(m_BufferSize + 1, 0.0);       // F_j(t)
+        State.ExitProb.resize(m_BufferSize + 1, 0.0);      // F_j^o(t)
         State.SumIn_History.resize(m_BufferSize + 1, 0.0); // F_j^i(t)
-        State.BestObs.resize(m_BufferSize + 1, 1e-300);   // b_j(x_t), floor avoids /0
+        State.BestObs.resize(m_BufferSize + 1, 1e-300);    // b_j(x_t), floor avoids /0
         for (AudioState &AS : State.AudioStates) {
             AS.Obs.resize(m_BufferSize + 1, 0.0);
             AS.Forward.resize(m_BufferSize + 1, 0.0);
@@ -81,9 +84,9 @@ void MDP::SetScoreStates(States ScoreStates) {
     }
 
     m_CurrentStateIndex = 0; // ← was -1: caused GetInitialDistribution to index
-                              //   m_States[-1] (UB) and give State 0 an InitProb of 0,
-                              //   making Forward[0] = 0 even with perfect observation.
-                              //   State 0 is the BEGIN/REST state; we ARE there at start.
+                             //   m_States[-1] (UB) and give State 0 an InitProb of 0,
+                             //   making Forward[0] = 0 even with perfect observation.
+                             //   State 0 is the BEGIN/REST state; we ARE there at start.
     m_Kappa = 1;
     m_BPM = m_States[0].BPMExpected;
     m_PsiN = 60.0f / m_States[0].BPMExpected;
@@ -311,6 +314,41 @@ void MDP::InitTimeDecoding(void) {
 }
 
 // ─────────────────────────────────────
+void MDP::BuildDistributionCache(double expected_frames) {
+    if (expected_frames < 1.0)
+        expected_frames = 1.0;
+
+    // Round to 1 decimal place to create a cache key (e.g., 12.4 frames -> 124)
+    int key = static_cast<int>(std::round(expected_frames * 10.0));
+
+    // If already computed, skip
+    if (m_OccupancyCache.find(key) != m_OccupancyCache.end())
+        return;
+
+    int max_u = static_cast<int>(std::ceil(5.0 * expected_frames));
+    std::vector<double> occ(max_u + 1, 0.0);
+    std::vector<double> surv(max_u + 1, 1.0);
+
+    double p = 0.5;
+    double r = expected_frames;
+
+    // Base case for u = 0
+    occ[0] = std::pow(p, r);
+    surv[0] = 1.0;
+    double current_surv = 1.0 - occ[0];
+
+    // Compute recursively (O(1) math per step)
+    for (int u = 1; u <= max_u; u++) {
+        occ[u] = occ[u - 1] * ((u + r - 1.0) / (double)u) * (1.0 - p);
+        surv[u] = (current_surv > 0.0) ? current_surv : 0.0;
+        current_surv -= occ[u];
+    }
+
+    m_OccupancyCache[key] = std::move(occ);
+    m_SurvivorCache[key] = std::move(surv);
+}
+
+// ─────────────────────────────────────
 double MDP::InverseA2(double SyncStrength) {
     if (SyncStrength < 0) {
         return 0;
@@ -321,8 +359,8 @@ double MDP::InverseA2(double SyncStrength) {
     }
 
     double key = std::round(SyncStrength * 10000.0) / 10000.0;
-    auto it = m_KappaArray.find(key);
-    if (it != m_KappaArray.end()) {
+    auto it = m_KappaCache.find(key);
+    if (it != m_KappaCache.end()) {
         return it->second;
     }
 
@@ -339,7 +377,7 @@ double MDP::InverseA2(double SyncStrength) {
         double I0 = std::cyl_bessel_i(0, Mid);
         A2Mid = I1 / I0;
         if (std::fabs(A2Mid - SyncStrength) < Tol) {
-            m_KappaArray[key] = Mid;
+            m_KappaCache[key] = Mid;
             return Mid;
         } else if (A2Mid < SyncStrength) {
             Low = Mid;
@@ -348,7 +386,7 @@ double MDP::InverseA2(double SyncStrength) {
         }
     }
 
-    m_KappaArray[key] = Mid;
+    m_KappaCache[key] = Mid;
     spdlog::warn("Kappa for Sync Strength {:.4f} not converged after {} iterations. Returning {:.4f} for A2 = {:.4f}",
                  SyncStrength, i, Mid, A2Mid);
     return Mid;
@@ -417,25 +455,31 @@ double MDP::UpdatePsiN(int StateIndex) {
     double IOISeconds = m_CurrentStateOnset - m_LastTn;
     double LastPhiN = LastState.IOIPhiN;
     double LastHatPhiN = LastState.IOIHatPhiN;
+
+    // \hat{\phi}_n foi previsto no step anterior e já está guardado aqui
     double HatPhiN = CurrentState.IOIHatPhiN;
-    double PhiNExpected = LastPhiN + ((m_CurrentStateOnset - m_LastTn) / m_PsiN);
-    CurrentState.IOIHatPhiN = PhiNExpected;
     CurrentState.OnsetObserved = m_CurrentStateOnset;
 
+    // Equação 1: Atualização de Kappa
     double PhaseDiff = (IOISeconds / m_PsiN) - HatPhiN;
     double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(TWO_PI * PhaseDiff));
     double Kappa = InverseA2(SyncStrength);
     m_SyncStr = SyncStrength;
     m_Kappa = Kappa;
 
+    // Equação 2: Atualização de Phi_n
     double FValueUpdate = CouplingFunction(LastPhiN, LastHatPhiN, Kappa);
     double PhiN = LastPhiN + (IOISeconds / m_LastPsiN) + (m_PhaseCoupling * FValueUpdate);
     PhiN = ModPhases(PhiN);
-    CurrentState.PhaseObserved = PhiN;
 
+    CurrentState.PhaseObserved = PhiN;
+    CurrentState.IOIPhiN = PhiN; // CORREÇÃO: Essencial para o "LastPhiN" do próximo loop
+
+    // Equação 3: Previsão do próximo BPM (\hat{\psi}_{n+1})
     double FValuePrediction = CouplingFunction(PhiN, HatPhiN, Kappa);
     double PsiN1 = m_PsiN * (1 + m_SyncStrength * FValuePrediction);
 
+    // Equação 4: Previsão do próximo \hat{\phi}_{n+1}
     double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
     double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
     NextState.IOIHatPhiN = PhiN1;
@@ -478,19 +522,8 @@ void MDP::GetAudioObservations(int T) {
 
         MarkovState &StateJ = m_States[j];
         double BestObs = 1e-300;
-
-        // Time
-        {
-            int currentBlock = m_TauWithSound;
-            int expectedBlock = static_cast<int>(std::round(StateJ.OnsetExpected / m_BlockDur));
-            double distance = static_cast<double>(currentBlock - expectedBlock);
-            double sigma = 200.0;
-            double prob = std::exp(-0.5 * (distance * distance) / (sigma * sigma));
-            double eps = 0.05; // piso mínimo
-            double beta = 0.46;
-            double factor = eps + (1.0 - eps) * (1.0 - std::exp(-beta * m_Kappa)) / (1.0 - std::exp(-beta * 10.0));
-            StateJ.TimeProb = prob * factor;
-        }
+        // Keep this for now
+        StateJ.TimeProb = 1;
 
         if (StateJ.Type == NOTE || StateJ.Type == TRILL) {
             for (AudioState &AS : StateJ.AudioStates) {
@@ -602,27 +635,33 @@ double MDP::GetTransProbability(int i, int j) {
 }
 
 // ─────────────────────────────────────
-// D_j(u) = survivor distribution: P(state j lasts >= u more frames)
-// Cont 2010 eq.19: d_j(t-t_{n-1}) = exp(-(t-t_{n-1}) / (ψ_{n-1} * ℓ_n))
-// Note: Cont 2010 calls this "d_j" but it is the survivor (D_j) in Cuvillier notation.
-double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
-    double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
-    if (expected_frames < 1.0)
-        expected_frames = 1.0;
-    return std::exp(-static_cast<double>(u) / expected_frames);
-}
-
-// ─────────────────────────────────────
-// d_j(u) = occupancy PMF: P(state j lasts exactly u frames before exit)
-// d_j(u) = D_j(u) - D_j(u+1)  [Cuvillier 2014, section 2.1]
-// For exponential survivor: d_j(u) = D_j(u) * (1 - exp(-1/ef))
 double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
     double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
         expected_frames = 1.0;
-    double Dju   = std::exp(-static_cast<double>(u)     / expected_frames);
-    double Dju1  = std::exp(-static_cast<double>(u + 1) / expected_frames);
-    return Dju - Dju1; // = D_j(u) * (1 - exp(-1/ef))
+
+    int key = static_cast<int>(std::round(expected_frames * 10.0));
+    BuildDistributionCache(expected_frames); // Builds only if missing
+
+    if (u < static_cast<int>(m_OccupancyCache[key].size())) {
+        return m_OccupancyCache[key][u];
+    }
+    return 0.0; // u is beyond the tail
+}
+
+// ─────────────────────────────────────
+double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
+    double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
+    if (expected_frames < 1.0)
+        expected_frames = 1.0;
+
+    int key = static_cast<int>(std::round(expected_frames * 10.0));
+    BuildDistributionCache(expected_frames); // Builds only if missing
+
+    if (u < static_cast<int>(m_SurvivorCache[key].size())) {
+        return m_SurvivorCache[key][u];
+    }
+    return 0.0; // u is beyond the tail
 }
 
 // ─────────────────────────────────────
@@ -630,20 +669,16 @@ int MDP::GetMaxUForJ(MarkovState &StateJ) {
     double expected_frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
         expected_frames = 1.0;
-    // 3× expected duration is a safe truncation; tail of exp distribution is negligible
-    int cap = static_cast<int>(std::ceil(3.0 * expected_frames));
+
+    // For Negative Binomial, the tail is longer.
+    // 5x expected_frames ensures we capture the "ageing" properties
+    // mentioned in your text without truncating the probability peak.
+    int cap = static_cast<int>(std::ceil(5.0 * expected_frames));
     return std::max(cap, 1);
 }
 
 // ─────────────────────────────────────
-// Markov state forward recursion (Cont 2010 eq.4 / Cuvillier SUM version):
-//
-//   F̃_j(t) = b_j(x_t) × Σ_i  p̃_{ij} × F̃_i(t-1)
-//
-// For a linear chain with self-loop: p̃_{jj} (self-stay) and p̃_{j-1,j} (arrive from j-1).
-// Markov states are atemporal (grace notes etc.) so they also store ExitProb for the
-// SemiMarkov states that may follow them; we set ExitProb = Forward for simplicity.
-double MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
+void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
 
     double fj;
@@ -665,86 +700,69 @@ double MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
         fj = bj * sumPrev;
     }
 
-    // For Markov states ExitProb = Forward (they can exit at every step)
+    // For Markov states Forward = ExitProb (they can exit at every step)
+    StateJ.Forward[bufferIndex] = fj;
     StateJ.ExitProb[bufferIndex] = fj;
-    return fj;
 }
 
 // ─────────────────────────────────────
-// Semi-Markov state forward recursion — right-censored Forward (Cuvillier 2014 eq.1):
-//
-//   F_j(t) = Σ_{u=1}^{t}  b_j(o_{t-u+1}^t) × F_j^i(t-u) × D_j(u)
-//   F_j^o(t) = Σ_{u=1}^{t}  b_j(o_{t-u+1}^t) × F_j^i(t-u) × d_j(u)
-//
-// where b_j(o_{t-u+1}^t) = ∏_{v=0}^{u-1} b_j(x_{t-v}) is the observation product.
-//
-// Numerical stability: instead of raw b_j products (which underflow, e.g. 0.003^24 ≈ 1e-57),
-// we use NORMALIZED observations b_j(x_{t-v}) / N(t-v), exactly as the reference C code
-// does via `obs *= p[j][t-u] / N[t-u]`.  N(t) is stored in m_Normalization[t%buf].
-//
-// F_j^i(t-u) is stored in SumIn_History and updated by Inference() after normalization.
 void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
-    double bj = StateJ.BestObs[bufferIndex]; // b_j(x_t)
+    double bj = StateJ.BestObs[bufferIndex]; // Factored out b_j(o_t)
 
-    if (m_Tau == 0) {
-        // Bootstrap: only u=1 is possible, entry prob = π(j)
-        double Dj1 = GetSurvivorDistribution(StateJ, 1);
-        double dj1 = GetOccupancyDistribution(StateJ, 1);
-        StateJ.Forward[bufferIndex]  = bj * StateJ.InitProb * Dj1;
-        StateJ.ExitProb[bufferIndex] = bj * StateJ.InitProb * dj1;
-        return;
-    }
+    double f_tilde_j = 0.0;  // \tilde{f}_j(t)
+    double f_tilde_jo = 0.0; // \tilde{f}_j^o(t)
+    double ObsProd = 1.0;    // b_j(o_{t-u+1}^{t-1})
 
-    int maxU = std::min(T, GetMaxUForJ(StateJ));
-    double fj  = 0.0; // accumulates F_j(t)
-    double fjo = 0.0; // accumulates F_j^o(t)
+    int maxU = GetMaxUForJ(StateJ);
 
-    // obs_prod = ∏_{v=0}^{u-1} b_j(x_{t-v}) / N(t-v)
-    // Starts at b_j(x_t)/N(t) but N(t) is not yet known (computed after this loop).
-    // We factor out b_j(x_t) and account for it at the end, matching Cont 2010 eq.3
-    // which writes b_j(x_t) outside and ∏_{v=1}^{u-1} inside.
-    // So obs_prod here covers only v=1..u-1 (past frames), normalized:
-    double obs_prod = 1.0; // for u=1: empty product = 1
+    for (int u = 1; u <= T + 1; u++) {
+        double D_bar_ju = GetSurvivorDistribution(StateJ, u); // \overline{D}_j(u)
+        double d_ju = GetOccupancyDistribution(StateJ, u);    // d_j(u)
 
-    for (int u = 1; u <= maxU; u++) {
-        // F_j^i(t-u): entry prob into state j at time (t-u).
-        // Special case T-u==0: F_j^i(0) = π(j) (Cuvillier eq.1, initial condition).
-        double entry;
-        if (T - u == 0) {
-            entry = StateJ.InitProb;
-        } else {
+        if (u == T + 1) {
+            // INIT TERM: \overline{D}_j(t+1) * b_j(o_0^t) * \pi(j)
+            f_tilde_j += D_bar_ju * ObsProd * StateJ.InitProb;
+            f_tilde_jo += d_ju * ObsProd * StateJ.InitProb;
+            break;
+        }
+
+        if (u <= maxU) {
             int entryBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            entry = StateJ.SumIn_History[entryBuf];
+
+            double transition_sum = 0.0;
+            for (int i = 0; i < (int)m_States.size(); i++) {
+                if (i != j) {
+                    double p_ij = GetTransProbability(i, j);
+                    if (p_ij > 0.0) {
+                        transition_sum += p_ij * m_States[i].ExitProb[entryBuf];
+                    }
+                }
+            }
+
+            f_tilde_j += D_bar_ju * ObsProd * transition_sum;
+            f_tilde_jo += d_ju * ObsProd * transition_sum;
         }
 
-        double Dju = GetSurvivorDistribution(StateJ, u); // D_j(u)
-        double dju = GetOccupancyDistribution(StateJ, u); // d_j(u)
+        // Advance scaled observation product to prevent floating-point underflow
+        int prevBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+        double prevObs = StateJ.BestObs[prevBuf];
+        double prevNorm = std::max(m_Normalization[prevBuf], 1e-300);
+        ObsProd *= prevObs / prevNorm;
 
-        fj  += obs_prod * entry * Dju;
-        fjo += obs_prod * entry * dju;
-
-        // Advance obs_prod for u+1: multiply by b_j(x_{t-u}) / N(t-u).
-        // N(t-u) = m_Normalization[(T-u) % bufSize], which was stored at timestep T-u.
-        if (u < maxU) {
-            int prevTBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            double prevObs  = StateJ.BestObs[prevTBuf];
-            double prevNorm = m_Normalization[prevTBuf];
-            if (prevNorm < 1e-300)
-                prevNorm = 1e-300;
-            obs_prod *= prevObs / prevNorm;
-        }
+        if (ObsProd < 1e-15)
+            break;
     }
 
-    // Factor b_j(x_t) back in (factored out of the sum, as in Cont 2010 eq.3)
-    StateJ.Forward[bufferIndex]  = bj * (fj  + 1e-300);
-    StateJ.ExitProb[bufferIndex] = bj * (fjo + 1e-300);
+    // Apply the factored-out current observation b_j(o_t)
+    StateJ.Forward[bufferIndex] = bj * (f_tilde_j + 1e-300);
+    StateJ.ExitProb[bufferIndex] = bj * (f_tilde_jo + 1e-300);
 }
 
 // ─────────────────────────────────────
 int MDP::Inference(int T) {
     int bIndex = T % m_BufferSize;
-    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappa {}", m_WinStart, m_WinEnd, bIndex,
-                  m_Tau, m_Kappa);
+    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappa {}", m_WinStart, m_WinEnd, bIndex, m_Tau,
+                  m_Kappa);
 
     // ── STEP 1: Compute F_j(t) and F_j^o(t) for all states ─────────
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
@@ -754,12 +772,9 @@ int MDP::Inference(int T) {
         if (StateJ.HSMMType == SEMIMARKOV)
             SemiMarkov(StateJ, j, T, bIndex); // sets Forward and ExitProb
         else
-            Markov(StateJ, j, T, bIndex);     // sets Forward and ExitProb
+            Markov(StateJ, j, T, bIndex); // sets Forward and ExitProb
     }
 
-    // ── STEP 2: Normalize F_j(t) and F_j^o(t) by N(t) ─────────────
-    // N(t) = Σ_j F_j(t).  Store in m_Normalization[bIndex] so future
-    // timesteps can use it for the obs_prod = b_j(x_{t-v})/N(t-v) trick.
     double N = 0.0;
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         if (j < 0 || j >= (int)m_States.size())
@@ -773,16 +788,12 @@ int MDP::Inference(int T) {
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         if (j < 0 || j >= (int)m_States.size())
             continue;
-        m_States[j].Forward[bIndex]  /= N;
-        m_States[j].Forward[bIndex]  += 1e-300; // floor (reference C code line)
+        m_States[j].Forward[bIndex] /= N;
+        m_States[j].Forward[bIndex] += 1e-300; // floor (reference C code line)
         m_States[j].ExitProb[bIndex] /= N;
         m_States[j].ExitProb[bIndex] += 1e-300;
     }
 
-    // ── STEP 3: Update entry probs F_j^i(t) for future use ─────────
-    // Cuvillier eq.1: F_j^i(t) = Σ_{i≠j} p_{ij} × F_i^o(t)
-    // Linear chain (p_{j-1,j} = 1): F_j^i(t) = F_{j-1}^o(t)
-    // Reference C code: si[j][t+1] = Σ_i a[j*J+i] * F[i][t]
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         if (j < 0 || j >= (int)m_States.size())
             continue;
@@ -793,7 +804,6 @@ int MDP::Inference(int T) {
         m_States[j].SumIn_History[bIndex] = entry;
     }
 
-    // ── STEP 4: Find best state ─────────────────────────────────────
     double maxVal = 1e-300;
     int bestStateIndex = m_CurrentStateIndex;
     for (int j = m_CurrentStateIndex; j <= m_WinEnd; ++j) {
@@ -805,8 +815,8 @@ int MDP::Inference(int T) {
             maxVal = fwd;
             bestStateIndex = j;
         }
-        spdlog::debug("State ({}) | ForwardLast {:.5f}, Obs = {:.5f}, Forward {:.5f}, Time Prob {:.5f}", StateJ.Index,
-                      StateJ.ForwardLast, StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.TimeProb);
+        spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
+                      StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.ExitProb[bIndex]);
     }
 
     MarkovState &BestState = m_States[bestStateIndex];

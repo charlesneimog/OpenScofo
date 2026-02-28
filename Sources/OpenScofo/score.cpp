@@ -201,7 +201,7 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 MarkovState Score::AddDummySilence() {
     MarkovState Event;
     Event.HSMMType = MARKOV;
-    Event.Type = BEGIN;
+    Event.Type = REST;
     Event.ScorePos = m_ScorePosition;
     Event.Index = m_ScoreStates.size();
 
@@ -265,6 +265,10 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
             AudioState SubState;
             PitchNode2Freq(ScoreStr, child, SubState);
             Event.AudioStates.push_back(SubState);
+
+            // AudioState Silence;
+            // Silence.Type = SILENCE;
+            // Event.AudioStates.push_back(Silence);
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
@@ -273,9 +277,15 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
                 if (eventPitchId == "pitch") {
                     AudioState Pitch;
                     PitchNode2Freq(ScoreStr, eventPitch, Pitch);
+
                     Event.AudioStates.push_back(Pitch);
                 }
             }
+
+            // AudioState Silence;
+            // Silence.Type = SILENCE;
+            // Event.AudioStates.push_back(Silence);
+
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
@@ -295,8 +305,6 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 
 // ─────────────────────────────────────
 MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
-    m_ScorePosition++;
-
     MarkovState Event;
     Event.Line = m_LineCount;
     Event.HSMMType = SEMIMARKOV;

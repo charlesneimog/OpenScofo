@@ -1,0 +1,6 @@
+#N canvas 0 0 925 1132 10;
+#X declare -path ./build/Sources/PureData -path tests;
+#X declare -path ./build/Sources/PureData -path Audios;
+#X obj 138 5 declare -path ./build/Sources/PureData -path tests;
+#X obj 138 25 declare -path ./build/Sources/PureData -path Audios;
+#X obj 38 168 o.scofo~;

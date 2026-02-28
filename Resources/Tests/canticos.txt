@@ -1,5 +1,5 @@
  /* Cânticos de Silício (2024) | Charles K. Neimog */
-BPM 60
+BPM 40
 
 // measure 1
 TRILL (Bb4 Eb5) 4

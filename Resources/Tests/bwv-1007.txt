@@ -3,7 +3,7 @@ Cello Suite No. 1 by Johann Sebastian Bach
 */
 
 BPM 60
-TIMBREMODEL "model.onnx"
+
 
 // Measure number 1
 NOTE G2 0.25

@@ -73,6 +73,7 @@ class MDP {
     double GetOccupancyDistribution(MarkovState &State, int u);
     double GetSurvivorDistribution(MarkovState &State, int u);
     void InitTimeDecoding();
+    void BuildDistributionCache(double expected_frames);
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);
@@ -83,8 +84,7 @@ class MDP {
     double GetBestEvent();
     int GetMaxJIndex(int StateIndex);
 
-    double Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
-    // double SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    void Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
     void SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
 
     int Inference(int CurrentState);
@@ -126,7 +126,10 @@ class MDP {
     double m_PhaseCoupling = 0.5;
     double m_SyncStr = 0;
     double m_TimeInPrevEvent = 0;
-    std::unordered_map<double, double> m_KappaArray;
+    std::unordered_map<double, double> m_KappaCache;
+    // Cache for the distributions
+    std::unordered_map<int, std::vector<double>> m_OccupancyCache;
+    std::unordered_map<int, std::vector<double>> m_SurvivorCache;
 
     double m_LastTn = 0;
     double m_TauWithSound = 0;
