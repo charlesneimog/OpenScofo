@@ -266,9 +266,6 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
             PitchNode2Freq(ScoreStr, child, SubState);
             Event.AudioStates.push_back(SubState);
 
-            // AudioState Silence;
-            // Silence.Type = SILENCE;
-            // Event.AudioStates.push_back(Silence);
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {

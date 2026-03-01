@@ -114,9 +114,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("ioi_hat_phi_n", &OpenScofo::MarkovState::IOIHatPhiN)
         .def_readwrite("audio_states", &OpenScofo::MarkovState::AudioStates)
         .def_readwrite("duration", &OpenScofo::MarkovState::Duration)
-        .def_readwrite("line", &OpenScofo::MarkovState::Line)
-        .def("__repr__", &OpenScofo::MarkovState::__repr__)
-        .def("__str__", &OpenScofo::MarkovState::__repr__);
+        .def_readwrite("line", &OpenScofo::MarkovState::Line);
 
     py::class_<OpenScofo::AudioState>(m, "AudioState")
         .def(py::init<>())

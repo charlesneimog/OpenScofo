@@ -73,8 +73,7 @@ class MarkovState {
     std::vector<double> ExitProb; // F_j^o(t): exit prob, circular buffer
     std::vector<double> BestObs;  // b_j(x_t): observation, circular buffer
     double ForwardLast = 0.0;
-    double SumIn = 0.0;
-    std::vector<double> SumIn_History; // F_j^i(t): entry prob, circular buffer
+    // double SumIn = 0.0;
 
     // Time
     double OnsetTime;
@@ -102,16 +101,6 @@ class MarkovState {
 
     // Error Handling
     int Line;
-
-    std::string __repr__() const {
-        std::string oss;
-        oss = "<<State(ScorePosition=";
-        oss += std::to_string(ScorePos);
-        oss += ", BPMExpected=";
-        oss += std::to_string(BPMExpected);
-        oss += ")>>";
-        return oss;
-    }
 };
 
 using States = std::vector<MarkovState>;
