@@ -72,3 +72,4 @@ perf.svg
 test.csv
 /Tests/allnotes.bin
 /Documentation/Editor
+/Documentation/__pycache__
