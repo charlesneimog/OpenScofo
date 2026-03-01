@@ -93,16 +93,6 @@ class ScofoOnlineEditor {
 
         this.codeContainer = document.getElementById("code-container");
 
-        // this.codeContainer.addEventListener("scroll", () => {
-        //     let codeInput = document.getElementById("code-input");
-        //     let lines = codeInput.value.split("\n");
-        //     let biggerLine = lines.reduce((a, b) => (a.length > b.length ? a : b));
-        //     let width = biggerLine.length + "ch";
-        //     let height = lines.length + "em";
-        //     codeInput.style.width = width;
-        //     codeInput.style.height = height;
-        // });
-
         this.loadState();
         this.saveStateOnChange = this.debounce(this.saveState, 2000);
         this.runTreeQueryOnChange = this.debounce(this.runTreeQuery, 100);
@@ -176,9 +166,9 @@ class ScofoOnlineEditor {
         this.fetchTextFile("highlight/lua.scm");
 
         // Buttons
-        const downloadButton = document.querySelector("#download-score");
-        const uploadButtom = document.querySelector("#upload-score");
-        const loadButtom = document.querySelector("#load-score");
+        const downloadButton = document.getElementById("download-score");
+        const uploadButtom = document.getElementById("upload-score");
+        const loadButtom = document.getElementById("load-score");
 
         if (downloadButton && uploadButtom && loadButtom) {
             downloadButton.addEventListener("click", () => this.downloadScore());
@@ -499,12 +489,8 @@ class ScofoOnlineEditor {
         node = node.rootNode;
         var lineWithErrors = [];
         var lineWithUnexpected = [];
-        const errorContainer = document.querySelector(".error-messages");
+        const errorContainer = document.getElementById("editor-console");
         errorContainer.innerHTML = "";
-
-        // let missing = [];
-        // this.getMissing(node, missing);
-        // console.log(missing);
 
         function checkNode(node) {
             for (let i = 0; i < node.namedChildCount; i++) {

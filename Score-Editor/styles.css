@@ -21,7 +21,7 @@
 /* Dark Theme */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #333;
+        --bg: transparent;
         --fg: #c0c0c0;
         --red: #e05661;
         --orange: #ee9025;
