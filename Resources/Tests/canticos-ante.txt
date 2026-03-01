@@ -1,0 +1,96 @@
+ /* Cânticos de Silício (2024) | Charles K. Neimog */
+BPM 40
+
+// measure 1
+TRILL (Bb4 Eb5) 4
+TRILL (F4 Db5) 4
+TRILL (Eb4 Gb5) 4
+NOTE 0 1
+NOTE E4 0.25
+NOTE C5 0.25
+NOTE B5 0.25
+NOTE F5 0.25
+NOTE 0 1
+
+// measure 5
+TRILL (E5 B4) 3
+
+// measure 6
+NOTE 0 1
+NOTE G4 0.25
+NOTE D5 0.25
+NOTE B5 0.25
+NOTE Ab4 0.25
+ 	
+NOTE 0 1
+
+// measure 7
+NOTE G4 0.25
+   
+
+NOTE Db5 0.25
+NOTE F#5 0.25
+NOTE B5 0.25
+NOTE C#6 1
+ 	
+NOTE 0 1
+
+// measure 8
+NOTE A5 1.5
+NOTE Eb5 1.5
+NOTE Ab5 4
+
+// measure 9
+NOTE 0 1
+
+// measure 10
+TRILL (Bb4 Eb5) 2
+	
+TRILL (F5 B4) 2
+	
+
+TRILL (E5 Ab4) 2
+	
+
+    
+// measure 13
+NOTE 0 0.5
+NOTE Db5 1
+
+NOTE F#5 1
+NOTE G5 1
+
+// measure 14
+NOTE 0 0.5
+NOTE B4 0.5
+NOTE C5 0.5
+NOTE Gb5 0.75
+NOTE F5 0.25
+
+// measure 15
+NOTE E5 0.25
+
+NOTE Db5 0.25
+NOTE C5 0.5
+NOTE 0 1
+
+// measure 16
+TRILL (Bb4 Eb5) 2
+	
+NOTE 0 1
+TRILL (A5 Db5) 2
+	
+
+// measure 17
+NOTE 0 1
+NOTE G4 0.25
+NOTE Db5 0.25
+NOTE B5 0.25
+NOTE 0 0.25
+
+// measure 18
+NOTE Eb4 0.25
+NOTE B4 0.25
+NOTE E5 0.25
+
+NOTE 0 0.25

@@ -8,7 +8,7 @@ def on_post_build(config):
     # Diretório de saída (site ou tmp no serve)
     site_dir = Path(config["site_dir"]).resolve()
 
-    origem = root / "Resources" / "Online-Editor"
+    origem = root / "Score-Editor"
     destino = site_dir / "Editor"
 
     if destino.exists():
