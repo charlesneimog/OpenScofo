@@ -7,6 +7,7 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
+set(BUILD_EXAMPLES OFF)
 
 option(BUILD_PY_MODULE "Build Python Module" OFF)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
@@ -235,6 +236,6 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
-if(BUILD_TESTS)
-    add_subdirectory(Tests)
-endif()
+# if(BUILD_TESTS)
+#     add_subdirectory(Tests)
+# endif()

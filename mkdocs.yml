@@ -1,7 +1,8 @@
 ---
 site_name: OpenScofo
 docs_dir: Documentation
-copyright: Copyright &copy 2026 | Charles K. Neimog 
+copyright: Copyright &copy 2026 | Charles K. Neimog
+hooks: [Documentation/copy-editor.py]
 theme:
   logo: assets/favicon.svg
   custom_dir: Documentation/overrides
