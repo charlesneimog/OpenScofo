@@ -1,5 +1,4 @@
 #pragma once
-
 #include <unordered_map>
 #include <vector>
 
@@ -111,6 +110,7 @@ class MDP {
     double m_HopSize;
     double m_dBTreshold = -55;
     int m_BufferSize = 1000;
+    bool m_IsSilence = false;
 
     // Pitch Template
     double m_Harmonics = 8;
@@ -138,7 +138,6 @@ class MDP {
     int m_MaxScoreState = 0;
 
     int m_Tau = 0;
-    int m_T = 0;
     double m_LastPsiN = 0;
     double m_PsiN = 0;
     double m_PsiN1 = 0;

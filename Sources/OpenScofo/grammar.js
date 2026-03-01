@@ -1,5 +1,5 @@
 module.exports = grammar({
-    name: "scofo",
+    name: "openscofo",
     precedence: "left",
     rules: {
         score: ($) => repeat($._statement),
