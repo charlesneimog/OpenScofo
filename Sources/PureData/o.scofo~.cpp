@@ -88,6 +88,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     if (ok) {
         logpost(x, 2, "[o.scofo~] Score loaded");
     } else {
+        logpost(x, 1, "[o.scofo~] Score has errors");
         return;
     }
     x->OpenScofo->SetCurrentEvent(0);
@@ -368,7 +369,7 @@ static void oscofo_adddsp(PdOpenScofo *x, t_signal **sp) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_callback(const spdlog::details::log_msg &log, void *data) {
+static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     PdOpenScofo *x = static_cast<PdOpenScofo *>(data);
     spdlog::level::level_enum pdlevel = x->log;
     if (log.level < pdlevel) {
@@ -402,8 +403,8 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     }
 
     // default parameters
-    x->FFTSize = 4096;
-    x->HopSize = 1024;
+    x->FFTSize = 2048;
+    x->HopSize = 512;
     x->Sr = (int)sys_getsr();
     x->Following = false;
     x->Event = -1;
@@ -453,7 +454,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
 
     // OpenScofo Library
     x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
-    x->OpenScofo->SetErrorCallback(oscofo_callback, static_cast<void *>(x));
+    x->OpenScofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(x));
 
     x->log = (spdlog::level::warn);
 

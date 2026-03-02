@@ -65,9 +65,9 @@ void MDP::SetScoreStates(States ScoreStates) {
 
     m_States.clear();
     m_States = ScoreStates;
+    spdlog::debug("There is {} score states", m_States.size());
 
     m_Normalization.resize(m_BufferSize + 1, 1.0); // init to 1 so first-step division is safe
-
     for (MarkovState &State : m_States) {
         State.Forward.resize(m_BufferSize + 1, 0.0);    // F_j(t)
         State.ExitProb.resize(m_BufferSize + 1, 0.0);   // F_j^o(t)
@@ -434,8 +434,8 @@ States MDP::GetStatesForProcessing() {
 // ─────────────────────────────────────
 void MDP::GetDecodeWindow() {
     int half = m_EventWindowSize / 2;
-    m_WinStart = std::max(0, (int)m_CurrentStateIndex - half);
-    m_WinEnd = std::min((int)m_States.size() - 1, (int)m_CurrentStateIndex + half);
+    m_WinStart = std::max(0, static_cast<int>(m_CurrentStateIndex) - half);
+    m_WinEnd = std::min(static_cast<int>(m_States.size()) - 1, static_cast<int>(m_CurrentStateIndex) + half);
 
     if (m_WinStart < 0 || m_WinEnd >= static_cast<int>(m_States.size())) {
         spdlog::critical("MDP::GetDecodeWindow invariant violated: "
@@ -588,11 +588,11 @@ void MDP::GetAudioObservations(int T) {
     }
 
     if (ObsNoSound > ObsSilence) {
-        spdlog::debug("SOUND   | Sound {} | Silence {}", ObsNoSound, ObsSilence);
+        spdlog::debug("SOUND   | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
         m_TauWithSound++;
         m_IsSilence = false;
     } else {
-        spdlog::debug("SILENCE | Sound {} | Silence {}", ObsNoSound, ObsSilence);
+        spdlog::debug("SILENCE | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
         m_IsSilence = true;
     }
 }
@@ -787,8 +787,8 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 // ─────────────────────────────────────
 int MDP::Inference(int T) {
     int bIndex = T % m_BufferSize;
-    spdlog::debug("WinStart {} | WinFinish {} | BufferSize {} | Tau {} | Kappa {}", m_WinStart, m_WinEnd, bIndex, m_Tau,
-                  m_Kappa);
+    spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
+                  m_WinEnd, bIndex, m_Tau, m_Kappa);
 
     // Compute \tilde{f}_j(t) and \tilde{f}_j^o(t)
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
@@ -823,7 +823,7 @@ int MDP::Inference(int T) {
     double maxVal = 1e-300;
     int bestStateIndex = m_CurrentStateIndex;
 
-    for (int j = m_CurrentStateIndex; j <= m_WinEnd; ++j) {
+    for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
 
         // NEW: If we are in silence, only allow advancing if the target is a REST

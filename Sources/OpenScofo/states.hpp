@@ -133,4 +133,20 @@ class Description {
     std::vector<double> Chroma; // size 12
 };
 
+// ─────────────────────────────────────
+struct MIRConfig {
+    double FFTSize;
+    double HopSize;
+    double Chroma;
+    double SilencedB;
+};
+
+// ─────────────────────────────────────
+struct MDPConfig {
+    double PitchSigma;
+    double HopSize;
+    double Chroma;
+    double SilencedB;
+};
+
 } // namespace OpenScofo
