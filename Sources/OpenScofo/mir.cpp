@@ -162,6 +162,10 @@ void MIR::OnsetInit() {
     m_ODSData = new float[nbytes / sizeof(float)];
     m_ODS = new OnsetsDS();
     onsetsds_init(m_ODS, m_ODSData, ODS_FFT_FFTW3_R2C, ODS_ODF_MKL, m_OnsetFFTSize, m_MedSpan, m_Sr);
+    if (!m_ODS) {
+        spdlog::critical("Not possible to initialize the onset detector");
+        return;
+    }
     m_OnsetInit = true;
 }
 
@@ -170,15 +174,7 @@ void MIR::OnsetExec(Description &Desc) {
     if (!m_OnsetInit) {
         return;
     }
-
-    const size_t numBins = m_OnsetFFTSize / 2 + 1;
-    std::vector<float> fft_data(2 * numBins);
-
-    for (size_t i = 0; i < numBins; ++i) {
-        fft_data[2 * i] = m_FFTOut[i][0];
-        fft_data[2 * i + 1] = m_FFTOut[i][1];
-    }
-    Desc.Onset = onsetsds_process(m_ODS, fft_data.data());
+    Desc.Onset = onsetsds_process(m_ODS, reinterpret_cast<float *>(m_FFTOut));
 }
 
 // ╭─────────────────────────────────────╮
@@ -325,21 +321,13 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     size_t N = In.size();
     size_t NHalf = N / 2; // include Nyquist to match rfft/librosa
 
-    if (NHalf != Desc.Power.size()) {
-        Desc.Power.resize(NHalf);
-        Desc.SpectralPower.resize(NHalf);
-        Desc.NormSpectralPower.resize(NHalf);
-        Desc.NormSpectralPower.resize(NHalf);
-        Desc.ReverbSpectralPower.resize(NHalf);
-        m_PreviousSpectralPower.resize(NHalf);
-    }
-
-    std::copy(In.begin(), In.end(), m_FFTIn);
     fftw_execute(m_FFTPlan);
 
-    // FFT Mag
     Desc.MaxAmp = 0;
+    double SumPower = 0.0;
     const double invN = 1.0 / static_cast<double>(N);
+
+    // FUSE 1: Calculate Power, MaxAmp, and SumPower in one pass
     for (size_t i = 0; i < NHalf; ++i) {
         const double re = m_FFTOut[i][0];
         const double im = m_FFTOut[i][1];
@@ -348,14 +336,25 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
 
         Desc.Power[i] = p;
         Desc.SpectralPower[i] = sp;
-        Desc.MaxAmp = std::max(Desc.MaxAmp, sp);
+        if (sp > Desc.MaxAmp)
+            Desc.MaxAmp = sp; // std::max can sometimes prevent auto-vectorization
+        SumPower += sp;
     }
 
-    // Normalize Spectral Power
-    double SumPower = std::accumulate(Desc.SpectralPower.begin(), Desc.SpectralPower.end(), 0.0);
-    for (size_t i = 0; i < NHalf; i++) {
-        Desc.NormSpectralPower[i] = (Desc.SpectralPower[i] + 1e-12) / (SumPower + 1e-12);
+    // FUSE 2: Normalize and calculate Mean/Variance simultaneously
+    const double SumPowerEps = SumPower + 1e-12;
+    const double Mean = 1.0 / NHalf;
+    double Variance = 0.0;
+
+    for (size_t i = 0; i < NHalf; ++i) {
+        double normSp = (Desc.SpectralPower[i] + 1e-12) / SumPowerEps;
+        Desc.NormSpectralPower[i] = normSp;
+
+        double Diff = normSp - Mean;
+        Variance += Diff * Diff;
     }
+
+    Desc.StdDev = std::sqrt(Variance / NHalf);
 
     // Fake CQT
     if (m_FakeCQT.size() != Desc.PseudoCQT.size()) {
@@ -370,15 +369,6 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
         }
         Desc.PseudoCQT[k] = sum / double(b1 - b0 + 1);
     }
-
-    const double Mean = 1.0 / NHalf;
-    double Variance = 0.0;
-    for (size_t i = 0; i < NHalf; i++) {
-        double Diff = Desc.NormSpectralPower[i] - Mean;
-        Variance += Diff * Diff;
-    }
-    Variance /= NHalf;
-    Desc.StdDev = std::sqrt(Variance);
 
     // Executable
     OnsetExec(Desc);
@@ -653,12 +643,18 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // ╰─────────────────────────────────────╯
 void MIR::GetDescription(std::vector<double> &In, Description &Desc, States &ScoreStates) {
     (void)ScoreStates;
-    double *x = In.data();
-    const double *w = m_WindowingFunc.data();
-    for (size_t i = 0; i < m_FFTSize; ++i)
-        x[i] *= w[i];
 
+    // 1. Calculate power on the PURE, un-windowed signal
     GetSignalPower(In, Desc);
+
+    // 2. FUSE: Apply window and copy directly to FFT buffer
+    const double *x = In.data();
+    const double *w = m_WindowingFunc.data();
+    for (size_t i = 0; i < m_FFTSize; ++i) {
+        m_FFTIn[i] = x[i] * w[i];
+    }
+
+    // 3. GetFFTDescriptions no longer needs std::copy
     GetFFTDescriptions(In, Desc);
 }
 } // namespace OpenScofo

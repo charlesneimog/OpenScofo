@@ -47,15 +47,24 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
 }
 
 //  ─────────────────────────────────────
-void OpenScofo::SetNewAudioParameters(float Sr, float FftSize, float HopSize) {
-    if (m_FFTSize == FftSize && m_HopSize == HopSize && m_Sr == Sr) {
+void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
+    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr) {
         return;
     }
     m_Sr = Sr;
-    m_FFTSize = FftSize;
+    m_FFTSize = FFTSize;
     m_HopSize = HopSize;
-    m_MDP = MDP(Sr, FftSize, HopSize);
-    m_MIR = MIR(Sr, FftSize, HopSize);
+    m_MDP = MDP(Sr, FFTSize, HopSize);
+    m_MIR = MIR(Sr, FFTSize, HopSize);
+
+    size_t NHalf = FFTSize / 2;
+    if (NHalf != m_Desc.Power.size()) {
+        m_Desc.Power.resize(NHalf);
+        m_Desc.SpectralPower.resize(NHalf);
+        m_Desc.NormSpectralPower.resize(NHalf);
+        m_Desc.NormSpectralPower.resize(NHalf);
+        m_Desc.ReverbSpectralPower.resize(NHalf);
+    }
 }
 
 // ╭─────────────────────────────────────╮
@@ -350,7 +359,11 @@ bool OpenScofo::ParseScore(std::string ScorePath) {
 
     // Add States
     m_MDP.SetScoreStates(m_States);
-    return true;
+    if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 // ─────────────────────────────────────

@@ -61,14 +61,15 @@ class Score {
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
     void PitchNode2Freq(const std::string Score, TSNode node, AudioState &State);
     // bool SpaceTab(const std::string &line, int numSpaces);
+    void ParseInput(const std::string &Score);
     void PrintTreeSitterNode(TSNode node, int indent = 0);
     TSNode GetField(TSNode Node, std::string s);
     bool isNumber(std::string str);
 
-    void ProcessEvent(const std::string &Score, TSNode Event);
+    void NewEvent(const std::string &Score, TSNode Event);
     void ProcessEventTime(MarkovState &Event);
-    void ProcessConfig(const std::string &Score, TSNode Node);
-    void ProcessAction(const std::string &Score, TSNode Node, MarkovState &Event);
+    void NewConfig(const std::string &Score, TSNode Node);
+    void NewEventAction(const std::string &Score, TSNode Node, MarkovState &Event);
 
     void ProcessNote(TSNode Note);
 
@@ -93,10 +94,13 @@ class Score {
     MarkovState AddRest(std::vector<std::string> Tokens);
     void AddAction(std::vector<std::string> Tokens);
 
+    // Configurations
+    MIRConfig m_MIRConfig;
+    MDPConfig m_MDPConfig;
+
     // Some ScoreConfigs
     double m_CurrentBPM = 60;
     float m_Transpose = 0;
-    double m_Entropy = 0;
     double m_PitchTemplateSigma = 0.5;
     double m_SyncStrength = 0.5;
     double m_PhaseCoupling = 0.5;

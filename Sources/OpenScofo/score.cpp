@@ -5,7 +5,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-extern "C" TSLanguage *tree_sitter_scofo();
+extern "C" TSLanguage *tree_sitter_openscofo();
 
 namespace OpenScofo {
 
@@ -248,7 +248,7 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     for (uint32_t i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(Node, i);
         std::string type = ts_node_type(child);
-        if (type == "pitchEventId") {
+        if (type == "keyword") {
             std::string id = GetCodeStr(ScoreStr, child);
             if (id == "NOTE") {
                 Event.Type = NOTE;
@@ -265,7 +265,6 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
             AudioState SubState;
             PitchNode2Freq(ScoreStr, child, SubState);
             Event.AudioStates.push_back(SubState);
-
         } else if (type == "pitches") {
             uint32_t pitchCount = ts_node_child_count(child);
             for (size_t j = 0; j < pitchCount; j++) {
@@ -278,20 +277,15 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
                     Event.AudioStates.push_back(Pitch);
                 }
             }
-
-            // AudioState Silence;
-            // Silence.Type = SILENCE;
-            // Event.AudioStates.push_back(Silence);
-
         } else if (type == "duration") {
             double duration = GetDurationFromNode(ScoreStr, child);
             Event.Duration = duration;
             m_MinimalDuration = std::min(m_MinimalDuration, duration);
         } else if (type == "ACTION") {
-            ProcessAction(ScoreStr, child, Event);
+            NewEventAction(ScoreStr, child, Event);
         } else {
             TSPoint Pos = ts_node_start_point(child);
-            spdlog::error("Invalid note event on line {}.", Pos.row + 1);
+            spdlog::error("Invalid note event on line {}, type of token {}.", Pos.row + 1, type);
             return Event;
         }
     }
@@ -379,7 +373,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 }
 
 // ─────────────────────────────────────
-void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
+void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
         MarkovState Event;
@@ -387,7 +381,7 @@ void Score::ProcessEvent(const std::string &ScoreStr, TSNode Node) {
         std::string type = ts_node_type(child);
         TSPoint Pos = ts_node_start_point(child);
         Event.Line = Pos.row + 1;
-        if (type == "pitchEvent") {
+        if (type == "noteEvent") {
             Event = NewPitchEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
@@ -422,7 +416,7 @@ std::string GetChildStringFromType(const std::string &source, TSNode parent, con
 }
 
 // ─────────────────────────────────────
-void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
+void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
     uint32_t child_count = ts_node_child_count(node);
 
     for (uint32_t i = 0; i < child_count; ++i) {
@@ -434,7 +428,6 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
             std::string id = GetChildStringFromType(ScoreStr, child, "numberConfigId");
             std::string value = GetChildStringFromType(ScoreStr, child, "number");
             float v = std::stof(value);
-
             if (id == "BPM") {
                 m_CurrentBPM = v;
                 MarkovState Begin = GetFirstEvent();
@@ -443,21 +436,31 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
                 m_ScoreStates.emplace_back(Begin);
             } else if (id == "TRANSPOSE") {
                 if (v < -36 || v > 36) {
-                    spdlog::error("Invalid transpose value on line {}.", pos.row + 1);
-                    return;
+                    spdlog::error("Weird transpose value on line {}.", pos.row + 1);
                 }
                 m_Transpose = v;
-            } else if (id == "ENTROPY" || id == "Entropy") {
-                m_Entropy = v;
-            } else if (id == "PhaseCoupling") {
-                m_PhaseCoupling = v;
-            } else if (id == "SyncStrength") {
-                m_SyncStrength = v;
-            } else if (id == "PitchSigma" || id == "VARIANCE") {
-                m_PitchTemplateSigma = v;
-            } else if (id == "FFTSize") {
+            } else if (id == "PHASECOUPLING") {
+                if (v < 0 || v > 2) {
+                    spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
+                } else {
+                    m_PhaseCoupling = v;
+                }
+
+            } else if (id == "SYNCSTRENGTH") {
+                if (v < 0 || v > 1) {
+                    spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
+                } else {
+                    m_SyncStrength = v;
+                }
+            } else if (id == "PITCHTEMPLATESIGMA") {
+                if (v < 0 || v > 1) {
+                    spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);
+                } else {
+                    m_PitchTemplateSigma = v;
+                }
+            } else if (id == "FFTSIZE") {
                 m_FFTSize = (int)v;
-            } else if (id == "HopSize") {
+            } else if (id == "HOPSIZE") {
                 m_HopSize = (int)v;
             }
         } else if (type == "pathConfig") {
@@ -482,7 +485,7 @@ void Score::ProcessConfig(const std::string &ScoreStr, TSNode node) {
 }
 
 // ─────────────────────────────────────
-void Score::ProcessAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
+void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
     Action NewAction;
     NewAction.AbsoluteTime = true;
     NewAction.Time = 0;
@@ -639,11 +642,6 @@ States Score::Parse(std::string ScoreFile) {
         return {};
     }
 
-    if (!ScoreIsText(ScoreFile)) {
-        spdlog::error("The Score file must be text files");
-        return {};
-    }
-
     File.clear(); // Clear error flags
 
     std::ostringstream Buffer;
@@ -654,7 +652,7 @@ States Score::Parse(std::string ScoreFile) {
     // Config Values
     m_CurrentBPM = 60;
     m_Transpose = 0;
-    m_Entropy = 0;
+    // m_Entropy = 0;
     m_PitchTemplateSigma = 0.5;
 
     m_LineCount = 0;
@@ -666,7 +664,7 @@ States Score::Parse(std::string ScoreFile) {
 
     // read and process score
     TSParser *parser = ts_parser_new();
-    ts_parser_set_language(parser, tree_sitter_scofo());
+    ts_parser_set_language(parser, tree_sitter_openscofo());
     TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
     TSNode rootNode = ts_tree_root_node(tree);
 
@@ -683,13 +681,16 @@ States Score::Parse(std::string ScoreFile) {
                 spdlog::error("BPM is not defined");
                 return {};
             }
-            ProcessEvent(ScoreStr, child);
+            NewEvent(ScoreStr, child);
         } else if (type == "CONFIG") {
-            ProcessConfig(ScoreStr, child);
+            NewConfig(ScoreStr, child);
         } else if (type == "LUA") {
             std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
             lua_body += "\n\n";
             m_LuaCode += lua_body;
+        } else if (type == "comment") {
+        } else {
+            spdlog::error("Not recognized {}", type);
         }
     }
 
