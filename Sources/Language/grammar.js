@@ -1,22 +1,32 @@
+/**
+ * @file The OScofo language is a specialized scripting language for OpenScofo, an open-source score follower tailored for contemporary live-electronic music. Inspired by the research behind IRCAM's Antescofo, it leverages Lua for flexible scripting and Tree-sitter to parse events and musical actions. It is built to lower the barrier to entry and setup complexity of live-electronics by enabling interactive scores that integrate seamlessly across PureData (including web deployment via pd4web), Max, Python, and C/C++.
+ * @author Charles K. Neimog <charlesneimog@outlook.com>
+ * @license GPL3
+ */
+
+///
+//
+
 module.exports = grammar({
     name: "openscofo",
     precedence: "left",
     rules: {
         score: ($) => repeat($._statement),
         _statement: ($) => choice($.CONFIG, $.EVENT, $.LUA),
+        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent),
         keyword: (_) => /[a-zA-Z_][a-zA-Z0-9_]*/,
 
         //╭─────────────────────────────────────╮
         //│                 LUA                 │
         //╰─────────────────────────────────────╯
-        LUA: ($) => seq(alias(token("LUA"), $.identifier), "{", optional($.lua_body), "}"),
+        LUA: ($) => seq(alias("LUA", $.identifier), "{", optional($.lua_body), "}"),
         lua_body: ($) => repeat1(choice(/[^{}`]+/, seq("{", optional($.lua_body), "}"), $.lua_comment)),
         lua_call: ($) => field("lua_call", repeat1(choice(/[^()`]+/, seq("(", optional($.lua_call), ")")))),
         lua_function: ($) => $.keyword,
         lua_comment: (_) => /--[^\n]*/,
 
         //╭─────────────────────────────────────╮
-        //│               Config                │
+        //│                Config               │
         //╰─────────────────────────────────────╯
         CONFIG: ($) => choice($.numberConfig, $.symbolConfig, $.pathConfig),
 
@@ -24,59 +34,37 @@ module.exports = grammar({
             field(
                 "configId",
                 choice(
-                    // Time
-                    alias(token("BPM"), $.keyword),
-                    alias(token("PhaseCoupling"), $.keyword),
-                    alias(token("SyncStrength"), $.keyword),
-
-                    // Score
-                    alias(token("TRANSPOSE"), $.keyword),
-
-                    // Listening
-                    alias(choice(token("ENTROPY"), token("Entropy")), $.keyword),
-                    alias(choice(token("PitchSigma"), token("VARIANCE")), $.keyword),
-
-                    // Audio
-                    alias(token("FFTSize"), $.keyword),
-                    alias(token("HopSize"), $.keyword),
+                    alias("BPM", $.keyword),
+                    alias("PHASECOUPLING", $.keyword),
+                    alias("SYNCSTRENGTH", $.keyword),
+                    alias("TRANSPOSE", $.keyword),
+                    alias("ENTROPY", $.keyword),
+                    alias("PITCHTEMPLATESIGMA", $.keyword),
+                    alias("FFTSIZE", $.keyword),
+                    alias("HOPSIZE", $.keyword),
                 ),
             ),
 
-        symbolConfigId: ($) => field("configId", choice()),
-        pathConfigId: ($) =>
-            field(
-                "configId",
-                choice(alias(token("TIMBREMODEL"), $.keyword)),
-                // alias(token("TIMBREMODEL"), $.keyword))
-                // alias(token("TIMBREMODEL"), $.keyword))
-            ),
+        symbolConfigId: ($) => field("configId", choice(alias("DUMMY", $.keyword))),
 
-        // types
+        pathConfigId: ($) => field("configId", choice(alias("TIMBREMODEL", $.keyword))),
+
         numberConfig: ($) => seq($.numberConfigId, $.number),
         symbolConfig: ($) => seq($.symbolConfigId, $.symbol),
-        pathConfig: ($) => seq($.pathConfigId, $.symbol),
+        pathConfig: ($) => seq($.pathConfigId, $.path),
 
         //╭─────────────────────────────────────╮
-        //│               Events                │
+        //│                Events               │
         //╰─────────────────────────────────────╯
-        EVENT: ($) => choice($.pitchEvent, $.restEvent, $.freeEvent),
-        pitchEventId: ($) =>
-            field(
-                "pitchEventId",
-                choice(
-                    alias(token("NOTE"), $.keyword),
-                    alias(token("TRILL"), $.keyword),
-                    alias(token("CHORD"), $.keyword),
-                ),
-            ),
-        restEventId: ($) => seq(alias(token("REST"), $.keyword)),
-        timeEventId: ($) => seq(alias(token("EVENT"), $.keyword)),
+        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent),
 
-        pitchEvent: ($) => seq($.pitchEventId, choice($.pitches, $.pitch), $.duration, repeat($.ACTION)),
-        restEvent: ($) => seq($.restEventId, $.duration, repeat($.ACTION)),
-        freeEvent: ($) => seq($.timeEventId, $.eventId, $.duration, repeat1($.ACTION)),
+        noteEvent: ($) => seq(alias("NOTE", $.keyword), $.pitch, $.duration, repeat($.ACTION)),
+        multiPitchEvent: ($) =>
+            seq(choice(alias("TRILL", $.keyword), alias("CHORD", $.keyword)), $.pitches, $.duration, repeat($.ACTION)),
 
-        //
+        restEvent: ($) => seq(alias("REST", $.keyword), $.duration, repeat($.ACTION)),
+        freeEvent: ($) => seq(alias("EVENT", $.keyword), $.eventId, $.duration, repeat1($.ACTION)),
+
         eventId: (_) => choice("timed", "internal"),
 
         // Pitch
@@ -90,7 +78,6 @@ module.exports = grammar({
         alteration: (_) => choice("#", "b"),
         octave: (_) => /[0-9]|1[0-2]/,
 
-        // duration
         duration: ($) => $.number,
 
         //╭─────────────────────────────────────╮
@@ -98,25 +85,20 @@ module.exports = grammar({
         //╰─────────────────────────────────────╯
         ACTION: ($) =>
             seq(
-                optional(alias(token("ACTION"), $.keyword)),
+                optional(alias("ACTION", $.keyword)),
                 optional(field("timedAction", $.timedAction)),
                 field("exec", $.exec),
-                repeat(seq(token(","), $.exec)),
+                repeat(seq(",", $.exec)),
             ),
 
-        timedAction: ($) =>
-            choice(seq(field("actionKey", token("delay")), field("value", $.number), field("timeUnit", $.timeUnit))),
+        timedAction: ($) => seq(field("actionKey", "delay"), field("value", $.number), field("timeUnit", $.timeUnit)),
 
         actionKeyword: ($) => choice($.lua_function, $.keyword),
 
         exec: ($) =>
             choice(
-                seq(
-                    field("keyword", token("sendto")),
-                    field("receiver", $.receiver),
-                    optional(field("pdargs", $.pdargs)),
-                ),
-                seq(field("keyword", token("luacall")), field("luabody", seq("(", $.lua_call, ")"))),
+                seq(field("keyword", "sendto"), field("receiver", $.receiver), optional(field("pdargs", $.pdargs))),
+                seq(field("keyword", "luacall"), field("luabody", seq("(", $.lua_call, ")"))),
             ),
 
         pdargs: ($) => seq("[", repeat1($.pdarg), "]"),
