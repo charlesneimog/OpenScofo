@@ -35,6 +35,12 @@ std::string Score::GetLuaCode() {
 }
 
 // ─────────────────────────────────────
+void Score::UpdateAudioParameters(float FftSize, float HopSize) {
+    m_FFTSize = FftSize;
+    m_HopSize = HopSize;
+}
+
+// ─────────────────────────────────────
 void Score::SetTunning(double Tunning) {
     m_Tunning = Tunning;
 }

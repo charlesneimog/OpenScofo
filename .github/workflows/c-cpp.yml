@@ -1,18 +1,26 @@
 ---
-name: C/C++ CI
+name: Compile PureData Object
 on:
-  workflow_dispatch:
   push:
-    tags: [v*]
     branches: [main]
-    paths: ['**/*.cpp', '**/*.hpp', '**/*.yml']
-  pull_request:
-    branches: [main]
-    paths: ['**/*.cpp', '**/*.hpp', '**,*.yml']
+#╭──────────────────────────────────────╮
+#│  Uncomment if you want to trigger a  │
+#│               release                │
+#╰──────────────────────────────────────╯
+  # workflow_dispatch:
+  #   inputs:
+  #     publish_release:
+  #       description: Publish a GitHub Release using LIBVERSION after build
+  #       required: false
+  #       type: boolean
+  #       default: false
 env:
-  LIBNAME: o.scofo~
+  LIBNAME: OpenScofo
+  LIBVERSION: 0.1.4
+permissions:
+  contents: write
 jobs:
-  build:
+  python:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ${{ matrix.os }}
     strategy:
@@ -47,150 +55,41 @@ jobs:
       - name: Upload to PyPI
         run: |
           twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
-  macos-build:
-    runs-on: ${{ matrix.os }}
+  macos:
+    runs-on: ${{ matrix.machines }}
     strategy:
       matrix:
-        os: [macos-latest]
-        precision: [32, 64]
+        precision: [32] #, 64]
+        machines: [macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 1
-      - name: Install PureData and Deps arm64 Mac
+          fetch-depth: 0
+      - name: Install PureData and Deps
         run: |
           brew install pd
           brew install pybind11
+          brew install googletest
           brew install tree-sitter
+          brew install boost
           npm install -g tree-sitter-cli
-      - name: Build Object
+      - name: Build
         run: |
-          mkdir -p max
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DPDLIBDIR=./ -DBUILD_ALL_OBJECTS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-          cmake --build build -j $(sysctl -n hw.logicalcpu)
-          cmake --install build
-          zip -r 'pd-${{env.LIBNAME}}-macos-${{env.ARCH_NAME}}-pd${{matrix.precision}}.zip' o.scofo~
-          rm -dfr o.scofo~
-          cp ./Resources/tests/bwv-1013.mp3 ./max/
-          cp ./Resources/tests/bwv-1013.txt ./max/
-          mv max o.scofo~
-          zip -r 'max-${{env.LIBNAME}}-macos-${{env.ARCH_NAME}}.zip' o.scofo~
-      - name: Release Pd External
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }}
+          cmake --build build --parallel $(sysctl -n hw.physicalcpu)
+          sudo cmake --install build
+      - name: Upload Object
+        uses: actions/upload-artifact@v4
         with:
-          body_path: ./Resources/CHANGELOG.md
-          tag_name: ${{ github.ref_name }}
-          files: |
-            pd-${{ env.LIBNAME }}-macos-universal-pd${{ matrix.precision }}.zip
-          draft: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Release Max External
-        uses: softprops/action-gh-release@v2
-        if: matrix.precision == '64' && startsWith(github.ref, 'refs/tags/')
-        with:
-          body_path: ./Resources/CHANGELOG.md
-          tag_name: ${{ github.ref_name }}
-          files: |
-            max-${{ env.LIBNAME }}-macos-${{ env.ARCH_NAME }}.zip
-          draft: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-  windows-build:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        compiler: [mingw]
-        arch: [amd64]
-        precision: [32, 64]  # pd double and single float
-        newTag: ["${{startsWith(github.ref, 'refs/tags/')}}"]
-        exclude:
-          - newTag: false
-            precision: 64
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 1
-      - if: matrix.compiler == 'mingw'
-        name: Set up Msys2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: mingw64
-          update: false
-          install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-tree-sitter
-            mingw-w64-x86_64-pybind11 zip
-      - name: Install PureData Float 32
-        if: matrix.compiler == 'mingw' && matrix.precision == '32'
-        run: |
-          winget install -e --id MillerPuckette.PureData --accept-source-agreements
-          npm install tree-sitter-cli
-      - name: Install PureData Float 64
-        if: matrix.compiler == 'mingw' && matrix.precision == '64'
-        run: |
-          winget install -e --id MillerPuckette.Pd64 --accept-source-agreements
-          npm install -g tree-sitter-cli
-      - name: Configure and build Mingw
-        shell: msys2 {0}
-        if: matrix.compiler == 'mingw'
-        run: |
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DPDLIBDIR=./ -DBUILD_ALL_OBJECTS=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build build
-          cmake --install build
-          zip -r 'pd-${{env.LIBNAME}}-windows-pd${{matrix.precision}}.zip' o.scofo~
-          rm -dfr o.scofo~
-          cp ./Resources/tests/bwv-1013.mp3 ./max/
-          cp ./Resources/tests/bwv-1013.txt ./max/
-          cp -r max o.scofo~
-          zip -r 'max-${{env.LIBNAME}}-windows.zip' o.scofo~
-      - name: Release Pd External
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          body_path: ./Resources/CHANGELOG.md
-          tag_name: ${{ github.ref_name }}
-          files: |
-            pd-${{ env.LIBNAME }}-windows-pd${{ matrix.precision }}.zip
-          draft: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Release Max External
-        uses: softprops/action-gh-release@v2
-        if: matrix.precision == '64' && startsWith(github.ref, 'refs/tags/')
-        with:
-          body_path: ./Resources/CHANGELOG.md
-          tag_name: ${{ github.ref_name }}
-          files: |
-            max-${{ env.LIBNAME }}-windows.zip
-          draft: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-${{matrix.machines}}-universal-pd${{matrix.precision}}
+          path: ${{env.LIBNAME}}
   linux-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        newTag: ["${{ startsWith(github.ref, 'refs/tags/') }}"]
-        arch: [amd64, aarch64, arm]
-        precision: [32, 64]
-        exclude:
-          - newTag: false
-            arch: aarch64
-            precision: 32
-          - newTag: false
-            arch: arm
-            precision: 32
-          - newTag: false
-            arch: aarch64
-            precision: 64
-          - newTag: false
-            arch: arm
-            precision: 64
-          - newTag: false
-            arch: amd64
-            precision: 64
+        arch: [amd64] #, arm, aarch64]
+        precision: [32] #, 64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -202,47 +101,69 @@ jobs:
           sudo add-apt-repository ppa:pure-data/pure-data -y
           sudo apt install puredata -y
           sudo apt install libboost-all-dev
+          sudo apt install libgtest-dev -y
           sudo apt install python3-pybind11 -y
           npm install -g tree-sitter-cli
-      - name: Install aarch64 gcc
-        if: matrix.arch == 'aarch64'
+      - name: Install compiler
+        id: compiler
         run: |
-          sudo apt install gcc-aarch64-linux-gnu -y
-          sudo apt install g++-aarch64-linux-gnu -y
-      - name: Install arm gcc
-        if: matrix.arch == 'arm'
+          arch=""
+          test "${{ matrix.arch }}" != "aarch64" || arch="aarch64-linux-gnu"
+          test "${{ matrix.arch }}" != "arm" || arch="arm-linux-gnueabihf"
+          if test -n "${arch}"; then
+            sudo apt-get install -y g++-${arch}
+            echo "arch=${arch}" >> $GITHUB_OUTPUT
+          fi
+      - name: Configure
         run: |
-          sudo apt install gcc-arm-linux-gnueabihf -y
-          sudo apt install g++-arm-linux-gnueabihf -y
+          arch="${{ steps.compiler.outputs.arch }}"
+          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release ${arch:+-DCMAKE_C_COMPILER=${arch}-gcc -DCMAKE_CXX_COMPILER=${arch}-g++}
       - name: Build Object
-        if: matrix.arch == 'amd64'
         run: |
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DPDLIBDIR=./ -DBUILD_ALL_OBJECTS=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build build -- -j$(nproc)
-          sudo cmake --install build 
-          zip -r 'pd-${{env.LIBNAME}}-linux-${{matrix.arch}}-pd${{matrix.precision}}.zip' o.scofo~
-      - name: Build Object
-        if: matrix.arch == 'aarch64'
-        run: |
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DPDLIBDIR=./ -DBUILD_ALL_OBJECTS=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -- -j$(nproc)
-          sudo cmake --install build 
-          zip -r 'pd-${{env.LIBNAME}}-linux-${{matrix.arch}}-pd${{matrix.precision}}.zip' o.scofo~
-      - name: Build Object
-        if: matrix.arch == 'arm'
-        run: |
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_PROCESSOR=arm -DPDLIBDIR=./ -DBUILD_ALL_OBJECTS=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -- -j$(nproc)
-          sudo cmake --install build 
-          zip -r 'pd-${{env.LIBNAME}}-linux-${{matrix.arch}}-pd${{matrix.precision}}.zip' o.scofo~
-      - name: Release Pd External
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+          sudo cmake --install build
+      - name: Upload Object
+        uses: actions/upload-artifact@v4
         with:
-          body_path: ./Resources/CHANGELOG.md
-          tag_name: ${{ github.ref_name }}
-          files: |
-            pd-${{ env.LIBNAME }}-linux-${{ matrix.arch }}-pd${{ matrix.precision }}.zip
-          draft: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-ubuntu-latest-${{matrix.arch}}-pd${{matrix.precision}}
+          path: ${{env.LIBNAME}}
+  windows-build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        compiler: [mingw]
+        arch: [amd64]
+        precision: [32] #, 64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - if: matrix.compiler == 'mingw'
+        name: Set up Msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-pybind11 mingw-w64-x86_64-gtest zip
+          update: false
+      - name: Install PureData Float 32
+        if: matrix.precision == '32'
+        run: |
+          winget install -e --id MillerPuckette.PureData --accept-source-agreements
+      - name: Install PureData Float 64
+        if: matrix.precision == '64'
+        run: |
+          winget install -e --id MillerPuckette.Pd64 --accept-source-agreements
+      - name: Configure and build Mingw
+        shell: msys2 {0}
+        if: matrix.compiler == 'mingw'
+        run: |
+          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+          cmake --install build
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-windows-latest-${{matrix.arch}}-pd${{matrix.precision}}
+          path: ${{env.LIBNAME}}

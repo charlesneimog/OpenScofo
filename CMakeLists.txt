@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(OpenScofo)
-project(
-    OpenScofo
-    VERSION 0.1.4
-    LANGUAGES CXX)
+project(OpenScofo VERSION 0.1.4)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
-
+set(CMAKE_OSX_DEPLOYMENT_TARGET 11)
 set(TREE_SITTER_VERSION "v0.26.3")
 
 option(BUILD_PY_MODULE "Build Python Module" OFF)
@@ -73,10 +69,7 @@ include(${CPM_FILE})
 # ╰──────────────────────────────────────╯
 cpmaddpackage("gh:tree-sitter/tree-sitter#${TREE_SITTER_VERSION}")
 
-find_program(
-    TREE_SITTER_EXECUTABLE
-    NAMES tree-sitter
-    DOC "tree-sitter CLI executable")
+find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
 if(NOT TREE_SITTER_EXECUTABLE)
     message(
         FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
@@ -139,10 +132,7 @@ if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
 
     # Download the archive
     if(NOT EXISTS "${TS_ARCHIVE}")
-        file(
-            DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}"
-            SHOW_PROGRESS
-            STATUS download_status)
+        file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" SHOW_PROGRESS STATUS download_status)
         list(GET download_status 0 status_code)
         if(NOT status_code EQUAL 0)
             message(FATAL_ERROR "Failed to download web-tree-sitter archive: ${download_status}")
@@ -167,6 +157,8 @@ endif()
 # ╰──────────────────────────────────────╯
 if(BUILD_WITH_LUA)
     cpmaddpackage("gh:lua/lua@5.4.0")
+    cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
+
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
         add_library(lua STATIC "${lua_SOURCE_DIR}/onelua.c")
@@ -196,24 +188,20 @@ if(NOT EXISTS ${FFTW3_FILE})
     file(DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE} STATUS DOWNLOAD_STATUS)
 endif()
 
-set(BUILD_SHARED_LIBS
-    OFF
-    CACHE BOOL "Build static libs" FORCE)
-set(ENABLE_FLOAT
-    OFF
-    CACHE BOOL "Enable single precision" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
+set(ENABLE_FLOAT OFF CACHE BOOL "Enable single precision" FORCE)
 
 file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz DESTINATION ${CMAKE_BINARY_DIR}/)
 add_subdirectory(${CMAKE_BINARY_DIR}/fftw-3.3.10 ${CMAKE_BINARY_DIR}/fftw3 EXCLUDE_FROM_ALL)
 set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+include_directories("${CMAKE_BINARY_DIR}/fftw-3.3.10/api")
 
 # ╭──────────────────────────────────────╮
 # │               LibONNX                │
 # ╰──────────────────────────────────────╯
 cpmaddpackage("gh:charlesneimog/libonnx#master")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
-cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -231,16 +219,11 @@ add_library(OpenScofo STATIC ${ScofoSrc})
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
 target_compile_definitions(OpenScofo PUBLIC OPENSCOFO_VERSION="${PROJECT_VERSION}")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(
-    OpenScofo
-    PUBLIC sol2
-           fftw3
-           tree-sitter
-           score_parser
-           lua
-           onnx
-           spdlog
-           onsetsds)
+target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
+
+if(BUILD_WITH_LUA)
+    target_link_libraries(OpenScofo PUBLIC sol2 lua)
+endif()
 
 if(EMSCRIPTEN)
     target_compile_options(
@@ -297,17 +280,12 @@ elseif(WIN32)
                -fdata-sections
                >)
 
-    target_link_options(
-        OpenScofo
-        PUBLIC
-        $<$<CONFIG:Release>:
-        -flto=auto
-        -Wl,--gc-sections
-        -s
-        >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
 
 elseif(APPLE)
-
+    find_package(Boost REQUIRED COMPONENTS math)
+    target_link_libraries(OpenScofo PRIVATE Boost::math)
+    target_compile_definitions(OpenScofo PRIVATE USE_BOOST_BESSEL)
     target_compile_options(
         OpenScofo
         PUBLIC -Wall
@@ -357,14 +335,7 @@ else() # Linux (GCC or Clang)
                -fdata-sections
                >)
 
-    target_link_options(
-        OpenScofo
-        PUBLIC
-        $<$<CONFIG:Release>:
-        -flto=auto
-        -Wl,--gc-sections
-        -s
-        >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
 
 endif()
 
