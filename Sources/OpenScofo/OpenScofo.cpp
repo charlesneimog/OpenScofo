@@ -58,8 +58,9 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
     m_Sr = Sr;
     m_FFTSize = FFTSize;
     m_HopSize = HopSize;
-    m_MDP = MDP(Sr, FFTSize, HopSize);
-    m_MIR = MIR(Sr, FFTSize, HopSize);
+    m_MDP.UpdateAudioParameters(Sr, FFTSize, HopSize);
+    m_MIR.UpdateAudioParameters(Sr, FFTSize, HopSize);
+    m_Score.UpdateAudioParameters(FFTSize, HopSize);
     m_InBuffer.resize(FFTSize);
     std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
     m_BlockIndex = 0;
@@ -359,7 +360,7 @@ bool OpenScofo::ParseScore(std::string ScorePath) {
 
     m_CurrentScorePosition = 0;
 
-    m_Score = Score(m_FFTSize, m_HopSize);
+    m_Score.UpdateAudioParameters(m_FFTSize, m_HopSize);
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
 
@@ -403,8 +404,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
     }
 
     SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
-    States GoodStates = m_MDP.GetStatesForProcessing();
-    m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
+    m_MIR.GetDescription(AudioBuffer, m_Desc);
     return m_Desc;
 }
 
@@ -414,8 +414,8 @@ bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         return false;
     }
-    States GoodStates = m_MDP.GetStatesForProcessing();
-    m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
+
+    m_MIR.GetDescription(AudioBuffer, m_Desc);
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
     m_MIR.AddReverb(m_Desc, 0.01);
     spdlog::debug("Time to Process Inference: {:.0f} µs\n", sw.elapsed().count() * 1'000'000.0);

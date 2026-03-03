@@ -1,4 +1,4 @@
-//#ifdef OSCOFO_LUA
+#ifdef OSCOFO_LUA
 
 #include <OpenScofo.hpp>
 #include <ext.h>
@@ -135,4 +135,4 @@ int luaopen_max(lua_State *L) {
     return 1;
 }
 
-//#endif
+#endif

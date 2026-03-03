@@ -1,7 +1,8 @@
 #include <OpenScofo.hpp>
-#include <sol/sol.hpp>
 
 #if defined(OSCOFO_LUA)
+
+#include <sol/sol.hpp>
 
 namespace OpenScofo {
 

@@ -1,5 +1,16 @@
 #include "OpenScofo.hpp"
 
+#if defined(__APPLE__)
+#include <boost/math/special_functions/bessel.hpp>
+#define CYL_BESSEL_I(v, x) boost::math::cyl_bessel_i(v, x)
+#else
+#include <cmath>
+#define CYL_BESSEL_I(v, x) std::cyl_bessel_i(v, x)
+#endif
+
+// double I1 = CYL_BESSEL_I(1.0, kappa);
+// double I0 = CYL_BESSEL_I(0.0, kappa);
+
 namespace OpenScofo {
 
 /*
@@ -29,13 +40,8 @@ namespace OpenScofo {
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
 MDP::MDP(double Sr, double FFTSize, double HopSize) {
-    m_HopSize = HopSize;
-    m_FFTSize = FFTSize;
-    m_Sr = Sr;
-
     m_SyncStrength = 0.5;
     m_PhaseCoupling = 0.5;
-    m_BlockDur = (1 / m_Sr) * HopSize;
     m_TimeInPrevEvent = 0;
     m_EventWindowSize = 20;
     SetTunning(440);
@@ -45,6 +51,33 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
     for (int i = 0; i <= KappaPrecision; i++) {
         double key = i / 1000.0;
         InverseA2(key);
+    }
+
+    UpdateAudioParameters(Sr, FFTSize, HopSize);
+}
+
+// ─────────────────────────────────────
+void MDP::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
+    m_HopSize = HopSize;
+    m_FFTSize = FFTSize;
+    m_Sr = Sr;
+    m_BlockDur = (1.0 / m_Sr) * m_HopSize;
+
+    m_PitchTemplates.clear();
+    m_PitchCQTTemplates.clear();
+    m_OccupancyCache.clear();
+    m_SurvivorCache.clear();
+
+    m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
+    for (MarkovState &State : m_States) {
+        State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
+        State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
+        State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
+    }
+
+    if (!m_States.empty()) {
+        UpdateAudioTemplate();
+        UpdatePhaseValues();
     }
 }
 
@@ -353,8 +386,8 @@ double MDP::A2(double kappa) {
         return 1.0 - (1.0 / (2.0 * kappa)) - (1.0 / (8.0 * kappa * kappa));
     }
 
-    double I1 = std::cyl_bessel_i(1, kappa);
-    double I0 = std::cyl_bessel_i(0, kappa);
+    double I1 = CYL_BESSEL_I(1, kappa);
+    double I0 = CYL_BESSEL_I(0, kappa);
     if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
         return 1.0 - (1.0 / (2.0 * kappa));
     }

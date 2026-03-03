@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <unordered_map>
+#include <complex>
 #include <cstdint>
 
 #include <fstream>
@@ -34,9 +35,10 @@ class MIR {
   public:
     MIR(float Sr, float WindowSize, float HopSize);
     ~MIR();
+    void UpdateAudioParameters(float Sr, float WindowSize, float HopSize);
 
     void SetdBTreshold(double dB);
-    void GetDescription(std::vector<double> &In, Description &Desc, States &States);
+    void GetDescription(std::vector<double> &In, Description &Desc);
     void AddReverb(Description &Desc, double decay);
 
     double GetdB();
@@ -74,15 +76,15 @@ class MIR {
     void SpectralChromaInit();
     void SpectralChromaExec(Description &Desc);
 
+    // FFTW
+    void FFTWInit();
+
     // CQT
     void CQTInit();
 
     // Get Signal
     void GetSignalPower(std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
-
-  private:
-    void ReleaseResources() noexcept;
 
   private:
     // FFT
@@ -103,9 +105,9 @@ class MIR {
     // MFCC
     int m_MFCCMels = 40;
     int m_MFCC = 13;
-    std::vector<std::vector<float>> m_MFCCFilter;
-    std::vector<std::vector<float>> m_DCTBasis;
-    std::vector<float> m_MFCCEnergy;
+    std::vector<std::vector<double>> m_MFCCFilter;
+    std::vector<std::vector<double>> m_DCTBasis;
+    std::vector<double> m_MFCCEnergy;
 
     // Chroma
     std::vector<int> m_ChromaBinMap;

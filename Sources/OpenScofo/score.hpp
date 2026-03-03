@@ -26,6 +26,8 @@ class Score {
         m_HopSize = HopSize;
     }
 
+        void UpdateAudioParameters(float FftSize, float HopSize);
+
     States Parse(std::string ScoreFile);
     void SetTunning(double Tunning);
     bool ScoreIsLoaded();

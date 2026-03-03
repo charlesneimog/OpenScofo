@@ -7,41 +7,7 @@ namespace OpenScofo {
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
 MIR::MIR(float Sr, float FftSize, float HopSize) {
-    m_HopSize = HopSize;
-    m_FFTSize = FftSize;
-    m_Sr = Sr;
-    spdlog::debug("Init MIR::MIR using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
-
-    float WindowHalf = FftSize / 2;
-    m_FFTIn = (double *)fftw_alloc_real((size_t)FftSize);
-    if (!m_FFTIn) {
-        spdlog::critical("fftw_alloc_real failed");
-        return;
-    }
-
-    m_FFTOut = (fftw_complex *)fftw_alloc_complex((size_t)WindowHalf + 1);
-    if (!m_FFTOut) {
-        fftw_free(m_FFTIn); // Free previously allocated memory
-        spdlog::critical("fftw_alloc_complex failed");
-        return;
-    }
-
-#ifdef __EMSCRIPTEN__
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
-#else
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
-#endif
-
-    // hanning
-    m_WindowingFunc.resize(m_FFTSize);
-    for (size_t i = 0; i < m_FFTSize; i++) {
-        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * M_PI * i / (m_FFTSize - 1)));
-    }
-
-    // Init Onset
-    OnsetInit();
-    MFCCInit();
-    CQTInit();
+    UpdateAudioParameters(Sr, FftSize, HopSize);
 }
 
 // ─────────────────────────────────────
@@ -93,6 +59,45 @@ double MIR::Freq2Bin(double Freq, double n, double sr) {
     return round(bin);
 }
 
+// ─────────────────────────────────────
+void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
+    const bool sameAudioConfig = (m_HopSize == HopSize && m_FFTSize == FftSize && m_Sr == Sr);
+    if (sameAudioConfig && m_FFTPlan != nullptr && m_FFTIn != nullptr && m_FFTOut != nullptr &&
+        m_WindowingFunc.size() == static_cast<size_t>(FftSize)) {
+        return;
+    }
+
+    m_HopSize = HopSize;
+    m_FFTSize = FftSize;
+    m_Sr = Sr;
+    m_BlockSize = HopSize;
+    m_Accum = 0;
+
+    if (m_FFTPlan != nullptr) {
+        fftw_destroy_plan(m_FFTPlan);
+        m_FFTPlan = nullptr;
+    }
+    if (m_FFTIn != nullptr) {
+        fftw_free(m_FFTIn);
+        m_FFTIn = nullptr;
+    }
+    if (m_FFTOut != nullptr) {
+        fftw_free(m_FFTOut);
+        m_FFTOut = nullptr;
+    }
+
+    m_PreviousSpectralPower.assign(static_cast<size_t>(round(m_FFTSize / 2)), 0.0);
+    m_TimeCoherenceKernelCache.clear();
+
+    FFTWInit();
+    OnsetInit();
+    MFCCInit();
+    CQTInit();
+    SpectralChromaInit();
+
+    spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
+}
+
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
@@ -103,6 +108,35 @@ void MIR::SetdBTreshold(double dB) {
 // ─────────────────────────────────────
 std::vector<std::pair<int, int>> MIR::GetCQT() {
     return m_FakeCQT;
+}
+
+// ─────────────────────────────────────
+void MIR::FFTWInit() {
+    float WindowHalf = m_FFTSize / 2;
+    m_FFTIn = (double *)fftw_alloc_real((size_t)m_FFTSize);
+    if (!m_FFTIn) {
+        spdlog::critical("fftw_alloc_real failed");
+        return;
+    }
+
+    m_FFTOut = (fftw_complex *)fftw_alloc_complex((size_t)WindowHalf + 1);
+    if (!m_FFTOut) {
+        fftw_free(m_FFTIn); // Free previously allocated memory
+        spdlog::critical("fftw_alloc_complex failed");
+        return;
+    }
+
+#ifdef __EMSCRIPTEN__
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
+#else
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
+#endif
+
+    // hann
+    m_WindowingFunc.resize(m_FFTSize);
+    for (size_t i = 0; i < m_FFTSize; i++) {
+        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * M_PI * i / (m_FFTSize - 1)));
+    }
 }
 
 // ╭─────────────────────────────────────╮
@@ -322,7 +356,7 @@ void MIR::CQTInit() {
 void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     // real audio analisys
     size_t N = In.size();
-    size_t NHalf = N / 2 + 1; // include Nyquist to match rfft/librosa
+    size_t NHalf = m_FFTSize / 2 + 1;
 
     fftw_execute(m_FFTPlan);
 
@@ -333,16 +367,15 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     spdlog::debug("Window Size {}, NHalf {}", N, NHalf);
 
     // FUSE 1: Calculate Power, MaxAmp, and SumPower in one pass
-    for (size_t i = 0; i < NHalf; ++i) {
+    for (size_t i = 0; i < NHalf; i++) {
         const double re = m_FFTOut[i][0];
         const double im = m_FFTOut[i][1];
         const double p = re * re + im * im;
         const double sp = std::sqrt(p) * invN;
-
         Desc.Power[i] = p;
         Desc.SpectralPower[i] = sp;
         if (sp > Desc.MaxAmp)
-            Desc.MaxAmp = sp; // std::max can sometimes prevent auto-vectorization
+            Desc.MaxAmp = sp;
         SumPower += sp;
     }
 
@@ -354,7 +387,6 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     for (size_t i = 0; i < NHalf; ++i) {
         double normSp = (Desc.SpectralPower[i] + 1e-12) / SumPowerEps;
         Desc.NormSpectralPower[i] = normSp;
-
         double Diff = normSp - Mean;
         Variance += Diff * Diff;
     }
@@ -379,42 +411,45 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     OnsetExec(Desc);
     MFCCExec(Desc);
 
+    // Spectral
     SpectralFluxExec(Desc);
     SpectralFlatnessExec(Desc);
     SpectralHarmonicityExec(Desc);
+    SpectralChromaExec(Desc);
 }
 
 // ╭─────────────────────────────────────╮
 // │                MFCC                 │
 // ╰─────────────────────────────────────╯
 void MIR::MFCCInit() {
-    const int n_f = m_FFTSize / 2 + 1; // match librosa rfft length
+    const int n_f = m_FFTSize / 2 + 1;
     const double fmin = 0.0;
-    const double fmax = m_Sr * 0.5;
+    const double fmax = static_cast<double>(m_Sr) * 0.5;
 
-    // FFT bin frequencies
+    // FFT bin frequencies (match np.fft.rfftfreq)
     std::vector<double> fft_freqs(n_f);
     for (int i = 0; i < n_f; ++i) {
-        fft_freqs[i] = i * m_Sr / static_cast<double>(m_FFTSize);
+        fft_freqs[i] =
+            static_cast<double>(i) *
+            static_cast<double>(m_Sr) /
+            static_cast<double>(m_FFTSize);
     }
 
-    // Slaney-style mel scale used by librosa (htk=False)
+    // Slaney mel scale (htk=False)
     const double f_sp = 200.0 / 3.0;
     const double min_log_hz = 1000.0;
     const double min_log_mel = (min_log_hz - fmin) / f_sp;
     const double logstep = std::log(6.4) / 27.0;
 
     auto hz_to_mel = [&](double hz) {
-        if (hz < min_log_hz) {
+        if (hz < min_log_hz)
             return (hz - fmin) / f_sp;
-        }
         return min_log_mel + std::log(hz / min_log_hz) / logstep;
     };
 
     auto mel_to_hz = [&](double mel) {
-        if (mel < min_log_mel) {
+        if (mel < min_log_mel)
             return mel * f_sp + fmin;
-        }
         return min_log_hz * std::exp((mel - min_log_mel) * logstep);
     };
 
@@ -422,42 +457,54 @@ void MIR::MFCCInit() {
     const double mel_max = hz_to_mel(fmax);
 
     std::vector<double> mel_pts(m_MFCCMels + 2);
-    for (int i = 0; i < m_MFCCMels + 2; i++) {
-        mel_pts[i] = mel_min + (mel_max - mel_min) * i / (m_MFCCMels + 1);
+    for (int i = 0; i < m_MFCCMels + 2; ++i) {
+        mel_pts[i] =
+            mel_min +
+            (mel_max - mel_min) *
+            static_cast<double>(i) /
+            static_cast<double>(m_MFCCMels + 1);
     }
 
     std::vector<double> hz_pts(m_MFCCMels + 2);
-    for (int i = 0; i < m_MFCCMels + 2; i++) {
+    for (int i = 0; i < m_MFCCMels + 2; ++i) {
         hz_pts[i] = mel_to_hz(mel_pts[i]);
     }
 
-    // Triangular Slaney mel filters normalized to match librosa
-    m_MFCCFilter.assign(m_MFCCMels, std::vector<float>(n_f, 0.0));
-    for (int m = 0; m < m_MFCCMels; m++) {
-        const double f_left = hz_pts[m];
+    // Slaney triangular filters (area normalized)
+    m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
+
+    for (int m = 0; m < m_MFCCMels; ++m) {
+        const double f_left   = hz_pts[m];
         const double f_center = hz_pts[m + 1];
-        const double f_right = hz_pts[m + 2];
+        const double f_right  = hz_pts[m + 2];
+
         const double norm = 2.0 / (f_right - f_left);
 
-        for (int k = 0; k < n_f; k++) {
+        for (int k = 0; k < n_f; ++k) {
             const double f = fft_freqs[k];
             double w = 0.0;
+
             if (f >= f_left && f <= f_center) {
                 w = (f - f_left) / (f_center - f_left);
             } else if (f > f_center && f <= f_right) {
                 w = (f_right - f) / (f_right - f_center);
             }
-            m_MFCCFilter[m][k] = std::max(0.0, w) * norm;
+
+            m_MFCCFilter[m][k] = (w > 0.0 ? w * norm : 0.0);
         }
     }
 
-    // Orthonormal DCT-II basis (librosa dct_type=2, norm="ortho")
-    m_DCTBasis.assign(m_MFCC, std::vector<float>(m_MFCCMels));
+    // Orthonormal DCT-II (librosa: dct_type=2, norm="ortho")
+    m_DCTBasis.assign(m_MFCC, std::vector<double>(m_MFCCMels));
+
     const double scale0 = std::sqrt(1.0 / m_MFCCMels);
-    const double scale = std::sqrt(2.0 / m_MFCCMels);
-    for (int k = 0; k < m_MFCC; k++) {
-        for (int n = 0; n < m_MFCCMels; n++) {
-            m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(M_PI * (n + 0.5) * k / m_MFCCMels);
+    const double scale  = std::sqrt(2.0 / m_MFCCMels);
+
+    for (int k = 0; k < m_MFCC; ++k) {
+        for (int n = 0; n < m_MFCCMels; ++n) {
+            m_DCTBasis[k][n] =
+                (k == 0 ? scale0 : scale) *
+                std::cos(PI * (n + 0.5) * k / m_MFCCMels);
         }
     }
 
@@ -466,53 +513,75 @@ void MIR::MFCCInit() {
 
 // ─────────────────────────────────────
 void MIR::MFCCExec(Description &Desc) {
-    const int n_f = m_FFTSize / 2 + 1;
-    const int n_mels = m_MFCCMels;
-    const int n_mfcc = m_MFCC;
+    const int n_mels = std::min<int>(m_MFCCMels,
+                                     static_cast<int>(m_MFCCFilter.size()));
+    const int n_mfcc = std::min<int>(m_MFCC,
+                                     static_cast<int>(m_DCTBasis.size()));
 
-    constexpr double kEps = 1e-30;
-    constexpr double kLog10 = 10.0;
-    constexpr double kDR = 80.0;
-
-    /* Mel filterbank */
-    const double *power = Desc.Power.data();
-    for (int m = 0; m < n_mels; m++) {
-        const float *filter = m_MFCCFilter[m].data();
-        double sum = 0.0;
-        for (int k = 0; k < n_f; k++) {
-            sum += filter[k] * power[k];
-        }
-        m_MFCCEnergy[m] = std::max(sum, kEps);
+    if (n_mels <= 0 || n_mfcc <= 0 || Desc.Power.empty()) {
+        Desc.MFCC.assign(std::max(0, n_mfcc), 0.0);
+        return;
     }
 
-    /* Power -> dB + dynamic range */
-    double maxLog = -1e300;
+    const int n_f =
+        std::min<int>(static_cast<int>(Desc.Power.size()),
+                      static_cast<int>(m_MFCCFilter[0].size()));
+
+    if (n_f <= 0) {
+        Desc.MFCC.assign(n_mfcc, 0.0);
+        return;
+    }
+
+    constexpr double kAmin  = 1e-10;
+    constexpr double kTopDb = 80.0;
+
+    if (static_cast<int>(m_MFCCEnergy.size()) != n_mels)
+        m_MFCCEnergy.resize(n_mels);
+
+    // Mel projection (power domain)
     for (int m = 0; m < n_mels; ++m) {
-        double v = kLog10 * std::log10(m_MFCCEnergy[m]);
+        const double* filter = m_MFCCFilter[m].data();
+        double mel = 0.0;
+
+        for (int k = 0; k < n_f; ++k) {
+            mel += filter[k] * Desc.Power[k];
+        }
+
+        m_MFCCEnergy[m] = mel;
+    }
+
+    // power_to_db(ref=1.0, top_db=80)
+    double maxLog = -std::numeric_limits<double>::infinity();
+
+    for (int m = 0; m < n_mels; ++m) {
+        const double v =
+            10.0 * std::log10(std::max(kAmin, m_MFCCEnergy[m]));
+
         m_MFCCEnergy[m] = v;
         if (v > maxLog)
             maxLog = v;
     }
 
-    const double floor = maxLog - kDR;
-    for (int m = 0; m < n_mels; ++m) {
-        if (m_MFCCEnergy[m] < floor)
-            m_MFCCEnergy[m] = floor;
-    }
-
-    /* Resize once */
-    if ((int)Desc.MFCC.size() != n_mfcc) {
-        Desc.MFCC.resize(n_mfcc);
-    }
-
-    /* DCT-II */
-    for (int k = 0; k < n_mfcc; ++k) {
-        std::vector<float> &basis = m_DCTBasis[k];
-        double sum = 0.0;
-        for (int n = 0; n < n_mels; ++n) {
-            sum += basis[n] * m_MFCCEnergy[n];
+    if (std::isfinite(maxLog)) {
+        const double floor = maxLog - kTopDb;
+        for (int m = 0; m < n_mels; ++m) {
+            if (m_MFCCEnergy[m] < floor)
+                m_MFCCEnergy[m] = floor;
         }
-        Desc.MFCC[k] = sum;
+    }
+
+    Desc.MFCC.assign(n_mfcc, 0.0);
+
+    // DCT-II
+    for (int k = 0; k < n_mfcc; ++k) {
+        const double* basis = m_DCTBasis[k].data();
+        double coeff = 0.0;
+
+        for (int n = 0; n < n_mels; ++n) {
+            coeff += basis[n] * m_MFCCEnergy[n];
+        }
+
+        Desc.MFCC[k] = coeff;
     }
 }
 
@@ -595,22 +664,22 @@ void MIR::SpectralFluxExec(Description &Desc) {
 
 // ─────────────────────────────────────
 void MIR::SpectralFlatnessExec(Description &Desc) {
-    const auto &S = Desc.SpectralPower;
+    const auto &S = Desc.Power; // usar potência
     const size_t N = S.size();
 
-    constexpr double eps = 1e-12;
+    constexpr double amin = 1e-10; // mesmo default do librosa
+
     double logSum = 0.0;
     double linSum = 0.0;
 
-    // skip DC
-    for (size_t k = 1; k < N; ++k) {
-        double v = S[k] + eps;
+    for (size_t k = 0; k < N; ++k) {
+        double v = std::max(amin, S[k]); // já está |X|^2
         logSum += std::log(v);
         linSum += v;
     }
 
-    double geoMean = std::exp(logSum / (N - 1));
-    double arithMean = linSum / (N - 1);
+    const double geoMean = std::exp(logSum / double(N));
+    const double arithMean = linSum / double(N);
 
     Desc.SpectralFlatness = geoMean / arithMean;
 }
@@ -646,8 +715,11 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // ╭─────────────────────────────────────╮
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
-void MIR::GetDescription(std::vector<double> &In, Description &Desc, States &ScoreStates) {
-    (void)ScoreStates;
+void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
+    if (m_FFTIn == nullptr || m_FFTPlan == nullptr || m_WindowingFunc.size() != In.size()) {
+        spdlog::error("MIR audio parameters are not ready for current input size {}", In.size());
+        return;
+    }
 
     // 1. Calculate power on the PURE, un-windowed signal
     GetSignalPower(In, Desc);

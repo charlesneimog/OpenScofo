@@ -75,6 +75,9 @@ double InverseA2(double SyncStrength) {
 
 PYBIND11_MODULE(_OpenScofo, m) {
 
+    m.doc() = "OpenScofo Python bindings";
+    m.attr("__version__") = OPENSCOFO_VERSION;
+
     py::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
         .def(py::init([](float sr, float fft_size, float hop) {
             auto obj = new OpenScofo::OpenScofo(sr, fft_size, hop);
@@ -131,6 +134,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
     py::class_<OpenScofo::Description>(m, "Description")
         .def(py::init<>())
         .def_readwrite("mfcc", &OpenScofo::Description::MFCC)
+        .def_readwrite("chroma", &OpenScofo::Description::Chroma)
         .def_readwrite("onset", &OpenScofo::Description::Onset)
         .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
         .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
