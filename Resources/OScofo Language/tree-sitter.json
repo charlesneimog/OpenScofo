@@ -1,0 +1,38 @@
+{
+    "grammars": [
+        {
+            "name": "openscofo",
+            "camelcase": "OpenScofo",
+            "title": "Open Source Score Follower Language",
+            "scope": "source.openscofo",
+            "file-types": ["scofo", "txt"],
+            "injection-regex": "^openscofo$",
+            "class-name": "TreeSitterOpenscofo"
+        }
+    ],
+    "metadata": {
+        "version": "0.1.4",
+        "license": "GPL3",
+        "description": "The OScofo language is a specialized scripting language for OpenScofo, an open-source score follower tailored for contemporary live-electronic music. Inspired by the research behind IRCAM's Antescofo, it leverages Lua for flexible scripting and Tree-sitter to parse events and musical actions. It is built to lower the barrier to entry and setup complexity of live-electronics by enabling interactive scores that integrate seamlessly across PureData (including web deployment via pd4web), Max, Python, and C/C++.",
+        "authors": [
+            {
+                "name": "Charles K. Neimog",
+                "email": "charlesneimog@outlook.com",
+                "url": "https://charlesneimog.github.io/"
+            }
+        ],
+        "links": {
+            "repository": "https://github.com/charlesneimog/OpenScofo",
+            "funding": "https://ko-fi.com/charlesneimog"
+        }
+    },
+    "bindings": {
+        "c": true,
+        "go": true,
+        "node": true,
+        "python": true,
+        "rust": true,
+        "swift": true,
+        "zig": false
+    }
+}

@@ -19,7 +19,7 @@ std::vector<double> load_mp3_as_wave(const char *path, int &sr, int &ch) {
 
     constexpr double inv = 1.0 / 32768.0;
     std::vector<double> wave(info.samples);
-    for (int i = 0; i < info.samples; i++) {
+    for (int i = 0; i < (int)info.samples; i++) {
         wave[i] = static_cast<double>(info.buffer[i]) * inv;
     }
 
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     for (size_t pos = 0; pos + HOP <= samples.size(); pos += HOP) {
         memmove(window.data(), window.data() + HOP, (WINDOW - HOP) * sizeof(float));
         memcpy(window.data() + (WINDOW - HOP), samples.data() + pos, HOP * sizeof(float));
-        bool ok = scofo.ProcessBlock(window);
+        ok = scofo.ProcessBlock(window);
         int event = scofo.GetEventIndex();
         if (event != currentEvent) {
             spdlog::info("Current Event is {}", event);
