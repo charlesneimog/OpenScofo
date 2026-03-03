@@ -58,7 +58,13 @@ module.exports = grammar({
         //╰─────────────────────────────────────╯
         EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent),
 
-        noteEvent: ($) => seq(alias("NOTE", $.keyword), $.pitch, $.duration, repeat($.ACTION)),
+        noteEvent: ($) =>
+            seq(
+                field("keyword", alias("NOTE", $.keyword)),
+                field("pitch", $.pitch),
+                field("duration", $.duration),
+                repeat(field("ACTION", $.ACTION)),
+            ),
         multiPitchEvent: ($) =>
             seq(choice(alias("TRILL", $.keyword), alias("CHORD", $.keyword)), $.pitches, $.duration, repeat($.ACTION)),
 

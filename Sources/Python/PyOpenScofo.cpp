@@ -26,6 +26,53 @@ static void python_error_callback(const spdlog::details::log_msg &log, void *dat
     }
 }
 
+// ─────────────────────────────────────
+double A2(double kappa) {
+    if (kappa <= 0.0) {
+        return 0.0;
+    }
+
+    if (kappa > 10.0) {
+        return 1.0 - (1.0 / (2.0 * kappa)) - (1.0 / (8.0 * kappa * kappa));
+    }
+
+    double I1 = std::cyl_bessel_i(1, kappa);
+    double I0 = std::cyl_bessel_i(0, kappa);
+    if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
+        return 1.0 - (1.0 / (2.0 * kappa));
+    }
+    return I1 / I0;
+}
+
+// ─────────────────────────────────────
+double InverseA2(double SyncStrength) {
+    if (SyncStrength <= 0.0) {
+        return 0.0;
+    }
+
+    double r = std::clamp(SyncStrength, 0.0, 0.999999);
+
+    double low = 0.0;
+    double high = 80.0;
+    while (A2(high) < r && high < 1e6) {
+        high *= 2.0;
+    }
+
+    double kappa = 0.0;
+    for (int i = 0; i < 80; i++) {
+        double mid = 0.5 * (low + high);
+        double val = A2(mid);
+        if (val < r) {
+            low = mid;
+        } else {
+            high = mid;
+        }
+        kappa = mid;
+    }
+
+    return kappa;
+}
+
 PYBIND11_MODULE(_OpenScofo, m) {
 
     py::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
@@ -41,6 +88,9 @@ PYBIND11_MODULE(_OpenScofo, m) {
                  return std::format("<OpenScofo(sr={}, fft_size={}, hop={})>", self.GetSr(), self.GetFFTSize(),
                                     self.GetHopSize());
              })
+
+        //
+        .def("get_kappa", &InverseA2)
 
         // Score
         .def("parse_score", &OpenScofo::OpenScofo::ParseScore)

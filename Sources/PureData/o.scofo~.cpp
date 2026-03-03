@@ -112,7 +112,6 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
         std::string error = x->OpenScofo->LuaGetError();
         pd_error(x, "[o.scofo~] Lua error");
         pd_error(x, "[o.scofo~] %s", error.c_str());
-        logpost(x, 1, "");
     }
 #endif
 }
@@ -124,10 +123,11 @@ static void oscofo_start(PdOpenScofo *x) {
         return;
     }
     x->Actions.clear();
-
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     x->OpenScofo->SetCurrentEvent(0);
     x->Event = 0;
+
+    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->EventOut, x->Event);
 
     x->Following = true;
     logpost(x, 2, "[o.scofo~] Start following");
@@ -135,12 +135,20 @@ static void oscofo_start(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
+    (void)s;
+
     if (argv[0].a_type != A_SYMBOL) {
         pd_error(x, "[o.scofo~] First argument of set method must be a symbol");
         return;
     }
+
     std::string method = atom_getsymbol(argv)->s_name;
     if (method == "event") {
+        if (argc > 0) {
+            pd_error(x, "[o.scofo~] Wrong number of arguments");
+            return;
+        }
+
         int f = atom_getint(argv + 1);
         x->Event = f;
         x->OpenScofo->SetCurrentEvent(f);
@@ -208,7 +216,7 @@ static void oscofo_pdsend(PdOpenScofo *x, std::string r, int argc, t_atom *argv)
 }
 
 // ─────────────────────────────────────
-static t_atom *oscofo_convertargs(PdOpenScofo *x, OpenScofo::Action &action) {
+static t_atom *oscofo_convertargs(OpenScofo::Action &action) {
     int size = action.Args.size();
     t_atom *PdArgs = new t_atom[size];
 
@@ -314,7 +322,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
             if (Act.isLua) {
                 oscofo_luaexecute(x, Act.Lua);
             } else {
-                t_atom *PdArgs = oscofo_convertargs(x, Act);
+                t_atom *PdArgs = oscofo_convertargs(Act);
                 oscofo_pdsend(x, Act.Receiver, Act.Args.size(), PdArgs);
                 delete[] PdArgs;
             }
@@ -322,7 +330,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
             double sysTime = clock_getsystimeafter(time);
             int size = Act.Args.size();
             std::string receiver = Act.Receiver;
-            t_atom *PdArgs = oscofo_convertargs(x, Act);
+            t_atom *PdArgs = oscofo_convertargs(Act);
             Action action = {sysTime, Act.isLua, receiver, Act.Lua, PdArgs, size};
             x->Actions.push_back(action);
         }
@@ -397,6 +405,8 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
 // ─────────────────────────────────────
 static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     PdOpenScofo *x = (PdOpenScofo *)pd_new(OpenScofoObj);
+    (void)s;
+
     if (!x) {
         pd_error(x, "[o.scofo~] Error creating object");
         return nullptr;

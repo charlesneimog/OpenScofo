@@ -40,9 +40,10 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
     m_EventWindowSize = 20;
     SetTunning(440);
 
-    double KappaPrecision = 10000;
+    constexpr int KappaPrecision = 1000;
+    m_KappaCache.reserve(static_cast<size_t>(KappaPrecision + 1));
     for (int i = 0; i <= KappaPrecision; i++) {
-        double key = i / 10000.0;
+        double key = i / 1000.0;
         InverseA2(key);
     }
 }
@@ -260,7 +261,6 @@ void MDP::SetCurrentEvent(int Event) {
     }
     m_CurrentStateIndex = Event;
     m_Tau = 0;
-    m_TauWithSound = 0;
     std::cout << "\n" << std::endl;
 }
 
@@ -344,74 +344,71 @@ void MDP::BuildDistributionCache(double ExpectedFrames) {
 }
 
 // ─────────────────────────────────────
+double MDP::A2(double kappa) {
+    if (kappa <= 0.0) {
+        return 0.0;
+    }
+
+    if (kappa > 10.0) {
+        return 1.0 - (1.0 / (2.0 * kappa)) - (1.0 / (8.0 * kappa * kappa));
+    }
+
+    double I1 = std::cyl_bessel_i(1, kappa);
+    double I0 = std::cyl_bessel_i(0, kappa);
+    if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
+        return 1.0 - (1.0 / (2.0 * kappa));
+    }
+    return I1 / I0;
+}
+
+// ─────────────────────────────────────
 double MDP::InverseA2(double SyncStrength) {
-    if (SyncStrength < 0) {
-        return 0;
+    if (SyncStrength <= 0.0) {
+        return 0.0;
     }
 
-    if (SyncStrength >= 0.95) {
-        return 10.0f;
-    }
-
-    double key = std::round(SyncStrength * 10000.0) / 10000.0;
+    double r = std::clamp(SyncStrength, 0.0, 0.999999);
+    int key = static_cast<int>(std::round(r * 1000.0));
     auto it = m_KappaCache.find(key);
     if (it != m_KappaCache.end()) {
         return it->second;
     }
 
-    double Low = 0.0;
-    double Tol = 1e-10;
-    double High = std::max(SyncStrength, 11.0);
-    double Mid;
-
-    int i;
-    double A2Mid;
-    for (i = 0; i < 8192; i++) {
-        Mid = (Low + High) / 2.0;
-        double I1 = std::cyl_bessel_i(1, Mid);
-        double I0 = std::cyl_bessel_i(0, Mid);
-        A2Mid = I1 / I0;
-        if (std::fabs(A2Mid - SyncStrength) < Tol) {
-            m_KappaCache[key] = Mid;
-            return Mid;
-        } else if (A2Mid < SyncStrength) {
-            Low = Mid;
-        } else {
-            High = Mid;
-        }
+    double low = 0.0;
+    double high = 80.0;
+    while (A2(high) < r && high < 1e6) {
+        high *= 2.0;
     }
 
-    m_KappaCache[key] = Mid;
-    spdlog::warn("Kappa for Sync Strength {:.4f} not converged after {} iterations. Returning {:.4f} for A2 = {:.4f}",
-                 SyncStrength, i, Mid, A2Mid);
-    return Mid;
+    double kappa = 0.0;
+    for (int i = 0; i < 80; i++) {
+        double mid = 0.5 * (low + high);
+        double val = A2(mid);
+        if (val < r) {
+            low = mid;
+        } else {
+            high = mid;
+        }
+        kappa = mid;
+    }
+
+    m_KappaCache[key] = kappa;
+    return kappa;
 }
 
 // ─────────────────────────────────────
-double MDP::CouplingFunction(double Phi, double PhiMu, double Kappa) {
-    if (Kappa <= 0.0)
-        return 0.0;
-
-    double PhiNDiff = ModPhases(Phi - PhiMu);
-    double I0 = std::cyl_bessel_i(0, Kappa);
-
-    // Prevent overflow/division by zero
-    if (std::isinf(I0) || I0 < 1e-12)
-        return 0.0;
-
-    double CosTerm = std::cos(TWO_PI * PhiNDiff);
-    double SinTerm = std::sin(TWO_PI * PhiNDiff);
-
-    // Cont (2010) Eq for Phase Coupling Force
-    return (1.0 / (TWO_PI * I0)) * std::exp(Kappa * CosTerm) * SinTerm;
+double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
+    static constexpr double invTwoPi = 1.0 / TWO_PI;
+    double diff = TWO_PI * (phi - phi_hat);
+    double cosDiff = std::cos(diff);
+    return invTwoPi * std::exp(kappa * (cosDiff - 1.0)) * std::sin(diff);
 }
 
 // ─────────────────────────────────────
 double MDP::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
-    if (Phase < 0.0) {
+    if (Phase < 0.0)
         Phase += 1.0;
-    }
     return Phase - 0.5;
 }
 
@@ -450,7 +447,7 @@ double MDP::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
 
-    if (StateIndex == m_CurrentStateIndex) {
+    if (StateIndex == m_CurrentStateIndex || StateIndex < 2) {
         return m_PsiN;
     }
 
@@ -460,59 +457,60 @@ double MDP::UpdatePsiN(int StateIndex) {
     // Cont (2010), Large and Palmer (1999) and Large and Jones (2002)
     MarkovState &LastState = m_States[StateIndex - 1];
     MarkovState &CurrentState = m_States[StateIndex];
-    MarkovState &NextState = m_States[StateIndex + 1];
+    MarkovState *NextState = nullptr;
+    if ((size_t)(StateIndex + 1) < m_States.size()) {
+        NextState = &m_States[StateIndex + 1];
+    }
 
     double IOISeconds = m_CurrentStateOnset - m_LastTn;
     double LastPhiN = LastState.IOIPhiN;
     double LastHatPhiN = LastState.IOIHatPhiN;
     double HatPhiN = CurrentState.IOIHatPhiN;
-    double PhiNExpected = LastPhiN + ((m_CurrentStateOnset - m_LastTn) / m_PsiN);
-    CurrentState.IOIHatPhiN = PhiNExpected;
     CurrentState.OnsetObserved = m_CurrentStateOnset;
 
-    // Update Variance (Cont, 2010) - Coupling Strength (Large 1999)
+    // Correction (1): r_n, kappa_n
     double PhaseDiff = (IOISeconds / m_PsiN) - HatPhiN;
     double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(TWO_PI * PhaseDiff));
     double Kappa = InverseA2(SyncStrength);
     m_SyncStr = SyncStrength;
     m_Kappa = Kappa;
 
-    // Update and Correct PhiN
+    // Correction (2): phi_n
     double FValueUpdate = CouplingFunction(LastPhiN, LastHatPhiN, Kappa);
     double PhiN = LastPhiN + (IOISeconds / m_LastPsiN) + (m_PhaseCoupling * FValueUpdate);
     PhiN = ModPhases(PhiN);
     CurrentState.PhaseObserved = PhiN;
+    CurrentState.IOIPhiN = PhiN;
 
-    // Prediction for next PsiN+1
+    // Prediction: psi_{n+1}
     double FValuePrediction = CouplingFunction(PhiN, HatPhiN, Kappa);
     double PsiN1 = m_PsiN * (1 + m_SyncStrength * FValuePrediction);
-
-    // Prediction for Next HatPhiN
-    double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
-    double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
-    NextState.IOIHatPhiN = PhiN1;
-
-    // Update all next expected onsets
-    NextState.OnsetExpected = Tn1;
-    double LastOnsetExpected = Tn1;
-
-    // the m_CurrentEvent + 1 already updated, now
-    // we update the future events to get the Sojourn Time
-    for (int i = m_CurrentStateIndex + 2; i < m_CurrentStateIndex + 20; i++) {
-        if ((size_t)i >= m_States.size()) {
-            break;
-        }
-        MarkovState &FutureState = m_States[i];
-        MarkovState &PreviousFutureState = m_States[(i - 1)];
-        double Duration = PreviousFutureState.Duration;
-        double FutureOnset = LastOnsetExpected + Duration * PsiN1;
-
-        FutureState.OnsetExpected = FutureOnset;
-        LastOnsetExpected = FutureOnset;
+    if (PsiN1 < 1e-6) {
+        PsiN1 = 1e-6;
     }
 
-    // Update Values for next calls
-    m_BPM = 60.0f / m_PsiN;
+    if (NextState != nullptr) {
+        double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
+        double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
+        NextState->IOIHatPhiN = PhiN1;
+        NextState->OnsetExpected = Tn1;
+
+        double LastOnsetExpected = Tn1;
+        for (int i = m_CurrentStateIndex + 2; i < m_CurrentStateIndex + 20; i++) {
+            if ((size_t)i >= m_States.size()) {
+                break;
+            }
+            MarkovState &FutureState = m_States[i];
+            MarkovState &PreviousFutureState = m_States[(i - 1)];
+            double Duration = PreviousFutureState.Duration;
+            double FutureOnset = LastOnsetExpected + Duration * PsiN1;
+
+            FutureState.OnsetExpected = FutureOnset;
+            LastOnsetExpected = FutureOnset;
+        }
+    }
+
+    m_BPM = 60.0f / PsiN1;
     m_LastPsiN = m_PsiN;
 
     if (StateIndex != m_CurrentStateIndex) {
@@ -526,9 +524,12 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╰─────────────────────────────────────╯
 void MDP::GetAudioObservations(int T) {
     std::unordered_map<double, double> PitchObs;
+    PitchObs.reserve(m_WinEnd - m_WinStart);
+
     int bufferIndex = T % m_BufferSize;
     double ObsNoSound = 0;
     double ObsSilence = m_Desc.SilenceProb;
+    double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
@@ -536,7 +537,6 @@ void MDP::GetAudioObservations(int T) {
 
         MarkovState &StateJ = m_States[j];
         double BestObs = 1e-300;
-        // StateJ.TimeProb = 1;
 
         switch (StateJ.Type) {
         case NOTE:
@@ -549,8 +549,8 @@ void MDP::GetAudioObservations(int T) {
                 if (it != PitchObs.end()) {
                     BestObs = std::max(BestObs, it->second);
                 } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * (1.0 - m_Desc.SilenceProb);
-                    PitchObs[AS.Freq] = kl;
+                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
+                    PitchObs.emplace(AS.Freq, kl);
                     BestObs = std::max(BestObs, kl);
                 }
             }
@@ -568,8 +568,8 @@ void MDP::GetAudioObservations(int T) {
                 if (it != PitchObs.end()) {
                     ChordKLObs += it->second;
                 } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * (1.0 - m_Desc.SilenceProb);
-                    PitchObs[AS.Freq] = kl;
+                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
+                    PitchObs.emplace(AS.Freq, kl);
                     ChordKLObs += kl;
                 }
             }
@@ -589,7 +589,6 @@ void MDP::GetAudioObservations(int T) {
 
     if (ObsNoSound > ObsSilence) {
         spdlog::debug("SOUND   | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
-        m_TauWithSound++;
         m_IsSilence = false;
     } else {
         spdlog::debug("SILENCE | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
@@ -601,18 +600,23 @@ void MDP::GetAudioObservations(int T) {
 double MDP::GetPitchSimilarity(double Freq) {
     double KLDiv = 0.0;
     double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
-    PitchTemplateArray PitchTemplate;
-
-    if (m_PitchTemplates.find(RootBinFreq) != m_PitchTemplates.end()) {
-        PitchTemplate = m_PitchTemplates[RootBinFreq];
-    } else {
+    auto it = m_PitchTemplates.find(RootBinFreq);
+    if (it == m_PitchTemplates.end()) {
         BuildPitchTemplate(Freq);
-        PitchTemplate = m_PitchTemplates[RootBinFreq];
+        it = m_PitchTemplates.find(RootBinFreq);
+        if (it == m_PitchTemplates.end()) {
+            return 1e-300;
+        }
     }
 
-    for (size_t i = 0; i < m_FFTSize / 2; i++) {
-        double P = PitchTemplate[i] + m_Desc.ReverbSpectralPower[i];
-        double Q = m_Desc.NormSpectralPower[i];
+    const PitchTemplateArray &PitchTemplate = it->second;
+    const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
+    const auto &normSpectralPower = m_Desc.NormSpectralPower;
+    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
+
+    for (size_t i = 0; i < halfFft; i++) {
+        double P = PitchTemplate[i] + reverbSpectralPower[i];
+        double Q = normSpectralPower[i];
         if (P > 0 && Q > 0) {
             KLDiv += P * log(P / Q);
         } else if (P == 0 && Q >= 0) {
@@ -814,7 +818,6 @@ int MDP::Inference(int T) {
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         m_States[j].Forward[bIndex] /= N;
         m_States[j].Forward[bIndex] += 1e-300;
-
         m_States[j].ExitProb[bIndex] /= N;
         m_States[j].ExitProb[bIndex] += 1e-300;
     }
@@ -825,21 +828,18 @@ int MDP::Inference(int T) {
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
-
-        // NEW: If we are in silence, only allow advancing if the target is a REST
-        if (m_IsSilence && j > m_CurrentStateIndex && StateJ.Type != REST) {
-            continue;
-        }
-
         double fwd = StateJ.Forward[bIndex];
-
-        if (fwd > maxVal) {
+        if (fwd > maxVal && j >= m_CurrentStateIndex) {
             maxVal = fwd;
             bestStateIndex = j;
         }
 
         spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
                       StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.ExitProb[bIndex]);
+    }
+
+    if (m_IsSilence && bestStateIndex != m_CurrentStateIndex && m_States[bestStateIndex].Type != REST) {
+        return m_CurrentStateIndex;
     }
 
     MarkovState &BestState = m_States[bestStateIndex];
@@ -875,7 +875,6 @@ int MDP::GetEvent(Description &Desc) {
         m_CurrentStateIndex = BestState;
     }
 
-    printf("\n");
     return m_States[BestState].ScorePos;
 }
 

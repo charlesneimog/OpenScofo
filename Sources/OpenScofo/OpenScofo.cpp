@@ -12,6 +12,7 @@ int luaopen_oscofo(lua_State *L);
 //  ─────────────────────────────────────
 OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
+
     m_States = States();
     m_Desc = Description();
     m_Sr = Sr;
@@ -37,18 +38,21 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     std::vector<spdlog::sink_ptr> sinks{m_Log};
 
 #ifndef NDEBUG
-    // Add console sink in debug
     auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     sinks.push_back(consoleSink);
     m_Log->set_pattern("%v"); // keep only message for callback sink
 #endif
+
     auto logger = std::make_shared<spdlog::logger>("OpenScofo", sinks.begin(), sinks.end());
     spdlog::set_default_logger(logger);
+    SetNewAudioParameters(Sr, FftSize, HopSize);
 }
 
 //  ─────────────────────────────────────
 void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
-    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr) {
+    size_t NHalf = FFTSize / 2 + 1;
+    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr && m_Desc.Power.size() == NHalf) {
+        spdlog::debug("Everything allocated for FFTSize {}, NHalf {}", FFTSize, NHalf);
         return;
     }
     m_Sr = Sr;
@@ -56,12 +60,15 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
     m_HopSize = HopSize;
     m_MDP = MDP(Sr, FFTSize, HopSize);
     m_MIR = MIR(Sr, FFTSize, HopSize);
+    m_InBuffer.resize(FFTSize);
+    std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
+    m_BlockIndex = 0;
 
-    size_t NHalf = FFTSize / 2;
+    spdlog::debug("Allocated Description size for Window Size {}, NHalf {}", FFTSize, NHalf);
+
     if (NHalf != m_Desc.Power.size()) {
         m_Desc.Power.resize(NHalf);
         m_Desc.SpectralPower.resize(NHalf);
-        m_Desc.NormSpectralPower.resize(NHalf);
         m_Desc.NormSpectralPower.resize(NHalf);
         m_Desc.ReverbSpectralPower.resize(NHalf);
     }
@@ -230,6 +237,18 @@ void OpenScofo::SetTunning(double Tunning) {
 // ─────────────────────────────────────
 void OpenScofo::SetCurrentEvent(int Event) {
     m_MDP.SetCurrentEvent(Event);
+
+    if (Event == 0) {
+        m_CurrentScorePosition = 0;
+        return;
+    }
+
+    if (Event > 0 && static_cast<size_t>(Event) < m_States.size()) {
+        m_CurrentScorePosition = m_States[Event].ScorePos;
+        return;
+    }
+
+    m_CurrentScorePosition = Event;
 }
 
 // ╭─────────────────────────────────────╮
@@ -338,6 +357,8 @@ double OpenScofo::GetBlockDuration() {
 bool OpenScofo::ParseScore(std::string ScorePath) {
     ClearErrors();
 
+    m_CurrentScorePosition = 0;
+
     m_Score = Score(m_FFTSize, m_HopSize);
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
@@ -376,7 +397,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
     if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         return {};
     }
-    if (m_FFTSize != AudioBuffer.size()) {
+    if (m_FFTSize != static_cast<int>(AudioBuffer.size())) {
         spdlog::error("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize);
         return {};
     }
@@ -389,15 +410,15 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 
 // ─────────────────────────────────────
 bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
+    spdlog::stopwatch sw;
     if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         return false;
     }
-
     States GoodStates = m_MDP.GetStatesForProcessing();
     m_MIR.GetDescription(AudioBuffer, m_Desc, GoodStates);
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
     m_MIR.AddReverb(m_Desc, 0.01);
-
+    spdlog::debug("Time to Process Inference: {:.0f} µs\n", sw.elapsed().count() * 1'000'000.0);
     return true;
 }
 

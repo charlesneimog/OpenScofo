@@ -29,6 +29,7 @@ extern "C" {
 #include <cmath>
 #include <numeric>
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 class Timer {
   public:
@@ -58,7 +59,6 @@ class OpenScofo {
     // Main Functions
     bool ParseScore(std::string ScorePath);
     bool ProcessBlock(std::vector<double> &AudioBuffer);
-
     bool ScoreIsLoaded();
 
     // Set Functions
@@ -122,10 +122,11 @@ class OpenScofo {
     Description m_Desc;
     int m_CurrentScorePosition = -1;
 
-    double m_Sr;
-    double m_FFTSize;
-    double m_HopSize;
-    unsigned m_BlockIndex;
+    int m_Sr;
+    int m_FFTSize;
+    int m_HopSize;
+    int m_BlockIndex = 0;
+    std::vector<double> m_InputBuffer;
 
     // Errors
     spdlog::level::level_enum m_HasErrors;

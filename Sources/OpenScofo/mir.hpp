@@ -82,10 +82,13 @@ class MIR {
     void GetSpectralFlux(Description &Desc);
 
   private:
+    void ReleaseResources() noexcept;
+
+  private:
     // FFT
-    double *m_FFTIn;
-    fftw_complex *m_FFTOut;
-    fftw_plan m_FFTPlan;
+    double *m_FFTIn = nullptr;
+    fftw_complex *m_FFTOut = nullptr;
+    fftw_plan m_FFTPlan = nullptr;
     std::vector<std::pair<int, int>> m_FakeCQT;
     std::vector<double> m_WindowingFunc;
 
@@ -110,8 +113,8 @@ class MIR {
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;
-    struct onnx_context_t *m_OnnxCTX;
-    int m_TensorCount;
+    struct onnx_context_t *m_OnnxCTX = nullptr;
+    int m_TensorCount = 0;
     std::unordered_map<std::string, float> m_ONNXResults;
 
     // Env

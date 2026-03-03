@@ -9,12 +9,15 @@ set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 
+set(TREE_SITTER_VERSION "v0.26.3")
+
 option(BUILD_PY_MODULE "Build Python Module" OFF)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
 option(BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(BUILD_ALL "Build Python Module and PureData Object" ON)
 option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" OFF)
 option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
+option(OSCOFO_BUILD_TESTS "Run Tests" ON)
 
 # check if it is EMSCRIPTEN
 if(EMSCRIPTEN)
@@ -28,7 +31,6 @@ if(BUILD_ALL)
     if(NOT LINUX)
         set(BUILD_MAX_OBJECT ON)
     endif()
-    set(BUILD_TESTS ON)
 endif()
 
 if(BUILD_ALL_OBJECTS)
@@ -65,7 +67,7 @@ include(${CPM_FILE})
 # ╭──────────────────────────────────────╮
 # │             Tree-Sitter              │
 # ╰──────────────────────────────────────╯
-cpmaddpackage("gh:tree-sitter/tree-sitter#v0.26.3")
+cpmaddpackage("gh:tree-sitter/tree-sitter#${TREE_SITTER_VERSION}")
 
 find_program(
     TREE_SITTER_EXECUTABLE
@@ -77,21 +79,29 @@ if(NOT TREE_SITTER_EXECUTABLE)
 endif()
 
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/oscofo_grammar")
-set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo/grammar.js")
+set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
+
+set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/OScofo Language/tree-sitter.json")
+set(GRAMMAR_JSON_BUILD "${GRAMMAR_BUILD_DIR}/tree-sitter.json")
+
 set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 
+set(OSCOFO_ONLINE_EDITOR_WASM
+    "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
+
 add_custom_command(
     OUTPUT "${PARSER_OUTPUT}"
-    BYPRODUCTS "${PARSER_BYPRODUCTS}"
+    BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/tree-sitter-${GRAMMAR_NAME}.wasm"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}/src"
     COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JS_SRC}" "${GRAMMAR_JS_BUILD}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JSON_SRC}" "${GRAMMAR_JSON_BUILD}"
     COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} generate
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     DEPENDS "${GRAMMAR_JS_SRC}"
-    COMMENT "Copying grammar.js and generating Tree-sitter parser..."
+    COMMENT "Generating Tree-sitter parser and WASM..."
     VERBATIM)
 
 # Target custom
@@ -102,6 +112,51 @@ add_library(score_parser STATIC "${PARSER_OUTPUT}")
 set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_dependencies(score_parser generate_tree_sitter_parser)
+
+# Custom command to generate the WASM file if it doesn't exist
+if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
+    add_custom_command(
+        OUTPUT "${OSCOFO_ONLINE_EDITOR_WASM}"
+        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
+                --wasm
+        COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
+        DEPENDS "${GRAMMAR_JS_SRC}"
+        COMMENT "Generating Tree-sitter parser for OScofo Online Editor and WASM..."
+        VERBATIM)
+
+    set(TS_URL
+        "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/web-tree-sitter.tar.gz"
+    )
+    set(TS_ARCHIVE "${CMAKE_BINARY_DIR}/web-tree-sitter.tar.gz")
+    set(TS_URL "https://example.com/path/to/web-tree-sitter.tar.gz")
+    set(TS_TEMP_DIR "${CMAKE_BINARY_DIR}/web-tree-sitter-temp")
+    set(TS_DEST "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter")
+
+    # Download the archive
+    if(NOT EXISTS "${TS_ARCHIVE}")
+        file(
+            DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}"
+            SHOW_PROGRESS
+            STATUS download_status)
+        list(GET download_status 0 status_code)
+        if(NOT status_code EQUAL 0)
+            message(FATAL_ERROR "Failed to download web-tree-sitter archive: ${download_status}")
+        endif()
+    endif()
+
+    # Extract all files to temp dir
+    file(MAKE_DIRECTORY "${TS_TEMP_DIR}")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
+                    WORKING_DIRECTORY "${TS_TEMP_DIR}")
+
+    # Copy only the required files
+    file(COPY "${TS_TEMP_DIR}/web-tree-sitter.wasm" "${TS_TEMP_DIR}/web-tree-sitter.js"
+         DESTINATION "${TS_DEST}")
+
+    # Create a target that depends on this output
+    add_custom_target(build_online_editor_wasm ALL DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}")
+endif()
 
 # ╭──────────────────────────────────────╮
 # │                 Lua                  │
@@ -140,9 +195,6 @@ endif()
 set(BUILD_SHARED_LIBS
     OFF
     CACHE BOOL "Build static libs" FORCE)
-set(BUILD_TESTS
-    OFF
-    CACHE BOOL "Disable FFTW tests" FORCE)
 set(ENABLE_FLOAT
     OFF
     CACHE BOOL "Enable single precision" FORCE)
@@ -185,31 +237,130 @@ target_link_libraries(
            spdlog
            onsetsds)
 
-if(LINUX)
-    target_link_options(OpenScofo PRIVATE -static-libstdc++ -Wl,--exclude-libs,ALL -static,)
-endif()
-
-if(NOT EMSCRIPTEN AND NOT MSVC)
+if(EMSCRIPTEN)
     target_compile_options(
         OpenScofo
-        PRIVATE -Wall # Enable all common warnings
-                -Wextra # Enable extra warnings
-                -Wshadow # Warn about shadowed variable declarations
-                -Wformat=2 # Enable stricter format string checks
-                -Wnull-dereference # Warn on dereferences of null pointers
-                -march=native
-                # Debug
-                $<$<CONFIG:Debug>:
-                -O2
-                -g
-                -fno-omit-frame-pointer
-                >
-                # Release
-                $<$<CONFIG:Release>:
-                -DNDEBUG
-                -O3
-                -march=native
-                >)
+        PUBLIC -Wall
+               -Wextra
+               -Wshadow
+               $<$<CONFIG:Debug>:
+               -O0
+               -g
+               >
+               $<$<CONFIG:Release>:
+               -O3
+               -DNDEBUG
+               -flto
+               >)
+
+elseif(MSVC)
+    target_compile_options(
+        OpenScofo
+        PUBLIC /W4
+               /permissive-
+               /Zc:__cplusplus
+               $<$<CONFIG:Debug>:
+               /Od
+               /Zi
+               >
+               $<$<CONFIG:Release>:
+               /O2
+               /DNDEBUG
+               /GL
+               >)
+
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: /LTCG >)
+
+elseif(WIN32)
+    target_compile_options(
+        OpenScofo
+        PUBLIC -Wall
+               -Wextra
+               -Wshadow
+               -Wformat=2
+               -Wnull-dereference
+               $<$<CONFIG:Debug>:
+               -O0
+               -g
+               -fno-omit-frame-pointer
+               >
+               $<$<CONFIG:Release>:
+               -O3
+               -DNDEBUG
+               -flto=auto
+               -ffunction-sections
+               -fdata-sections
+               >)
+
+    target_link_options(
+        OpenScofo
+        PUBLIC
+        $<$<CONFIG:Release>:
+        -flto=auto
+        -Wl,--gc-sections
+        -s
+        >)
+
+elseif(APPLE)
+
+    target_compile_options(
+        OpenScofo
+        PUBLIC -Wall
+               -Wextra
+               -Wshadow
+               -Wformat=2
+               -Wnull-dereference
+               $<$<CONFIG:Debug>:
+               -O0
+               -g
+               -fno-omit-frame-pointer
+               >
+               $<$<CONFIG:Release>:
+               -O3
+               -DNDEBUG
+               -flto
+               -ffunction-sections
+               -fdata-sections
+               >)
+
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto -Wl,-dead_strip >)
+
+else() # Linux (GCC or Clang)
+
+    target_compile_options(
+        OpenScofo
+        PUBLIC -Wall
+               -Wextra
+               -Wshadow
+               -Wformat=2
+               -Wnull-dereference
+               -march=native
+               $<$<CONFIG:Debug>:
+               -O0
+               -g
+               -fno-omit-frame-pointer
+               >
+               $<$<CONFIG:RelWithDebInfo>:
+               -g
+               -fno-omit-frame-pointer
+               >
+               $<$<CONFIG:Release>:
+               -O3
+               -DNDEBUG
+               -flto=auto
+               -ffunction-sections
+               -fdata-sections
+               >)
+
+    target_link_options(
+        OpenScofo
+        PUBLIC
+        $<$<CONFIG:Release>:
+        -flto=auto
+        -Wl,--gc-sections
+        -s
+        >)
+
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -236,6 +387,6 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
-# if(BUILD_TESTS)
-#     add_subdirectory(Tests)
-# endif()
+if(OSCOFO_BUILD_TESTS)
+    add_subdirectory(Tests)
+endif()

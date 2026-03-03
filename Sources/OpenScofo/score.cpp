@@ -160,12 +160,11 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &
 
 // ─────────────────────────────────────
 double Score::ModPhases(double Phase) {
-    // Following Cont (2010) conventions
-    double NewPhase = std::fmod(Phase + M_PI, TWO_PI);
-    if (NewPhase < 0) {
-        NewPhase += TWO_PI;
+    Phase = std::fmod(Phase + 0.5, 1.0);
+    if (Phase < 0.0) {
+        Phase += 1.0;
     }
-    return NewPhase - M_PI;
+    return Phase - 0.5;
 }
 
 // ╭─────────────────────────────────────╮
@@ -239,55 +238,128 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
     MarkovState Event;
-    Event.Line = m_LineCount;
+    Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
 
-    uint32_t child_count = ts_node_child_count(Node);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(Node, i);
-        std::string type = ts_node_type(child);
-        if (type == "keyword") {
-            std::string id = GetCodeStr(ScoreStr, child);
-            if (id == "NOTE") {
-                Event.Type = NOTE;
-            } else if (id == "TRILL") {
-                Event.Type = TRILL;
-            } else if (id == "CHORD") {
-                Event.Type = CHORD;
-            } else {
-                TSPoint Pos = ts_node_start_point(child);
-                spdlog::error("Invalid pitch event on line {}.", Pos.row + 1);
-                return Event;
-            }
-        } else if (type == "pitch") {
-            AudioState SubState;
-            PitchNode2Freq(ScoreStr, child, SubState);
-            Event.AudioStates.push_back(SubState);
-        } else if (type == "pitches") {
-            uint32_t pitchCount = ts_node_child_count(child);
-            for (size_t j = 0; j < pitchCount; j++) {
-                TSNode eventPitch = ts_node_child(child, j);
-                std::string eventPitchId = ts_node_type(eventPitch);
-                if (eventPitchId == "pitch") {
-                    AudioState Pitch;
-                    PitchNode2Freq(ScoreStr, eventPitch, Pitch);
+    if (ts_node_has_error(Node)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Pitch event with syntax error on line {}", Init.row + 1);
+        return {};
+    }
 
-                    Event.AudioStates.push_back(Pitch);
-                }
-            }
-        } else if (type == "duration") {
-            double duration = GetDurationFromNode(ScoreStr, child);
-            Event.Duration = duration;
-            m_MinimalDuration = std::min(m_MinimalDuration, duration);
-        } else if (type == "ACTION") {
-            NewEventAction(ScoreStr, child, Event);
-        } else {
-            TSPoint Pos = ts_node_start_point(child);
-            spdlog::error("Invalid note event on line {}, type of token {}.", Pos.row + 1, type);
-            return Event;
+    TSNode TypeNode = ts_node_child_by_field_name(Node, "keyword", 7);
+    TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+
+    if (ts_node_is_null(TypeNode) || ts_node_is_null(PitchNode) || ts_node_is_null(DurationNode)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Invalid NOTE event structure on line {}", Init.row + 1);
+        return {};
+    }
+
+    if (std::string(ts_node_type(TypeNode)) != "keyword" || std::string(ts_node_type(PitchNode)) != "pitch" ||
+        std::string(ts_node_type(DurationNode)) != "duration") {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Unexpected NOTE event tokens on line {}", Init.row + 1);
+        return {};
+    }
+
+    // Type
+    std::string id = GetCodeStr(ScoreStr, TypeNode);
+    if (id == "NOTE") {
+        Event.Type = NOTE;
+    } else {
+        TSPoint Init = ts_node_start_point(TypeNode);
+        spdlog::error("Wrong Type on {}", Init.row + 1);
+        return {};
+    }
+
+    TSNode ActionNode = ts_node_child_by_field_name(Node, "ACTION", 6);
+    while (!ts_node_is_null(ActionNode)) {
+        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
+            NewEventAction(ScoreStr, ActionNode, Event);
         }
+        ActionNode = ts_node_next_named_sibling(ActionNode);
+    }
+
+    // Pitch
+    AudioState SubState;
+    PitchNode2Freq(ScoreStr, PitchNode, SubState);
+    Event.AudioStates.push_back(SubState);
+
+    // Duration
+    double duration = GetDurationFromNode(ScoreStr, DurationNode);
+    Event.Duration = duration;
+
+    ProcessEventTime(Event);
+    return Event;
+}
+
+// ─────────────────────────────────────
+MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    MarkovState Event;
+    Event.Line = ts_node_start_point(Node).row + 1;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
+
+    if (ts_node_has_error(Node)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Multi pitch event with syntax error on line {}", Init.row + 1);
+        return {};
+    }
+
+    TSNode TypeNode = ts_node_named_child(Node, 0);
+    TSNode PitchesNode = ts_node_named_child(Node, 1);
+    TSNode DurationNode = ts_node_named_child(Node, 2);
+
+    if (ts_node_is_null(TypeNode) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Invalid multi pitch event structure on line {}", Init.row + 1);
+        return {};
+    }
+
+    std::string id = GetCodeStr(ScoreStr, TypeNode);
+    if (id == "TRILL") {
+        Event.Type = TRILL;
+    } else if (id == "CHORD") {
+        Event.Type = CHORD;
+    } else {
+        TSPoint Init = ts_node_start_point(TypeNode);
+        spdlog::error("Wrong Type on {}", Init.row + 1);
+        return {};
+    }
+
+    uint32_t pitch_count = ts_node_named_child_count(PitchesNode);
+    if (pitch_count == 0) {
+        TSPoint Init = ts_node_start_point(PitchesNode);
+        spdlog::error("Missing pitches on line {}", Init.row + 1);
+        return {};
+    }
+
+    for (uint32_t i = 0; i < pitch_count; i++) {
+        TSNode PitchNode = ts_node_named_child(PitchesNode, i);
+        if (std::string(ts_node_type(PitchNode)) != "pitch") {
+            continue;
+        }
+        AudioState SubState;
+        PitchNode2Freq(ScoreStr, PitchNode, SubState);
+        Event.AudioStates.push_back(SubState);
+    }
+
+    double duration = GetDurationFromNode(ScoreStr, DurationNode);
+    Event.Duration = duration;
+
+    TSNode ActionNode = ts_node_next_named_sibling(DurationNode);
+    while (!ts_node_is_null(ActionNode)) {
+        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
+            NewEventAction(ScoreStr, ActionNode, Event);
+        }
+        ActionNode = ts_node_next_named_sibling(ActionNode);
     }
 
     ProcessEventTime(Event);
@@ -296,53 +368,71 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 
 // ─────────────────────────────────────
 MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
+    // m_ScorePosition++;
+    // Note that Rest do not count for the score position, as they are not considered in the evaluation
+
     MarkovState Event;
-    Event.Line = m_LineCount;
+    Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
 
-    uint32_t child_count = ts_node_child_count(Node);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(Node, i);
-        std::string type = ts_node_type(child);
-        if (type == "restEventId") {
-            continue;
-        } else if (type == "duration") {
-            double duration = GetDurationFromNode(ScoreStr, child);
-            Event.Duration = duration;
-            Event.Type = REST;
-
-            m_MinimalDuration = std::min(m_MinimalDuration, duration);
-
-            AudioState Silence;
-            Silence.Type = SILENCE;
-            Event.AudioStates.push_back(Silence);
-        } else {
-            spdlog::error("Rest TOKEN is not reconized on line {}", m_LineCount);
-        }
+    if (ts_node_has_error(Node)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Rest event with syntax error on line {}", Init.row + 1);
+        return {};
     }
+
+    TSNode TypeNode = ts_node_named_child(Node, 0);
+    TSNode DurationNode = ts_node_named_child(Node, 1);
+
+    if (ts_node_is_null(TypeNode) || ts_node_is_null(DurationNode)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Invalid REST event structure on line {}", Init.row + 1);
+        return {};
+    }
+
+    std::string id = GetCodeStr(ScoreStr, TypeNode);
+    if (id != "REST") {
+        TSPoint Init = ts_node_start_point(TypeNode);
+        spdlog::error("Wrong Type on {}", Init.row + 1);
+        return {};
+    }
+
+    double duration = GetDurationFromNode(ScoreStr, DurationNode);
+    Event.Duration = duration;
+    Event.Type = REST;
+    m_MinimalDuration = std::min(m_MinimalDuration, duration);
+
+    AudioState Silence;
+    Silence.Type = SILENCE;
+    Event.AudioStates.push_back(Silence);
+
+    TSNode ActionNode = ts_node_next_named_sibling(DurationNode);
+    while (!ts_node_is_null(ActionNode)) {
+        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
+            NewEventAction(ScoreStr, ActionNode, Event);
+        }
+        ActionNode = ts_node_next_named_sibling(ActionNode);
+    }
+
     ProcessEventTime(Event);
     return Event;
 }
 
 // ─────────────────────────────────────
 void Score::ProcessEventTime(MarkovState &Event) {
-    // Time
     if (Event.Index != 0) {
-        int Index = Event.Index;
-        double PsiK = 60.0f / m_ScoreStates[Index - 1].BPMExpected;
-        double PrevDur = m_ScoreStates[Index - 1].Duration;
-        double Tn = m_ScoreStates[Index - 1].OnsetExpected;
-        double Tn1 = Tn + Event.Duration * PsiK;
+        int index = Event.Index;
+        MarkovState &prev = m_ScoreStates[index - 1];
 
-        double PhiN0 = Event.PhaseExpected;
-        double PhiN1 = PhiN0 + ((Tn1 - Tn) / PsiK);
-        PhiN1 = ModPhases(PhiN1);
-        Event.OnsetExpected = Tn + PrevDur;
-        Event.PhaseExpected = PhiN1;
-        Event.IOIHatPhiN = (Tn1 - Tn) / PsiK;
-        Event.IOIPhiN = (Tn1 - Tn) / PsiK;
+        double psiPrev = 60.0f / prev.BPMExpected;
+        double ioibeats = prev.Duration;
+
+        Event.OnsetExpected = prev.OnsetExpected + ioibeats * psiPrev;
+        Event.IOIHatPhiN = ModPhases(prev.IOIHatPhiN + ioibeats);
+        Event.PhaseExpected = Event.IOIHatPhiN;
+        Event.IOIPhiN = Event.IOIHatPhiN;
     } else {
         Event.PhaseExpected = 0;
         Event.IOIHatPhiN = 0;
@@ -386,6 +476,12 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
             m_ScoreStates.emplace_back(Event);
+        } else if (type == "multiPitchEvent") {
+            Event = NewMultiPitchEvent(ScoreStr, child);
+            m_PrevDuration = Event.Duration;
+            m_LastOnset = Event.OnsetExpected;
+            m_ScoreStates.emplace_back(Event);
+
         } else if (type == "restEvent") {
             Event = NewRestEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
@@ -652,7 +748,6 @@ States Score::Parse(std::string ScoreFile) {
     // Config Values
     m_CurrentBPM = 60;
     m_Transpose = 0;
-    // m_Entropy = 0;
     m_PitchTemplateSigma = 0.5;
 
     m_LineCount = 0;

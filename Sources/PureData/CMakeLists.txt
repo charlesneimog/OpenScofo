@@ -11,10 +11,9 @@ pd_add_external(o.scofo~ "${OBJ_SOURCES}" LINK_LIBRARIES OpenScofo)
 # │           PureData Objects           │
 # ╰──────────────────────────────────────╯
 if(NOT APPLE AND NOT EMSCRIPTEN)
-    target_compile_options(o.scofo_tilde PRIVATE -static-libstdc++ -static-libgcc
-                                                 -Wl,-allow-multiple-definition -static)
-    target_link_options(o.scofo_tilde PRIVATE -static-libstdc++ -static-libgcc
-                        -Wl,-allow-multiple-definition)
+    target_link_options(o.scofo_tilde PRIVATE -Wl,-allow-multiple-definition)
+    target_compile_options(o.scofo_tilde PRIVATE -flto=auto)
+    target_link_options(o.scofo_tilde PRIVATE -flto=auto)
 endif()
 
 pd_add_datafile(o.scofo_tilde "${CMAKE_CURRENT_SOURCE_DIR}/../../README.md")
