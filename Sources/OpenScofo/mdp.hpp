@@ -66,6 +66,7 @@ class MDP {
 
     // Time
     double UpdatePsiN(int StateIndex);
+    double A2(double kappa);
     double InverseA2(double r);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
@@ -126,13 +127,12 @@ class MDP {
     double m_PhaseCoupling = 0.5;
     double m_SyncStr = 0;
     double m_TimeInPrevEvent = 0;
-    std::unordered_map<double, double> m_KappaCache;
+    std::unordered_map<int, double> m_KappaCache;
     // Cache for the distributions
     std::unordered_map<int, std::vector<double>> m_OccupancyCache;
     std::unordered_map<int, std::vector<double>> m_SurvivorCache;
 
     double m_LastTn = 0;
-    double m_TauWithSound = 0;
     double m_BlockDur = 0;
     double m_CurrentStateOnset = 0;
     int m_MaxScoreState = 0;

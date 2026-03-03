@@ -82,7 +82,7 @@ class Score {
     // Events
     MarkovState NewRestEvent(const std::string &Score, TSNode Node);
     MarkovState NewPitchEvent(const std::string &Score, TSNode Node);
-    MarkovState TrillEvent(const std::string &Score, TSNode Node);
+    MarkovState NewMultiPitchEvent(const std::string &Score, TSNode Node);
 
     // Add events
     MarkovState GetFirstEvent();

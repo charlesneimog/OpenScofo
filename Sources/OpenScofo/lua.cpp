@@ -10,13 +10,6 @@ int luaopen_oscofo(lua_State *L) {
     sol::table m = lua.create_table();
     sol::usertype<OpenScofo> oscofo_type = lua.new_usertype<OpenScofo>("OpenScofo", sol::constructors<OpenScofo(float, float, float)>());
 
-    // Error callback example
-    oscofo_type.set(sol::call_constructor, [](float sr, float fft_size, float hop) {
-        auto obj = new OpenScofo(sr, fft_size, hop);
-        obj->SetErrorCallBack([](const std::string &msg) { throw std::runtime_error(msg); });
-        return obj;
-    });
-
     // Methods (same as pybind11)
     oscofo_type["set_db_threshold"] = &OpenScofo::SetdBTreshold;
     oscofo_type["set_tuning"] = &OpenScofo::SetTunning;
@@ -26,14 +19,10 @@ int luaopen_oscofo(lua_State *L) {
     oscofo_type["set_pitch_template_sigma"] = &OpenScofo::SetPitchTemplateSigma;
     oscofo_type["get_live_bpm"] = &OpenScofo::GetLiveBPM;
     oscofo_type["get_event_index"] = &OpenScofo::GetEventIndex;
-    oscofo_type["get_error"] = &OpenScofo::GetErrorMessage;
     oscofo_type["get_states"] = &OpenScofo::GetStates;
     oscofo_type["get_pitch_template"] = &OpenScofo::GetPitchTemplate;
     oscofo_type["get_cqt_template"] = &OpenScofo::GetCQTTemplate;
     oscofo_type["get_audio_description"] = &OpenScofo::GetAudioDescription;
-    oscofo_type["get_time_coherence_template"] =
-        sol::overload([](OpenScofo &self, int pos) { return self.GetTimeCoherenceTemplate(pos, 0); },
-                      [](OpenScofo &self, int pos, int time_in_event) { return self.GetTimeCoherenceTemplate(pos, time_in_event); });
 
     m["OpenScofo"] = oscofo_type;
 

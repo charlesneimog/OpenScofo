@@ -1,4 +1,5 @@
 #include "OpenScofo.hpp"
+#include <utility>
 
 namespace OpenScofo {
 
@@ -9,6 +10,7 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
     m_HopSize = HopSize;
     m_FFTSize = FftSize;
     m_Sr = Sr;
+    spdlog::debug("Init MIR::MIR using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
 
     float WindowHalf = FftSize / 2;
     m_FFTIn = (double *)fftw_alloc_real((size_t)FftSize);
@@ -25,14 +27,14 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
     }
 
 #ifdef __EMSCRIPTEN__
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FftSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
 #else
     m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
 #endif
 
     // hanning
     m_WindowingFunc.resize(m_FFTSize);
-    for (size_t i = 0; i < (size_t)m_FFTSize; i++) {
+    for (size_t i = 0; i < m_FFTSize; i++) {
         m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * M_PI * i / (m_FFTSize - 1)));
     }
 
@@ -68,6 +70,7 @@ MIR::~MIR() {
             onnx_context_free(m_OnnxCTX);
             m_OnnxCTX = nullptr;
         }
+        m_ONNXModelLoaded = false;
     }
 }
 
@@ -319,13 +322,15 @@ void MIR::CQTInit() {
 void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
     // real audio analisys
     size_t N = In.size();
-    size_t NHalf = N / 2; // include Nyquist to match rfft/librosa
+    size_t NHalf = N / 2 + 1; // include Nyquist to match rfft/librosa
 
     fftw_execute(m_FFTPlan);
 
     Desc.MaxAmp = 0;
     double SumPower = 0.0;
     const double invN = 1.0 / static_cast<double>(N);
+
+    spdlog::debug("Window Size {}, NHalf {}", N, NHalf);
 
     // FUSE 1: Calculate Power, MaxAmp, and SumPower in one pass
     for (size_t i = 0; i < NHalf; ++i) {
@@ -515,7 +520,7 @@ void MIR::MFCCExec(Description &Desc) {
 // │               Chroma                │
 // ╰─────────────────────────────────────╯
 void MIR::SpectralChromaInit() {
-    size_t NHalf = m_FFTSize / 2;
+    size_t NHalf = m_FFTSize / 2 + 1;
     m_ChromaBinMap.resize(NHalf);
 
     const double A4 = 440.0;
