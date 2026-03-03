@@ -1,6 +1,6 @@
 [project]
 name = "OpenScofo"
-version = "0.1.4"
+dynamic = ["version"]
 authors = [{name = "Charles K. Neimog", email = "charlesneimog@outlook.com"}]
 description = "OpenScofo is an OpenSource Score Follower based on the Research of Cont (2010)."
 readme = "README.md"

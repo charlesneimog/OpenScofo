@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 project(OpenScofo)
+project(
+    OpenScofo
+    VERSION 0.1.4
+    LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -225,6 +229,7 @@ list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
+target_compile_definitions(OpenScofo PUBLIC OPENSCOFO_VERSION="${PROJECT_VERSION}")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(
     OpenScofo
