@@ -21,7 +21,7 @@ BPM 50
 ```
 
 ---
-### `PhaseCoupling`
+### `PHASECOUPLING`
 
 - `Default is 0.5`
 - `Range 0-2`
@@ -30,7 +30,7 @@ This value must be between 0 and 2 and captures the amount of force exerted on a
 
 ---
 
-### `SyncStrength`
+### `SYNCSTRENGTH`
 
 - `Default is 0.5`
 - `Range 0-1`
@@ -38,61 +38,48 @@ This value must be between 0 and 2 and captures the amount of force exerted on a
 The value of $\eta_s$ (Sync Strength) corresponds to what Large and Jones (1999) refer to as the adaptation rate. This value determines how much of the previous predictions will be considered for the next BPM prediction and must be between 0 and 1. According to Large and Jones (1999, p. 131), "if it is set to 1, each estimate of $\kappa$ will be based solely on the current onsets. If $\eta_s$ < 1, the focus adapts more slowly because the previous context is taken into account".
 
 ```
-SyncStrength 0.4
+SYNCSTRENGTH 0.4
 ```
 
 ---
 ## <h2 align="center">Listening Module Configuration</h2>
 ---
 
-### `PitchSigma`
+### `PITCHSIGMA`
 
 - `Default is 0.5`
-- `Range 0-1`
+- `Range -12 - 12`
 
-Define the
-
-```
-PitchSigma 0.2
-```
-
----
-
-### `Entropy`
-
-- `Default is 0`
-- `Range 0-1`
-
-Define the min value to entropy to trigger a new event. If they are very similar, the event is not triggered.
-
-```
-Entropy 0.02
-```
+Defines the width of the pitch template: wider values increase flexibility, narrower values increase precision.
 
 ---
 ## <h2 align="center">Audio Configuration</h2>
 ---
 
-### `FFTSize`
+### `FFTSIZE`
 
-- `Default is 4096`
+- `Default is 2048`
 - `Must be a power of 2, I recomend 1024, 2048 or 4096`
 
+
+Define the FFT Size used in decoding.
+
 ```
-FFTSize 4096
+FFTSIZE 2048
 ```
 
 ---
 
-### `HopSize`
+### `HOPSIZE`
 
 - `Default is 1024`
-- `Must be a power of 2, I recomend 256, 512 or 1024`
+- `Must be a power of 2, I recomend 512 or 1024`
+
+Define the Hop Size used in decoding.
 
 ```
-HopSize 4096
+HOPSIZE 4096
 ```
-
 
 ---
 
