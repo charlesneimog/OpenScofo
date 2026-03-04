@@ -15,15 +15,9 @@ option(BUILD_PY_MODULE "Build Python Module" OFF)
 option(BUILD_PD_OBJECT "Build PureData Object" ON)
 option(BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(BUILD_ALL "Build Python Module and PureData Object" ON)
-option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" OFF)
+option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
-option(OSCOFO_BUILD_TESTS "Run Tests" ON)
-
-# check if it is EMSCRIPTEN
-if(EMSCRIPTEN)
-    message(STATUS "Emscripten compilation")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_BOOST_HEADERS=1")
-endif()
+option(OSCOFO_BUILD_TESTS "Run Tests" OFF)
 
 if(BUILD_ALL)
     set(BUILD_PY_MODULE ON)
@@ -46,7 +40,6 @@ if(BUILD_PD_OBJECT)
     if(NOT EXISTS "${PDCMAKE_FILE}")
         file(
             DOWNLOAD
-            # https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/naming-conventions/pd.cmake
             https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/main/pd.cmake
             ${PDCMAKE_FILE})
     endif()
@@ -159,7 +152,6 @@ endif()
 if(BUILD_WITH_LUA)
     cpmaddpackage("gh:lua/lua@5.4.0")
     cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
-
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
         add_library(lua STATIC "${lua_SOURCE_DIR}/onelua.c")

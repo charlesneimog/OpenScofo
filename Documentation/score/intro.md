@@ -36,7 +36,7 @@ As `Antescofo`, `OpenScofo` uses a textual score where the composer must define 
 After Configuration, the Score will look like this:
 
 <p align="center">
-    <img class="mycode" style="width: 70%" src="../../assets/oscofo-code.png">
+    <img style="width: 80%; border-radius: 5px" src="../../assets/oscofo-code.png">
 </p>
 
 On it, we have three `EVENTS`, and a lot of `ACTIONS`.
