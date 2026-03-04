@@ -162,7 +162,11 @@ class pytrain(pd.NewObject):
 
             idx = random.randint(0, 1024)
             while True:
+                # here we output the index and mode (test or train) to pd.
+                # From pd, we use o.scofo~ to read the correspoding window and retrieve the descriptors (mfcc)
                 self.out(1, pd.LIST, [idx, mode])
+                # in here, o.scofo~ already send to py.train the descriptors list using in_1_testdata or in_1_traindata, and we append the descriptors list with the label to the target list (test_data or train_data)
+                
                 if idx >= len(signal) - 2048:
                     break
 
@@ -257,11 +261,12 @@ class pytrain(pd.NewObject):
         self.logpost(2, "", prefix=False)
         self.logpost(2, "Training finished!")
 
-    def in_0_train(self, args):
-        # self._propagate_thread_exceptions()
-        # self.logpost(2, "Training, wait...")
-        # self._start_worker(self._train)
-        self._train()
+    def in_0_
+
+    def in_0_train(self, _):
+        self._propagate_thread_exceptions()
+        self.logpost(2, "Training, wait...")
+        self._start_worker(self._train)
 
     def in_0_export(self, args):
         self._propagate_thread_exceptions()

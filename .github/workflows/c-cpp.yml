@@ -147,6 +147,10 @@ jobs:
           msystem: mingw64
           install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-pybind11 mingw-w64-x86_64-gtest zip
           update: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Install PureData Float 32
         if: matrix.precision == '32'
         run: |
