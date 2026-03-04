@@ -16,6 +16,6 @@ if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
 endif()
 
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/README.md")
-pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Resources/o.scofo~-help.pd")
+pd_add_datafile(o.scofo_tilde "${CMAKE_CURRENT_SOURCE_DIR}/o.scofo~-help.pd")
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.mp3")
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt")
