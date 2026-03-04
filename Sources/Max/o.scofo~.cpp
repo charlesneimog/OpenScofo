@@ -2,7 +2,9 @@
 #include <cstring>
 
 #include <ext.h>
+#include <ext_buffer.h>
 #include <z_dsp.h>
+
 #include <OpenScofo.hpp>
 
 static t_class *oscofo_class = nullptr;
