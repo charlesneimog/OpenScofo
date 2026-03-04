@@ -11,35 +11,123 @@ I am not present the language here, there are a lot of tutorials on the internet
 
 What I will present is how to create these actions using `lua` and `oscofo`, `pd` and `max` module.
 
+!!! danger "Under developement yet"
+    Lua Module for Pure Data, Max, and OpenScofo are in developement yet.
 
-### <h2 align="center">:simple-lua: `oscofo` Lua Module</h2>
 
-The `oscofo` module inside Lua can be used to get and set values of `oscofo` on the fly. It exposes several functions:
+### <h2 align="center">:simple-lua: `OpenScofo` Lua Module</h2>
 
-- **`oscofo.getKappa`**  
-    - `input`: No input.
-    - `output`: Value of Kappa $\kappa$.
-    - `description`: Get the value for Kappa. The closer it is to 10, the more synchronized the algorithm and the performance are.
+The `oscofo` module now exposes classes (via `sol2`) instead of only standalone functions.
 
----
-- **`oscofo.getBPM`**  
-    - `input`: No input.
-    - `output`: Value of the current BPM;
-    - `description`: Get the current BPM.
+### Creating an `OpenScofo` object
 
----
-- **`oscofo.getPitchProb`**  
-    - `input`: Frequency value in Hz, for example `oscofo.getPitchProb(440)` will return the probability of the pitch 440Hz being played.
-    - `output`: Value of the probability.
-    - `description`: Get the probability of being a specified pitch using the pitch templates.
+```lua
+local oscofo = require("oscofo")
 
----
-- **`oscofo.getSpectrumPower`**  
-    - `input`: No input.
-    - `output`: Value of the probability.
-    - `description`: Returns a table with the current FFT magnitude of all the bins.
+-- Depending on the Lua/sol2 constructor mode, one of these forms is available:
+local tracker = oscofo.OpenScofo(48000, 2048, 512)
+-- local tracker = oscofo.OpenScofo.new(48000, 2048, 512)
+```
 
-### <h2 align="center">:simple-lua: `pd` Lua Module</h2>
+Constructor arguments:
+
+- `sr` (float): sample rate.
+- `fft_size` (float): FFT/window size.
+- `hop_size` (float): hop size.
+
+### `OpenScofo` methods
+
+- **`set_db_threshold(value)`**  
+    - `input`: float value in dB.  
+    - `output`: no output.  
+    - `description`: Sets audio threshold used by the tracker.
+
+- **`set_tuning(value)`**  
+    - `input`: tuning reference value.  
+    - `output`: no output.  
+    - `description`: Sets tuning used for score parsing/tracking.
+
+- **`set_current_event(event)`**  
+    - `input`: integer event index/position.  
+    - `output`: no output.  
+    - `description`: Forces the current score position.
+
+- **`set_amplitude_decay(value)`**  
+    - `input`: float decay factor.  
+    - `output`: no output.  
+    - `description`: Sets amplitude decay in the MDP model.
+
+- **`set_harmonics(value)`**  
+    - `input`: integer number of harmonics.  
+    - `output`: no output.  
+    - `description`: Sets number of harmonics used by the pitch template.
+
+- **`set_pitch_template_sigma(value)`**  
+    - `input`: float sigma value.  
+    - `output`: no output.  
+    - `description`: Sets pitch template sigma.
+
+- **`get_live_bpm()`**  
+    - `input`: no input.  
+    - `output`: current estimated BPM (float).  
+    - `description`: Returns live tempo estimation.
+
+- **`get_event_index()`**  
+    - `input`: no input.  
+    - `output`: current event index (integer).  
+    - `description`: Returns the current tracked score event.
+
+- **`get_states()`**  
+    - `input`: no input.  
+    - `output`: collection of `State` objects.  
+    - `description`: Returns all score states currently loaded.
+
+- **`get_pitch_template(freq)`**  
+    - `input`: frequency in Hz (float).  
+    - `output`: numeric array with the pitch template.  
+    - `description`: Returns internal pitch template for a given frequency.
+
+- **`get_audio_description(buffer)`**  
+    - `input`: numeric buffer (table/array) with FFT-size samples.  
+    - `output`: `Description` object.  
+    - `description`: Computes MIR/audio features for the input block.
+
+### Exposed types in `oscofo`
+
+- **`Description`**
+    - `mfcc`
+    - `onset`
+    - `silence_prob`
+    - `spectral_power`
+    - `norm_spectral_power`
+    - `pseudo_cqt`
+    - `loudness`
+    - `spectral_flux`
+    - `spectral_flatness`
+    - `harmonicity`
+    - `db`
+    - `rms`
+    - `power`
+
+- **`State`**
+    - `position`
+    - `type`
+    - `markov`
+    - `forward`
+    - `bpm_expected`
+    - `bpm_observed`
+    - `onset_expected`
+    - `onset_observed`
+    - `phase_expected`
+    - `phase_observed`
+    - `ioi_phi_n`
+    - `ioi_hat_phi_n`
+    - `audiostates`
+    - `duration`
+    - `line`
+
+
+### <h2 align="center">:simple-lua: `PureData` Lua Module</h2>
 
 The `pd` module inside Lua allows interaction with Pure Data functionalities, exposing the following functions:
 
@@ -84,7 +172,7 @@ The `pd` module inside Lua allows interaction with Pure Data functionalities, ex
     - **`output`**: no output.
     - **`description`**: Sends a list of values to a specified destination in Pure Data.
 
-### <h2 align="center">:simple-lua: `max` Lua Module</h2>
+### <h2 align="center">:simple-lua: `Max` Lua Module</h2>
 
 The `max` module inside Lua allows interaction with Max functionalities, exposing the following functions:
 

@@ -97,7 +97,7 @@
         />
 
         <!-- Main modules -->
-        <script src="./pd4web/pd4web.threads.js"></script>
+        <script src="../coi-serviceworker.js"></script>
         <script src="./pd4web/pd4web.js"></script>
 
         <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -165,10 +165,13 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="size-12 flex-shrink-0">
-                        <img
-                            src="https://raw.githubusercontent.com/charlesneimog/OpenScofo/refs/heads/main/Documentation/assets/g2.png"
-                            class="h-12 w-12 object-contain"
-                        />
+                        <a href="https://charlesneimog.github.io/OpenScofo/">
+                            <img
+                                src="https://raw.githubusercontent.com/charlesneimog/OpenScofo/refs/heads/main/Documentation/assets/g2.png"
+                                class="h-12 w-12 object-contain"
+                                alt="OpenScofo"
+                            />
+                        </a>
                     </div>
                     <div class="flex flex-col justify-center">
                         <h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-slate-100">
@@ -287,12 +290,7 @@
                     id="mkdocs-docs"
                     class="flex w-full h-screen shrink-0 flex-col border-t border-surface-border bg-console-bg"
                 >
-                    <iframe
-                        src="https://charlesneimog.github.io/OpenScofo/score/intro/"
-                        class="w-full h-full border-0"
-                        loading="lazy"
-                    >
-                    </iframe>
+                    <iframe src="/OpenScofo/score/intro/" class="w-full h-full border-0" loading="lazy"> </iframe>
                 </div>
             </section>
         </main>

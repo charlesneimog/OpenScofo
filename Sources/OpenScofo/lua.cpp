@@ -9,7 +9,8 @@ namespace OpenScofo {
 int luaopen_oscofo(lua_State *L) {
     sol::state_view lua(L);
     sol::table m = lua.create_table();
-    sol::usertype<OpenScofo> oscofo_type = lua.new_usertype<OpenScofo>("OpenScofo", sol::constructors<OpenScofo(float, float, float)>());
+    sol::usertype<OpenScofo> oscofo_type =
+        lua.new_usertype<OpenScofo>("OpenScofo", sol::constructors<OpenScofo(float, float, float)>());
 
     // Methods (same as pybind11)
     oscofo_type["set_db_threshold"] = &OpenScofo::SetdBTreshold;
@@ -28,7 +29,8 @@ int luaopen_oscofo(lua_State *L) {
     m["OpenScofo"] = oscofo_type;
 
     // ─── Description class ───
-    sol::usertype<Description> desc_type = lua.new_usertype<Description>("Description", sol::constructors<Description()>());
+    sol::usertype<Description> desc_type =
+        lua.new_usertype<Description>("Description", sol::constructors<Description()>());
     desc_type["mfcc"] = &Description::MFCC;
     desc_type["onset"] = &Description::Onset;
     desc_type["silence_prob"] = &Description::SilenceProb;
@@ -64,7 +66,8 @@ int luaopen_oscofo(lua_State *L) {
     m["State"] = state_type;
 
     // ─── AudioState class ───
-    sol::usertype<AudioState> audio_type = lua.new_usertype<AudioState>("AudioState", sol::constructors<AudioState()>());
+    sol::usertype<AudioState> audio_type =
+        lua.new_usertype<AudioState>("AudioState", sol::constructors<AudioState()>());
     audio_type["freq"] = &AudioState::Freq;
     audio_type["index"] = &AudioState::Index;
     m["AudioState"] = audio_type;

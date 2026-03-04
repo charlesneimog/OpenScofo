@@ -1,117 +1,199 @@
 # Python
 
-`OpenScofo` also provides a Python module, which is primarily used for development and research purposes. In addition, this module can be employed for validation tasks, prototyping, and other auxiliary applications, such as experimental evaluation and rapid testing of algorithmic components.
+`OpenScofo` provides Python bindings (via `pybind11`) for development, validation, and research workflows.
 
+## Import and create an object
 
-## OpenScofo Class
-
-### `OpenScofo`
-
-``` py
+```py
 from OpenScofo import OpenScofo
 
 scofo = OpenScofo(48000, 4096, 1024)
-
 ```
 
-#### `parse_score`
+Constructor arguments:
 
-``` py
-scofo.parse_score("myscore.txt")
+- `sr` (float): sample rate.
+- `fft_size` (float): FFT/window size.
+- `hop` (float): hop size.
+
+## `OpenScofo` methods
+
+### Score
+
+#### `parse_score(path)`
+
+- Input: score file path.
+- Output: `bool`.
+
+```py
+ok = scofo.parse_score("myscore.txt")
 ```
 
-#### `process_block`
+### Processing
 
-``` py
+#### `process_block(audio)`
+
+- Input: 1D NumPy array (`float64`) with one audio block.
+- Output: `bool` indicating processing success.
+
+```py
+import librosa
+
 y, _ = librosa.load(path, sr=48000)
-pos = 0
 fftsize = 4096
 hopsize = 1024
-while pos + 4096 < len(y):
-    segment = y[pos : pos + fftsize]
-    desc = scofo.process_block(segment)
+pos = 0
+while pos + fftsize <= len(y):
+    segment = y[pos: pos + fftsize]
+    ok = scofo.process_block(segment)
     pos += hopsize
 ```
 
-#### `set_db_threshold`
+### Configuration
 
-``` py
+#### `set_db_threshold(value)`
+
+```py
 scofo.set_db_threshold(-80)
 ```
 
-#### `set_tuning`
+#### `set_tuning(value)`
 
-``` py
+```py
 scofo.set_tuning(442)
 ```
 
-#### `set_current_event`
+#### `set_current_event(event)`
 
-``` py
+```py
 scofo.set_current_event(2)
 ```
 
-#### `set_amplitude_decay`
+#### `set_amplitude_decay(value)`
 
-Set the the amplitude decay in each harmonics increate.
+Sets the amplitude decay for harmonic weighting.
 
-``` py
+```py
 scofo.set_amplitude_decay(0.7)
 ```
 
-#### `set_harmonics`
+#### `set_harmonics(value)`
 
-Set the the number of harmonics used in the pitch template generation.
+Sets the number of harmonics used to build pitch templates.
 
-``` py
+```py
 scofo.set_harmonics(8)
 ```
 
-#### `set_pitch_template_sigma`
+#### `set_pitch_template_sigma(value)`
 
-Set the pitch template sigma for the pitch template generation.
+Sets the sigma used for pitch template generation.
 
-``` py
+```py
 scofo.set_pitch_template_sigma(1.2)
 ```
 
-#### `get_live_bpm`
+### Information
 
-Get the current `BPM` measure by the Large (1999) algorithm.
+#### `get_live_bpm()`
 
-``` py
+```py
 bpm = scofo.get_live_bpm()
 ```
 
-#### `get_event_index`
+#### `get_event_index()`
 
-``` py
+```py
 score_index = scofo.get_event_index()
 ```
 
-#### `get_states`
+#### `get_states()`
 
-``` py
-score_states = scofo.get_states()
+```py
+states = scofo.get_states()
 ```
 
-#### `get_pitch_template`
+#### `get_pitch_template(freq)`
 
-``` py
-score_states = scofo.get_pitch_template(440)
+```py
+template = scofo.get_pitch_template(440)
 ```
 
-#### `get_cqt_template`
+#### `get_cqt_template(freq)`
 
-``` py
-score_states = scofo.get_cqt_template(440)
+```py
+cqt_template = scofo.get_cqt_template(440)
 ```
 
-#### `get_audio_description`
+#### `get_block_duration()`
 
-``` py
+```py
+seconds = scofo.get_block_duration()
+```
+
+#### `get_audio_description(audio)`
+
+```py
 y, _ = librosa.load(path, sr=48000)
-segment = y[0: 0 + 4096]
+segment = y[0:4096]
 desc = scofo.get_audio_description(segment)
 ```
+
+## Exposed types
+
+### `Description`
+
+Attributes:
+
+- `mfcc`
+- `chroma`
+- `onset`
+- `silence_prob`
+- `spectral_power`
+- `norm_spectral_power`
+- `pseudo_cqt`
+- `loudness`
+- `spectral_flux`
+- `spectral_flatness`
+- `harmonicity`
+- `db`
+- `rms`
+- `power`
+
+### `State`
+
+Attributes:
+
+- `position`
+- `type`
+- `markov`
+- `forward`
+- `bpm_expected`
+- `bpm_observed`
+- `onset_expected`
+- `onset_observed`
+- `phase_expected`
+- `phase_observed`
+- `ioi_phi_n`
+- `ioi_hat_phi_n`
+- `audio_states`
+- `duration`
+- `line`
+
+### `AudioState`
+
+Attributes:
+
+- `frequency`
+- `index`
+
+### `EventType`
+
+Enum values:
+
+- `EventType.REST`
+- `EventType.NOTE`
+- `EventType.CHORD`
+- `EventType.TRILL`
+- `EventType.MULTI`
 
