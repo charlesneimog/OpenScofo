@@ -11,15 +11,15 @@ static int max_Post(lua_State *L) {
         if (lua_type(L, i) == LUA_TSTRING) {
             object_post(nullptr, "%s", lua_tostring(L, i));
         } else if (lua_type(L, i) == LUA_TNUMBER) {
-            object_post(nullptr,"%f", lua_tonumber(L, i));
+            object_post(nullptr, "%f", lua_tonumber(L, i));
         } else if (lua_type(L, i) == LUA_TBOOLEAN) {
             if (lua_toboolean(L, i)) {
-                object_post(nullptr,"true");
+                object_post(nullptr, "true");
             } else {
-                object_post(nullptr,"false");
+                object_post(nullptr, "false");
             }
         } else {
-            object_post(nullptr,"Unsupported type: %s", lua_typename(L, lua_type(L, i)));
+            object_post(nullptr, "Unsupported type: %s", lua_typename(L, lua_type(L, i)));
         }
     }
 
@@ -108,7 +108,7 @@ static int max_sendList(lua_State *L) {
         }
         lua_pop(L, 1);
     }
-    object_method(symbol->s_thing, gensym("list"), listSize, atomList.data());
+    object_method_typed(symbol->s_thing, gensym("list"), listSize, atomList.data(), nullptr);
     return 0;
 }
 
@@ -120,7 +120,7 @@ static const luaL_Reg max_funcs[] = {
     {"post", max_Post},
     {"error", max_Error},
 
-    // PureData
+    // Max
     {"sendBang", max_sendBang},
     {"sendFloat", max_sendFloat},
     {"sendSymbol", max_sendSymbol},

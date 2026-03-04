@@ -1,8 +1,13 @@
 import numpy as np
-import librosa
 import OpenScofo
 import os
 import random
+
+
+import librosa
+import pyloudnorm
+import essentia
+import essentia.standard as es
 
 os.chdir(os.path.dirname(__file__))
 
@@ -85,13 +90,52 @@ def run_test_flatness(window, label):
         f"D: {diff:+010.5f}"
     )
 
+# ---------------- RMS TEST ----------------
+def run_test_rms(window, label):
+    scofo_desc = scofo.get_audio_description(window)
 
-# ---------------- SILÊNCIO ----------------
-silence = np.zeros(n_fft, dtype=np.float32)
+    # RMS-based loudness (power=2.0 equivalent)
+    l_loudness = librosa.feature.rms(
+        y=window,
+        frame_length=n_fft,
+        hop_length=hop,
+        center=False,
+    )[0, 0]
 
-run_test_mfcc(silence, "SILENCE")
-run_test_flatness(silence, "SILENCE")
+    s_loudness = scofo_desc.rms
+    diff = abs(l_loudness - s_loudness)
 
+    print(
+        f"{label} | "
+        f"RMS | "
+        f"L: {l_loudness:+010.5f} | "
+        f"S: {s_loudness:+010.5f} | "
+        f"D: {diff:+010.5f}"
+    )
+
+
+# ---------------- LOUDNESS TEST ----------------
+def run_test_loudness(window, label):
+    scofo_desc = scofo.get_audio_description(window)
+
+    # Ensure window is float32
+    window = window.astype(np.float32)
+
+    # Essentia Loudness
+    loudness_algo = es.Loudness()
+    l_loudness = loudness_algo(window)
+
+    # Compare against scofo_desc.loudness (C++ perceptual loudness)
+    s_loudness = scofo_desc.loudness
+    diff = abs(l_loudness - s_loudness)
+
+    print(
+        f"{label} | "
+        f"LOUD | "
+        f"Essentia: {l_loudness:+010.5f} | "
+        f"OScofo  : {s_loudness:+010.5f} | "
+        f"Diff    : {diff:+010.5f}"
+    )
 
 # ---------------- TESTES ALEATÓRIOS ----------------
 n_tests = 20
@@ -103,4 +147,7 @@ for _ in range(n_tests):
 
     run_test_mfcc(window, f"Start {start:08d}")
     run_test_flatness(window, f"Start {start:08d}")
+    run_test_rms(window, f"Start {start:08d}")
+    run_test_loudness(window, f"Start {start:08d}")
+
     print("")
