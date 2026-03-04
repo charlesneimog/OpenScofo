@@ -52,7 +52,7 @@ static int max_sendBang(lua_State *L) {
     const char *r = luaL_checkstring(L, 1);
     t_symbol *symbol = gensym(r);
     if (symbol->s_thing) {
-        object_method(symbol->s_thing, gensym("bang"));
+        object_method_typed(symbol->s_thing, gensym("bang"), 0, nullptr, nullptr);
     } else {
         luaL_error(L, "Receiver not found");
     }
@@ -65,7 +65,9 @@ static int max_sendFloat(lua_State *L) {
     const double f = luaL_checknumber(L, 2);
     t_symbol *symbol = gensym(r);
     if (symbol->s_thing) {
-        object_method(symbol->s_thing, gensym("float"), f);
+        t_atom atom;
+        atom_setfloat(&atom, f);
+        object_method_typed(symbol->s_thing, gensym("float"), 1, &atom, nullptr);
     } else {
         luaL_error(L, "Receiver not found");
     }
@@ -78,7 +80,9 @@ static int max_sendSymbol(lua_State *L) {
     const char *s = luaL_checkstring(L, 2);
     t_symbol *symbol = gensym(r);
     if (symbol->s_thing) {
-        object_method(symbol->s_thing, gensym("symbol"), gensym(s));
+        t_atom atom;
+        atom_setsym(&atom, gensym(s));
+        object_method_typed(symbol->s_thing, gensym("symbol"), 1, &atom, nullptr);
     } else {
         luaL_error(L, "Receiver not found");
     }

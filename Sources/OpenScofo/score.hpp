@@ -9,10 +9,6 @@
 
 namespace OpenScofo {
 
-#ifndef TWO_PI
-#define TWO_PI (2 * M_PI)
-#endif
-
 namespace fs = std::filesystem;
 
 // ╭─────────────────────────────────────╮

@@ -176,7 +176,7 @@ void MDP::BuildPitchTemplate(double Freq) {
         maxBin = std::min(static_cast<int>(m_FFTSize / 2) - 1, maxBin);
 
         double twoSigmaSq = 2.0 * sigmaHz * sigmaHz;
-        double normalizationFactor = 1.0 / (sigmaHz * std::sqrt(2.0 * M_PI));
+        double normalizationFactor = 1.0 / (sigmaHz * std::sqrt(2.0 * std::numbers::pi));
 
         for (int i = minBin; i <= maxBin; ++i) {
             double binFreq = i * binWidth;
@@ -431,8 +431,8 @@ double MDP::InverseA2(double SyncStrength) {
 
 // ─────────────────────────────────────
 double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
-    static constexpr double invTwoPi = 1.0 / TWO_PI;
-    double diff = TWO_PI * (phi - phi_hat);
+    static constexpr double invTwoPi = 1.0 / 2 * std::numbers::pi;
+    double diff = 2 * std::numbers::pi * (phi - phi_hat);
     double cosDiff = std::cos(diff);
     return invTwoPi * std::exp(kappa * (cosDiff - 1.0)) * std::sin(diff);
 }
@@ -503,7 +503,7 @@ double MDP::UpdatePsiN(int StateIndex) {
 
     // Correction (1): r_n, kappa_n
     double PhaseDiff = (IOISeconds / m_PsiN) - HatPhiN;
-    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(TWO_PI * PhaseDiff));
+    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(2 * std::numbers::pi * PhaseDiff));
     double Kappa = InverseA2(SyncStrength);
     m_SyncStr = SyncStrength;
     m_Kappa = Kappa;

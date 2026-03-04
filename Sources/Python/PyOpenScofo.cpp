@@ -26,7 +26,6 @@ static void python_error_callback(const spdlog::details::log_msg &log, void *dat
     }
 }
 
-
 PYBIND11_MODULE(_OpenScofo, m) {
 
     m.doc() = "OpenScofo Python bindings";

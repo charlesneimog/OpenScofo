@@ -76,7 +76,7 @@ jobs:
           npm install -g tree-sitter-cli
       - name: Build
         run: |
-          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }}
+          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }} -DOSCOFO_BUILD_TESTS=OFF
           cmake --build build --parallel $(sysctl -n hw.physicalcpu)
           sudo cmake --install build
       - name: Upload Object
@@ -131,7 +131,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        compiler: [mingw]
+        compiler: [clang]
         arch: [amd64]
         precision: [32] #, 64]
     steps:
@@ -140,32 +140,48 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - if: matrix.compiler == 'mingw'
-        name: Set up Msys2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: mingw64
-          install: make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake make mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-cmake mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-pybind11 mingw-w64-x86_64-gtest zip
-          update: false
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install tree-sitter CLI
+        run: npm install -g tree-sitter-cli
+
+      - name: Install LLVM
+        shell: pwsh
+        run: |
+          winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
+
+      - name: Check if clang is in PATH
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          clang --version
+
+      - name: Install pybind11
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pybind11
+
       - name: Install PureData Float 32
-        if: matrix.precision == '32'
         run: |
           winget install -e --id MillerPuckette.PureData --accept-source-agreements
-      - name: Install PureData Float 64
-        if: matrix.precision == '64'
+      - name: Configure and build Clang
+        shell: pwsh
         run: |
-          winget install -e --id MillerPuckette.Pd64 --accept-source-agreements
-      - name: Configure and build Mingw
-        shell: msys2 {0}
-        if: matrix.compiler == 'mingw'
-        run: |
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release
+          $pybind11Dir = python -m pybind11 --cmakedir
+          $treeSitterBin = (Get-Command tree-sitter.cmd -ErrorAction SilentlyContinue).Source
+          if (-not $treeSitterBin) {
+            $treeSitterBin = (Get-Command tree-sitter -ErrorAction SilentlyContinue).Source
+          }
+          if (-not $treeSitterBin) {
+            throw "tree-sitter CLI not found in PATH"
+          }
+    
+          cmake . -B build -G Ninja -DPD_FLOATSIZE=${{ matrix.precision }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR="$pybind11Dir" -DTREE_SITTER_EXECUTABLE="$treeSitterBin" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DOSCOFO_BUILD_TESTS=OFF
           cmake --build build --parallel
-          cmake --install build
+      
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
