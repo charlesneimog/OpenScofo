@@ -27,6 +27,7 @@ extern "C" {
 #include <iostream>
 
 #include <cmath>
+#include <numbers>
 #include <numeric>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>

@@ -19,10 +19,6 @@
 #include "states.hpp"
 namespace OpenScofo {
 
-#ifndef TWO_PI
-#define TWO_PI (2 * M_PI)
-#endif
-
 namespace fs = std::filesystem;
 
 using Spectrum = std::vector<std::complex<double>>;

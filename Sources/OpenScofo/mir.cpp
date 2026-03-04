@@ -135,7 +135,7 @@ void MIR::FFTWInit() {
     // hann
     m_WindowingFunc.resize(m_FFTSize);
     for (size_t i = 0; i < m_FFTSize; i++) {
-        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * M_PI * i / (m_FFTSize - 1)));
+        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / (m_FFTSize - 1)));
     }
 }
 
@@ -143,7 +143,12 @@ void MIR::FFTWInit() {
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
 void MIR::LoadONNXModel(fs::path path) {
-    m_OnnxCTX = onnx_context_alloc_from_file(path.c_str(), NULL, 0);
+#ifdef _WIN32
+    std::string path_utf8(path.u8string().begin(), path.u8string().end());
+    m_OnnxCTX = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
+#else
+    m_OnnxCTX = onnx_context_alloc_from_file(path.c_str(), nullptr, 0);
+#endif
     if (m_OnnxCTX == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
         return;
@@ -429,10 +434,7 @@ void MIR::MFCCInit() {
     // FFT bin frequencies (match np.fft.rfftfreq)
     std::vector<double> fft_freqs(n_f);
     for (int i = 0; i < n_f; ++i) {
-        fft_freqs[i] =
-            static_cast<double>(i) *
-            static_cast<double>(m_Sr) /
-            static_cast<double>(m_FFTSize);
+        fft_freqs[i] = static_cast<double>(i) * static_cast<double>(m_Sr) / static_cast<double>(m_FFTSize);
     }
 
     // Slaney mel scale (htk=False)
@@ -458,11 +460,7 @@ void MIR::MFCCInit() {
 
     std::vector<double> mel_pts(m_MFCCMels + 2);
     for (int i = 0; i < m_MFCCMels + 2; ++i) {
-        mel_pts[i] =
-            mel_min +
-            (mel_max - mel_min) *
-            static_cast<double>(i) /
-            static_cast<double>(m_MFCCMels + 1);
+        mel_pts[i] = mel_min + (mel_max - mel_min) * static_cast<double>(i) / static_cast<double>(m_MFCCMels + 1);
     }
 
     std::vector<double> hz_pts(m_MFCCMels + 2);
@@ -474,9 +472,9 @@ void MIR::MFCCInit() {
     m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
 
     for (int m = 0; m < m_MFCCMels; ++m) {
-        const double f_left   = hz_pts[m];
+        const double f_left = hz_pts[m];
         const double f_center = hz_pts[m + 1];
-        const double f_right  = hz_pts[m + 2];
+        const double f_right = hz_pts[m + 2];
 
         const double norm = 2.0 / (f_right - f_left);
 
@@ -498,13 +496,11 @@ void MIR::MFCCInit() {
     m_DCTBasis.assign(m_MFCC, std::vector<double>(m_MFCCMels));
 
     const double scale0 = std::sqrt(1.0 / m_MFCCMels);
-    const double scale  = std::sqrt(2.0 / m_MFCCMels);
+    const double scale = std::sqrt(2.0 / m_MFCCMels);
 
     for (int k = 0; k < m_MFCC; ++k) {
         for (int n = 0; n < m_MFCCMels; ++n) {
-            m_DCTBasis[k][n] =
-                (k == 0 ? scale0 : scale) *
-                std::cos(PI * (n + 0.5) * k / m_MFCCMels);
+            m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(PI * (n + 0.5) * k / m_MFCCMels);
         }
     }
 
@@ -513,26 +509,22 @@ void MIR::MFCCInit() {
 
 // ─────────────────────────────────────
 void MIR::MFCCExec(Description &Desc) {
-    const int n_mels = std::min<int>(m_MFCCMels,
-                                     static_cast<int>(m_MFCCFilter.size()));
-    const int n_mfcc = std::min<int>(m_MFCC,
-                                     static_cast<int>(m_DCTBasis.size()));
+    const int n_mels = std::min<int>(m_MFCCMels, static_cast<int>(m_MFCCFilter.size()));
+    const int n_mfcc = std::min<int>(m_MFCC, static_cast<int>(m_DCTBasis.size()));
 
     if (n_mels <= 0 || n_mfcc <= 0 || Desc.Power.empty()) {
         Desc.MFCC.assign(std::max(0, n_mfcc), 0.0);
         return;
     }
 
-    const int n_f =
-        std::min<int>(static_cast<int>(Desc.Power.size()),
-                      static_cast<int>(m_MFCCFilter[0].size()));
+    const int n_f = std::min<int>(static_cast<int>(Desc.Power.size()), static_cast<int>(m_MFCCFilter[0].size()));
 
     if (n_f <= 0) {
         Desc.MFCC.assign(n_mfcc, 0.0);
         return;
     }
 
-    constexpr double kAmin  = 1e-10;
+    constexpr double kAmin = 1e-10;
     constexpr double kTopDb = 80.0;
 
     if (static_cast<int>(m_MFCCEnergy.size()) != n_mels)
@@ -540,7 +532,7 @@ void MIR::MFCCExec(Description &Desc) {
 
     // Mel projection (power domain)
     for (int m = 0; m < n_mels; ++m) {
-        const double* filter = m_MFCCFilter[m].data();
+        const double *filter = m_MFCCFilter[m].data();
         double mel = 0.0;
 
         for (int k = 0; k < n_f; ++k) {
@@ -554,8 +546,7 @@ void MIR::MFCCExec(Description &Desc) {
     double maxLog = -std::numeric_limits<double>::infinity();
 
     for (int m = 0; m < n_mels; ++m) {
-        const double v =
-            10.0 * std::log10(std::max(kAmin, m_MFCCEnergy[m]));
+        const double v = 10.0 * std::log10(std::max(kAmin, m_MFCCEnergy[m]));
 
         m_MFCCEnergy[m] = v;
         if (v > maxLog)
@@ -574,7 +565,7 @@ void MIR::MFCCExec(Description &Desc) {
 
     // DCT-II
     for (int k = 0; k < n_mfcc; ++k) {
-        const double* basis = m_DCTBasis[k].data();
+        const double *basis = m_DCTBasis[k].data();
         double coeff = 0.0;
 
         for (int n = 0; n < n_mels; ++n) {

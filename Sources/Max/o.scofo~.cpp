@@ -2,7 +2,6 @@
 #include <cstring>
 
 #include <ext.h>
-#include <ext_buffer.h>
 #include <z_dsp.h>
 
 #include <OpenScofo.hpp>
@@ -411,13 +410,14 @@ static void oscofo_maxsend(MaxOpenScofo *x, std::string r, int argc, t_atom *arg
     }
 
     if (argc == 0) {
-        object_method(receiver, gensym("bang"));
+        object_method_typed(receiver, gensym("bang"), 0, nullptr, nullptr);
     } else {
         object_method_typed(receiver, gensym("list"), argc, argv, nullptr);
     }
 }
 // ─────────────────────────────────────
 static t_atom *oscofo_convertargs(MaxOpenScofo *x, OpenScofo::Action &action) {
+    (void)x;
     int size = action.Args.size();
     t_atom *MaxArgs = new t_atom[size];
 
