@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="90.367706mm"
+   height="62.987125mm"
+   viewBox="0 0 90.367706 62.987125"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   sodipodi:docname="logo.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.5723626"
+     inkscape:cx="100.80372"
+     inkscape:cy="114.79541"
+     inkscape:window-width="1860"
+     inkscape:window-height="1164"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="g3">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="90.367706"
+       height="62.987125"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-4.816145,-6.9870528)">
+    <g
+       id="g1"
+       transform="matrix(0.62056245,0,0,0.62056245,1.1423787,4.2114374)">
+      <g
+         id="g4"
+         transform="translate(0,-6.7024619)">
+        <g
+           id="g2"
+           transform="translate(-3.5630553)">
+          <path
+             d="M 155.10538,88.824797 V 86.417054 H 9.4831142 v 2.407743 z m 0,-18.810465 V 67.606595 H 9.4831142 v 2.407737 z m 0,-18.810461 V 48.796134 H 9.4831142 v 2.407737 z m 0,-18.810461 V 29.985667 H 9.4831142 v 2.407743 z m 0,-18.81047 V 11.175203 H 9.4831142 v 2.407737 z"
+             id="path1-2"
+             style="stroke-width:0.120868" />
+        </g>
+        <g
+           id="g3"
+           transform="translate(-21.382809)">
+          <path
+             d="m 107.08245,91.528764 c 0.28321,-0.283211 0.47202,-0.660828 0.47202,-1.132848 0,-0.566424 -0.47202,-1.321656 -1.22725,-1.321656 -0.18881,0 -0.47202,0.0944 -0.66083,0.283212 l -11.894909,9.912423 -11.7061,-9.912423 c -0.1888,-0.188808 -0.37761,-0.283212 -0.66082,-0.283212 -0.75524,0 -1.22726,0.660828 -1.22726,1.41606 0,0.377616 0.0944,0.755233 0.47202,1.038444 l 11.23408,9.345996 -11.23408,9.4404 c -0.28321,0.28321 -0.47202,0.75523 -0.47202,1.13285 0,0.56642 0.47202,1.22725 1.13285,1.22725 0.28321,0 0.56643,-0.0944 0.75523,-0.18881 l 11.7061,-9.91242 11.894909,9.91242 c 0.18881,0.0944 0.47202,0.18881 0.66083,0.18881 0.56642,0 1.22725,-0.56642 1.22725,-1.32166 0,-0.37761 -0.18881,-0.84963 -0.47202,-1.03844 l -11.234079,-9.4404 z"
+             id="path1-5"
+             style="stroke-width:0.0944041" />
+          <path
+             d="m 122.12069,44.259441 -5.02756,-5.027542 -9.53501,9.534994 V 90.54754 h -2.60044 V 51.367357 L 90.30844,65.929901 88.488126,64.10958 104.95768,47.640037 V 14.700931 h 2.60044 v 30.338642 l 7.7147,-7.714682 -5.02756,-5.027542 16.29619,-4.334096 z"
+             id="path1"
+             style="stroke-width:0.0866823" />
+        </g>
+        <text
+           xml:space="preserve"
+           style="font-size:28.8988px;writing-mode:lr-tb;direction:ltr;fill:#003380;stroke-width:0.677314"
+           x="5.7010465"
+           y="144.55881"
+           id="text1"
+           inkscape:export-filename="logo.png"
+           inkscape:export-xdpi="900"
+           inkscape:export-ydpi="900"><tspan
+             sodipodi:role="line"
+             id="tspan1"
+             style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:28.8988px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#003380;stroke-width:0.677314"
+             x="5.7010465"
+             y="144.55881">OpenScofo</tspan></text>
+      </g>
+    </g>
+  </g>
+</svg>

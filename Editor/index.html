@@ -1,0 +1,311 @@
+<!doctype html>
+
+<html class="dark" lang="en">
+    <head>
+        <style>
+            .pd4web-patch-canvas {
+                tabindex: 0;
+                margin: 10px auto;
+                display: flex;
+                border-radius: 5px;
+                box-shadow:
+                    rgba(14, 30, 37, 0.12) 0px 2px 4px 0px,
+                    rgba(14, 30, 37, 0.32) 0px 2px 16px 0px;
+            }
+
+            .pd4web-patch-canvas:focus {
+                box-shadow:
+                    rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
+                    rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
+                outline: none;
+            }
+
+            .pd4web-sound-switch {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 25px;
+                height: 25px;
+                margin: 0 auto;
+                transform: none;
+            }
+
+            /* Animation */
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes pulse {
+                0% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.2);
+                }
+                100% {
+                    transform: scale(1);
+                }
+            }
+            .pulse-icon {
+                animation: pulse 1s infinite;
+            }
+        </style>
+        <meta charset="utf-8" />
+        <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+        <title>OpenScofo Editor Workspace</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@300;400;500;600;700&amp;display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+            rel="stylesheet"
+        />
+
+        <!-- ─────────────── Zip ─────────────── -->
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+            integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
+
+        <!-- <script type="module" src="tree-sitter/web-tree-sitter.js"></script> -->
+
+        <!-- ─────────────── Editor ─────────────── -->
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"
+            integrity="sha512-8RnEqURPUc5aqFEN04aQEiPlSAdE0jlFS/9iGgUyNtwFnSKCXhmB6ZTNl7LnDtDWKabJIASzXrzD0K+LYexU9g=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css"
+            integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        />
+
+        <!-- Main modules -->
+        <script src="../coi-serviceworker.js"></script>
+        <script src="./pd4web/pd4web.js"></script>
+
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <script id="tailwind-config">
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: "#137fec",
+                            "background-light": "#f6f7f8",
+                            "background-dark": "#101922",
+                            "surface-dark": "#16212e",
+                            "surface-border": "#233648",
+                            "console-bg": "#0d131a",
+                        },
+                        fontFamily: {
+                            display: ["Space Grotesk", "sans-serif"],
+                            mono: ["Noto Sans Mono", "monospace"],
+                        },
+                        borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+                    },
+                },
+            };
+        </script>
+        <link href="./styles.css" rel="stylesheet" />
+        <style>
+            /* Custom scrollbar for code editor feel */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            ::-webkit-scrollbar-track {
+                background: #101922;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #233648;
+                border-radius: 4px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #324d67;
+            }
+            .code-line-numbers {
+                counter-reset: line;
+            }
+            .code-line::before {
+                counter-increment: line;
+                content: counter(line);
+                display: inline-block;
+                width: 2rem;
+                margin-right: 1rem;
+                color: #4b647d;
+                text-align: right;
+                user-select: none;
+            }
+        </style>
+    </head>
+    <body
+        class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display min-h-screen flex flex-col overflow-hidden"
+    >
+        <!-- Header -->
+        <header
+            class="flex h-16 shrink-0 items-center justify-between border-b border-solid border-surface-border bg-surface-dark px-6 z-20"
+        >
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="size-12 flex-shrink-0">
+                        <a href="https://charlesneimog.github.io/OpenScofo/">
+                            <img
+                                src="https://raw.githubusercontent.com/charlesneimog/OpenScofo/refs/heads/main/Documentation/assets/g2.png"
+                                class="h-12 w-12 object-contain"
+                                alt="OpenScofo"
+                            />
+                        </a>
+                    </div>
+                    <div class="flex flex-col justify-center">
+                        <h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-slate-100">
+                            OpenScofo Editor
+                        </h1>
+                        <p class="text-xs text-slate-400 font-normal">v0.1.4</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col justify-center">
+                        <h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-slate-100">
+                            Under Construction
+                        </h1>
+                    </div>
+                    <span class="material-symbols-outlined text-4xl text-yellow-400"> precision_manufacturing </span>
+                </div>
+            </div>
+        </header>
+        <!-- Main Workspace -->
+        <main class="flex flex-1 overflow-hidden">
+            <!-- Left Panel: Code Editor -->
+            <section class="flex w-1/2 flex-col border-r border-surface-border bg-surface-dark/50">
+                <!-- Editor Toolbar -->
+                <div
+                    class="flex h-12 shrink-0 items-center justify-between border-b border-surface-border bg-surface-dark px-4"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-200">Scofo Score</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
+                            id="upload-score"
+                        >
+                            <input
+                                type="file"
+                                id="scoreXmlInput"
+                                accept=".xml, .musicxml, .mxl"
+                                style="display: none"
+                            />
+                            <span class="material-symbols-outlined text-base">music_note</span>
+                            Import MusicXML
+                        </button>
+                        <button
+                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
+                            id="load-score"
+                        >
+                            <input type="file" id="scoreTxtInput" accept=".txt, .oscofo" style="display: none" />
+                            <span class="material-symbols-outlined text-base">upload_file</span>
+                            Load .txt Score
+                        </button>
+                        <!-- <button -->
+                        <!--     class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors" -->
+                        <!-- > -->
+                        <!--     <span id="format-score" class="material-symbols-outlined text-base">format_align_left</span> -->
+                        <!--     Format Score -->
+                        <!-- </button> -->
+                        <button
+                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors"
+                            id="download-score"
+                        >
+                            <span class="material-symbols-outlined text-base">download</span>
+                            Download Score
+                        </button>
+                    </div>
+                </div>
+                <!-- Editor Area -->
+                <div id="code-container" class="container">
+                    <textarea id="code-input"> </textarea>
+                </div>
+
+                <!-- <div -->
+                <!--     id="code-input" -->
+                <!--     class="relative flex-1 overflow-auto bg-background-dark p-4 font-mono text-sm leading-6" -->
+                <!-- ></div> -->
+                <!-- Console Area -->
+                <div class="flex h-48 shrink-0 flex-col border-t border-surface-border bg-console-bg">
+                    <div
+                        class="flex h-8 items-center justify-between border-b border-surface-border bg-surface-dark px-4"
+                    >
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider"
+                            >Console Output</span
+                        >
+                        <div class="flex gap-2">
+                            <button class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                        </div>
+                    </div>
+                    <div id="editor-console" class="flex-1 overflow-auto p-3 font-mono text-xs"></div>
+                </div>
+            </section>
+            <!-- Right Panel: Visual Workspace -->
+            <section class="flex w-1/2 flex-col bg-background-light dark:bg-background-dark relative">
+                <!-- Workspace Toolbar -->
+                <div
+                    class="flex h-12 shrink-0 items-center justify-between border-b border-surface-border bg-surface-dark px-4"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-200">Pure Data Patch</span>
+                    </div>
+                    <button
+                        class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
+                        id="upload-wav"
+                    >
+                        <input type="file" id="audioInput" accept=".wav, .mp3, .aiff" style="display: none" />
+                        <span class="material-symbols-outlined text-base">music_note</span>
+                        Import Audio Playback
+                    </button>
+                </div>
+                <div class="flex flex-col justify-center bg-background-dark p-8">
+                    <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
+                    <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
+                </div>
+                <div
+                    id="mkdocs-docs"
+                    class="flex w-full h-screen shrink-0 flex-col border-t border-surface-border bg-console-bg"
+                >
+                    <iframe src="/OpenScofo/score/intro/" class="w-full h-full border-0" loading="lazy"> </iframe>
+                </div>
+            </section>
+        </main>
+    </body>
+    <script type="module">
+        import { app } from "./app.js";
+    </script>
+    <script>
+        Pd4WebModule().then((Pd4WebModulePromise) => {
+            const Pd4Web = new Pd4WebModulePromise.Pd4Web();
+            Pd4Web.openPatch("index.pd", {
+                canvasId: "Pd4WebCanvas",
+                soundToggleId: "Pd4WebAudioSwitch",
+                patchZoom: 3,
+            });
+        });
+    </script>
+</html>
