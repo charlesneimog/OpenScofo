@@ -35,7 +35,8 @@ This value must be between 0 and 2 and captures the amount of force exerted on a
 - `Default is 0.5`
 - `Range 0-1`
 
-The value of $\eta_s$ (Sync Strength) corresponds to what Large and Jones (1999) refer to as the adaptation rate. This value determines how much of the previous predictions will be considered for the next BPM prediction and must be between 0 and 1. According to Large and Jones (1999, p. 131), "if it is set to 1, each estimate of $\kappa$ will be based solely on the current onsets. If $\eta_s$ < 1, the focus adapts more slowly because the previous context is taken into account".
+Set the value of $\eta_s$ (Sync Strength) corresponds to what [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119){:target="_blank"} (1999) refer to as the adaptation rate. This value determines how much of the previous predictions will be considered for the next BPM prediction and must be between 0 and 1. According to [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119) (1999, p. 131): 
+> if it is set to 1, each estimate of $\kappa$ will be based solely on the current onsets. If $\eta_s$ < 1, the focus adapts more slowly because the previous context is taken into account.
 
 ```
 SYNCSTRENGTH 0.4
@@ -50,7 +51,15 @@ SYNCSTRENGTH 0.4
 - `Default is 0.5`
 - `Range -12 - 12`
 
-Defines the width of the pitch template: wider values increase flexibility, narrower values increase precision.
+Defines the width of the pitch template: wider values increase flexibility, narrower values increase precision. This value scale using `MIDI`, so using `0.5` will give you a flexibility of half-tone more or less.
+
+### `TIMBREMODEL`
+
+Defines a path to a `.onnx` model trained with `py.train` for identification of extended techniques. These paths are relative to the score file, so `TIMBREMODEL "flute.onnx"` expected a file `flute.onnx` side by side of the score file loaded.
+
+```
+TIMBREMODEL "flute.onnx"
+```
 
 ---
 ## <h2 align="center">Audio Configuration</h2>

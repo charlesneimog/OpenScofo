@@ -283,37 +283,17 @@
                     <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
                     <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
                 </div>
-                <div class="flex shrink-0 flex-col border-t border-surface-border bg-console-bg">
-                    <div class="flex items-center justify-between border-b border-surface-border bg-surface-dark px-4">
-                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Search Docs</span>
-                        <input
-                            type="text"
-                            id="docSearch"
-                            placeholder="Type to search..."
-                            class="ml-2 px-2 py-1 border rounded"
-                        />
-                    </div>
-
-                    <div id="docsList" class="overflow-y-auto flex-1 px-4 py-2 text-sm text-white">
-                        <div class="doc-item">Introduction</div>
-                        <div class="doc-item">Getting Started</div>
-                        <div class="doc-item">API Reference</div>
-                        <div class="doc-item">Examples</div>
-                        <div class="doc-item">FAQ</div>
-                    </div>
+                <div
+                    id="mkdocs-docs"
+                    class="flex w-full h-screen shrink-0 flex-col border-t border-surface-border bg-console-bg"
+                >
+                    <iframe
+                        src="https://charlesneimog.github.io/OpenScofo/score/intro/"
+                        class="w-full h-full border-0"
+                        loading="lazy"
+                    >
+                    </iframe>
                 </div>
-
-                <script>
-                    const searchInput = document.getElementById("docSearch");
-                    const docs = document.querySelectorAll("#docsList .doc-item");
-
-                    searchInput.addEventListener("input", () => {
-                        const query = searchInput.value.toLowerCase();
-                        docs.forEach((doc) => {
-                            doc.style.display = doc.textContent.toLowerCase().includes(query) ? "" : "none";
-                        });
-                    });
-                </script>
             </section>
         </main>
     </body>

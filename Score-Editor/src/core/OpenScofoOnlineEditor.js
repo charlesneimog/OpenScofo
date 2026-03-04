@@ -106,10 +106,14 @@ export class OpenScofoOnlineEditor {
         this.loadState();
         this.saveStateOnChange = this.debounce(this.saveState, 2000);
         this.runTreeQueryOnChange = this.debounce(this.runTreeQuery, 100);
+        this.runTreeQueryOnViewportChange = this.debounce(this.runTreeQuery, 50);
 
         this.handleCodeChange = this.handleCodeChange.bind(this);
         this.treeEditForEditorChange = this.treeEditForEditorChange.bind(this);
         this.codeEditor.on("changes", this.handleCodeChange);
+        this.codeEditor.on("viewportChange", (cm, from, to) => {
+            this.runTreeQueryOnViewportChange(cm, from, to);
+        });
 
         this.highlights = HIGHLIGHTS;
 

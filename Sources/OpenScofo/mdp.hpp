@@ -112,8 +112,8 @@ class MDP {
 
     // Pitch Template
     double m_Harmonics = 8;
-    double m_PitchTemplateSigma = 0.387;
-    double m_PitchTemplateAmplitudeDecay = 0.87270;
+    double m_PitchTemplateSigma = 0.5;
+    double m_PitchTemplateAmplitudeDecay = 0.5;
 
     // Events
     double m_Tunning = 440;
