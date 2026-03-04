@@ -46,7 +46,8 @@ if(BUILD_PD_OBJECT)
     if(NOT EXISTS "${PDCMAKE_FILE}")
         file(
             DOWNLOAD
-            https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/naming-conventions/pd.cmake
+            # https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/naming-conventions/pd.cmake
+            https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/main/pd.cmake
             ${PDCMAKE_FILE})
     endif()
     include(${PDCMAKE_FILE})

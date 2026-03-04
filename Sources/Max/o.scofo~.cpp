@@ -2,6 +2,8 @@
 #include <cstring>
 
 #include <ext.h>
+#include <ext_buffer.h>
+#include <ext_obex.h>
 #include <z_dsp.h>
 
 #include <OpenScofo.hpp>
@@ -508,8 +510,9 @@ static void oscofo_ticknewevent(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
+static void oscofo_perform64(t_object *obj, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
                              long sampleframes, long flags, void *userparam) {
+    auto *x = (MaxOpenScofo *)obj;
     (void)dsp64;
     (void)numins;
     (void)outs;
@@ -552,11 +555,14 @@ static void oscofo_perform64(MaxOpenScofo *x, t_object *dsp64, double **ins, lon
 // ─────────────────────────────────────
 static void oscofo_dsp64(MaxOpenScofo *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize,
                          long flags) {
+    (void)count;
+    (void)flags;
     x->BlockSize = maxvectorsize;
     x->BlockIndex = 0;
     x->Sr = samplerate;
     x->inBuffer.resize(x->FFTSize, 0.0f);
-    object_method(dsp64, gensym("dsp_add64"), x, oscofo_perform64, 0, NULL);
+    dsp_add64(dsp64, (t_object *)x, oscofo_perform64, 0, nullptr);
+    
 }
 
 // ─────────────────────────────────────
@@ -656,10 +662,9 @@ static void oscofo_free(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-void ext_main(void *r) {
+void ext_main(void) {
     t_class *c =
-        class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
-    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
+        class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
                 OSCOFO_VERSION_PATCH);
     // message methods
     class_addmethod(c, (method)oscofo_set, "set", A_GIMME, 0);

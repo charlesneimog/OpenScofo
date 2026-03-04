@@ -76,14 +76,19 @@ jobs:
           npm install -g tree-sitter-cli
       - name: Build
         run: |
-          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }} -DOSCOFO_BUILD_TESTS=OFF
+          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }} -DOSCOFO_BUILD_TESTS=OFF -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
           cmake --build build --parallel $(sysctl -n hw.physicalcpu)
-          sudo cmake --install build
       - name: Upload Object
         uses: actions/upload-artifact@v4
         with:
-          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-${{matrix.machines}}-universal-pd${{matrix.precision}}
+          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-macos
           path: ${{env.LIBNAME}}
+      - name: Upload Max Object
+        uses: actions/upload-artifact@v4
+        with:
+          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-macos
+          path: max
+
   linux-build:
     runs-on: ubuntu-latest
     strategy:
@@ -117,16 +122,19 @@ jobs:
       - name: Configure
         run: |
           arch="${{ steps.compiler.outputs.arch }}"
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release ${arch:+-DCMAKE_C_COMPILER=${arch}-gcc -DCMAKE_CXX_COMPILER=${arch}-g++}
+          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release ${arch:+-DCMAKE_C_COMPILER=${arch}-gcc -DCMAKE_CXX_COMPILER=${arch}-g++} -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
+
+
       - name: Build Object
         run: |
           cmake --build build -- -j$(nproc)
-          sudo cmake --install build
-      - name: Upload Object
+      - name: Upload PureData Object
         uses: actions/upload-artifact@v4
         with:
-          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-ubuntu-latest-${{matrix.arch}}-pd${{matrix.precision}}
+          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-linux-${{matrix.arch}}
           path: ${{env.LIBNAME}}
+
+
   windows-build:
     runs-on: windows-latest
     strategy:
@@ -172,18 +180,16 @@ jobs:
         run: |
           $pybind11Dir = python -m pybind11 --cmakedir
           $treeSitterBin = (Get-Command tree-sitter.cmd -ErrorAction SilentlyContinue).Source
-          if (-not $treeSitterBin) {
-            $treeSitterBin = (Get-Command tree-sitter -ErrorAction SilentlyContinue).Source
-          }
-          if (-not $treeSitterBin) {
-            throw "tree-sitter CLI not found in PATH"
-          }
-    
-          cmake . -B build -G Ninja -DPD_FLOATSIZE=${{ matrix.precision }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR="$pybind11Dir" -DTREE_SITTER_EXECUTABLE="$treeSitterBin" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DOSCOFO_BUILD_TESTS=OFF
+          cmake . -B build -G Ninja -DPD_FLOATSIZE=${{ matrix.precision }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR="$pybind11Dir" -DTREE_SITTER_EXECUTABLE="$treeSitterBin" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DOSCOFO_BUILD_TESTS=OFF -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
           cmake --build build --parallel
-      
-      - name: Upload
+      - name: Upload PureData Object
         uses: actions/upload-artifact@v4
         with:
-          name: ${{env.LIBNAME}}-${{env.LIBVERSION}}-windows-latest-${{matrix.arch}}-pd${{matrix.precision}}
+          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-windows
           path: ${{env.LIBNAME}}
+
+      - name: Upload Max Object
+        uses: actions/upload-artifact@v4
+        with:
+          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-windows
+          path: max

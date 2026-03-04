@@ -22,6 +22,8 @@ hide:
 
 ---
 
+!!! warning "This docs are being prepared and tested for new release"
+
 `OpenScofo` is an open-source score-following system specifically designed for contemporary music. Its development builds upon the research conducted by Arshia Cont and the `Antescofo` team at IRCAM. Current efforts in the development of `OpenScofo` focus on extending its capabilities to accommodate extended instrumental techniques. It should be noted that the software remains in an alpha stage of development.
 
 `OpenScofo` was initially developed as a highly minimal score-following system, designed to be fully compatible with the execution of Pure Data patches within web browsers via [pd4web](https://charlesneimog.github.io/pd4web/). Leveraging `pd4web` is expected to reduce the complexity of live-electronics setups, thereby enabling a broader range of performers to engage with, and gain experiential insight into, live-electronics compositions.
