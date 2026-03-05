@@ -122,6 +122,7 @@ void MDP::SetScoreStates(States ScoreStates) {
 }
 
 // ─────────────────────────────────────
+// GONG 2015 (adapted)
 void MDP::BuildPitchTemplate(double Freq) {
     const double m_MinHarmonicDecay = 0.2;
     const double m_MaxHarmonicDecay = 1.8;
@@ -198,6 +199,7 @@ void MDP::BuildPitchTemplate(double Freq) {
 }
 
 // ─────────────────────────────────────
+// GONG 2015 (adapted)
 void MDP::UpdateAudioTemplate() {
     int StateSize = (int)m_States.size();
     m_PitchTemplates.clear();
@@ -214,6 +216,7 @@ void MDP::UpdateAudioTemplate() {
 }
 
 // ─────────────────────────────────────
+// GONG 2015 (adapted)
 PitchTemplateArray MDP::GetPitchTemplate(double Freq) {
     BuildPitchTemplate(Freq);
     double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
@@ -320,6 +323,7 @@ void MDP::SetPitchTemplateSigma(double f) {
 // ╭─────────────────────────────────────╮
 // │            Time Decoding            │
 // ╰─────────────────────────────────────╯
+// CONT 2010
 void MDP::InitTimeDecoding(void) {
     double PsiK = 60 / m_States[0].BPMExpected;
     m_LastPsiN = PsiK;
@@ -334,6 +338,7 @@ void MDP::InitTimeDecoding(void) {
 
 // ─────────────────────────────────────
 // https://stat.ethz.ch/R-manual//R-patched/library/stats/html/NegBinomial.html
+// CUVILLIER 2016 (Check chapter 3 and 4)
 void MDP::BuildDistributionCache(double ExpectedFrames) {
     if (ExpectedFrames < 1.0)
         ExpectedFrames = 1.0;
@@ -377,6 +382,7 @@ void MDP::BuildDistributionCache(double ExpectedFrames) {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Section 7.1)
 double MDP::A2(double kappa) {
     if (kappa <= 0.0) {
         return 0.0;
@@ -395,6 +401,7 @@ double MDP::A2(double kappa) {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Section 7.1)
 double MDP::InverseA2(double SyncStrength) {
     if (SyncStrength <= 0.0) {
         return 0.0;
@@ -430,6 +437,7 @@ double MDP::InverseA2(double SyncStrength) {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Section 7.1)
 double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
     static constexpr double invTwoPi = 1.0 / 2 * std::numbers::pi;
     double diff = 2 * std::numbers::pi * (phi - phi_hat);
@@ -438,6 +446,7 @@ double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Section 7.1)
 double MDP::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
     if (Phase < 0.0)
@@ -446,6 +455,7 @@ double MDP::ModPhases(double Phase) {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Last § of section 4)
 States MDP::GetStatesForProcessing() {
     double EventOnset = m_States[m_CurrentStateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
     size_t begin = m_CurrentStateIndex;
@@ -462,6 +472,7 @@ States MDP::GetStatesForProcessing() {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Last § of section 4)
 void MDP::GetDecodeWindow() {
     int half = m_EventWindowSize / 2;
     m_WinStart = std::max(0, static_cast<int>(m_CurrentStateIndex) - half);
@@ -476,6 +487,7 @@ void MDP::GetDecodeWindow() {
 }
 
 // ─────────────────────────────────────
+// CONT 2010 (Section 5, algorithm 1)
 double MDP::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
@@ -555,6 +567,7 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╭─────────────────────────────────────╮
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
+// Section (CONT 2010) section 3.1 and also CUVILLIER (2016) section 2.2.2
 void MDP::GetAudioObservations(int T) {
     std::unordered_map<double, double> PitchObs;
     PitchObs.reserve(m_WinEnd - m_WinStart);
@@ -630,6 +643,9 @@ void MDP::GetAudioObservations(int T) {
 }
 
 // ─────────────────────────────────────
+// CONT (2010) section 3.1;
+// CUVILLIER (2016) section 2.2.2; 
+// GONG (2015)
 double MDP::GetPitchSimilarity(double Freq) {
     double KLDiv = 0.0;
     double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
@@ -699,11 +715,14 @@ void MDP::GetInitialDistribution() {
 }
 
 // ─────────────────────────────────────
+// CUVILLIER and CONT (2014) section 2.1.
 double MDP::GetTransProbability(int i, int j) {
     return (i + 1 == j) ? 1.0 : 0.0;
 }
 
 // ─────────────────────────────────────
+// CUVILLIER (2015)
+// Needs review
 double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0)
@@ -720,6 +739,8 @@ double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
 }
 
 // ─────────────────────────────────────
+// CUVILLIER (2015)
+// Needs review
 double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
     double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
@@ -735,6 +756,8 @@ double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
 }
 
 // ─────────────────────────────────────
+// CUVILLIER (2015)
+// Needs review
 int MDP::GetMaxUForJ(MarkovState &StateJ) {
     double expected_frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
@@ -748,6 +771,7 @@ int MDP::GetMaxUForJ(MarkovState &StateJ) {
 }
 
 // ─────────────────────────────────────
+// GUÉDON (2005) + CUVILLIER (2016)
 void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
     double fj;
@@ -776,6 +800,7 @@ void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 }
 
 // ─────────────────────────────────────
+// GUÉDON (2005) + CUVILLIER (2016)
 void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
 
@@ -822,6 +847,7 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 }
 
 // ─────────────────────────────────────
+// GUÉDON (2005) + CUVILLIER (2016)
 int MDP::Inference(int T) {
     int bIndex = T % m_BufferSize;
     spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
