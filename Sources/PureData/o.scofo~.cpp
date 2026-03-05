@@ -407,7 +407,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
-    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
+    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event);
 
     for (OpenScofo::Action &Act : Actions) {
         double time = Act.Time;
