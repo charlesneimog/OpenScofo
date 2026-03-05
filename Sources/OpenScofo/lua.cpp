@@ -261,9 +261,8 @@ static const luaL_Reg oscofo_funcs[] = {
     {"get_live_bpm", OpenScofoGetLiveBPM},
     {"get_event_index", OpenScofoGetEventIndex},
     {"get_states", OpenScofoGetStates},
-    {"get_pitch_template", OpenScofoGetPitchTemplate},
-    {"get_cqt_template", OpenScofoGetCQTTemplate},
-    {"get_audio_description", OpenScofoGetAudioDescription},
+    // {"get_pitch_template", OpenScofoGetPitchTemplate},
+    // {"get_cqt_template", OpenScofoGetCQTTemplate},
     {NULL, NULL},
 };
 

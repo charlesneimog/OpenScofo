@@ -1,186 +1,140 @@
----
 name: Compile PureData Object
+
 on:
   push:
     branches: [main]
-#╭──────────────────────────────────────╮
-#│  Uncomment if you want to trigger a  │
-#│               release                │
-#╰──────────────────────────────────────╯
-  # workflow_dispatch:
-  #   inputs:
-  #     publish_release:
-  #       description: Publish a GitHub Release using LIBVERSION after build
-  #       required: false
-  #       type: boolean
-  #       default: false
+  workflow_dispatch:
+
 env:
   LIBNAME: OpenScofo
   LIBVERSION: 0.1.4
+
 permissions:
   contents: write
+
 jobs:
-  python:
-    if: startsWith(github.ref, 'refs/tags/')
+  build:
     runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        precision: [32]
+
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
-      - name: Set up Python
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.13
-      - name: Mac Build
-        if: runner.os == 'macOS'
-        run: |
-          pip install build scikit-build-core cibuildwheel twine
-          CMAKE_BUILD_PARALLEL_LEVEL=8 cibuildwheel --output-dir dist
-      - name: Linux Build
-        if: runner.os == 'Linux'
-        run: |
-          pip install build scikit-build-core cibuildwheel twine
-          CMAKE_BUILD_PARALLEL_LEVEL=8 cibuildwheel --output-dir dist
-      - name: Windows Build
-        if: runner.os == 'Windows'
-        run: |
-          python -m pip install build scikit-build-core cibuildwheel twine
-          $env:CMAKE_BUILD_PARALLEL_LEVEL = "8"
-          cibuildwheel --output-dir dist
-      - name: Upload to PyPI
-        run: |
-          twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
-  macos:
-    runs-on: ${{ matrix.machines }}
-    strategy:
-      matrix:
-        precision: [32] #, 64]
-        machines: [macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-      - name: Install PureData and Deps
-        run: |
-          brew install pd
-          brew install pybind11
-          brew install googletest
-          brew install tree-sitter
-          brew install boost
-          npm install -g tree-sitter-cli
-      - name: Build
-        run: |
-          cmake . -B build -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DPD_FLOATSIZE=${{ matrix.precision }} -DOSCOFO_BUILD_TESTS=OFF -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
-          cmake --build build --parallel $(sysctl -n hw.physicalcpu)
-      - name: Upload Object
-        uses: actions/upload-artifact@v4
-        with:
-          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-macos
-          path: ${{env.LIBNAME}}
-      - name: Upload Max Object
-        uses: actions/upload-artifact@v4
-        with:
-          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-macos
-          path: max
+          python-version: "3.13"
 
-  linux-build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64] #, arm, aarch64]
-        precision: [32] #, 64]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 1
-      - name: PureData Sources
+      # -----------------------
+      # Linux dependencies
+      # -----------------------
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt update
           sudo add-apt-repository ppa:pure-data/pure-data -y
           sudo apt install puredata -y
-          sudo apt install libboost-all-dev
-          sudo apt install libgtest-dev -y
-          sudo apt install python3-pybind11 -y
+          sudo apt install libboost-all-dev libgtest-dev python3-pybind11 -y
           npm install -g tree-sitter-cli
-      - name: Install compiler
-        id: compiler
-        run: |
-          arch=""
-          test "${{ matrix.arch }}" != "aarch64" || arch="aarch64-linux-gnu"
-          test "${{ matrix.arch }}" != "arm" || arch="arm-linux-gnueabihf"
-          if test -n "${arch}"; then
-            sudo apt-get install -y g++-${arch}
-            echo "arch=${arch}" >> $GITHUB_OUTPUT
-          fi
-      - name: Configure
-        run: |
-          arch="${{ steps.compiler.outputs.arch }}"
-          cmake . -B build -DPD_FLOATSIZE=${{ matrix.precision }} -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release ${arch:+-DCMAKE_C_COMPILER=${arch}-gcc -DCMAKE_CXX_COMPILER=${arch}-g++} -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
-      - name: Build Object
-        run: |
-          cmake --build build -- -j$(nproc)
-      - name: Upload PureData Object
-        uses: actions/upload-artifact@v4
-        with:
-          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-linux-${{matrix.arch}}
-          path: ${{env.LIBNAME}}
+          pip install build scikit-build-core cibuildwheel twine
 
+      # -----------------------
+      # macOS dependencies
+      # -----------------------
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install pd pybind11 googletest tree-sitter boost
+          npm install -g tree-sitter-cli
+          pip install build scikit-build-core cibuildwheel twine
 
-  windows-build:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        compiler: [clang]
-        arch: [amd64]
-        precision: [32] #, 64]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install tree-sitter CLI
-        run: npm install -g tree-sitter-cli
-
-      - name: Install LLVM
+      # -----------------------
+      # Windows dependencies
+      # -----------------------
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
-      - name: Install pybind11
-        shell: pwsh
-        run: |
+          winget install -e --id MillerPuckette.PureData --accept-source-agreements
+          npm install -g tree-sitter-cli
           python -m pip install --upgrade pip
           python -m pip install pybind11
+          pip install build scikit-build-core cibuildwheel twine
 
-      - name: Install PureData Float 32
+      # -----------------------
+      # Configure (Unix)
+      # -----------------------
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          winget install -e --id MillerPuckette.PureData --accept-source-agreements
-      - name: Configure and build Clang
+          python -m build --wheel \
+            -Cbuild-dir=build \
+            -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
+            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+            -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+            -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+            -Ccmake.args="-G Ninja"
+
+      # -----------------------
+      # Configure (Windows)
+      # -----------------------
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $pybind11Dir = python -m pybind11 --cmakedir
-          $treeSitterBin = (Get-Command tree-sitter.cmd -ErrorAction SilentlyContinue).Source
-          cmake . -B build -G Ninja -DPD_FLOATSIZE=${{ matrix.precision }} -DPD_LIB_DIR=./ -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR="$pybind11Dir" -DTREE_SITTER_EXECUTABLE="$treeSitterBin" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DOSCOFO_BUILD_TESTS=OFF -DPD_OUTPUT_PATH="${{ github.workspace }}/${{env.LIBNAME}}"
-          cmake --build build --parallel
+          $treeSitterBin = (Get-Command tree-sitter.cmd).Source
+
+          $buildArgs = @(
+            "-Cbuild-dir=build"
+            "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
+            "-Ccmake.define.CMAKE_BUILD_TYPE=Release"
+            "-Ccmake.define.pybind11_DIR=$pybind11Dir"
+            "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
+            "-Ccmake.define.CMAKE_C_COMPILER=clang"
+            "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
+            "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
+            "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
+            "-Ccmake.args=-G Ninja"
+          )
+
+          python -m build --wheel @buildArgs
+
+      # -----------------------
+      # Build
+      # -----------------------
+      - name: Build
+        run: | 
+          cmake --build build -j4
+
+      # -----------------------
+      # Upload artifacts
+      # -----------------------
       - name: Upload PureData Object
         uses: actions/upload-artifact@v4
         with:
-          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-windows
+          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{ runner.os }}
           path: ${{env.LIBNAME}}
 
       - name: Upload Max Object
         uses: actions/upload-artifact@v4
+        if: runner.os != 'Linux'
         with:
-          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-windows
+          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+          path: max
+
+      - name: Upload Python Object
+        uses: actions/upload-artifact@v4
+        with:
+          name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: max
