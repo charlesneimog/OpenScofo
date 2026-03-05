@@ -2,78 +2,295 @@
 
 #if defined(OSCOFO_LUA)
 
-#include <sol/sol.hpp>
-
 namespace OpenScofo {
 
-int luaopen_oscofo(lua_State *L) {
-    sol::state_view lua(L);
-    sol::table m = lua.create_table();
-    sol::usertype<OpenScofo> oscofo_type =
-        lua.new_usertype<OpenScofo>("OpenScofo", sol::constructors<OpenScofo(float, float, float)>());
+// ─────────────────────────────────────
+static OpenScofo *GetCurrentOpenScofo(lua_State *L) {
+    lua_getglobal(L, "_OpenScofo");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        return nullptr;
+    }
 
-    // Methods (same as pybind11)
-    oscofo_type["set_db_threshold"] = &OpenScofo::SetdBTreshold;
-    oscofo_type["set_tuning"] = &OpenScofo::SetTunning;
-    oscofo_type["set_current_event"] = &OpenScofo::SetCurrentEvent;
-    oscofo_type["set_amplitude_decay"] = &OpenScofo::SetAmplitudeDecay;
-    oscofo_type["set_harmonics"] = &OpenScofo::SetHarmonics;
-    oscofo_type["set_pitch_template_sigma"] = &OpenScofo::SetPitchTemplateSigma;
-    oscofo_type["get_live_bpm"] = &OpenScofo::GetLiveBPM;
-    oscofo_type["get_event_index"] = &OpenScofo::GetEventIndex;
-    oscofo_type["get_states"] = &OpenScofo::GetStates;
-    oscofo_type["get_pitch_template"] = &OpenScofo::GetPitchTemplate;
-    oscofo_type["get_cqt_template"] = &OpenScofo::GetCQTTemplate;
-    oscofo_type["get_audio_description"] = &OpenScofo::GetAudioDescription;
+    lua_getfield(L, -1, "pointer");
+    void *pointer = lua_touserdata(L, -1);
+    lua_pop(L, 2);
+    return static_cast<OpenScofo *>(pointer);
+}
 
-    m["OpenScofo"] = oscofo_type;
+// ─────────────────────────────────────
+static void PushNumberVector(lua_State *L, const std::vector<double> &values) {
+    lua_createtable(L, static_cast<int>(values.size()), 0);
+    for (size_t i = 0; i < values.size(); ++i) {
+        lua_pushnumber(L, values[i]);
+        lua_rawseti(L, -2, static_cast<int>(i + 1));
+    }
+}
 
-    // ─── Description class ───
-    sol::usertype<Description> desc_type =
-        lua.new_usertype<Description>("Description", sol::constructors<Description()>());
-    desc_type["mfcc"] = &Description::MFCC;
-    desc_type["onset"] = &Description::Onset;
-    desc_type["silence_prob"] = &Description::SilenceProb;
-    desc_type["spectral_power"] = &Description::SpectralPower;
-    desc_type["norm_spectral_power"] = &Description::NormSpectralPower;
-    desc_type["pseudo_cqt"] = &Description::PseudoCQT;
-    desc_type["loudness"] = &Description::Loudness;
-    desc_type["spectral_flux"] = &Description::SpectralFlux;
-    desc_type["spectral_flatness"] = &Description::SpectralFlatness;
-    desc_type["harmonicity"] = &Description::Harmonicity;
-    desc_type["db"] = &Description::dB;
-    desc_type["rms"] = &Description::RMS;
-    desc_type["power"] = &Description::Power;
-    m["Description"] = desc_type;
+// ─────────────────────────────────────
+static void PushAudioState(lua_State *L, const AudioState &state) {
+    lua_createtable(L, 0, 4);
+    lua_pushinteger(L, state.Type);
+    lua_setfield(L, -2, "type");
+    lua_pushnumber(L, state.Freq);
+    lua_setfield(L, -2, "freq");
+    lua_pushnumber(L, state.Midi);
+    lua_setfield(L, -2, "midi");
+    lua_pushinteger(L, static_cast<lua_Integer>(state.Index));
+    lua_setfield(L, -2, "index");
+}
 
-    // ─── MarkovState / State class ───
-    sol::usertype<MarkovState> state_type = lua.new_usertype<MarkovState>("State", sol::constructors<MarkovState()>());
-    state_type["position"] = &MarkovState::ScorePos;
-    state_type["type"] = &MarkovState::Type;
-    state_type["markov"] = &MarkovState::HSMMType;
-    state_type["forward"] = &MarkovState::Forward;
-    state_type["bpm_expected"] = &MarkovState::BPMExpected;
-    state_type["bpm_observed"] = &MarkovState::BPMObserved;
-    state_type["onset_expected"] = &MarkovState::OnsetExpected;
-    state_type["onset_observed"] = &MarkovState::OnsetObserved;
-    state_type["phase_expected"] = &MarkovState::PhaseExpected;
-    state_type["phase_observed"] = &MarkovState::PhaseObserved;
-    state_type["ioi_phi_n"] = &MarkovState::IOIPhiN;
-    state_type["ioi_hat_phi_n"] = &MarkovState::IOIHatPhiN;
-    state_type["audiostates"] = &MarkovState::AudioStates;
-    state_type["duration"] = &MarkovState::Duration;
-    state_type["line"] = &MarkovState::Line;
-    m["State"] = state_type;
+// ─────────────────────────────────────
+static void PushDescription(lua_State *L, const Description &desc) {
+    lua_createtable(L, 0, 16);
 
-    // ─── AudioState class ───
-    sol::usertype<AudioState> audio_type =
-        lua.new_usertype<AudioState>("AudioState", sol::constructors<AudioState()>());
-    audio_type["freq"] = &AudioState::Freq;
-    audio_type["index"] = &AudioState::Index;
-    m["AudioState"] = audio_type;
+    lua_pushboolean(L, desc.Silence);
+    lua_setfield(L, -2, "silence");
+    lua_pushboolean(L, desc.Onset);
+    lua_setfield(L, -2, "onset");
+    lua_pushnumber(L, desc.SilenceProb);
+    lua_setfield(L, -2, "silence_prob");
 
-    // ─── Push the module table ───
-    m.push();
+    lua_pushnumber(L, desc.dB);
+    lua_setfield(L, -2, "db");
+    lua_pushnumber(L, desc.RMS);
+    lua_setfield(L, -2, "rms");
+    lua_pushnumber(L, desc.MaxAmp);
+    lua_setfield(L, -2, "max_amp");
+    lua_pushnumber(L, desc.Loudness);
+    lua_setfield(L, -2, "loudness");
+
+    lua_pushnumber(L, desc.Harmonicity);
+    lua_setfield(L, -2, "harmonicity");
+    lua_pushnumber(L, desc.SpectralFlatness);
+    lua_setfield(L, -2, "spectral_flatness");
+    lua_pushnumber(L, desc.SpectralFlux);
+    lua_setfield(L, -2, "spectral_flux");
+    lua_pushnumber(L, desc.StdDev);
+    lua_setfield(L, -2, "std_dev");
+
+    PushNumberVector(L, desc.Power);
+    lua_setfield(L, -2, "power");
+    PushNumberVector(L, desc.SpectralPower);
+    lua_setfield(L, -2, "spectral_power");
+    PushNumberVector(L, desc.NormSpectralPower);
+    lua_setfield(L, -2, "norm_spectral_power");
+    PushNumberVector(L, desc.ReverbSpectralPower);
+    lua_setfield(L, -2, "reverb_spectral_power");
+    PushNumberVector(L, desc.PseudoCQT);
+    lua_setfield(L, -2, "pseudo_cqt");
+    PushNumberVector(L, desc.MFCC);
+    lua_setfield(L, -2, "mfcc");
+    PushNumberVector(L, desc.Chroma);
+    lua_setfield(L, -2, "chroma");
+}
+
+// ─────────────────────────────────────
+static void PushMarkovState(lua_State *L, const MarkovState &state) {
+    lua_createtable(L, 0, 14);
+    lua_pushinteger(L, state.ScorePos);
+    lua_setfield(L, -2, "position");
+    lua_pushinteger(L, state.Type);
+    lua_setfield(L, -2, "type");
+    lua_pushinteger(L, state.HSMMType);
+    lua_setfield(L, -2, "markov");
+
+    PushNumberVector(L, state.Forward);
+    lua_setfield(L, -2, "forward");
+    lua_pushnumber(L, state.BPMExpected);
+    lua_setfield(L, -2, "bpm_expected");
+    lua_pushnumber(L, state.BPMObserved);
+    lua_setfield(L, -2, "bpm_observed");
+    lua_pushnumber(L, state.OnsetExpected);
+    lua_setfield(L, -2, "onset_expected");
+    lua_pushnumber(L, state.OnsetObserved);
+    lua_setfield(L, -2, "onset_observed");
+    lua_pushnumber(L, state.PhaseExpected);
+    lua_setfield(L, -2, "phase_expected");
+    lua_pushnumber(L, state.PhaseObserved);
+    lua_setfield(L, -2, "phase_observed");
+    lua_pushnumber(L, state.IOIPhiN);
+    lua_setfield(L, -2, "ioi_phi_n");
+    lua_pushnumber(L, state.IOIHatPhiN);
+    lua_setfield(L, -2, "ioi_hat_phi_n");
+    lua_pushnumber(L, state.Duration);
+    lua_setfield(L, -2, "duration");
+    lua_pushinteger(L, state.Line);
+    lua_setfield(L, -2, "line");
+
+    lua_createtable(L, static_cast<int>(state.AudioStates.size()), 0);
+    for (size_t i = 0; i < state.AudioStates.size(); ++i) {
+        PushAudioState(L, state.AudioStates[i]);
+        lua_rawseti(L, -2, static_cast<int>(i + 1));
+    }
+    lua_setfield(L, -2, "audiostates");
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetDbThreshold(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetdBTreshold(luaL_checknumber(L, 1));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetTuning(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetTunning(luaL_checknumber(L, 1));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetCurrentEvent(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetCurrentEvent(static_cast<int>(luaL_checkinteger(L, 1)));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetAmplitudeDecay(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetAmplitudeDecay(luaL_checknumber(L, 1));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetHarmonics(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetHarmonics(static_cast<int>(luaL_checkinteger(L, 1)));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetPitchTemplateSigma(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->SetPitchTemplateSigma(luaL_checknumber(L, 1));
+    return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetLiveBPM(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    lua_pushnumber(L, self->GetLiveBPM());
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetEventIndex(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    lua_pushinteger(L, self->GetEventIndex());
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetStates(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+
+    States states = self->GetStates();
+    lua_createtable(L, static_cast<int>(states.size()), 0);
+    for (size_t i = 0; i < states.size(); ++i) {
+        PushMarkovState(L, states[i]);
+        lua_rawseti(L, -2, static_cast<int>(i + 1));
+    }
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetPitchTemplate(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    PushNumberVector(L, self->GetPitchTemplate(luaL_checknumber(L, 1)));
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetCQTTemplate(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    PushNumberVector(L, self->GetCQTTemplate(luaL_checknumber(L, 1)));
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoGetAudioDescription(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+
+    luaL_checktype(L, 1, LUA_TTABLE);
+    const size_t size = lua_rawlen(L, 1);
+    std::vector<double> audioBuffer(size);
+    for (size_t i = 0; i < size; ++i) {
+        lua_rawgeti(L, 1, static_cast<int>(i + 1));
+        audioBuffer[i] = luaL_checknumber(L, -1);
+        lua_pop(L, 1);
+    }
+
+    PushDescription(L, self->GetAudioDescription(audioBuffer));
+    return 1;
+}
+
+// ─────────────────────────────────────
+static const luaL_Reg oscofo_funcs[] = {
+    {"set_db_threshold", OpenScofoSetDbThreshold},
+    {"set_tuning", OpenScofoSetTuning},
+    {"set_current_event", OpenScofoSetCurrentEvent},
+    {"set_amplitude_decay", OpenScofoSetAmplitudeDecay},
+    {"set_harmonics", OpenScofoSetHarmonics},
+    {"set_pitch_template_sigma", OpenScofoSetPitchTemplateSigma},
+    {"get_live_bpm", OpenScofoGetLiveBPM},
+    {"get_event_index", OpenScofoGetEventIndex},
+    {"get_states", OpenScofoGetStates},
+    {"get_pitch_template", OpenScofoGetPitchTemplate},
+    {"get_cqt_template", OpenScofoGetCQTTemplate},
+    {"get_audio_description", OpenScofoGetAudioDescription},
+    {NULL, NULL},
+};
+
+// ─────────────────────────────────────
+int luaopen_OpenScofo(lua_State *L) {
+    lua_getglobal(L, "_OpenScofo");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        lua_newtable(L);
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, "_OpenScofo");
+    }
+
+    const int moduleIndex = lua_absindex(L, -1);
+    luaL_setfuncs(L, oscofo_funcs, 0);
+
+    lua_getglobal(L, "package");
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, "loaded");
+        if (lua_istable(L, -1)) {
+            lua_pushvalue(L, moduleIndex);
+            lua_setfield(L, -2, "OpenScofo");
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+
     return 1;
 }
 

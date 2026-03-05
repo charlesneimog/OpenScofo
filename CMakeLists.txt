@@ -38,10 +38,8 @@ if(BUILD_PD_OBJECT)
     set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
     set(PDCMAKE_VERSION "v0.2.12")
     if(NOT EXISTS "${PDCMAKE_FILE}")
-        file(
-            DOWNLOAD
-            https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/main/pd.cmake
-            ${PDCMAKE_FILE})
+        file(DOWNLOAD https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/main/pd.cmake
+             ${PDCMAKE_FILE})
     endif()
     include(${PDCMAKE_FILE})
 endif()
@@ -151,7 +149,6 @@ endif()
 # ╰──────────────────────────────────────╯
 if(BUILD_WITH_LUA)
     cpmaddpackage("gh:lua/lua@5.4.0")
-    cpmaddpackage("gh:ThePhD/sol2#v3.5.0")
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
         add_library(lua STATIC "${lua_SOURCE_DIR}/onelua.c")
@@ -215,7 +212,7 @@ set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
 
 if(BUILD_WITH_LUA)
-    target_link_libraries(OpenScofo PUBLIC sol2 lua)
+    target_link_libraries(OpenScofo PUBLIC lua)
 endif()
 
 if(EMSCRIPTEN)

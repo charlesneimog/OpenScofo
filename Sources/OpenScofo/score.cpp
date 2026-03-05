@@ -466,6 +466,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 
 // ─────────────────────────────────────
 void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
+
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
         MarkovState Event;
@@ -477,21 +478,19 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
             Event = NewPitchEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
-            m_ScoreStates.emplace_back(Event);
         } else if (type == "multiPitchEvent") {
             Event = NewMultiPitchEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
-            m_ScoreStates.emplace_back(Event);
-
         } else if (type == "restEvent") {
             Event = NewRestEvent(ScoreStr, child);
             m_PrevDuration = Event.Duration;
             m_LastOnset = Event.OnsetExpected;
-            m_ScoreStates.emplace_back(Event);
         } else {
             spdlog::error("Type not implemented {}.", type);
         }
+
+        m_ScoreStates.emplace_back(Event);
     }
 }
 

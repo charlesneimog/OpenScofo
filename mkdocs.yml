@@ -83,6 +83,18 @@ nav:
   - Python: python.md
   - OpenScofo Online Editor: Editor/
   - Downloads: https://github.com/charlesneimog/OpenScofo/releases/latest
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: timeago
+      custom_format: "%d. %B %Y"
+      timezone: Europe/Amsterdam
+      locale: en
+      fallback_to_build_date: false
+      enable_creation_date: true
+      enable_git_follow: true
+      enabled: true
+      strict: true
 extra:
   social:
     - icon: fontawesome/brands/instagram
