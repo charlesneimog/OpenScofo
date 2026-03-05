@@ -6,7 +6,7 @@
 namespace OpenScofo {
 
 #if defined(OSCOFO_LUA)
-int luaopen_oscofo(lua_State *L);
+int luaopen_OpenScofo(lua_State *L);
 #endif
 
 //  ─────────────────────────────────────
@@ -22,7 +22,7 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     m_BlockIndex = 0;
 
 #if defined(OSCOFO_LUA)
-    InitLua();
+    InitLuaModule();
 #endif
 
 #if defined(NDEBUG)
@@ -113,14 +113,14 @@ void OpenScofo::ClearErrors() {
 // │                 Lua                 │
 // ╰─────────────────────────────────────╯
 #if defined(OSCOFO_LUA)
-void OpenScofo::InitLua() {
+void OpenScofo::InitLuaModule() {
     m_LuaState = luaL_newstate();
     luaL_openlibs(m_LuaState); // NOTE: Rethink if I load all functions
     lua_newtable(m_LuaState);
     lua_pushlightuserdata(m_LuaState, this);
     lua_setfield(m_LuaState, -2, "pointer");
     lua_setglobal(m_LuaState, "_OpenScofo");
-    luaL_requiref(m_LuaState, "oscofo", luaopen_oscofo, 1);
+    luaL_requiref(m_LuaState, "OpenScofo", luaopen_OpenScofo, 1);
 }
 
 // ─────────────────────────────────────

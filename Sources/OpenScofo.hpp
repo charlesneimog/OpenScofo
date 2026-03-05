@@ -97,7 +97,7 @@ class OpenScofo {
     void ClearErrors();
 
 #if defined(OSCOFO_LUA)
-    void InitLua();
+    void InitLuaModule();
     bool LuaExecute(std::string code);
     std::string LuaGetError();
     bool LuaAddModule(std::string name, lua_CFunction func);
