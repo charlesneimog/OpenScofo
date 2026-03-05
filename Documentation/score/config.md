@@ -1,9 +1,45 @@
 # Score Configuration
 
-I chose to make all the configuration from `OpenScofo` using the score, this make easier to use the object on different programs. For example, instead of create a lot of code to handle the configuration for `Pd` object, and another object for `Max`, I can create a simple one where the composer can config the `OpenScofo` using the score. This allows that I use my time to develop the object itself, not the bridge between `OpenScofo` and `Pd`, `Max` or others.
+`OpenScofo` is configured directly through the score, which simplifies its use across different environments.
+
+Instead of writing separate methods for each platform — such as Pd, Max, SuperCollider or others — a simple interface can be created. The composer defines all necessary settings within the score itself.
+
+This approach allows development to focus on improving the core functionality of `OpenScofo`, rather than maintaining platform-specific integration layers.
 
 !!! tip "Always try on `OpenScofo` Editor"
-    Always try the examples on `OpenScofo` Online Editor, with highlight this becomes much easier.
+    Always try the examples on [`OpenScofo` Online Score Editor](./../../Editor), with color highlight, write scores its easier.
+
+---
+## <h2 align="center">Audio Configuration</h2>
+---
+
+### `FFTSIZE`
+
+- `Default is 2048`
+- `Must be a power of 2, I recomend 1024, 2048 or 4096`
+
+
+Define the FFT Size used in decoding.
+
+```
+FFTSIZE 2048
+```
+
+---
+
+### `HOPSIZE`
+
+- `Default is 1024`
+- `Must be a power of 2, I recomend 512 or 1024`
+
+Define the Hop Size used in decoding.
+
+```
+HOPSIZE 4096
+```
+
+---
+
 
 
 ---
@@ -60,36 +96,4 @@ Defines a path to a `.onnx` model trained with `py.train` for identification of 
 ```
 TIMBREMODEL "flute.onnx"
 ```
-
----
-## <h2 align="center">Audio Configuration</h2>
----
-
-### `FFTSIZE`
-
-- `Default is 2048`
-- `Must be a power of 2, I recomend 1024, 2048 or 4096`
-
-
-Define the FFT Size used in decoding.
-
-```
-FFTSIZE 2048
-```
-
----
-
-### `HOPSIZE`
-
-- `Default is 1024`
-- `Must be a power of 2, I recomend 512 or 1024`
-
-Define the Hop Size used in decoding.
-
-```
-HOPSIZE 4096
-```
-
----
-
 
