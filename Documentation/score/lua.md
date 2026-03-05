@@ -5,11 +5,12 @@ Lua is an amazing language to create interactive events. You can read its 88 pag
 I am not present the language here, there are a lot of tutorials on the internet and YouTube.
 
 * Very Complete [here](https://youtu.be/zi-svfdcUc8?si=-JpbobE-0T-zS4_z&t=1393){target="_blank"}.
-* Very Fast, Complex but yet Complete tutorial [here](https://www.youtube.com/watch?v=jUuqBZwwkQw){target="_blank"}.
-* If you know how to program in another language [here](https://www.youtube.com/watch?v=kgiEF1frHQ8){target="_blank"}.
+* Very Fast, Complex but yet Complete tutorial if you already know how to program in another language [here](https://www.youtube.com/watch?v=jUuqBZwwkQw){target="_blank"}.
+* More complet tutorial [here](https://www.youtube.com/watch?v=kgiEF1frHQ8){target="_blank"}.
 * Text [here](https://tylerneylon.com/a/learn-lua/){target="_blank"}.
 
-What I will present is how to create these actions using `lua` and `oscofo`, `pd` and `max` module.
+
+All these modules are for the `OpenScofo` language; What I will present is how to create actions using `lua` and `oscofo`, `pd` and `max` lua module.
 
 !!! danger "Under developement yet"
     Lua Module for Pure Data, Max, and OpenScofo are in developement yet.

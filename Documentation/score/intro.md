@@ -1,7 +1,6 @@
 # Intro
 
-As `Antescofo`, `OpenScofo` uses a textual score where the composer must define the musical `EVENTS` and its consequences, what we call `ACTIONS`. In addition to that, `OpenScofo` has also some `CONFIG` keywords and the possibility to use `LUA` language to create interactive `ACTIONS`. In this section I explain all these concepts.
-
+`OpenScofo` uses a textual score where the composer must define the musical `EVENTS` and its consequences, what is called `ACTIONS`. In addition to that, `OpenScofo` has also some `CONFIG` keywords and the possibility to use `LUA` language to create interactive `ACTIONS`. In this section is explained all these concepts.
 
 ---
 

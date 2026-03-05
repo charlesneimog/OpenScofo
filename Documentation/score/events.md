@@ -17,11 +17,11 @@ On OpenScofo pitches are represented by `name` or `MIDI`.
 - `MIDI`: Normal `MIDI`. 60 for `C4`, 67 for `G4`, etc...
 
 ---
-### `DURATION`
+### `TIME`
 
-Different from `Antescofo`, on `OpenScofo` you just represent `<DURATION>` using number of **tempos**.
+On `OpenScofo` you represent `<DURATION>` using number of **tempos**.
 
-So _fraction representation is not support_, mainly because something like `1` is ambiguous with `1/1`. And, for me, in fraction will be necessary to define the Time Unity to be a more precise language.
+So **fraction representation is not support**, mainly because something like `1` is ambiguous with `1/1`. And, for me, in fraction will be necessary to define the Time Unity to be a more precise language.
 
 Because that `OpenScofo` uses time representation relative to the value of `BPM` define previously. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
 
@@ -29,6 +29,7 @@ Because that `OpenScofo` uses time representation relative to the value of `BPM`
 - :material-music-note-quarter: duration value is `1`;
 - :material-music-note-eighth: is `0.5`,
 - :material-music-note-sixteenth: is `0.25`
+- :material-music-note-eighth-dotted: is `0.75`
 
 if in your score you have the `BPM` set as **:material-music-note-eighth: = 60** this means that
 
