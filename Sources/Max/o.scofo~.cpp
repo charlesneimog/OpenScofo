@@ -482,7 +482,7 @@ static void oscofo_ticknewevent(MaxOpenScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
-    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event - 1);
+    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event);
 
     for (OpenScofo::Action &Act : Actions) {
         double time = Act.Time;
@@ -562,7 +562,6 @@ static void oscofo_dsp64(MaxOpenScofo *x, t_object *dsp64, short *count, double 
     x->Sr = samplerate;
     x->inBuffer.resize(x->FFTSize, 0.0f);
     dsp_add64(dsp64, (t_object *)x, oscofo_perform64, 0, nullptr);
-    
 }
 
 // ─────────────────────────────────────
@@ -664,7 +663,8 @@ static void oscofo_free(MaxOpenScofo *x) {
 // ─────────────────────────────────────
 void ext_main(void) {
     t_class *c =
-        class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
+        class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
+    object_post(nullptr, "[oscofo~] version %d.%d.%d, by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
                 OSCOFO_VERSION_PATCH);
     // message methods
     class_addmethod(c, (method)oscofo_set, "set", A_GIMME, 0);
