@@ -197,6 +197,7 @@ void MIR::LoadONNXModel(fs::path path) {
 // ╭─────────────────────────────────────╮
 // │           Onset Detector            │
 // ╰─────────────────────────────────────╯
+//
 void MIR::OnsetInit() {
     size_t nbytes = onsetsds_memneeded(ODS_ODF_MKL, m_FFTSize, m_MedSpan);
     delete[] m_ODSData;
