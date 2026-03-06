@@ -120,8 +120,6 @@ class MDP {
     int m_CurrentStateIndex = 0;
 
     // Time
-    double m_SyncStrength = 0.5;
-    double m_PhaseCoupling = 0.5;
     double m_SyncStr = 0;
     double m_TimeInPrevEvent = 0;
     std::unordered_map<int, double> m_KappaCache;
@@ -139,7 +137,9 @@ class MDP {
     double m_PsiN = 0;
     double m_PsiN1 = 0;
     double m_BPM = 0;
-    double m_Kappa = 1;
+    double m_Kappa = 5;
+    double m_SyncStrength = 0.5;
+    double m_PhaseCoupling = 0.5;
     double m_MaxAheadSeconds;
     double m_BeatsAhead = 1;
     double m_NormAlpha = 1;

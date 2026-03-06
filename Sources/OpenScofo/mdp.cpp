@@ -8,9 +8,6 @@
 #define CYL_BESSEL_I(v, x) std::cyl_bessel_i(v, x)
 #endif
 
-// double I1 = CYL_BESSEL_I(1.0, kappa);
-// double I0 = CYL_BESSEL_I(0.0, kappa);
-
 namespace OpenScofo {
 
 /*
@@ -116,6 +113,12 @@ void MDP::SetScoreStates(States ScoreStates) {
     m_LastPsiN = 60.0f / m_States[0].BPMExpected;
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
+    if (std::isfinite(m_States[0].SyncStrength)) {
+        m_SyncStrength = std::clamp(m_States[0].SyncStrength, 0.0, 1.0);
+    }
+    if (std::isfinite(m_States[0].PhaseCoupling)) {
+        m_PhaseCoupling = std::clamp(m_States[0].PhaseCoupling, 0.0, 2.0);
+    }
 
     UpdateAudioTemplate();
     UpdatePhaseValues();
@@ -392,8 +395,8 @@ double MDP::A2(double kappa) {
         return 1.0 - (1.0 / (2.0 * kappa)) - (1.0 / (8.0 * kappa * kappa));
     }
 
-    double I1 = CYL_BESSEL_I(1, kappa);
-    double I0 = CYL_BESSEL_I(0, kappa);
+    double I1 = std::cyl_bessel_i(1, kappa);
+    double I0 = std::cyl_bessel_i(0, kappa);
     if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
         return 1.0 - (1.0 / (2.0 * kappa));
     }
@@ -403,44 +406,46 @@ double MDP::A2(double kappa) {
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
 double MDP::InverseA2(double SyncStrength) {
-    if (SyncStrength <= 0.0) {
-        return 0.0;
+    // SyncStrength must be between 0 and 1
+    if (SyncStrength < 0) {
+        return 0;
     }
 
-    double r = std::clamp(SyncStrength, 0.0, 0.999999);
-    int key = static_cast<int>(std::round(r * 1000.0));
-    auto it = m_KappaCache.find(key);
-    if (it != m_KappaCache.end()) {
-        return it->second;
+    // Following Large and Jones (1999, p. 157).
+    if (SyncStrength > 0.95) {
+        return 10.0f;
     }
 
-    double low = 0.0;
-    double high = 80.0;
-    while (A2(high) < r && high < 1e6) {
-        high *= 2.0;
-    }
+    double Low = 0.0;
+    double Tol = 1e-16;
+    double High = std::max(SyncStrength, 10.0);
+    double Mid;
 
-    double kappa = 0.0;
-    for (int i = 0; i < 80; i++) {
-        double mid = 0.5 * (low + high);
-        double val = A2(mid);
-        if (val < r) {
-            low = mid;
+    // In my tests I never reached more than 100 iterations.
+    int i;
+    for (i = 0; i < 1000; ++i) {
+        Mid = (Low + High) / 2.0;
+        double I1 = std::cyl_bessel_i(1, Mid);
+        double I0 = std::cyl_bessel_i(0, Mid);
+        double A2Mid = I1 / I0;
+        if (std::fabs(A2Mid - SyncStrength) < Tol) {
+            return Mid;
+        } else if (A2Mid < SyncStrength) {
+            Low = Mid;
         } else {
-            high = mid;
+            High = Mid;
         }
-        kappa = mid;
     }
-
-    m_KappaCache[key] = kappa;
-    return kappa;
+    // LOGE() << "InverseA2 not converged after " << i << " iterations.";
+    return Mid;
 }
+
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
 double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
-    static constexpr double invTwoPi = 1.0 / 2 * std::numbers::pi;
-    double diff = 2 * std::numbers::pi * (phi - phi_hat);
+    static constexpr double invTwoPi = 1.0 / (2.0 * std::numbers::pi);
+    double diff = 2.0 * std::numbers::pi * (phi - phi_hat);
     double cosDiff = std::cos(diff);
     return invTwoPi * std::exp(kappa * (cosDiff - 1.0)) * std::sin(diff);
 }
@@ -492,11 +497,16 @@ double MDP::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
 
-    if (StateIndex == m_CurrentStateIndex || StateIndex < 2) {
+    if (StateIndex == m_CurrentStateIndex) {
+        m_PsiN1 = m_PsiN;
         return m_PsiN;
     }
 
-    m_LastTn = m_CurrentStateOnset;
+    if (StateIndex <= 0 || StateIndex < 2) {
+        m_PsiN1 = m_PsiN;
+        return m_PsiN;
+    }
+
     m_CurrentStateOnset += m_TimeInPrevEvent;
 
     // Cont (2010), Large and Palmer (1999) and Large and Jones (2002)
@@ -513,9 +523,16 @@ double MDP::UpdatePsiN(int StateIndex) {
     double HatPhiN = CurrentState.IOIHatPhiN;
     CurrentState.OnsetObserved = m_CurrentStateOnset;
 
+    if (std::isfinite(CurrentState.SyncStrength)) {
+        m_SyncStrength = std::clamp(CurrentState.SyncStrength, 0.0, 1.0);
+    }
+    if (std::isfinite(CurrentState.PhaseCoupling)) {
+        m_PhaseCoupling = std::clamp(CurrentState.PhaseCoupling, 0.0, 2.0);
+    }
+
     // Correction (1): r_n, kappa_n
     double PhaseDiff = (IOISeconds / m_PsiN) - HatPhiN;
-    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(2 * std::numbers::pi * PhaseDiff));
+    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(2.0 * std::numbers::pi * PhaseDiff));
     double Kappa = InverseA2(SyncStrength);
     m_SyncStr = SyncStrength;
     m_Kappa = Kappa;
@@ -557,10 +574,11 @@ double MDP::UpdatePsiN(int StateIndex) {
 
     m_BPM = 60.0f / PsiN1;
     m_LastPsiN = m_PsiN;
+    m_PsiN1 = PsiN1;
 
-    if (StateIndex != m_CurrentStateIndex) {
-        m_TimeInPrevEvent = 0;
-    }
+    m_TimeInPrevEvent = 0;
+    m_LastTn = m_CurrentStateOnset;
+
     return PsiN1;
 }
 
@@ -644,7 +662,7 @@ void MDP::GetAudioObservations(int T) {
 
 // ─────────────────────────────────────
 // CONT (2010) section 3.1;
-// CUVILLIER (2016) section 2.2.2; 
+// CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
 double MDP::GetPitchSimilarity(double Freq) {
     double KLDiv = 0.0;
