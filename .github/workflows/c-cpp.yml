@@ -45,7 +45,6 @@ jobs:
           sudo apt install libboost-all-dev libgtest-dev python3-pybind11 -y
           npm install -g tree-sitter-cli
           pip install build scikit-build-core cibuildwheel twine
-
       # -----------------------
       # macOS dependencies
       # -----------------------
@@ -55,7 +54,6 @@ jobs:
           brew install pd pybind11 googletest tree-sitter boost
           npm install -g tree-sitter-cli
           pip install build scikit-build-core cibuildwheel twine
-
       # -----------------------
       # Windows dependencies
       # -----------------------
@@ -69,7 +67,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pybind11
           pip install build scikit-build-core cibuildwheel twine
-
       # -----------------------
       # Configure (Unix)
       # -----------------------
@@ -84,7 +81,6 @@ jobs:
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
             -Ccmake.args="-G Ninja"
-
       # -----------------------
       # Configure (Windows)
       # -----------------------
@@ -94,7 +90,6 @@ jobs:
         run: |
           $pybind11Dir = python -m pybind11 --cmakedir
           $treeSitterBin = (Get-Command tree-sitter.cmd).Source
-
           $buildArgs = @(
             "-Cbuild-dir=build"
             "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
@@ -107,16 +102,13 @@ jobs:
             "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
             "-Ccmake.args=-G Ninja"
           )
-
           python -m build --wheel @buildArgs
-
       # -----------------------
       # Build
       # -----------------------
       - name: Build
         run: | 
           cmake --build build -j4
-
       # -----------------------
       # Upload artifacts
       # -----------------------
@@ -137,4 +129,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: max
+          path: dist/*.whl

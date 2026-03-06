@@ -273,8 +273,8 @@ elseif(WIN32)
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
 
 elseif(APPLE)
-    find_package(Boost REQUIRED COMPONENTS math)
-    target_link_libraries(OpenScofo PRIVATE Boost::math)
+    find_package(Boost REQUIRED)
+    target_link_libraries(OpenScofo PRIVATE Boost::headers)
     target_compile_definitions(OpenScofo PRIVATE USE_BOOST_BESSEL)
     target_compile_options(
         OpenScofo
