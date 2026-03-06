@@ -4,7 +4,7 @@ dynamic = ["version"]
 authors = [{name = "Charles K. Neimog", email = "charlesneimog@outlook.com"}]
 description = "OpenScofo is an OpenSource Score Follower based on the Research of Cont (2010)."
 readme = "README.md"
-requires-python = ">=3.10, <3.14"
+requires-python = ">=3.10, <3.15"
 
 [build-system]
 requires = ["scikit-build-core"]
