@@ -257,6 +257,7 @@ void OpenScofo::SetCurrentEvent(int Event) {
 // ╰─────────────────────────────────────╯
 int OpenScofo::GetEventIndex() {
     return m_CurrentScorePosition; // TODO: Implement yet
+    m_CurrentScorePosition;
 }
 
 // ─────────────────────────────────────
@@ -412,6 +413,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
     spdlog::stopwatch sw;
     if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
+        spdlog::error("Score not loaded");
         return false;
     }
 

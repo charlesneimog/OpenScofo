@@ -105,7 +105,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("power", &OpenScofo::Description::Power);
 
     // State Class
-    py::class_<OpenScofo::MarkovState>(m, "State")
+    py::class_<OpenScofo::MarkovState>(m, "MarkovState")
         .def(py::init<>())
         .def_readwrite("position", &OpenScofo::MarkovState::ScorePos)
         .def_readwrite("type", &OpenScofo::MarkovState::Type)
