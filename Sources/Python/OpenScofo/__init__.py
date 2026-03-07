@@ -1,5 +1,17 @@
-import os
-import sys
+from ._OpenScofo import (
+    OpenScofo,
+    EventType,
+    HMMType,
+    AudioState,
+    MarkovState,
+    Description,
+)
 
-from ._OpenScofo import OpenScofo
-from ._OpenScofo import State
+__all__ = [
+    "OpenScofo",
+    "EventType",
+    "HMMType",
+    "AudioState",
+    "MarkovState",
+    "Description",
+]

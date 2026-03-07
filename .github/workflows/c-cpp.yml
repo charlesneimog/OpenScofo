@@ -1,37 +1,31 @@
+---
 name: Compile PureData Object
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 env:
   LIBNAME: OpenScofo
   LIBVERSION: 0.1.4
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         precision: [32]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: '3.13'
 
       # -----------------------
       # Linux dependencies
@@ -61,12 +55,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          npm install -g tree-sitter-cli
           winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
           winget install -e --id MillerPuckette.PureData --accept-source-agreements
-          npm install -g tree-sitter-cli
           python -m pip install --upgrade pip
-          python -m pip install pybind11
-          pip install build scikit-build-core cibuildwheel twine
+          python -m pip install build scikit-build-core cibuildwheel twine pybind11
       # -----------------------
       # Configure (Unix)
       # -----------------------
@@ -80,6 +73,7 @@ jobs:
             -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+            -Ccmake.define.BUILD_ALL=ON \
             -Ccmake.args="-G Ninja"
       # -----------------------
       # Configure (Windows)
@@ -100,33 +94,28 @@ jobs:
             "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
             "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
             "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
+            "-Ccmake.define.BUILD_ALL=ON"
             "-Ccmake.args=-G Ninja"
           )
           python -m build --wheel @buildArgs
-      # -----------------------
-      # Build
-      # -----------------------
-      - name: Build
-        run: | 
-          cmake --build build -j4
       # -----------------------
       # Upload artifacts
       # -----------------------
       - name: Upload PureData Object
         uses: actions/upload-artifact@v4
         with:
-          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{ runner.os }}
+          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
+            runner.os }}
           path: ${{env.LIBNAME}}
-
       - name: Upload Max Object
         uses: actions/upload-artifact@v4
         if: runner.os != 'Linux'
         with:
           name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: max
-
       - name: Upload Python Object
         uses: actions/upload-artifact@v4
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
+
