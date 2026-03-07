@@ -1,0 +1,27 @@
+BPM 120
+PHASECOUPLING 0.75
+SYNCSTRENGTH 0.4
+TRANSPOSE 3
+ENTROPY 0.15
+FFTSIZE 2048
+HOPSIZE 512
+
+LUA {
+    local oscofo = require("OpenScofo")
+	
+    pd.post("hello from lua code")
+    pd.post(oscofo.get_live_bpm())
+    
+    function evento1()
+    	pd.post("evento1 detectato")
+    end
+    
+    function evento2()
+    	pd.post("evento2 detectado")
+    end
+}
+
+NOTE C4 2
+    luacall (evento1())
+    delay 2 tempo luacall(evento2())
+    
