@@ -395,8 +395,8 @@ double MDP::A2(double kappa) {
         return 1.0 - (1.0 / (2.0 * kappa)) - (1.0 / (8.0 * kappa * kappa));
     }
 
-    double I1 = std::cyl_bessel_i(1, kappa);
-    double I0 = std::cyl_bessel_i(0, kappa);
+    double I1 = CYL_BESSEL_I(1, kappa);
+    double I0 = CYL_BESSEL_I(0, kappa);
     if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
         return 1.0 - (1.0 / (2.0 * kappa));
     }
@@ -425,8 +425,8 @@ double MDP::InverseA2(double SyncStrength) {
     int i;
     for (i = 0; i < 1000; ++i) {
         Mid = (Low + High) / 2.0;
-        double I1 = std::cyl_bessel_i(1, Mid);
-        double I0 = std::cyl_bessel_i(0, Mid);
+        double I1 = CYL_BESSEL_I(1, Mid);
+        double I0 = CYL_BESSEL_I(0, Mid);
         double A2Mid = I1 / I0;
         if (std::fabs(A2Mid - SyncStrength) < Tol) {
             return Mid;
@@ -948,7 +948,7 @@ int MDP::GetEvent(Description &Desc) {
 
     // Advance the score position if a new event was detected
     if (BestState != m_CurrentStateIndex) {
-        spdlog::info("New Event Index {:04d}, Score Position {:04d}", BestState, m_States[BestState].ScorePos);
+        spdlog::debug("New Event Index {:04d}, Score Position {:04d}", BestState, m_States[BestState].ScorePos);
         m_CurrentStateIndex = BestState;
     }
 
