@@ -31,6 +31,64 @@ PYBIND11_MODULE(_OpenScofo, m) {
     m.doc() = "OpenScofo Python bindings";
     m.attr("__version__") = OPENSCOFO_VERSION;
 
+    py::enum_<OpenScofo::EventType>(m, "EventType")
+        .value("REST", OpenScofo::REST)
+        .value("NOTE", OpenScofo::NOTE)
+        .value("CHORD", OpenScofo::CHORD)
+        .value("TRILL", OpenScofo::TRILL)
+        .value("MULTI", OpenScofo::MULTI)
+        .export_values();
+
+    py::enum_<OpenScofo::HMMType>(m, "HMMType")
+        .value("SEMIMARKOV", OpenScofo::SEMIMARKOV)
+        .value("MARKOV", OpenScofo::MARKOV)
+        .export_values();
+
+    py::class_<OpenScofo::AudioState>(m, "AudioState")
+        .def(py::init<>())
+        .def_readwrite("frequency", &OpenScofo::AudioState::Freq)
+        .def_readwrite("index", &OpenScofo::AudioState::Index);
+
+    // Description Class
+    py::class_<OpenScofo::Description>(m, "Description")
+        .def(py::init<>())
+        .def_readwrite("mfcc", &OpenScofo::Description::MFCC)
+        .def_readwrite("chroma", &OpenScofo::Description::Chroma)
+        .def_readwrite("onset", &OpenScofo::Description::Onset)
+        .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
+        .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
+        .def_readwrite("norm_spectral_power", &OpenScofo::Description::NormSpectralPower)
+        .def_readwrite("pseudo_cqt", &OpenScofo::Description::PseudoCQT)
+
+        .def_readwrite("loudness", &OpenScofo::Description::Loudness)
+        .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)
+        .def_readwrite("spectral_flatness", &OpenScofo::Description::SpectralFlatness)
+        .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
+
+        .def_readwrite("db", &OpenScofo::Description::dB)
+        .def_readwrite("rms", &OpenScofo::Description::RMS)
+
+        .def_readwrite("power", &OpenScofo::Description::Power);
+
+    // State Class
+    py::class_<OpenScofo::MarkovState>(m, "MarkovState")
+        .def(py::init<>())
+        .def_readwrite("position", &OpenScofo::MarkovState::ScorePos)
+        .def_readwrite("type", &OpenScofo::MarkovState::Type)
+        .def_readwrite("markov", &OpenScofo::MarkovState::HSMMType)
+        .def_readwrite("forward", &OpenScofo::MarkovState::Forward)
+        .def_readwrite("bpm_expected", &OpenScofo::MarkovState::BPMExpected)
+        .def_readwrite("bpm_observed", &OpenScofo::MarkovState::BPMObserved)
+        .def_readwrite("onset_expected", &OpenScofo::MarkovState::OnsetExpected)
+        .def_readwrite("onset_observed", &OpenScofo::MarkovState::OnsetObserved)
+        .def_readwrite("phase_expected", &OpenScofo::MarkovState::PhaseExpected)
+        .def_readwrite("phase_observed", &OpenScofo::MarkovState::PhaseObserved)
+        .def_readwrite("ioi_phi_n", &OpenScofo::MarkovState::IOIPhiN)
+        .def_readwrite("ioi_hat_phi_n", &OpenScofo::MarkovState::IOIHatPhiN)
+        .def_readwrite("audio_states", &OpenScofo::MarkovState::AudioStates)
+        .def_readwrite("duration", &OpenScofo::MarkovState::Duration)
+        .def_readwrite("line", &OpenScofo::MarkovState::Line);
+
     py::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
         .def(py::init([](float sr, float fft_size, float hop) {
             auto obj = new OpenScofo::OpenScofo(sr, fft_size, hop);
@@ -82,57 +140,4 @@ PYBIND11_MODULE(_OpenScofo, m) {
                                           static_cast<double *>(bufInfo.ptr) + bufInfo.shape[0]);
             return self.ProcessBlock(cpp_audio);
         });
-
-    // Description Class
-    py::class_<OpenScofo::Description>(m, "Description")
-        .def(py::init<>())
-        .def_readwrite("mfcc", &OpenScofo::Description::MFCC)
-        .def_readwrite("chroma", &OpenScofo::Description::Chroma)
-        .def_readwrite("onset", &OpenScofo::Description::Onset)
-        .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
-        .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
-        .def_readwrite("norm_spectral_power", &OpenScofo::Description::NormSpectralPower)
-        .def_readwrite("pseudo_cqt", &OpenScofo::Description::PseudoCQT)
-
-        .def_readwrite("loudness", &OpenScofo::Description::Loudness)
-        .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)
-        .def_readwrite("spectral_flatness", &OpenScofo::Description::SpectralFlatness)
-        .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
-
-        .def_readwrite("db", &OpenScofo::Description::dB)
-        .def_readwrite("rms", &OpenScofo::Description::RMS)
-
-        .def_readwrite("power", &OpenScofo::Description::Power);
-
-    // State Class
-    py::class_<OpenScofo::MarkovState>(m, "MarkovState")
-        .def(py::init<>())
-        .def_readwrite("position", &OpenScofo::MarkovState::ScorePos)
-        .def_readwrite("type", &OpenScofo::MarkovState::Type)
-        .def_readwrite("markov", &OpenScofo::MarkovState::HSMMType)
-        .def_readwrite("forward", &OpenScofo::MarkovState::Forward)
-        .def_readwrite("bpm_expected", &OpenScofo::MarkovState::BPMExpected)
-        .def_readwrite("bpm_observed", &OpenScofo::MarkovState::BPMObserved)
-        .def_readwrite("onset_expected", &OpenScofo::MarkovState::OnsetExpected)
-        .def_readwrite("onset_observed", &OpenScofo::MarkovState::OnsetObserved)
-        .def_readwrite("phase_expected", &OpenScofo::MarkovState::PhaseExpected)
-        .def_readwrite("phase_observed", &OpenScofo::MarkovState::PhaseObserved)
-        .def_readwrite("ioi_phi_n", &OpenScofo::MarkovState::IOIPhiN)
-        .def_readwrite("ioi_hat_phi_n", &OpenScofo::MarkovState::IOIHatPhiN)
-        .def_readwrite("audio_states", &OpenScofo::MarkovState::AudioStates)
-        .def_readwrite("duration", &OpenScofo::MarkovState::Duration)
-        .def_readwrite("line", &OpenScofo::MarkovState::Line);
-
-    py::class_<OpenScofo::AudioState>(m, "AudioState")
-        .def(py::init<>())
-        .def_readwrite("frequency", &OpenScofo::AudioState::Freq)
-        .def_readwrite("index", &OpenScofo::AudioState::Index);
-
-    py::enum_<OpenScofo::EventType>(m, "EventType")
-        .value("REST", OpenScofo::REST)
-        .value("NOTE", OpenScofo::NOTE)
-        .value("CHORD", OpenScofo::CHORD)
-        .value("TRILL", OpenScofo::TRILL)
-        .value("MULTI", OpenScofo::MULTI)
-        .export_values(); // optional
 }

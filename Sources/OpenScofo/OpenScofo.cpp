@@ -257,7 +257,6 @@ void OpenScofo::SetCurrentEvent(int Event) {
 // ╰─────────────────────────────────────╯
 int OpenScofo::GetEventIndex() {
     return m_CurrentScorePosition; // TODO: Implement yet
-    m_CurrentScorePosition;
 }
 
 // ─────────────────────────────────────
