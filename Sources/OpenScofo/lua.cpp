@@ -41,49 +41,49 @@ static void PushAudioState(lua_State *L, const AudioState &state) {
 }
 
 // // ─────────────────────────────────────
-// static void PushDescription(lua_State *L, const Description &desc) {
-//     lua_createtable(L, 0, 16);
-//
-//     lua_pushboolean(L, desc.Silence);
-//     lua_setfield(L, -2, "silence");
-//     lua_pushboolean(L, desc.Onset);
-//     lua_setfield(L, -2, "onset");
-//     lua_pushnumber(L, desc.SilenceProb);
-//     lua_setfield(L, -2, "silence_prob");
-//
-//     lua_pushnumber(L, desc.dB);
-//     lua_setfield(L, -2, "db");
-//     lua_pushnumber(L, desc.RMS);
-//     lua_setfield(L, -2, "rms");
-//     lua_pushnumber(L, desc.MaxAmp);
-//     lua_setfield(L, -2, "max_amp");
-//     lua_pushnumber(L, desc.Loudness);
-//     lua_setfield(L, -2, "loudness");
-//
-//     lua_pushnumber(L, desc.Harmonicity);
-//     lua_setfield(L, -2, "harmonicity");
-//     lua_pushnumber(L, desc.SpectralFlatness);
-//     lua_setfield(L, -2, "spectral_flatness");
-//     lua_pushnumber(L, desc.SpectralFlux);
-//     lua_setfield(L, -2, "spectral_flux");
-//     lua_pushnumber(L, desc.StdDev);
-//     lua_setfield(L, -2, "std_dev");
-//
-//     PushNumberVector(L, desc.Power);
-//     lua_setfield(L, -2, "power");
-//     PushNumberVector(L, desc.SpectralPower);
-//     lua_setfield(L, -2, "spectral_power");
-//     PushNumberVector(L, desc.NormSpectralPower);
-//     lua_setfield(L, -2, "norm_spectral_power");
-//     PushNumberVector(L, desc.ReverbSpectralPower);
-//     lua_setfield(L, -2, "reverb_spectral_power");
-//     PushNumberVector(L, desc.PseudoCQT);
-//     lua_setfield(L, -2, "pseudo_cqt");
-//     PushNumberVector(L, desc.MFCC);
-//     lua_setfield(L, -2, "mfcc");
-//     PushNumberVector(L, desc.Chroma);
-//     lua_setfield(L, -2, "chroma");
-// }
+static void PushDescription(lua_State *L, const Description &desc) {
+    lua_createtable(L, 0, 16);
+
+    lua_pushboolean(L, desc.Silence);
+    lua_setfield(L, -2, "silence");
+    lua_pushboolean(L, desc.Onset);
+    lua_setfield(L, -2, "onset");
+    lua_pushnumber(L, desc.SilenceProb);
+    lua_setfield(L, -2, "silence_prob");
+
+    lua_pushnumber(L, desc.dB);
+    lua_setfield(L, -2, "db");
+    lua_pushnumber(L, desc.RMS);
+    lua_setfield(L, -2, "rms");
+    lua_pushnumber(L, desc.MaxAmp);
+    lua_setfield(L, -2, "max_amp");
+    lua_pushnumber(L, desc.Loudness);
+    lua_setfield(L, -2, "loudness");
+
+    lua_pushnumber(L, desc.Harmonicity);
+    lua_setfield(L, -2, "harmonicity");
+    lua_pushnumber(L, desc.SpectralFlatness);
+    lua_setfield(L, -2, "spectral_flatness");
+    lua_pushnumber(L, desc.SpectralFlux);
+    lua_setfield(L, -2, "spectral_flux");
+    lua_pushnumber(L, desc.StdDev);
+    lua_setfield(L, -2, "std_dev");
+
+    PushNumberVector(L, desc.Power);
+    lua_setfield(L, -2, "power");
+    PushNumberVector(L, desc.SpectralPower);
+    lua_setfield(L, -2, "spectral_power");
+    PushNumberVector(L, desc.NormSpectralPower);
+    lua_setfield(L, -2, "norm_spectral_power");
+    PushNumberVector(L, desc.ReverbSpectralPower);
+    lua_setfield(L, -2, "reverb_spectral_power");
+    PushNumberVector(L, desc.PseudoCQT);
+    lua_setfield(L, -2, "pseudo_cqt");
+    PushNumberVector(L, desc.MFCC);
+    lua_setfield(L, -2, "mfcc");
+    PushNumberVector(L, desc.Chroma);
+    lua_setfield(L, -2, "chroma");
+}
 
 // ─────────────────────────────────────
 static void PushMarkovState(lua_State *L, const MarkovState &state) {
@@ -214,6 +214,19 @@ static int OpenScofoGetStates(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+static int OpenScofoGetCurrentDescription(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+
+    Description desc = self->GetDescription();
+
+    lua_newtable(L);
+    PushDescription(L, desc);
+    return 1;
+}
+
+// ─────────────────────────────────────
 static const luaL_Reg oscofo_funcs[] = {
     {"set_db_threshold", OpenScofoSetDbThreshold},
     {"set_tuning", OpenScofoSetTuning},
@@ -224,6 +237,8 @@ static const luaL_Reg oscofo_funcs[] = {
     {"get_live_bpm", OpenScofoGetLiveBPM},
     {"get_event_index", OpenScofoGetEventIndex},
     {"get_states", OpenScofoGetStates},
+    {"get_audio_description", OpenScofoGetCurrentDescription},
+
     {NULL, NULL},
 };
 

@@ -120,15 +120,14 @@ static int max_sendList(lua_State *L) {
 static const luaL_Reg max_funcs[] = {
 
     // Log
-    {"print", max_Post},
     {"post", max_Post},
     {"error", max_Error},
 
     // Max
-    {"sendBang", max_sendBang},
-    {"sendFloat", max_sendFloat},
-    {"sendSymbol", max_sendSymbol},
-    {"sendList", max_sendList},
+    {"send_bang", max_sendBang},
+    {"send_float", max_sendFloat},
+    {"send_symbol", max_sendSymbol},
+    {"send_list", max_sendList},
 
     // Sentinela
     {NULL, NULL}};

@@ -18,84 +18,76 @@ All these modules are for the `OpenScofo` language; What I will present is how t
 
 ### <h2 align="center">:simple-lua: `OpenScofo` Lua Module</h2>
 
-The `oscofo` module now exposes classes (via `sol2`) instead of only standalone functions.
+The `OpenScofo` module exposes classes and functions.
 
 ### Creating an `OpenScofo` object
 
 ```lua
-local oscofo = require("oscofo")
-
--- Depending on the Lua/sol2 constructor mode, one of these forms is available:
-local tracker = oscofo.OpenScofo(48000, 2048, 512)
--- local tracker = oscofo.OpenScofo.new(48000, 2048, 512)
+local oscofo = require("OpenScofo")
 ```
-
-Constructor arguments:
-
-- `sr` (float): sample rate.
-- `fft_size` (float): FFT/window size.
-- `hop_size` (float): hop size.
 
 ### `OpenScofo` methods
 
-- **`set_db_threshold(value)`**  
+These are all functions exposed using `oscofo`.
+
+- **`oscofo.set_db_threshold(value)`**  
     - `input`: float value in dB.  
     - `output`: no output.  
     - `description`: Sets audio threshold used by the tracker.
 
-- **`set_tuning(value)`**  
+- **`oscofo.set_tuning(value)`**  
     - `input`: tuning reference value.  
     - `output`: no output.  
     - `description`: Sets tuning used for score parsing/tracking.
 
-- **`set_current_event(event)`**  
+- **`oscofo.set_current_event(event)`**  
     - `input`: integer event index/position.  
     - `output`: no output.  
     - `description`: Forces the current score position.
 
-- **`set_amplitude_decay(value)`**  
+- **`oscofo.set_amplitude_decay(value)`**  
     - `input`: float decay factor.  
     - `output`: no output.  
     - `description`: Sets amplitude decay in the MDP model.
 
-- **`set_harmonics(value)`**  
+- **`oscofo.set_harmonics(value)`**  
     - `input`: integer number of harmonics.  
     - `output`: no output.  
     - `description`: Sets number of harmonics used by the pitch template.
 
-- **`set_pitch_template_sigma(value)`**  
+- **`oscofo.set_pitch_template_sigma(value)`**  
     - `input`: float sigma value.  
     - `output`: no output.  
     - `description`: Sets pitch template sigma.
 
-- **`get_live_bpm()`**  
+- **`oscofo.get_live_bpm()`**  
     - `input`: no input.  
     - `output`: current estimated BPM (float).  
     - `description`: Returns live tempo estimation.
 
-- **`get_event_index()`**  
+- **`oscofo.get_event_index()`**  
     - `input`: no input.  
     - `output`: current event index (integer).  
     - `description`: Returns the current tracked score event.
 
-- **`get_states()`**  
+- **`oscofo.get_states()`**  
     - `input`: no input.  
-    - `output`: collection of `State` objects.  
+    - `output`: return collection of `OpenScofo.State` of the current score.  
     - `description`: Returns all score states currently loaded.
 
-- **`get_pitch_template(freq)`**  
+- **`oscofo.get_pitch_template(freq)`**  
     - `input`: frequency in Hz (float).  
     - `output`: numeric array with the pitch template.  
     - `description`: Returns internal pitch template for a given frequency.
 
-- **`get_audio_description(buffer)`**  
-    - `input`: numeric buffer (table/array) with FFT-size samples.  
-    - `output`: `Description` object.  
+- **`oscofo.get_audio_description()`**  
+    - `input`: no input.
+    - `output`: `OpenScofo.Description` object of the current audio buffer.  
     - `description`: Computes MIR/audio features for the input block.
 
 ### Exposed types in `oscofo`
 
-- **`Description`**
+- **`OpenScofo.Description`**
     - `mfcc`
     - `onset`
     - `silence_prob`
@@ -110,7 +102,7 @@ Constructor arguments:
     - `rms`
     - `power`
 
-- **`State`**
+- **`OpenScofo.State`**
     - `position`
     - `type`
     - `markov`
@@ -132,11 +124,6 @@ Constructor arguments:
 
 The `pd` module inside Lua allows interaction with Pure Data functionalities, exposing the following functions:
 
-- **`pd.print`**  
-    - **`input`**: A string message to print.  
-    - **`output`**: no output.
-    - **`description`**: Logs a message to the console, similar to Pure Data's `print` object.
-
 ---
 - **`pd.post`**  
     - **`input`**: A string message to post.  
@@ -150,25 +137,25 @@ The `pd` module inside Lua allows interaction with Pure Data functionalities, ex
     - **`description`**: Logs an error message in the Pure Data console, similar to a `print` with error severity.
 
 ---
-- **`pd.sendBang`**  
+- **`pd.send_bang`**  
     - **`input`**: A string representing the destination symbol in Pure Data.  
     - **`output`**: no output.
     - **`description`**: Sends a bang message to a specified destination in Pure Data.
 
 ---
-- **`pd.sendFloat`**  
+- **`pd.send_float`**  
     - **`input`**: A float value and a string representing the destination symbol in Pure Data.  
     - **`output`**: no output.
     - **`description`**: Sends a floating-point number to a specified destination in Pure Data.
 
 ---
-- **`pd.sendSymbol`**  
+- **`pd.send_symbol`**  
     - **`input`**: A string symbol and a string representing the destination symbol in Pure Data.  
     - **`output`**: no output.
     - **`description`**: Sends a symbol to a specified destination in Pure Data.
 
 ---
-- **`pd.sendList`**  
+- **`pd.send_list`**  
     - **`input`**: A list of values (mixed types) and a string representing the destination symbol in Pure Data.  
     - **`output`**: no output.
     - **`description`**: Sends a list of values to a specified destination in Pure Data.
@@ -189,25 +176,25 @@ The `max` module inside Lua allows interaction with Max functionalities, exposin
     - **`description`**: Logs an error message in the Max console, similar to a `print` with error severity.
 
 ---
-- **`max.sendBang`**  
+- **`max.send_bang`**  
     - **`input`**: A string representing the receiver symbol in Max.  
     - **`output`**: no output.
     - **`description`**: Sends a bang message to a specified receiver in Max.
 
 ---
-- **`max.sendFloat`**  
+- **`max.send_float`**  
     - **`input`**: A float value and a string representing the destination symbol in Max.  
     - **`output`**: no output.
     - **`description`**: Sends a floating-point number to a specified destination in Max.
 
 ---
-- **`max.sendSymbol`**  
+- **`max.send_symbol`**  
     - **`input`**: A string symbol and a string representing the destination symbol in Max.  
     - **`output`**: no output.
     - **`description`**: Sends a symbol to a specified destination in Pure Data.
 
 ---
-- **`max.sendList`**  
+- **`max.send_list`**  
     - **`input`**: A list of values (mixed types) and a string representing the destination symbol in Max.  
     - **`output`**: no output.
     - **`description`**: Sends a list of values to a specified destination in Max.
