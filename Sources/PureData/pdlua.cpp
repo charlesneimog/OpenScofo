@@ -3,6 +3,7 @@
 #include <OpenScofo.hpp>
 #include <m_pd.h>
 
+// ─────────────────────────────────────
 static int pd_Post(lua_State *L) {
     int num_args = lua_gettop(L);
     for (int i = 1; i <= num_args; i++) {
@@ -114,15 +115,15 @@ static int pd_sendList(lua_State *L) {
 static const luaL_Reg pd_funcs[] = {
 
     // Log
-    {"print", pd_Post},
+    // {"print", pd_Post},
     {"post", pd_Post},
     {"error", pd_Error},
 
     // PureData
-    {"sendBang", pd_sendBang},
-    {"sendFloat", pd_sendFloat},
-    {"sendSymbol", pd_sendSymbol},
-    {"sendList", pd_sendList},
+    {"send_bang", pd_sendBang},
+    {"send_float", pd_sendFloat},
+    {"send_symbol", pd_sendSymbol},
+    {"send_list", pd_sendList},
 
     // Sentinela
     {NULL, NULL}};
