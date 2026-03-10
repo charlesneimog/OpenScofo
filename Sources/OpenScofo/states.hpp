@@ -120,6 +120,7 @@ class Description {
     double Harmonicity;
     double SpectralFlatness;
     double SpectralFlux;
+    double ZeroCrossingRate;
     double StdDev;
 
     std::vector<double> Power;

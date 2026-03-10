@@ -1,8 +1,20 @@
  /* Cânticos de Silício (2024) | Charles K. Neimog */
 BPM 40
 
+LUA {
+	OpenScofo = require("OpenScofo")
+	function myevent()
+		local desc = OpenScofo.get_audio_description()
+		pd.post(desc.loudness)
+	end
+
+}
+
 // measure 1
 TRILL (Bb4 Eb5) 4
+	luacall (myevent())
+
+
 TRILL (F4 Db5) 4
 TRILL (Eb4 Gb5) 4
 REST 1

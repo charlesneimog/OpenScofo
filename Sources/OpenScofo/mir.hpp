@@ -39,7 +39,6 @@ class MIR {
 
     double GetdB();
     void LoadONNXModel(fs::path path);
-    void BuildTimeCoherenceTemplate(States &States);
 
     // Tests
     std::vector<std::pair<int, int>> GetCQT();
@@ -48,7 +47,7 @@ class MIR {
     double Mtof(double Note, double Tunning);
     double Ftom(double Freq, double Tunning);
     double Freq2Bin(double freq, double n, double Sr);
-    void GetFFTDescriptions(std::vector<double> &In, Description &Desc);
+    void GetFFTDescriptions(Description &Desc);
     // MFCC
     void MFCCInit();
     void MFCCExec(Description &Desc);
@@ -71,6 +70,9 @@ class MIR {
     // Chroma
     void SpectralChromaInit();
     void SpectralChromaExec(Description &Desc);
+    // Zero Crossing Rate
+    void ZeroCrossingRateInit();
+    void ZeroCrossingRateExec(std::vector<double> &In, Description &Desc);
 
     // FFTW
     void FFTWInit();
@@ -104,10 +106,20 @@ class MIR {
     std::vector<std::vector<double>> m_MFCCFilter;
     std::vector<std::vector<double>> m_DCTBasis;
     std::vector<double> m_MFCCEnergy;
+    std::vector<std::pair<int, int>> m_MFCCActiveBins;
 
     // Chroma
     std::vector<int> m_ChromaBinMap;
     size_t m_ChromaSize = 12;
+
+    // Zero-crossing rate (librosa-like defaults)
+    int m_ZCRFrameLength = 2048;
+    int m_ZCRHopLength = 512;
+    bool m_ZCRCenter = true;
+    bool m_ZCRPad = false;
+    bool m_ZCRZeroPos = true;
+    double m_ZCRThreshold = 1e-10;
+    std::vector<double> m_ZCRScratch;
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;
@@ -125,16 +137,9 @@ class MIR {
     float m_Sr;
     double m_dB;
     std::vector<double> m_PreviousSpectralPower;
+    std::vector<double> m_SpectralPrefix;
 
     // Time
     double m_EventTimeElapsed = 0.0; // ms
-    unsigned m_TimeCoherenceTemplateSize = 1024;
-
-    // Errors
-    bool m_HasErrors = false;
-    std::vector<std::string> m_Errors;
-
-    // Time coherence peak kernels (keyed by quantized sigma+dt)
-    mutable std::unordered_map<std::uint64_t, std::vector<float>> m_TimeCoherenceKernelCache;
 };
 } // namespace OpenScofo

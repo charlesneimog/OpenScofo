@@ -17,10 +17,11 @@ build-backend = "scikit_build_core.build"
 build-dir = "build"
 wheel.packages = ["OpenScofo"]
 cmake.args = [
-    "-DBUILD_PY_MODULE=ON",
-    "-DBUILD_MAX_OBJECT=OFF",
-    "-DBUILD_PD_OBJECT=OFF",
-    "-DBUILD_WITH_LUA=ON",
+    "-DOSCOFO_BUILD_PY_MODULE=ON",
+    "-DOSCOFO_BUILD_MAX_OBJECT=ON",
+    "-DOSCOFO_BUILD_PD_OBJECT=ON",
+    "-DOSCOFO_BUILD_WITH_LUA=ON",
+    # "-DCMAKE_BUILD_TYPE=Debug",
     "-DPD_LIB_DIR=./OpenScofo",
 ]
 
