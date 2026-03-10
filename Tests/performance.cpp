@@ -17,10 +17,9 @@ std::vector<double> load_mp3_as_wave(const char *path, int &sr, int &ch) {
     sr = info.hz;
     ch = info.channels;
 
-    constexpr double inv = 1.0 / 32768.0;
     std::vector<double> wave(info.samples);
     for (int i = 0; i < (int)info.samples; i++) {
-        wave[i] = static_cast<double>(info.buffer[i]) * inv;
+        wave[i] = static_cast<double>(info.buffer[i]);
     }
 
     free(info.buffer);

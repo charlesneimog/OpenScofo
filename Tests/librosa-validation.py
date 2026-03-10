@@ -90,6 +90,7 @@ def run_test_flatness(window, label):
         f"D: {diff:+010.5f}"
     )
 
+
 # ---------------- RMS TEST ----------------
 def run_test_rms(window, label):
     scofo_desc = scofo.get_audio_description(window)
@@ -114,28 +115,36 @@ def run_test_rms(window, label):
     )
 
 
-# ---------------- LOUDNESS TEST ----------------
-def run_test_loudness(window, label):
+# ---------------- ZEROCROSS-RATING TEST --------
+def run_test_zcr(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
-    # Ensure window is float32
-    window = window.astype(np.float32)
+    l_zcr = librosa.feature.zero_crossing_rate(
+        y=window,
+        frame_length=n_fft,
+        hop_length=hop,
+        center=True,
+        threshold=1e-10,
+        ref_magnitude=1.0,
+        pad=False,
+        zero_pos=True,
+    )[0, 0]
 
-    # Essentia Loudness
-    loudness_algo = es.Loudness()
-    l_loudness = loudness_algo(window)
-
-    # Compare against scofo_desc.loudness (C++ perceptual loudness)
-    s_loudness = scofo_desc.loudness
-    diff = abs(l_loudness - s_loudness)
+    s_zcr = scofo_desc.zero_crossing_rate
+    diff = abs(l_zcr - s_zcr)
 
     print(
         f"{label} | "
-        f"LOUD | "
-        f"Essentia: {l_loudness:+010.5f} | "
-        f"OScofo  : {s_loudness:+010.5f} | "
-        f"Diff    : {diff:+010.5f}"
+        f"ZCR | "
+        f"L: {l_zcr:+015.10f} | "
+        f"S: {s_zcr:+015.10f} | "
+        f"D: {diff:+015.10f}"
     )
+
+
+# TODO: Create loudness validation
+# ---------------- LOUDNESS TEST ----------------
+
 
 # ---------------- TESTES ALEATÓRIOS ----------------
 n_tests = 20
@@ -148,6 +157,6 @@ for _ in range(n_tests):
     run_test_mfcc(window, f"Start {start:08d}")
     run_test_flatness(window, f"Start {start:08d}")
     run_test_rms(window, f"Start {start:08d}")
-    run_test_loudness(window, f"Start {start:08d}")
+    run_test_zcr(window, f"Start {start:08d}")
 
     print("")

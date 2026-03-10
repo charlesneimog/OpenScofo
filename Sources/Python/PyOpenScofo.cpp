@@ -64,6 +64,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)
         .def_readwrite("spectral_flatness", &OpenScofo::Description::SpectralFlatness)
         .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
+        .def_readwrite("zero_crossing_rate", &OpenScofo::Description::ZeroCrossingRate)
 
         .def_readwrite("db", &OpenScofo::Description::dB)
         .def_readwrite("rms", &OpenScofo::Description::RMS)

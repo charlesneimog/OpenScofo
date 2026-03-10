@@ -39,6 +39,7 @@ class PdOpenScofo {
         SILENCE,
         CHROMA,
         CQT,
+        ZCR,
     };
 
     // Clock
@@ -179,11 +180,11 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.RMS);
             outlet_anything(x->DescOut, gensym("rms"), 1, mfccAtoms.data());
-        } else if (v == PdOpenScofo::MIR::SILENCE) {
-            std::vector<t_atom> mfccAtoms(1);
-            SETFLOAT(&mfccAtoms[0], (t_float)Desc.SilenceProb);
-            outlet_anything(x->DescOut, gensym("silence"), 1, mfccAtoms.data());
         } else if (v == PdOpenScofo::MIR::CHROMA) {
+        } else if (v == PdOpenScofo::MIR::ZCR) {
+            std::vector<t_atom> mfccAtoms(1);
+            SETFLOAT(&mfccAtoms[0], (t_float)Desc.ZeroCrossingRate);
+            outlet_anything(x->DescOut, gensym("zcr"), 1, mfccAtoms.data());
         }
     }
 }
@@ -507,6 +508,7 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
     if (log.level < pdlevel) {
         return;
     }
+
     std::string text(log.payload.data(), log.payload.size());
     switch (log.level) {
     case spdlog::level::critical:
@@ -570,7 +572,11 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
             } else if (strcmp(sym->s_name, "chroma") == 0) {
                 DescOut = true;
                 x->RequestMIR.push_back(PdOpenScofo::MIR::CHROMA);
+            } else if (strcmp(sym->s_name, "zcr") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(PdOpenScofo::MIR::ZCR);
             }
+
             argc--, argv++;
         }
     }

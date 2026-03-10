@@ -1,4 +1,6 @@
 #include "OpenScofo.hpp"
+#include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace OpenScofo {
@@ -87,13 +89,13 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     }
 
     m_PreviousSpectralPower.assign(static_cast<size_t>(round(m_FFTSize / 2)), 0.0);
-    m_TimeCoherenceKernelCache.clear();
 
     FFTWInit();
     OnsetInit();
     MFCCInit();
     CQTInit();
     SpectralChromaInit();
+    ZeroCrossingRateInit();
 
     spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
 }
@@ -129,7 +131,7 @@ void MIR::FFTWInit() {
 #ifdef __EMSCRIPTEN__
     m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
 #else
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_MEASURE);
 #endif
 
     // hann
@@ -149,6 +151,7 @@ void MIR::LoadONNXModel(fs::path path) {
 #else
     m_OnnxCTX = onnx_context_alloc_from_file(path.c_str(), nullptr, 0);
 #endif
+
     if (m_OnnxCTX == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
         return;
@@ -197,7 +200,6 @@ void MIR::LoadONNXModel(fs::path path) {
 // ╭─────────────────────────────────────╮
 // │           Onset Detector            │
 // ╰─────────────────────────────────────╯
-//
 void MIR::OnsetInit() {
     size_t nbytes = onsetsds_memneeded(ODS_ODF_MKL, m_FFTSize, m_MedSpan);
     delete[] m_ODSData;
@@ -218,53 +220,6 @@ void MIR::OnsetExec(Description &Desc) {
         return;
     }
     Desc.Onset = onsetsds_process(m_ODS, reinterpret_cast<float *>(m_FFTOut));
-}
-
-// ╭─────────────────────────────────────╮
-// │           Time Coherence            │
-// ╰─────────────────────────────────────╯
-void MIR::BuildTimeCoherenceTemplate(States &ScoreStates) {
-    const double dt = static_cast<double>(m_HopSize) / m_Sr;
-
-    double totalTime = 0.0;
-    for (const auto &s : ScoreStates) {
-        totalTime += s.Duration;
-    }
-
-    const size_t N = static_cast<size_t>(std::ceil(totalTime / dt));
-    std::vector<double> probability(N, 0.0);
-
-    // Gaussian width (seconds)
-    const double sigma = 0.005;
-    const double inv2Sigma2 = 1.0 / (2.0 * sigma * sigma);
-
-    // 2. event onsets
-    double onset = 0.0;
-    for (const auto &state : ScoreStates) {
-        if (state.Type == REST) {
-            continue;
-        }
-        const size_t center = static_cast<size_t>(onset / dt);
-
-        // limit influence window to ±3σ
-        const int radius = static_cast<int>(std::ceil(3.0 * sigma / dt));
-
-        for (int i = -radius; i <= radius; ++i) {
-            const int idx = static_cast<int>(center) + i;
-            if (idx < 0 || idx >= static_cast<int>(N))
-                continue;
-
-            const double t = (idx * dt) - onset;
-            const double g = std::exp(-(t * t) * inv2Sigma2);
-
-            probability[idx] += g;
-        }
-
-        onset += state.Duration;
-    }
-
-    for (auto &p : probability)
-        p = std::min(1.0, p);
 }
 
 // ╭─────────────────────────────────────╮
@@ -359,33 +314,71 @@ void MIR::CQTInit() {
 }
 
 // ─────────────────────────────────────
-void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
-    // real audio analisys
-    size_t N = In.size();
-    size_t NHalf = m_FFTSize / 2 + 1;
+void MIR::GetFFTDescriptions(Description &Desc) {
+    const size_t NHalf = m_FFTSize / 2 + 1;
 
     fftw_execute(m_FFTPlan);
 
     Desc.MaxAmp = 0;
     double SumPower = 0.0;
-    const double invN = 1.0 / static_cast<double>(N);
+    const double invN = 1.0 / static_cast<double>(m_FFTSize);
 
-    spdlog::debug("Window Size {}, NHalf {}", N, NHalf);
+    // FUSE 1: Calculate power-domain arrays and descriptors in one pass.
+    double logSumPower = 0.0;
+    double linSumPower = 0.0;
+    double flux = 0.0;
+    double harmonicityPeak = 0.0;
+    double harmonicitySum = 0.0;
+    constexpr double amin = 1e-10;
 
-    // FUSE 1: Calculate Power, MaxAmp, and SumPower in one pass
-    for (size_t i = 0; i < NHalf; i++) {
+    if (m_PreviousSpectralPower.size() != NHalf) {
+        m_PreviousSpectralPower.assign(NHalf, 0.0);
+    }
+
+    if (Desc.Chroma.size() != m_ChromaSize)
+        Desc.Chroma.resize(m_ChromaSize);
+    std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
+
+    for (size_t i = 0; i < NHalf; ++i) {
         const double re = m_FFTOut[i][0];
         const double im = m_FFTOut[i][1];
         const double p = re * re + im * im;
         const double sp = std::sqrt(p) * invN;
+
         Desc.Power[i] = p;
         Desc.SpectralPower[i] = sp;
+
         if (sp > Desc.MaxAmp)
             Desc.MaxAmp = sp;
+
         SumPower += sp;
+
+        // Flatness on power spectrum.
+        const double v = std::max(amin, p);
+        logSumPower += std::log(v);
+        linSumPower += v;
+
+        // Flux and harmonicity skip DC to match previous behavior.
+        if (i > 0) {
+            const double diff = sp - m_PreviousSpectralPower[i];
+            if (diff > 0.0) {
+                flux += diff;
+            }
+
+            harmonicitySum += sp;
+            if (sp > harmonicityPeak) {
+                harmonicityPeak = sp;
+            }
+        }
+        m_PreviousSpectralPower[i] = sp;
+
+        const int pc = m_ChromaBinMap[i];
+        if (pc >= 0) {
+            Desc.Chroma[pc] += sp;
+        }
     }
 
-    // FUSE 2: Normalize and calculate Mean/Variance simultaneously
+    // FUSE 2: Normalize and calculate mean/variance simultaneously.
     const double SumPowerEps = SumPower + 1e-12;
     const double Mean = 1.0 / NHalf;
     double Variance = 0.0;
@@ -399,29 +392,43 @@ void MIR::GetFFTDescriptions(std::vector<double> &In, Description &Desc) {
 
     Desc.StdDev = std::sqrt(Variance / NHalf);
 
-    // Fake CQT
+    // Finalize descriptors derived from the fused pass.
+    const double chromaSum = std::accumulate(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
+    if (chromaSum > 0.0) {
+        for (size_t i = 0; i < m_ChromaSize; ++i) {
+            Desc.Chroma[i] /= chromaSum;
+        }
+    }
+
+    Desc.SpectralFlux = flux;
+    Desc.SpectralFlatness = std::exp(logSumPower / static_cast<double>(NHalf)) /
+                            (linSumPower / static_cast<double>(NHalf));
+    Desc.Harmonicity = harmonicityPeak / (harmonicitySum + 1e-12);
+
+    // Pseudo-CQT with prefix sums reduces O(bands * bins) to O(bands).
     if (m_FakeCQT.size() != Desc.PseudoCQT.size()) {
         Desc.PseudoCQT.resize(m_FakeCQT.size());
     }
 
-    for (size_t k = 0; k < m_FakeCQT.size(); ++k) {
-        auto [b0, b1] = m_FakeCQT[k];
-        double sum = 0.0;
-        for (int i = b0; i <= b1; i++) {
-            sum += Desc.SpectralPower[i];
-        }
-        Desc.PseudoCQT[k] = sum / double(b1 - b0 + 1);
+    const size_t prefixSize = NHalf + 1;
+    if (m_SpectralPrefix.size() != prefixSize) {
+        m_SpectralPrefix.resize(prefixSize);
     }
 
-    // Executable
+    m_SpectralPrefix[0] = 0.0;
+    for (size_t i = 0; i < NHalf; ++i) {
+        m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.SpectralPower[i];
+    }
+
+    for (size_t k = 0; k < m_FakeCQT.size(); ++k) {
+        auto [b0, b1] = m_FakeCQT[k];
+        const double sum = m_SpectralPrefix[static_cast<size_t>(b1) + 1] - m_SpectralPrefix[static_cast<size_t>(b0)];
+        Desc.PseudoCQT[k] = sum / static_cast<double>(b1 - b0 + 1);
+    }
+
+    // Remaining descriptors that require their own transforms.
     OnsetExec(Desc);
     MFCCExec(Desc);
-
-    // Spectral
-    SpectralFluxExec(Desc);
-    SpectralFlatnessExec(Desc);
-    SpectralHarmonicityExec(Desc);
-    SpectralChromaExec(Desc);
 }
 
 // ╭─────────────────────────────────────╮
@@ -471,6 +478,7 @@ void MIR::MFCCInit() {
 
     // Slaney triangular filters (area normalized)
     m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
+    m_MFCCActiveBins.assign(m_MFCCMels, {0, -1});
 
     for (int m = 0; m < m_MFCCMels; ++m) {
         const double f_left = hz_pts[m];
@@ -479,7 +487,11 @@ void MIR::MFCCInit() {
 
         const double norm = 2.0 / (f_right - f_left);
 
-        for (int k = 0; k < n_f; ++k) {
+        const int startBin = std::max(0, static_cast<int>(std::ceil(f_left * m_FFTSize / m_Sr)));
+        const int endBin = std::min(n_f - 1, static_cast<int>(std::floor(f_right * m_FFTSize / m_Sr)));
+        m_MFCCActiveBins[m] = {startBin, endBin};
+
+        for (int k = startBin; k <= endBin; ++k) {
             const double f = fft_freqs[k];
             double w = 0.0;
 
@@ -535,8 +547,16 @@ void MIR::MFCCExec(Description &Desc) {
     for (int m = 0; m < n_mels; ++m) {
         const double *filter = m_MFCCFilter[m].data();
         double mel = 0.0;
+        const auto [startBinRaw, endBinRaw] = m_MFCCActiveBins[m];
+        const int startBin = std::clamp(startBinRaw, 0, n_f - 1);
+        const int endBin = std::clamp(endBinRaw, 0, n_f - 1);
 
-        for (int k = 0; k < n_f; ++k) {
+        if (endBin < startBin) {
+            m_MFCCEnergy[m] = 0.0;
+            continue;
+        }
+
+        for (int k = startBin; k <= endBin; ++k) {
             mel += filter[k] * Desc.Power[k];
         }
 
@@ -633,6 +653,103 @@ void MIR::SpectralChromaExec(Description &Desc) {
 }
 
 // ╭─────────────────────────────────────╮
+// │         Zero Crossing Rate          │
+// ╰─────────────────────────────────────╯
+void MIR::ZeroCrossingRateInit() {
+    m_ZCRFrameLength = static_cast<int>(m_FFTSize);
+    m_ZCRHopLength = static_cast<int>(m_HopSize);
+
+    if (m_ZCRFrameLength <= 0) {
+        m_ZCRFrameLength = 1;
+    }
+    if (m_ZCRHopLength <= 0) {
+        m_ZCRHopLength = 1;
+    }
+
+    // Reuse this buffer across calls to avoid per-block allocations.
+    const size_t pad = m_ZCRCenter ? static_cast<size_t>(m_ZCRFrameLength / 2) : 0;
+    m_ZCRScratch.resize(static_cast<size_t>(m_ZCRFrameLength) + (2 * pad));
+}
+
+// ─────────────────────────────────────
+void MIR::ZeroCrossingRateExec(std::vector<double> &In, Description &Desc) {
+    if (In.empty()) {
+        Desc.ZeroCrossingRate = 0.0;
+        return;
+    }
+
+    const int frameLength = std::max(1, m_ZCRFrameLength);
+    const size_t frameLengthSz = static_cast<size_t>(frameLength);
+    const double *yData = nullptr;
+    size_t ySize = 0;
+
+    if (m_ZCRCenter) {
+        const size_t pad = frameLengthSz / 2;
+        const size_t inSize = In.size();
+        ySize = inSize + (2 * pad);
+        if (m_ZCRScratch.size() < ySize) {
+            m_ZCRScratch.resize(ySize);
+        }
+
+        double *dst = m_ZCRScratch.data();
+        const double edgeLeft = In.front();
+        const double edgeRight = In.back();
+        std::fill_n(dst, pad, edgeLeft);
+        std::copy(In.begin(), In.end(), dst + pad);
+        std::fill_n(dst + pad + inSize, pad, edgeRight);
+        yData = dst;
+    } else {
+        yData = In.data();
+        ySize = In.size();
+    }
+
+    if (ySize < frameLengthSz) {
+        Desc.ZeroCrossingRate = 0.0;
+        return;
+    }
+
+    size_t crossings = 0;
+    if (m_ZCRPad) {
+        crossings += 1;
+    }
+
+    const double threshold = m_ZCRThreshold;
+    if (m_ZCRZeroPos) {
+        double prev = yData[0];
+        if (std::abs(prev) <= threshold) {
+            prev = 0.0;
+        }
+
+        for (int i = 1; i < frameLength; ++i) {
+            double curr = yData[static_cast<size_t>(i)];
+            if (std::abs(curr) <= threshold)
+                curr = 0.0;
+
+            crossings += static_cast<size_t>(std::signbit(prev) != std::signbit(curr));
+            prev = curr;
+        }
+    } else {
+        double prev = yData[0];
+        if (std::abs(prev) <= threshold) {
+            prev = 0.0;
+        }
+
+        int prevSign = (prev > 0.0) - (prev < 0.0);
+        for (int i = 1; i < frameLength; ++i) {
+            double curr = yData[static_cast<size_t>(i)];
+            if (std::abs(curr) <= threshold)
+                curr = 0.0;
+
+            const int currSign = (curr > 0.0) - (curr < 0.0);
+            crossings += static_cast<size_t>(prevSign != currSign);
+            prevSign = currSign;
+        }
+    }
+
+    Desc.ZeroCrossingRate = static_cast<double>(crossings) / static_cast<double>(frameLengthSz);
+}
+
+// ╭─────────────────────────────────────╮
 // │        Spectral Descriptions        │
 // ╰─────────────────────────────────────╯
 void MIR::SpectralFluxExec(Description &Desc) {
@@ -715,15 +832,18 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
 
     // 1. Calculate power on the PURE, un-windowed signal
     GetSignalPower(In, Desc);
+    ZeroCrossingRateExec(In, Desc);
 
     // 2. FUSE: Apply window and copy directly to FFT buffer
-    const double *x = In.data();
-    const double *w = m_WindowingFunc.data();
+    const double *__restrict x = In.data();
+    const double *__restrict w = m_WindowingFunc.data();
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC ivdep
+#endif
     for (size_t i = 0; i < m_FFTSize; ++i) {
         m_FFTIn[i] = x[i] * w[i];
     }
 
-    // 3. GetFFTDescriptions no longer needs std::copy
-    GetFFTDescriptions(In, Desc);
+    GetFFTDescriptions(Desc);
 }
 } // namespace OpenScofo

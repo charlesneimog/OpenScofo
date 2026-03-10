@@ -11,30 +11,25 @@ set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
 
-option(BUILD_PY_MODULE "Build Python Module" OFF)
-option(BUILD_PD_OBJECT "Build PureData Object" ON)
-option(BUILD_MAX_OBJECT "Build Max Object" OFF)
-option(BUILD_ALL "Build Python Module and PureData Object" ON)
-option(BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
+option(OSCOFO_BUILD_PD_OBJECT "Build PureData Object" ON)
+option(OSCOFO_BUILD_PY_MODULE "Build Python Module" ON)
+option(OSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
+option(OSCOFO_BUILD_TESTS "Build Tests" ON)
+option(OSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" OFF)
+
+option(OSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
+
 option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
-option(OSCOFO_BUILD_TESTS "Run Tests" OFF)
 
-if(BUILD_ALL)
-    set(BUILD_PY_MODULE ON)
-    set(BUILD_PD_OBJECT ON)
+if(OSCOFO_BUILD_ALL)
+    set(OSCOFO_BUILD_PY_MODULE ON)
+    set(OSCOFO_BUILD_PD_OBJECT ON)
     if(NOT LINUX)
-        set(BUILD_MAX_OBJECT ON)
+        set(OSCOFO_BUILD_MAX_OBJECT ON)
     endif()
 endif()
 
-if(BUILD_ALL_OBJECTS)
-    set(BUILD_PD_OBJECT ON)
-    if(NOT LINUX)
-        set(BUILD_MAX_OBJECT ON)
-    endif()
-endif()
-
-if(BUILD_PD_OBJECT)
+if(OSCOFO_BUILD_PD_OBJECT)
     set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
     set(PDCMAKE_VERSION "v0.2.12")
     if(NOT EXISTS "${PDCMAKE_FILE}")
@@ -147,7 +142,7 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
-if(BUILD_WITH_LUA)
+if(OSCOFO_BUILD_WITH_LUA)
     cpmaddpackage("gh:lua/lua@5.4.0")
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
@@ -211,7 +206,7 @@ target_compile_definitions(OpenScofo PUBLIC OPENSCOFO_VERSION="${PROJECT_VERSION
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
 
-if(BUILD_WITH_LUA)
+if(OSCOFO_BUILD_WITH_LUA)
     target_link_libraries(OpenScofo PUBLIC lua)
 endif()
 
@@ -309,8 +304,8 @@ else() # Linux (GCC or Clang)
                -Wnull-dereference
                -march=native
                $<$<CONFIG:Debug>:
-               -O0
                -g
+               -O3
                -fno-omit-frame-pointer
                >
                $<$<CONFIG:RelWithDebInfo>:
@@ -332,21 +327,21 @@ endif()
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
-if(BUILD_PY_MODULE)
+if(OSCOFO_BUILD_PY_MODULE)
     add_subdirectory(Sources/Python)
 endif()
 
 # ╭──────────────────────────────────────╮
 # │           PureData Object            │
 # ╰──────────────────────────────────────╯
-if(BUILD_PD_OBJECT)
+if(OSCOFO_BUILD_PD_OBJECT)
     add_subdirectory(Sources/PureData)
 endif()
 
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
-if(BUILD_MAX_OBJECT AND NOT LINUX)
+if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX)
     add_subdirectory(Sources/Max)
 endif()
 

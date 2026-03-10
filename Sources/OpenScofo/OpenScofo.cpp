@@ -364,9 +364,6 @@ bool OpenScofo::ParseScore(std::string ScorePath) {
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
 
-    // Time coherence
-    m_MIR.BuildTimeCoherenceTemplate(m_States);
-
     // Timbre detection
     if (m_Score.HasTimbreModel()) {
         m_MIR.LoadONNXModel(m_Score.GetTimbreModel());
