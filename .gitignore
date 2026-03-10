@@ -74,3 +74,4 @@ test.csv
 /Tests/allnotes.bin
 /Documentation/Editor
 /Documentation/__pycache__
+/out.perf
