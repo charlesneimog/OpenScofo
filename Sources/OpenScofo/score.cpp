@@ -533,7 +533,7 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
                 m_ScoreStates.emplace_back(Begin);
             } else if (id == "TRANSPOSE") {
                 if (v < -36 || v > 36) {
-                    spdlog::error("Weird transpose value on line {}.", pos.row + 1);
+                    spdlog::warn("Weird transpose value on line {}.", pos.row + 1);
                 }
                 m_Transpose = v;
             } else if (id == "PHASECOUPLING") {
@@ -556,9 +556,19 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
                     m_PitchTemplateSigma = v;
                 }
             } else if (id == "FFTSIZE") {
-                m_FFTSize = (int)v;
+                int fft = static_cast<int>(v);
+                if (fft > 0 && (fft & (fft - 1)) == 0) {
+                    m_FFTSize = fft;
+                } else {
+                    spdlog::error("FFTSIZE must be a power of two");
+                }
             } else if (id == "HOPSIZE") {
-                m_HopSize = (int)v;
+                int hop = static_cast<int>(v);
+                if (hop > 0 && (hop & (hop - 1)) == 0) {
+                    m_HopSize = hop;
+                } else {
+                    spdlog::error("HopSize must be a power of two");
+                }
             }
         } else if (type == "pathConfig") {
             std::string id = GetChildStringFromField(ScoreStr, child, "pathConfigId");
