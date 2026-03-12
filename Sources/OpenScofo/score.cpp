@@ -254,6 +254,19 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode TypeNode = ts_node_child_by_field_name(Node, "keyword", 7);
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+    TSNode AttributeNode = ts_node_child_by_field_name(Node, "attribute", 9);
+
+    bool Percurssive = false;
+    if (!ts_node_is_null(AttributeNode)) {
+        TSNode type = ts_node_child(AttributeNode, 1); // skip "@"
+
+        uint32_t start = ts_node_start_byte(type);
+        uint32_t end = ts_node_end_byte(type);
+        std::string attr_type(ScoreStr.data() + start, end - start);
+        if (attr_type == "percurssive") {
+            Percurssive = true;
+        }
+    }
 
     if (ts_node_is_null(TypeNode) || ts_node_is_null(PitchNode) || ts_node_is_null(DurationNode)) {
         TSPoint Init = ts_node_start_point(Node);
@@ -290,6 +303,13 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     AudioState SubState;
     PitchNode2Freq(ScoreStr, PitchNode, SubState);
     Event.AudioStates.push_back(SubState);
+
+    // Silence
+    if (Percurssive) {
+        AudioState PercurssiveDesc;
+        PercurssiveDesc.Type = SILENCE;
+        Event.AudioStates.push_back(PercurssiveDesc);
+    }
 
     // Duration
     double duration = GetDurationFromNode(ScoreStr, DurationNode);
@@ -372,6 +392,14 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
 MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     // m_ScorePosition++;
     // Note that Rest do not count for the score position, as they are not considered in the evaluation
+
+    if (m_ScorePosition == 0) {
+        spdlog::warn("OpenScofo cannot detect the start of a piece when the first events are REST. "
+                     "It cannot distinguish between silence before the piece and the actual start of the piece. "
+                     "As a result, the current event (line {}) and its associated actions will not be added.",
+                     ts_node_start_point(Node).row + 1);
+        return {};
+    }
 
     MarkovState Event;
     Event.Line = ts_node_start_point(Node).row + 1;

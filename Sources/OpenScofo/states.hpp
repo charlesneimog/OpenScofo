@@ -10,17 +10,46 @@ namespace OpenScofo {
 enum AudioDescType {
     PITCH,
     SILENCE,
-    ONSET,
     LABEL,
 };
 
 // ─────────────────────────────────────
+enum Descriptors {
+    MFCC,
+    LOUDNESS,
+    RMS,
+    POWER,
+    CHROMA,
+    ZCR,
+    HFR,
+    CENTROID,
+    SPREAD,
+    FLATNESS,
+    FLUX,
+    IRREGULARITY,
+    HARMONICITY,
+    YIN,
+
+    //
+    SILENCEPROB,
+    PERCUSSIVEPROB,
+    ONSET,
+};
+
+// ─────────────────────────────────────
 enum EventType {
-    REST,  // Markov state
-    NOTE,  // MarkovState, Semimarkov with Markov inside
-    CHORD, // MarkovState,
-    TRILL, // MarkovState, SemiMarkov with Markov inside
-    MULTI, // MarkovState,
+    // Tradicional
+    REST,
+    NOTE,
+    CHORD,
+    TRILL,
+    MULTI,
+
+    //  AI model
+    TECH,
+
+    // Cort Lippe event (event is just count)
+    EVENT,
 };
 
 enum HMMType { SEMIMARKOV, MARKOV };
@@ -44,8 +73,7 @@ class AudioState {
     AudioDescType Type;
     double Freq;
     double Midi;
-    // std::vector<double> Obs;
-    // std::vector<double> Forward;
+    std::string Label;
     unsigned Index;
 };
 
@@ -72,17 +100,6 @@ class MarkovState {
     std::vector<double> Forward;  // F_j(t): current-state prob, circular buffer
     std::vector<double> ExitProb; // F_j^o(t): exit prob, circular buffer
     std::vector<double> BestObs;  // b_j(x_t): observation, circular buffer
-    double ForwardLast = 0.0;
-    // double SumIn = 0.0;
-
-    // Time
-    double OnsetTime;
-    // double Duration;
-
-    double Sigma = 0.0;
-    double PdfStartTime;
-    std::vector<double> Pdf;
-    std::vector<double> Context;
 
     // Time
     int UpperBound;
@@ -108,9 +125,9 @@ using States = std::vector<MarkovState>;
 // ─────────────────────────────────────
 class Description {
   public:
-    bool Silence;
     bool Onset;
     double SilenceProb;
+    double PercussiveProb;
 
     double dB;
     double RMS;
@@ -120,8 +137,18 @@ class Description {
     double Harmonicity;
     double SpectralFlatness;
     double SpectralFlux;
+    double SpectralIrregularity = 0.0;
+    double SpectralCrest = 0.0;
+    double SpectralCentroid = 0.0;
+    double CentroidVelocity = 0.0;
+    double SpectralSpread = 0.0;
+    double HighFreqRatio = 0.0;
+    double Peakiness = 0.0;
     double ZeroCrossingRate;
     double StdDev;
+
+    double Pitch = 0.0;
+    double PitchConfidence = 0.0;
 
     std::vector<double> Power;
     std::vector<double> SpectralPower;

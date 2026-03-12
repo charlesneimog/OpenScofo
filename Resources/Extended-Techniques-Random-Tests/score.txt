@@ -1,0 +1,23 @@
+BPM 120
+
+// Measure 1
+REST 0.6
+NOTE E5 0.6
+NOTE F#4 1.2
+NOTE E5 0.6
+REST 0.6
+REST 1.2
+NOTE G4 1.2 @percussive
+
+// Measure 2
+NOTE F3 0.5 @percussive
+NOTE A3 0.5 @percussive
+NOTE D#5 0.5
+NOTE C#4 0.5
+NOTE D3 0.5 @percussive
+NOTE F3 0.5 @percussive
+NOTE C#3 1 @percussive
+NOTE C#4 0.5 @percussive
+NOTE C#4 0.5
+NOTE F4 0.5
+REST 0.5

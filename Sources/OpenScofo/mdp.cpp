@@ -347,7 +347,6 @@ void MDP::BuildDistributionCache(double ExpectedFrames) {
         ExpectedFrames = 1.0;
 
     int key = static_cast<int>(std::round(ExpectedFrames * 10.0));
-
     if (m_OccupancyCache.find(key) != m_OccupancyCache.end())
         return;
 
@@ -417,13 +416,6 @@ double MDP::InverseA2(double SyncStrength) {
         return 10.0f;
     }
 
-    // Constructor pre-fills this cache at 1e-3 resolution.
-    const int cacheKey = static_cast<int>(std::round(std::clamp(SyncStrength, 0.0, 1.0) * 1000.0));
-    auto cacheIt = m_KappaCache.find(cacheKey);
-    if (cacheIt != m_KappaCache.end()) {
-        return cacheIt->second;
-    }
-
     double Low = 0.0;
     double Tol = 1e-16;
     double High = std::max(SyncStrength, 10.0);
@@ -437,7 +429,6 @@ double MDP::InverseA2(double SyncStrength) {
         double I0 = CYL_BESSEL_I(0, Mid);
         double A2Mid = I1 / I0;
         if (std::fabs(A2Mid - SyncStrength) < Tol) {
-            m_KappaCache.emplace(cacheKey, Mid);
             return Mid;
         } else if (A2Mid < SyncStrength) {
             Low = Mid;
@@ -446,9 +437,9 @@ double MDP::InverseA2(double SyncStrength) {
         }
     }
     // LOGE() << "InverseA2 not converged after " << i << " iterations.";
-    m_KappaCache.emplace(cacheKey, Mid);
     return Mid;
 }
+
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
@@ -596,10 +587,8 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╰─────────────────────────────────────╯
 // Section (CONT 2010) section 3.1 and also CUVILLIER (2016) section 2.2.2
 void MDP::GetAudioObservations(int T) {
-    std::unordered_map<int, double> pitchObs;
-    pitchObs.reserve(static_cast<size_t>(std::max(1, m_WinEnd - m_WinStart + 1)));
-
-    const double binWidth = m_Sr / m_FFTSize;
+    std::unordered_map<double, double> PitchObs;
+    PitchObs.reserve(m_WinEnd - m_WinStart);
 
     int bufferIndex = T % m_BufferSize;
     double ObsNoSound = 0;
@@ -620,13 +609,12 @@ void MDP::GetAudioObservations(int T) {
                 if (AS.Type != PITCH) {
                     spdlog::error("Memory error on creation of Audio States, please report");
                 }
-                const int rootBin = static_cast<int>(std::round(AS.Freq / binWidth));
-                auto it = pitchObs.find(rootBin);
-                if (it != pitchObs.end()) {
+                auto it = PitchObs.find(AS.Freq);
+                if (it != PitchObs.end()) {
                     BestObs = std::max(BestObs, it->second);
                 } else {
                     double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
-                    pitchObs.emplace(rootBin, kl);
+                    PitchObs.emplace(AS.Freq, kl);
                     BestObs = std::max(BestObs, kl);
                 }
             }
@@ -640,13 +628,12 @@ void MDP::GetAudioObservations(int T) {
                     spdlog::error("Memory error on creation of Audio States, please report");
                 }
 
-                const int rootBin = static_cast<int>(std::round(AS.Freq / binWidth));
-                auto it = pitchObs.find(rootBin);
-                if (it != pitchObs.end()) {
+                auto it = PitchObs.find(AS.Freq);
+                if (it != PitchObs.end()) {
                     ChordKLObs += it->second;
                 } else {
                     double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
-                    pitchObs.emplace(rootBin, kl);
+                    PitchObs.emplace(AS.Freq, kl);
                     ChordKLObs += kl;
                 }
             }
@@ -682,10 +669,11 @@ double MDP::GetPitchSimilarity(double Freq) {
     double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
     auto it = m_PitchTemplates.find(RootBinFreq);
     if (it == m_PitchTemplates.end()) {
-        spdlog::critical("Pitch template not found for frequency {:.2f} Hz (root bin {:.2f} Hz). This should not "
-                         "happen, please report.",
-                         Freq, RootBinFreq);
-        return 0.0;
+        BuildPitchTemplate(Freq);
+        it = m_PitchTemplates.find(RootBinFreq);
+        if (it == m_PitchTemplates.end()) {
+            return 1e-300;
+        }
     }
 
     const PitchTemplateArray &PitchTemplate = it->second;
@@ -696,19 +684,16 @@ double MDP::GetPitchSimilarity(double Freq) {
     for (size_t i = 0; i < halfFft; i++) {
         double P = PitchTemplate[i] + reverbSpectralPower[i];
         double Q = normSpectralPower[i];
-        if (Q <= 0.0) {
-            continue;
-        }
-        if (P > 0.0) {
-            KLDiv += P * std::log(P / Q);
-        } else {
+        if (P > 0 && Q > 0) {
+            KLDiv += P * log(P / Q);
+        } else if (P == 0 && Q >= 0) {
             KLDiv += Q;
         }
     }
 
     double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
     KLDiv *= noise_robustness;
-    KLDiv = std::exp(-m_PitchScalingFactor * KLDiv);
+    KLDiv = exp(-m_PitchScalingFactor * KLDiv);
     return KLDiv;
 }
 
@@ -841,28 +826,11 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
     double f_tilde_jo = 0.0;
     double ObsProd = 1.0;
 
-    double expectedFrames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
-    if (expectedFrames < 1.0) {
-        expectedFrames = 1.0;
-    }
-    const int distKey = static_cast<int>(std::round(expectedFrames * 10.0));
-    BuildDistributionCache(expectedFrames);
-
-    auto occIt = m_OccupancyCache.find(distKey);
-    auto survIt = m_SurvivorCache.find(distKey);
-    if (occIt == m_OccupancyCache.end() || survIt == m_SurvivorCache.end()) {
-        StateJ.Forward[bufferIndex] = bj * 1e-300;
-        StateJ.ExitProb[bufferIndex] = bj * 1e-300;
-        return;
-    }
-
-    const std::vector<double> &occ = occIt->second;
-    const std::vector<double> &surv = survIt->second;
-    const int maxU = static_cast<int>(occ.size()) - 1;
+    int maxU = GetMaxUForJ(StateJ);
 
     for (int u = 1; u <= T + 1; u++) {
-        double D_bar_ju = (u < static_cast<int>(surv.size())) ? surv[static_cast<size_t>(u)] : 0.0;
-        double d_ju = (u < static_cast<int>(occ.size())) ? occ[static_cast<size_t>(u)] : 0.0;
+        double D_bar_ju = GetSurvivorDistribution(StateJ, u);
+        double d_ju = GetOccupancyDistribution(StateJ, u);
 
         if (u == T + 1) {
             f_tilde_j += D_bar_ju * ObsProd * StateJ.InitProb;

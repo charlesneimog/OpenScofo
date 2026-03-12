@@ -40,14 +40,11 @@ class MIR {
     double GetdB();
     void LoadONNXModel(fs::path path);
 
-    // Tests
-    std::vector<std::pair<int, int>> GetCQT();
-
   private:
     double Mtof(double Note, double Tunning);
     double Ftom(double Freq, double Tunning);
     double Freq2Bin(double freq, double n, double Sr);
-    void GetFFTDescriptions(Description &Desc);
+    void GetSpectralDescriptions(Description &Desc);
     // MFCC
     void MFCCInit();
     void MFCCExec(Description &Desc);
@@ -83,6 +80,8 @@ class MIR {
     // Get Signal
     void GetSignalPower(std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
+    void YINInit();
+    void YINExec(std::vector<double> &In, Description &Desc);
 
   private:
     // FFT
@@ -91,13 +90,18 @@ class MIR {
     fftw_plan m_FFTPlan = nullptr;
     std::vector<std::pair<int, int>> m_FakeCQT;
     std::vector<double> m_WindowingFunc;
+    double m_PrevPercussiveProb;
+    double m_PrevRMS;
+    double m_PeakFlux;
+    double m_PeakDeltaRMS;
+    double m_PeakFlatness;
 
     // Onsets
     bool m_OnsetInit = false;
     OnsetsDS *m_ODS = nullptr;
     float *m_ODSData = nullptr;
     int m_OnsetFFTSize = 512;
-    int m_MedSpan = 20;
+    int m_MedSpan = 50;
     int m_Accum = 0;
 
     // MFCC
@@ -138,6 +142,12 @@ class MIR {
     double m_dB;
     std::vector<double> m_PreviousSpectralPower;
     std::vector<double> m_SpectralPrefix;
+    std::vector<double> m_YINDifference;
+    std::vector<double> m_YINCMNDF;
+    double m_PrevCentroid = 0.0;
+    double m_YINThreshold = 0.15;
+    double m_YINMinFrequency = 50.0;
+    double m_YINMaxFrequency = 2000.0;
 
     // Time
     double m_EventTimeElapsed = 0.0; // ms

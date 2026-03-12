@@ -308,26 +308,6 @@ std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
 }
 
 // ─────────────────────────────────────
-std::vector<double> OpenScofo::GetCQTTemplate(double Freq) {
-    PitchTemplateArray p = m_MDP.GetPitchTemplate(Freq);
-    std::vector<std::pair<int, int>> cqt = m_MIR.GetCQT();
-
-    std::vector<double> cqt_template;
-    cqt_template.resize(cqt.size());
-
-    for (size_t k = 0; k < cqt.size(); ++k) {
-        auto [b0, b1] = cqt[k];
-        double sum = 0.0;
-        for (int i = b0; i <= b1; i++) {
-            sum += p[i];
-        }
-        cqt_template[k] = sum / double(b1 - b0 + 1);
-    }
-
-    return cqt_template;
-}
-
-// ─────────────────────────────────────
 std::vector<double> OpenScofo::GetSpectrumPower() const {
     return m_Desc.NormSpectralPower;
 }

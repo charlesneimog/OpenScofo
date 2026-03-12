@@ -18,6 +18,8 @@ extern "C" {
 #define OSCOFO_VERSION_MINOR 1
 #define OSCOFO_VERSION_PATCH 4
 
+#define OSCOFO_BUILD_TIME (__DATE__ " " __TIME__)
+
 // vector
 #include <vector>
 #include <functional>
@@ -89,7 +91,6 @@ class OpenScofo {
     double GetBlockDuration();
     Description GetAudioDescription(std::vector<double> &AudioBuffer);
     Description GetDescription();
-    std::vector<double> GetCQTTemplate(double Freq);
     std::vector<float> GetTimeCoherenceTemplate(int pos, int timeInEvent = 0);
     double GetTimeCoherenceConfiability(const std::vector<double> &eventValues);
 
