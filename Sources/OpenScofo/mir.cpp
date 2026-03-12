@@ -1,6 +1,7 @@
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <utility>
 
 namespace OpenScofo {
@@ -420,10 +421,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         m_PreviousSpectralPower.assign(NHalf, 0.0);
     }
 
-    if (Desc.Chroma.size() != m_ChromaSize)
-        Desc.Chroma.resize(m_ChromaSize);
-    std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
-
     for (size_t i = 0; i < NHalf; ++i) {
         const double re = m_FFTOut[i][0];
         const double im = m_FFTOut[i][1];
@@ -468,11 +465,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
             }
         }
         m_PreviousSpectralPower[i] = sp;
-
-        const int pc = m_ChromaBinMap[i];
-        if (pc >= 0) {
-            Desc.Chroma[pc] += sp;
-        }
     }
 
     const bool hasSpectralEnergy = SumPower > 1e-12;
@@ -501,13 +493,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     Desc.SpectralSpread = hasSpectralEnergy ? std::sqrt(weightedSpreadVariance / SumPower) : 0.0;
 
     // Finalize descriptors derived from the fused pass.
-    const double chromaSum = std::accumulate(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
-    if (chromaSum > 0.0) {
-        for (size_t i = 0; i < m_ChromaSize; ++i) {
-            Desc.Chroma[i] /= chromaSum;
-        }
-    }
-
     Desc.SpectralFlux = flux;
     Desc.SpectralIrregularity = irregularityDenominator > 0.0 ? (irregularityNumerator / irregularityDenominator) : 0.0;
     Desc.SpectralCrest = Desc.MaxAmp / ((SumPower / static_cast<double>(NHalf)) + 1e-12);
@@ -695,55 +680,106 @@ void MIR::MFCCExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │               Chroma                │
 // ╰─────────────────────────────────────╯
+double MIR::HzToOcts(double frequency, double tuning, int binsPerOctave) const {
+    const double a440 = m_ChromaA440 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
+    return std::log2(frequency / (a440 / 16.0));
+}
+
+double MIR::PositiveRemainder(double value, double modulus) const {
+    double result = std::fmod(value, modulus);
+    if (result < 0.0) {
+        result += modulus;
+    }
+    return result;
+}
+
+// ─────────────────────────────────────
 void MIR::SpectralChromaInit() {
-    size_t NHalf = m_FFTSize / 2 + 1;
-    m_ChromaBinMap.resize(NHalf);
+    const size_t nFft = static_cast<size_t>(m_FFTSize);
+    const size_t nHalf = nFft / 2 + 1;
 
-    const double A4 = 440.0;
-    const double invLog2 = 1.0 / std::log(2.0);
-
-    for (size_t k = 0; k < NHalf; ++k) {
-        double freq = (double(k) * m_Sr) / double(m_FFTSize);
-        if (freq < 20.0) {
-            m_ChromaBinMap[k] = -1;
-            continue;
-        }
-        double midi = 69.0 + 12.0 * std::log(freq / A4) * invLog2;
-        int pitchClass = int(std::round(midi)) % 12;
-        if (pitchClass < 0)
-            pitchClass += 12;
-
-        m_ChromaBinMap[k] = pitchClass;
+    m_ChromaFilter.assign(m_ChromaSize, std::vector<double>(nHalf, 0.0));
+    if (nFft == 0 || nHalf == 0 || m_Sr <= 0.0f) {
+        return;
     }
 
-    spdlog::debug("Chroma: {}", VectorToString(m_ChromaBinMap));
+    std::vector<double> frqbins(nFft, 0.0);
+    if (nFft > 1) {
+        for (size_t k = 1; k < nFft; ++k) {
+            const double frequency = static_cast<double>(k) * static_cast<double>(m_Sr) / static_cast<double>(nFft);
+            frqbins[k] =
+                static_cast<double>(m_ChromaSize) * HzToOcts(frequency, m_ChromaTuning, static_cast<int>(m_ChromaSize));
+        }
+        frqbins[0] = frqbins[1] - 1.5 * static_cast<double>(m_ChromaSize);
+    } else {
+        frqbins[0] = -1.5 * static_cast<double>(m_ChromaSize);
+    }
+
+    std::vector<double> binwidthbins(nFft, 1.0);
+    for (size_t k = 0; k + 1 < nFft; ++k) {
+        binwidthbins[k] = std::max(frqbins[k + 1] - frqbins[k], 1.0);
+    }
+
+    const double nChroma2 = std::round(static_cast<double>(m_ChromaSize) / 2.0);
+    for (size_t k = 0; k < nHalf; ++k) {
+        double columnNorm = 0.0;
+        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+            const double distance = PositiveRemainder(frqbins[k] - static_cast<double>(chroma) + nChroma2 +
+                                                          10.0 * static_cast<double>(m_ChromaSize),
+                                                      static_cast<double>(m_ChromaSize)) -
+                                    nChroma2;
+            const double weight = std::exp(-0.5 * std::pow(2.0 * distance / binwidthbins[k], 2.0));
+            m_ChromaFilter[chroma][k] = weight;
+            columnNorm += weight * weight;
+        }
+
+        if (columnNorm > 0.0) {
+            const double invNorm = 1.0 / std::sqrt(columnNorm);
+            for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+                m_ChromaFilter[chroma][k] *= invNorm;
+            }
+        }
+
+        const double octaveWeight = std::exp(
+            -0.5 * std::pow((frqbins[k] / static_cast<double>(m_ChromaSize) - m_ChromaCenterOctave) / m_ChromaOctaveWidth,
+                            2.0));
+        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+            m_ChromaFilter[chroma][k] *= octaveWeight;
+        }
+    }
+
+    const size_t chromaShift = 3 * (m_ChromaSize / 12);
+    if (chromaShift > 0 && chromaShift < m_ChromaSize) {
+        Matrix rolled(m_ChromaSize, std::vector<double>(nHalf, 0.0));
+        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+            rolled[chroma] = m_ChromaFilter[(chroma + chromaShift) % m_ChromaSize];
+        }
+        m_ChromaFilter.swap(rolled);
+    }
 }
 
 // ─────────────────────────────────────
 void MIR::SpectralChromaExec(Description &Desc) {
-    size_t NHalf = Desc.SpectralPower.size();
-
     if (Desc.Chroma.size() != m_ChromaSize)
         Desc.Chroma.resize(m_ChromaSize);
 
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
 
-    // Accumulate energy per pitch class
-    for (size_t k = 0; k < NHalf; ++k) {
-
-        int pc = m_ChromaBinMap[k];
-        if (pc < 0)
-            continue;
-
-        Desc.Chroma[pc] += Desc.SpectralPower[k];
+    if (m_ChromaFilter.empty() || m_ChromaFilter[0].empty() || Desc.Power.empty()) {
+        return;
     }
 
-    // Normalize (L1 normalization)
-    double sum = std::accumulate(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
+    const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
 
-    if (sum > 0.0) {
-        for (size_t i = 0; i < m_ChromaSize; ++i)
-            Desc.Chroma[i] /= sum;
+    for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        double energy = 0.0;
+        const auto &filter = m_ChromaFilter[chroma];
+
+        for (size_t k = 0; k < nHalf; ++k) {
+            energy += filter[k] * Desc.Power[k];
+        }
+
+        Desc.Chroma[chroma] = energy;
     }
 }
 
@@ -935,10 +971,10 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
 
     // Perc vs Pitch
     // Take the strongest percussive indicator: energy burst OR noise burst
-    double inst_perc = std::max(Desc.SpectralFlux / (Desc.Harmonicity + 1e-6), Desc.ZeroCrossingRate);
+    double inst_perc = Desc.SpectralFlux / (Desc.Harmonicity + 1e-6);
 
     inst_perc *= (1.0 - Desc.SilenceProb * Desc.Harmonicity);
-    inst_perc = std::min(1.0, std::max(0.0, inst_perc));
+    inst_perc = std::min(1.0, std::max(1e-300, inst_perc));
 
     Desc.PercussiveProb = inst_perc;
     m_PrevPercussiveProb = Desc.PercussiveProb;

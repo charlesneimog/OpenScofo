@@ -42,7 +42,7 @@ static void PushAudioState(lua_State *L, const AudioState &state) {
 
 // // ─────────────────────────────────────
 static void PushDescription(lua_State *L, const Description &desc) {
-    lua_createtable(L, 0, 22);
+    lua_createtable(L, 0, 21);
 
     lua_pushboolean(L, desc.Onset);
     lua_setfield(L, -2, "onset");
@@ -89,8 +89,6 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "norm_spectral_power");
     PushNumberVector(L, desc.ReverbSpectralPower);
     lua_setfield(L, -2, "reverb_spectral_power");
-    PushNumberVector(L, desc.PseudoCQT);
-    lua_setfield(L, -2, "pseudo_cqt");
     PushNumberVector(L, desc.MFCC);
     lua_setfield(L, -2, "mfcc");
     PushNumberVector(L, desc.Chroma);
