@@ -148,6 +148,42 @@ def run_test_flatness(window, label):
     )
 
 
+# ---------------- CHROMA TEST ----------------
+def run_test_chroma(window, label):
+    scofo_desc = scofo.get_audio_description(window)
+    librosa_chroma = librosa.feature.chroma_stft(
+        y=window,
+        sr=sr,
+        n_fft=n_fft,
+        hop_length=hop,
+        win_length=n_fft,
+        window="hann",
+        center=False,
+        n_chroma=12,
+        tuning=0.0,
+        norm=None,
+    )[:, 0].tolist()
+
+    scofo_chroma = scofo_desc.chroma
+
+    max_diff = 0.0
+    max_vals = (0.0, 0.0)
+
+    for i, (l_val, s_val) in enumerate(zip(librosa_chroma, scofo_chroma)):
+        abs_diff = abs(l_val - s_val)
+        if abs_diff > max_diff:
+            max_diff = abs_diff
+            max_vals = (l_val, s_val)
+
+    print(
+        f"{label} | "
+        f"CHRO | "
+        f"L: {max_vals[0]:+012.5f} | "
+        f"S: {max_vals[1]:+012.5f} | "
+        f"D: {max_diff:+012.5f}"
+    )
+
+
 # ---------------- FLUX TEST ----------------
 def run_test_harmonicity(window, label):
     scofo_desc = scofo.get_audio_description(window)
@@ -225,5 +261,6 @@ for _ in range(n_tests):
     run_test_zcr(window, f"Start {start:08d}")
     run_test_spread(window, f"Start {start:08d}")
     run_test_centroid(window, f"Start {start:08d}")
+    run_test_chroma(window, f"Start {start:08d}")
 
     print("")

@@ -440,7 +440,6 @@ double MDP::InverseA2(double SyncStrength) {
     return Mid;
 }
 
-
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
 double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
@@ -594,6 +593,8 @@ void MDP::GetAudioObservations(int T) {
     double ObsNoSound = 0;
     double ObsSilence = m_Desc.SilenceProb;
     double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
+    double nonPercussiveWeight = 1.0 - m_Desc.PercussiveProb;
+    double PercussiveWeight = m_Desc.PercussiveProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
@@ -613,7 +614,7 @@ void MDP::GetAudioObservations(int T) {
                 if (it != PitchObs.end()) {
                     BestObs = std::max(BestObs, it->second);
                 } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
+                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
                     PitchObs.emplace(AS.Freq, kl);
                     BestObs = std::max(BestObs, kl);
                 }
@@ -627,12 +628,11 @@ void MDP::GetAudioObservations(int T) {
                 if (AS.Type != PITCH) {
                     spdlog::error("Memory error on creation of Audio States, please report");
                 }
-
                 auto it = PitchObs.find(AS.Freq);
                 if (it != PitchObs.end()) {
                     ChordKLObs += it->second;
                 } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight;
+                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
                     PitchObs.emplace(AS.Freq, kl);
                     ChordKLObs += kl;
                 }
@@ -645,9 +645,16 @@ void MDP::GetAudioObservations(int T) {
             BestObs = std::max(BestObs, m_Desc.SilenceProb);
             break;
         }
+        case EXTENDED: {
+            BestObs = std::max(BestObs, m_Desc.SilenceProb);
+            spdlog::error("Observation not implemented yet");
+            break;
+        }
+
         default:
             spdlog::error("Observation not implemented yet");
         }
+
         StateJ.BestObs[bufferIndex] = BestObs;
     }
 

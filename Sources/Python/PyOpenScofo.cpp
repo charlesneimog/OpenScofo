@@ -58,7 +58,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
         .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
         .def_readwrite("norm_spectral_power", &OpenScofo::Description::NormSpectralPower)
-        .def_readwrite("pseudo_cqt", &OpenScofo::Description::PseudoCQT)
 
         .def_readwrite("loudness", &OpenScofo::Description::Loudness)
         .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)

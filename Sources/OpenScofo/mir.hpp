@@ -44,6 +44,8 @@ class MIR {
     double Mtof(double Note, double Tunning);
     double Ftom(double Freq, double Tunning);
     double Freq2Bin(double freq, double n, double Sr);
+    double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
+    double PositiveRemainder(double value, double modulus) const;
     void GetSpectralDescriptions(Description &Desc);
     // MFCC
     void MFCCInit();
@@ -113,8 +115,12 @@ class MIR {
     std::vector<std::pair<int, int>> m_MFCCActiveBins;
 
     // Chroma
-    std::vector<int> m_ChromaBinMap;
+    Matrix m_ChromaFilter;
     size_t m_ChromaSize = 12;
+    double m_ChromaA440 = 440.0;
+    double m_ChromaTuning = 0.0;
+    double m_ChromaCenterOctave = 5.0;
+    double m_ChromaOctaveWidth = 2.0;
 
     // Zero-crossing rate (librosa-like defaults)
     int m_ZCRFrameLength = 2048;

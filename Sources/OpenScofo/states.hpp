@@ -46,7 +46,7 @@ enum EventType {
     MULTI,
 
     //  AI model
-    TECH,
+    EXTENDED,
 
     // Cort Lippe event (event is just count)
     EVENT,
@@ -126,14 +126,18 @@ using States = std::vector<MarkovState>;
 class Description {
   public:
     bool Onset;
+
+    // Probability
     double SilenceProb;
     double PercussiveProb;
 
+    // Amplitude
     double dB;
     double RMS;
     double MaxAmp;
     double Loudness;
 
+    // Spectral
     double Harmonicity;
     double SpectralFlatness;
     double SpectralFlux;
@@ -146,17 +150,12 @@ class Description {
     double Peakiness = 0.0;
     double ZeroCrossingRate;
     double StdDev;
-
     double Pitch = 0.0;
     double PitchConfidence = 0.0;
-
     std::vector<double> Power;
     std::vector<double> SpectralPower;
     std::vector<double> NormSpectralPower;
     std::vector<double> ReverbSpectralPower;
-
-    // HPSS (Harmonic–Percussive Source Separation)
-    std::vector<double> PseudoCQT;
     std::vector<double> MFCC;
     std::vector<double> Chroma; // size 12
 };
