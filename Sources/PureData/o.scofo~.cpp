@@ -31,17 +31,6 @@ class PdOpenScofo {
     t_canvas *Canvas;
     std::string PatchDir;
 
-    enum MIR {
-        MFCC = 0,
-        LOUDNESS,
-        RMS,
-        POWER,
-        SILENCE,
-        CHROMA,
-        CQT,
-        ZCR,
-    };
-
     // Clock
     t_clock *ClockEvent;
     t_clock *ClockActions;
@@ -53,7 +42,7 @@ class PdOpenScofo {
     std::vector<Action> Actions;
 
     // Mir
-    std::vector<MIR> RequestMIR;
+    std::vector<OpenScofo::Descriptors> RequestMIR;
     bool MirOutput = false;
 
     // OpenScofo
@@ -143,45 +132,87 @@ static void oscofo_start(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &Desc) {
-    for (PdOpenScofo::MIR v : x->RequestMIR) {
-        if (v == PdOpenScofo::MIR::MFCC) {
+    for (auto it = x->RequestMIR.rbegin(); it != x->RequestMIR.rend(); ++it) {
+        OpenScofo::Descriptors v = *it;
+        if (v == OpenScofo::Descriptors::MFCC) {
             size_t mfccSize = Desc.MFCC.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
             for (size_t i = 0; i < mfccSize; ++i) {
                 SETFLOAT(&mfccAtoms[i], (t_float)Desc.MFCC[i]);
             }
             outlet_anything(x->DescOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
-        } else if (v == PdOpenScofo::MIR::CHROMA) {
+        } else if (v == OpenScofo::Descriptors::CHROMA) {
             size_t chromaSize = Desc.Chroma.size();
             std::vector<t_atom> chromaAtoms(chromaSize);
             for (size_t i = 0; i < chromaSize; ++i) {
                 SETFLOAT(&chromaAtoms[i], (t_float)Desc.Chroma[i]);
             }
             outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
-        } else if (v == PdOpenScofo::MIR::CQT) {
-            size_t mfccSize = Desc.PseudoCQT.size();
-            std::vector<t_atom> Atoms(mfccSize);
-            for (size_t i = 0; i < mfccSize; ++i) {
-                SETFLOAT(&Atoms[i], (t_float)Desc.PseudoCQT[i]);
-            }
-            outlet_anything(x->DescOut, gensym("cqt"), mfccSize, Atoms.data());
-        } else if (v == PdOpenScofo::MIR::POWER) {
+        } else if (v == OpenScofo::Descriptors::POWER) {
             size_t mfccSize = Desc.Power.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
             for (size_t i = 0; i < mfccSize; ++i) {
                 SETFLOAT(&mfccAtoms[i], (t_float)Desc.Power[i]);
             }
             outlet_anything(x->DescOut, gensym("power"), mfccSize, mfccAtoms.data());
-        } else if (v == PdOpenScofo::MIR::LOUDNESS) {
+        } else if (v == OpenScofo::Descriptors::LOUDNESS) {
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.Loudness);
             outlet_anything(x->DescOut, gensym("loudness"), 1, mfccAtoms.data());
-        } else if (v == PdOpenScofo::MIR::RMS) {
+        } else if (v == OpenScofo::Descriptors::SILENCEPROB) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SilenceProb);
+            outlet_anything(x->DescOut, gensym("silence"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::CENTROID) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralCentroid);
+            outlet_anything(x->DescOut, gensym("centroid"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::SPREAD) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralSpread);
+            outlet_anything(x->DescOut, gensym("spread"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::FLATNESS) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralFlatness);
+            outlet_anything(x->DescOut, gensym("flatness"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::FLUX) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralFlux);
+            outlet_anything(x->DescOut, gensym("flux"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::IRREGULARITY) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralIrregularity);
+            outlet_anything(x->DescOut, gensym("irregularity"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::YIN) {
+            std::vector<t_atom> Atoms(2);
+            SETFLOAT(&Atoms[0], (t_float)Desc.Pitch);
+            SETFLOAT(&Atoms[1], (t_float)Desc.PitchConfidence);
+            outlet_anything(x->DescOut, gensym("yin"), 2, Atoms.data());
+
+        } else if (v == OpenScofo::Descriptors::HARMONICITY) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.Harmonicity);
+            outlet_anything(x->DescOut, gensym("harmonicity"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::PERCUSSIVEPROB) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.PercussiveProb);
+            outlet_anything(x->DescOut, gensym("percussive"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::ONSET) {
+            if (Desc.Onset) {
+                std::vector<t_atom> Atoms(1);
+                SETSYMBOL(&Atoms[0], gensym("bang"));
+                outlet_anything(x->DescOut, gensym("onset"), 1, Atoms.data());
+            }
+        } else if (v == OpenScofo::Descriptors::RMS) {
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.RMS);
             outlet_anything(x->DescOut, gensym("rms"), 1, mfccAtoms.data());
-        } else if (v == PdOpenScofo::MIR::CHROMA) {
-        } else if (v == PdOpenScofo::MIR::ZCR) {
+        } else if (v == OpenScofo::Descriptors::CHROMA) {
+        } else if (v == OpenScofo::Descriptors::HFR) {
+            std::vector<t_atom> mfccAtoms(1);
+            SETFLOAT(&mfccAtoms[0], (t_float)Desc.HighFreqRatio);
+            outlet_anything(x->DescOut, gensym("hfr"), 1, mfccAtoms.data());
+        } else if (v == OpenScofo::Descriptors::ZCR) {
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.ZeroCrossingRate);
             outlet_anything(x->DescOut, gensym("zcr"), 1, mfccAtoms.data());
@@ -556,25 +587,54 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
             t_symbol *sym = atom_getsymbol(argv);
             if (strcmp(sym->s_name, "mfcc") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::MFCC);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::MFCC);
             } else if (strcmp(sym->s_name, "rms") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::RMS);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::RMS);
             } else if (strcmp(sym->s_name, "loudness") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::LOUDNESS);
-            } else if (strcmp(sym->s_name, "silence") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::SILENCE);
-            } else if (strcmp(sym->s_name, "cqt") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::CQT);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::LOUDNESS);
             } else if (strcmp(sym->s_name, "chroma") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::CHROMA);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::CHROMA);
+            } else if (strcmp(sym->s_name, "silence") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::SILENCEPROB);
+            } else if (strcmp(sym->s_name, "centroid") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::CENTROID);
             } else if (strcmp(sym->s_name, "zcr") == 0) {
                 DescOut = true;
-                x->RequestMIR.push_back(PdOpenScofo::MIR::ZCR);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::ZCR);
+            } else if (strcmp(sym->s_name, "hfr") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::HFR);
+            } else if (strcmp(sym->s_name, "spread") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::SPREAD);
+            } else if (strcmp(sym->s_name, "flatness") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::FLATNESS);
+            } else if (strcmp(sym->s_name, "flux") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::FLUX);
+            } else if (strcmp(sym->s_name, "irregularity") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::IRREGULARITY);
+            } else if (strcmp(sym->s_name, "harmonicity") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::HARMONICITY);
+            } else if (strcmp(sym->s_name, "percussive") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
+            } else if (strcmp(sym->s_name, "onset") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::ONSET);
+            } else if (strcmp(sym->s_name, "yin") == 0) {
+                DescOut = true;
+                x->RequestMIR.push_back(OpenScofo::Descriptors::YIN);
+            } else {
+                pd_error(x, "[o.scofo~] Invalid argument: %s", sym->s_name);
             }
 
             argc--, argv++;
@@ -624,8 +684,8 @@ extern "C" void setup_o0x2escofo_tilde(void) {
     OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
                              CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[o.scofo~] version %d.%d.%d (%s %s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
-         OSCOFO_VERSION_PATCH, __DATE__, __TIME__);
+    post("[o.scofo~] version %d.%d.%d (%s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
+         OSCOFO_VERSION_PATCH, OSCOFO_BUILD_TIME);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);

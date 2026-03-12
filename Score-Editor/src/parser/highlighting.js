@@ -123,6 +123,57 @@ export function luaIndentBody(node) {
     return false;
 }
 
+export function highlightTechFallback(startRow, endRow) {
+    const techPattern = /(\bTECH\b)\s+([a-zA-Z][a-zA-Z0-9_-]*)(?:\s+(-?[0-9]+(?:\.[0-9]+)?))?/g;
+
+    for (let line = startRow; line < endRow; line++) {
+        const text = this.codeEditor.getLine(line);
+        if (!text || !text.includes("TECH")) {
+            continue;
+        }
+
+        techPattern.lastIndex = 0;
+        let match;
+        while ((match = techPattern.exec(text)) !== null) {
+            const keywordStart = match.index + match[0].indexOf(match[1]);
+            const techniqueStart = match.index + match[0].indexOf(match[2]);
+            const durationStart = match[3] ? match.index + match[0].lastIndexOf(match[3]) : -1;
+
+            this.codeEditor.markText(
+                { line, ch: keywordStart },
+                { line, ch: keywordStart + match[1].length },
+                {
+                    inclusiveLeft: true,
+                    inclusiveRight: true,
+                    css: this.getHighlights("oscofo", "eventKeyword"),
+                },
+            );
+
+            this.codeEditor.markText(
+                { line, ch: techniqueStart },
+                { line, ch: techniqueStart + match[2].length },
+                {
+                    inclusiveLeft: true,
+                    inclusiveRight: true,
+                    css: this.getHighlights("oscofo", "techniqueId"),
+                },
+            );
+
+            if (durationStart >= 0) {
+                this.codeEditor.markText(
+                    { line, ch: durationStart },
+                    { line, ch: durationStart + match[3].length },
+                    {
+                        inclusiveLeft: true,
+                        inclusiveRight: true,
+                        css: this.getHighlights("oscofo", "duration"),
+                    },
+                );
+            }
+        }
+    }
+}
+
 export function runTreeQuery(_, startRow, endRow) {
     if (endRow == null) {
         const viewport = this.codeEditor.getViewport();
@@ -161,6 +212,8 @@ export function runTreeQuery(_, startRow, endRow) {
                     }
                 }
             }
+
+            this.highlightTechFallback(startRow, endRow);
         }
     });
 }

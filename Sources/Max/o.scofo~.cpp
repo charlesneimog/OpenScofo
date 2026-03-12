@@ -30,16 +30,6 @@ class MaxOpenScofo {
     t_sample Sample;
     std::string PatchDir;
 
-    enum MIR {
-        MFCC = 0,
-        LOUDNESS,
-        RMS,
-        POWER,
-        SILENCE,
-        CHROMA,
-        CQT,
-    };
-
     // Clock
     t_clock *ClockEvent;
     t_clock *ClockInfo;
@@ -51,7 +41,7 @@ class MaxOpenScofo {
     std::vector<Action> Actions;
 
     // Mir
-    std::vector<MIR> RequestMIR;
+    std::vector<OpenScofo::Descriptors> RequestMIR;
     bool MirOutput = false;
 
     // OpenScofo
@@ -126,47 +116,41 @@ static void oscofo_assist(MaxOpenScofo *x, void *b, long m, long a, char *s) {
 
 // ─────────────────────────────────────
 static void oscofo_output_descriptiors(MaxOpenScofo *x, OpenScofo::Description &Desc) {
-    for (MaxOpenScofo::MIR v : x->RequestMIR) {
-        if (v == MaxOpenScofo::MIR::MFCC) {
+    for (OpenScofo::Descriptors v : x->RequestMIR) {
+        if (v == OpenScofo::Descriptors::MFCC) {
             size_t mfccSize = Desc.MFCC.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
             for (size_t i = 0; i < mfccSize; ++i) {
                 atom_setfloat(&mfccAtoms[i], (float)Desc.MFCC[i]);
             }
             outlet_anything(x->InfoOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::CHROMA) {
+        } else if (v == OpenScofo::Descriptors::CHROMA) {
             size_t chromaSize = Desc.Chroma.size();
             std::vector<t_atom> chromaAtoms(chromaSize);
             for (size_t i = 0; i < chromaSize; ++i) {
                 atom_setfloat(&chromaAtoms[i], (float)Desc.Chroma[i]);
             }
             outlet_anything(x->InfoOut, gensym("chroma"), chromaSize, chromaAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::CQT) {
-            size_t cqtSize = Desc.PseudoCQT.size();
-            std::vector<t_atom> cqtAtoms(cqtSize);
-            for (size_t i = 0; i < cqtSize; ++i) {
-                atom_setfloat(&cqtAtoms[i], (float)Desc.PseudoCQT[i]);
-            }
-            outlet_anything(x->InfoOut, gensym("cqt"), cqtSize, cqtAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::POWER) {
+        } else if (v == OpenScofo::Descriptors::POWER) {
             size_t powerSize = Desc.Power.size();
             std::vector<t_atom> powerAtoms(powerSize);
             for (size_t i = 0; i < powerSize; ++i) {
                 atom_setfloat(&powerAtoms[i], (float)Desc.Power[i]);
             }
             outlet_anything(x->InfoOut, gensym("power"), powerSize, powerAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::LOUDNESS) {
+        } else if (v == OpenScofo::Descriptors::LOUDNESS) {
             std::vector<t_atom> loudnessAtoms(1);
             atom_setfloat(&loudnessAtoms[0], (float)Desc.Loudness);
             outlet_anything(x->InfoOut, gensym("loudness"), 1, loudnessAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::RMS) {
+        } else if (v == OpenScofo::Descriptors::CENTROID) {
+        } else if (v == OpenScofo::Descriptors::SILENCEPROB) {
+            std::vector<t_atom> loudnessAtoms(1);
+            atom_setfloat(&loudnessAtoms[0], (float)Desc.SilenceProb);
+            outlet_anything(x->InfoOut, gensym("silence"), 1, loudnessAtoms.data());
+        } else if (v == OpenScofo::Descriptors::RMS) {
             std::vector<t_atom> rmsAtoms(1);
             atom_setfloat(&rmsAtoms[0], (float)Desc.RMS);
             outlet_anything(x->InfoOut, gensym("rms"), 1, rmsAtoms.data());
-        } else if (v == MaxOpenScofo::MIR::SILENCE) {
-            std::vector<t_atom> silenceAtoms(1);
-            atom_setfloat(&silenceAtoms[0], (float)Desc.SilenceProb);
-            outlet_anything(x->InfoOut, gensym("silence"), 1, silenceAtoms.data());
         }
     }
 }
@@ -610,31 +594,29 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
             t_symbol *sym = atom_getsym(argv);
             if (strcmp(sym->s_name, "mfcc") == 0) {
                 x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::MFCC);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::MFCC);
             } else if (strcmp(sym->s_name, "rms") == 0) {
                 x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::RMS);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::RMS);
             } else if (strcmp(sym->s_name, "loudness") == 0) {
                 x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::LOUDNESS);
-            } else if (strcmp(sym->s_name, "silence") == 0) {
-                x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::SILENCE);
-            } else if (strcmp(sym->s_name, "cqt") == 0) {
-                x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::CQT);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::LOUDNESS);
             } else if (strcmp(sym->s_name, "chroma") == 0) {
                 x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::CHROMA);
-            } else if (strcmp(sym->s_name, "power") == 0) {
+                x->RequestMIR.push_back(OpenScofo::Descriptors::CHROMA);
+            } else if (strcmp(sym->s_name, "silence") == 0) {
                 x->MirOutput = true;
-                x->RequestMIR.push_back(MaxOpenScofo::MIR::POWER);
+                x->RequestMIR.push_back(OpenScofo::Descriptors::SILENCEPROB);
             }
+        } else if (strcmp(sym->s_name, "power") == 0) {
+            x->MirOutput = true;
+            x->RequestMIR.push_back(OpenScofo::Descriptors::POWER);
         }
-        argc--, argv++;
     }
+    argc--, argv++;
+}
 
-    return (x);
+return (x);
 }
 
 // ─────────────────────────────────────

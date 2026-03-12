@@ -42,14 +42,12 @@ static void PushAudioState(lua_State *L, const AudioState &state) {
 
 // // ─────────────────────────────────────
 static void PushDescription(lua_State *L, const Description &desc) {
-    lua_createtable(L, 0, 16);
+    lua_createtable(L, 0, 22);
 
-    lua_pushboolean(L, desc.Silence);
-    lua_setfield(L, -2, "silence");
     lua_pushboolean(L, desc.Onset);
     lua_setfield(L, -2, "onset");
     lua_pushnumber(L, desc.SilenceProb);
-    lua_setfield(L, -2, "silence_prob");
+    lua_setfield(L, -2, "silence");
 
     lua_pushnumber(L, desc.dB);
     lua_setfield(L, -2, "db");
@@ -66,6 +64,20 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "spectral_flatness");
     lua_pushnumber(L, desc.SpectralFlux);
     lua_setfield(L, -2, "spectral_flux");
+    lua_pushnumber(L, desc.SpectralIrregularity);
+    lua_setfield(L, -2, "spectral_irregularity");
+    lua_pushnumber(L, desc.SpectralCrest);
+    lua_setfield(L, -2, "spectral_crest");
+    lua_pushnumber(L, desc.SpectralCentroid);
+    lua_setfield(L, -2, "spectral_centroid");
+    lua_pushnumber(L, desc.CentroidVelocity);
+    lua_setfield(L, -2, "centroid_velocity");
+    lua_pushnumber(L, desc.SpectralSpread);
+    lua_setfield(L, -2, "spectral_spread");
+    lua_pushnumber(L, desc.HighFreqRatio);
+    lua_setfield(L, -2, "high_freq_ratio");
+    lua_pushnumber(L, desc.Peakiness);
+    lua_setfield(L, -2, "peakiness");
     lua_pushnumber(L, desc.StdDev);
     lua_setfield(L, -2, "std_dev");
 

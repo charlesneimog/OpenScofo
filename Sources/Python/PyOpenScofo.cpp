@@ -62,8 +62,15 @@ PYBIND11_MODULE(_OpenScofo, m) {
 
         .def_readwrite("loudness", &OpenScofo::Description::Loudness)
         .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)
+        .def_readwrite("spectral_irregularity", &OpenScofo::Description::SpectralIrregularity)
+        .def_readwrite("spectral_crest", &OpenScofo::Description::SpectralCrest)
+        .def_readwrite("spectral_centroid", &OpenScofo::Description::SpectralCentroid)
+        .def_readwrite("centroid_velocity", &OpenScofo::Description::CentroidVelocity)
+        .def_readwrite("spectral_spread", &OpenScofo::Description::SpectralSpread)
         .def_readwrite("spectral_flatness", &OpenScofo::Description::SpectralFlatness)
+        .def_readwrite("high_freq_ratio", &OpenScofo::Description::HighFreqRatio)
         .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
+        .def_readwrite("peakiness", &OpenScofo::Description::Peakiness)
         .def_readwrite("zero_crossing_rate", &OpenScofo::Description::ZeroCrossingRate)
 
         .def_readwrite("db", &OpenScofo::Description::dB)
@@ -125,7 +132,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def("get_event_index", &OpenScofo::OpenScofo::GetEventIndex)
         .def("get_states", &OpenScofo::OpenScofo::GetStates)
         .def("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
-        .def("get_cqt_template", &OpenScofo::OpenScofo::GetCQTTemplate)
         .def("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
 
         // Help & Test Functions

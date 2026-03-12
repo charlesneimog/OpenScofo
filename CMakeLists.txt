@@ -99,44 +99,69 @@ add_dependencies(score_parser generate_tree_sitter_parser)
 
 # Custom command to generate the WASM file if it doesn't exist
 if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
+
     add_custom_command(
         OUTPUT "${OSCOFO_ONLINE_EDITOR_WASM}"
-        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
-                --wasm
-        COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
+        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}"
+                ${TREE_SITTER_EXECUTABLE} build --wasm
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
         DEPENDS "${GRAMMAR_JS_SRC}"
         COMMENT "Generating Tree-sitter parser for OScofo Online Editor and WASM..."
-        VERBATIM)
+        VERBATIM
+    )
 
     set(TS_URL
         "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/web-tree-sitter.tar.gz"
     )
+
     set(TS_ARCHIVE "${CMAKE_BINARY_DIR}/web-tree-sitter.tar.gz")
-    set(TS_URL "https://example.com/path/to/web-tree-sitter.tar.gz")
     set(TS_TEMP_DIR "${CMAKE_BINARY_DIR}/web-tree-sitter-temp")
     set(TS_DEST "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter")
 
-    # Download the archive
+    file(MAKE_DIRECTORY "${TS_TEMP_DIR}")
+    file(MAKE_DIRECTORY "${TS_DEST}")
+
+    # Download archive if missing
     if(NOT EXISTS "${TS_ARCHIVE}")
-        file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" SHOW_PROGRESS STATUS download_status)
+        file(DOWNLOAD
+            "${TS_URL}"
+            "${TS_ARCHIVE}"
+            SHOW_PROGRESS
+            STATUS download_status
+        )
         list(GET download_status 0 status_code)
         if(NOT status_code EQUAL 0)
-            message(FATAL_ERROR "Failed to download web-tree-sitter archive: ${download_status}")
+            message(FATAL_ERROR "Failed to download web-tree-sitter archive")
         endif()
     endif()
 
-    # Extract all files to temp dir
-    file(MAKE_DIRECTORY "${TS_TEMP_DIR}")
-    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
-                    WORKING_DIRECTORY "${TS_TEMP_DIR}")
+    # Extract
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
+        WORKING_DIRECTORY "${TS_TEMP_DIR}"
+    )
 
-    # Copy only the required files
-    file(COPY "${TS_TEMP_DIR}/web-tree-sitter.wasm" "${TS_TEMP_DIR}/web-tree-sitter.js"
-         DESTINATION "${TS_DEST}")
+    # Verify files exist
+    if(NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.js" OR
+       NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.wasm")
+        message(FATAL_ERROR "web-tree-sitter extraction failed")
+    endif()
 
-    # Create a target that depends on this output
-    add_custom_target(build_online_editor_wasm ALL DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}")
+    # Copy required runtime files
+    file(COPY
+        "${TS_TEMP_DIR}/web-tree-sitter.js"
+        "${TS_TEMP_DIR}/web-tree-sitter.wasm"
+        DESTINATION "${TS_DEST}"
+    )
+
+    add_custom_target(
+        build_online_editor_wasm
+        ALL
+        DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}"
+    )
+
 endif()
 
 # ╭──────────────────────────────────────╮

@@ -75,3 +75,6 @@ test.csv
 /Documentation/Editor
 /Documentation/__pycache__
 /out.perf
+/Tests/outputs
+/Tests/X.npy
+/Tests/y.npy

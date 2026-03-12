@@ -1,4 +1,4 @@
-#N canvas 0 0 925 1132 10;
+#N canvas 0 0 1299 1132 10;
 #X declare -path ../build/Sources/PureData;
 #X declare -lib xlab;
 #X obj 5 4 declare -path ../build/Sources/PureData;

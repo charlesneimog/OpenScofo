@@ -1,5 +1,4 @@
 import sys
-import puredata as pd
 
 sys.path.append("/home/neimog/.config/miniconda3.dir/lib/python3.13/site-packages")
 
@@ -9,20 +8,24 @@ import threading
 import traceback
 from collections import Counter
 from queue import SimpleQueue, Empty
+import OpenScofo
 import numpy as np
 import librosa
-import OpenScofo
+import puredata as pd
 
 from sklearn.metrics import classification_report
 from catboost import CatBoostClassifier
 
+import onnx
+from onnx import helper, TensorProto
+
 
 class pytrain(pd.NewObject):
-    name = "py.train"
+    name = "py.train-onnx"
 
     def __init__(self, args):
         # pd
-        self.inlets = 2
+        self.inlets = 1
         self.outlets = 2
         self.tabname = "train"
         self.redraw_tab_after = 120
@@ -54,7 +57,6 @@ class pytrain(pd.NewObject):
         self._main_thread_id = threading.get_ident()
         self._thread_errors = SimpleQueue()
 
-
     def _thread_target(self, target):
         try:
             target()
@@ -82,7 +84,6 @@ class pytrain(pd.NewObject):
     # Model
     # ----------------------------
     def _init_model(self):
-        # TODO: Implement more models
         return CatBoostClassifier(
             iterations=self.iterations,
             depth=6,
@@ -195,12 +196,15 @@ class pytrain(pd.NewObject):
                     idx += random.randint(512, 1024)
                     continue
 
-                mfcc = np.asarray(desc.mfcc, dtype=np.float32).ravel()
-                if mfcc.size > 0:
-                    target_list.append((mfcc, label))
-
+                mylist = desc.mfcc + [
+                    desc.zero_crossing_rate,
+                    desc.spectral_centroid,
+                    desc.spectral_spread,
+                ]
+                mfcc = np.asarray(mylist, dtype=np.float32)
+                target_list.append((mfcc, label))
                 idx += random.randint(512, 1024)
-                self.out(1, pd.FLOAT,self.processed_count)
+                self.out(1, pd.FLOAT, self.processed_count)
 
     def _write_tab(self, y):
         self.redraw += 1
@@ -321,7 +325,63 @@ class pytrain(pd.NewObject):
         if os.path.exists(path):
             self.logpost(1, "Model already exists, will replace it!")
         self.clf.save_model(path, format="onnx")
+        # self.inject_entropy_tensor(path)
         self.logpost(2, f"Model exported to {path}")
+
+    def inject_entropy_tensor(self, model_path):
+        model = onnx.load(model_path)
+        graph = model.graph
+
+        prob_name = None
+        for o in graph.output:
+            if "probab" in o.name.lower():
+                prob_name = o.name
+                break
+
+        if prob_name is None:
+            raise RuntimeError("Probability tensor not found in ONNX graph")
+
+        log_node = helper.make_node(
+            "Log",
+            [prob_name],
+            ["log_p"],
+            name="Entropy_Log"
+        )
+
+        mul_node = helper.make_node(
+            "Mul",
+            [prob_name, "log_p"],
+            ["p_log_p"],
+            name="Entropy_Mul"
+        )
+
+        sum_node = helper.make_node(
+            "ReduceSum",
+            ["p_log_p"],
+            ["sum_p_log_p"],
+            axes=[1],
+            keepdims=0,
+            name="Entropy_Sum"
+        )
+
+        neg_node = helper.make_node(
+            "Neg",
+            ["sum_p_log_p"],
+            ["entropy"],
+            name="Entropy_Neg"
+        )
+
+        graph.node.extend([log_node, mul_node, sum_node, neg_node])
+
+        graph.output.append(
+            helper.make_tensor_value_info(
+                "entropy",
+                TensorProto.FLOAT,
+                [None]
+            )
+        )
+
+        onnx.save(model, model_path)
 
     # ----------------------------
     # Utils

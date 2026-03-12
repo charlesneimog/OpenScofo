@@ -1,12 +1,13 @@
 export const PARSER_OPEN_SCOFO_WASM = "tree-sitter/tree-sitter-openscofo.wasm";
 export const PARSER_LUA_WASM = "tree-sitter/tree-sitter-lua.wasm";
 
-export const AUTOCOMPLETE_KEYWORDS = ["NOTE", "REST", "TRILL", "CHORD", "BPM"];
+export const AUTOCOMPLETE_KEYWORDS = ["NOTE", "REST", "TRILL", "CHORD", "TECH", "BPM"];
 
 export const SUGGESTIONS = {
     NOTE: "NOTE",
     TRILL: "TRILL",
     CHORD: "CHORD",
+    TECH: "TECH",
 };
 
 export const HIGHLIGHTS = {
@@ -16,6 +17,8 @@ export const HIGHLIGHTS = {
         luaKeyword: "color: var(--purple); font-weight: bold;",
         pitch: "color: var(--blue); font-weight: bold;",
         duration: "color: var(--yellow); font-weight: bold;",
+        techniqueId: "color: var(--green); font-style: italic; font-weight: bold;",
+        attributeId: "color: var(--cyan); font-weight: bold;",
         comment: "color: var(--comment); opacity: 0.4; font-style: italic;",
         config: "color: var(--purple); font-weight: bold;",
         error: "text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--red);",
@@ -49,7 +52,7 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
 
     ; Primary event keywords
         ((keyword) @eventKeyword
-            (#match? @eventKeyword "^(NOTE|REST|TRILL|CHORD|EVENT)$"))
+            (#match? @eventKeyword "^(NOTE|REST|TRILL|CHORD|EVENT|TECH)$"))
 
         ; Primary config keywords
         ((keyword) @config
@@ -76,6 +79,8 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
     ; Musical Attributes
     (pitch) @pitch
     (duration (number) @duration)
+    (techniqueId) @techniqueId
+    (attributeId) @attributeId
 
     ; Actions and Executions
     (timedAction) @timedAction

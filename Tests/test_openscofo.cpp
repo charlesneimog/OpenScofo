@@ -33,7 +33,6 @@ TEST_F(OpenScofoTest, Initialization) {
 TEST_F(OpenScofoTest, DefaultDescription) {
     OpenScofo::Description desc = oscofo->GetDescription();
     EXPECT_FALSE(desc.Onset);
-    EXPECT_FALSE(desc.Silence);
 }
 
 // 3. Test Audio Processing with an empty buffer

@@ -107,7 +107,7 @@ class MDP {
     double m_FFTSize;
     double m_HopSize;
     double m_dBTreshold = -55;
-    int m_BufferSize = 1000;
+    int m_BufferSize = 500;
     bool m_IsSilence = false;
 
     // Pitch Template

@@ -74,6 +74,7 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     m_Sr = Sr;
     m_BlockSize = HopSize;
     m_Accum = 0;
+    m_PrevCentroid = 0.0;
 
     if (m_FFTPlan != nullptr) {
         fftw_destroy_plan(m_FFTPlan);
@@ -93,9 +94,9 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     FFTWInit();
     OnsetInit();
     MFCCInit();
-    CQTInit();
     SpectralChromaInit();
     ZeroCrossingRateInit();
+    YINInit();
 
     spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
 }
@@ -108,36 +109,27 @@ void MIR::SetdBTreshold(double dB) {
 }
 
 // ─────────────────────────────────────
-std::vector<std::pair<int, int>> MIR::GetCQT() {
-    return m_FakeCQT;
-}
-
-// ─────────────────────────────────────
 void MIR::FFTWInit() {
-    float WindowHalf = m_FFTSize / 2;
-    m_FFTIn = (double *)fftw_alloc_real((size_t)m_FFTSize);
+    int WindowHalf = round(m_FFTSize / 2);
+    m_FFTIn = fftw_alloc_real(m_FFTSize);
     if (!m_FFTIn) {
         spdlog::critical("fftw_alloc_real failed");
         return;
     }
 
-    m_FFTOut = (fftw_complex *)fftw_alloc_complex((size_t)WindowHalf + 1);
+    m_FFTOut = fftw_alloc_complex(WindowHalf + 1);
     if (!m_FFTOut) {
-        fftw_free(m_FFTIn); // Free previously allocated memory
+        fftw_free(m_FFTIn);
         spdlog::critical("fftw_alloc_complex failed");
         return;
     }
 
-#ifdef __EMSCRIPTEN__
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_ESTIMATE);
-#else
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_MEASURE);
-#endif
+    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
 
-    // hann
+    // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
     m_WindowingFunc.resize(m_FFTSize);
     for (size_t i = 0; i < m_FFTSize; i++) {
-        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / (m_FFTSize - 1)));
+        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_FFTSize));
     }
 }
 
@@ -145,12 +137,10 @@ void MIR::FFTWInit() {
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
 void MIR::LoadONNXModel(fs::path path) {
-#ifdef _WIN32
-    std::string path_utf8(path.u8string().begin(), path.u8string().end());
+    auto u8 = path.u8string();
+    std::string path_utf8(u8.begin(), u8.end());
+
     m_OnnxCTX = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
-#else
-    m_OnnxCTX = onnx_context_alloc_from_file(path.c_str(), nullptr, 0);
-#endif
 
     if (m_OnnxCTX == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
@@ -266,9 +256,6 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
         Desc.dB = -100; // handle silence
     }
 
-    // Silence detection
-    Desc.Silence = Desc.dB < m_dBTreshold;
-
     // Loudness (based on sum of squares)
     double meanSquare = z_loudness / In.size();
     if (meanSquare <= 0.0) {
@@ -283,39 +270,131 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
     Desc.SilenceProb = 1.0 / (1.0 + std::exp(alpha * (Desc.Loudness - L0)));
 }
 
-// ─────────────────────────────────────
-void MIR::CQTInit() {
-    int binsPerOctave = 48;
-    int nOctaves = 6;
-    double fMin = 55.0;
+// ╭─────────────────────────────────────╮
+// │                Pitch                │
+// ╰─────────────────────────────────────╯
+void MIR::YINInit() {
+    const size_t frameSize = static_cast<size_t>(std::max(2.0f, m_FFTSize));
+    const size_t half = frameSize / 2;
+    const size_t allocSize = half + 2;
+    m_YINDifference.assign(allocSize, 0.0);
+    m_YINCMNDF.assign(allocSize, 1.0);
+}
 
-    double Q = 1.0 / (std::pow(2.0, 1.0 / binsPerOctave) - 1.0);
-    int nCQTbins = binsPerOctave * nOctaves;
-
-    m_FakeCQT.clear();
-    m_FakeCQT.reserve(nCQTbins);
-
-    for (int k = 0; k < nCQTbins; ++k) {
-        double fk = fMin * std::pow(2.0, k / double(binsPerOctave));
-        if (fk >= 0.5 * m_Sr)
-            break;
-
-        double bw = fk / Q;
-
-        int b0 = int((fk - 0.5 * bw) * m_FFTSize / m_Sr);
-        int b1 = int((fk + 0.5 * bw) * m_FFTSize / m_Sr);
-
-        b0 = std::max(b0, 0);
-        b1 = std::min(b1, int(m_FFTSize / 2 - 1));
-
-        if (b1 > b0)
-            m_FakeCQT.emplace_back(b0, b1);
+void MIR::YINExec(std::vector<double> &In, Description &Desc) {
+    const size_t frame = In.size();
+    if (frame < 2 || m_YINDifference.empty() || m_YINCMNDF.empty()) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
     }
+
+    const double sampleRate = std::max(1.0, static_cast<double>(m_Sr));
+    const size_t minTau = std::max<size_t>(1, static_cast<size_t>(sampleRate / m_YINMaxFrequency));
+    const size_t maxTauByPitch = std::max(minTau + 1, static_cast<size_t>(std::ceil(sampleRate / m_YINMinFrequency)));
+    const size_t maxTau = std::min({frame / 2, m_YINDifference.size() - 1, maxTauByPitch});
+    if (maxTau <= minTau) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
+    }
+
+    double *Diff = m_YINDifference.data();
+    double *Cmnfg = m_YINCMNDF.data();
+    std::fill_n(Diff, maxTau + 1, 0.0);
+    std::fill_n(Cmnfg, maxTau + 1, 1.0);
+
+    const double *data = In.data();
+    const size_t frameMinus1 = frame - 1;
+
+    // Walk the input once and update a contiguous lag window for each sample.
+    for (size_t i = 0; i < frameMinus1; ++i) {
+        const double x_i = data[i];
+        const size_t remaining = frameMinus1 - i;
+        const size_t limit = std::min(maxTau, remaining);
+        const double *lagPtr = data + i + 1;
+        for (size_t tau = minTau; tau <= limit; ++tau) {
+            const double delta = x_i - lagPtr[tau - 1];
+            Diff[tau] += delta * delta;
+        }
+    }
+
+    double cumulative = 0.0;
+    Cmnfg[0] = 1.0;
+    for (size_t tau = 1; tau <= maxTau; ++tau) {
+        cumulative += Diff[tau];
+        if (cumulative <= 0.0) {
+            Cmnfg[tau] = 1.0;
+        } else {
+            Cmnfg[tau] = (Diff[tau] * static_cast<double>(tau)) / cumulative;
+        }
+    }
+
+    size_t tauEstimate = 0;
+    double bestValue = std::numeric_limits<double>::infinity();
+    for (size_t tau = minTau; tau <= maxTau; ++tau) {
+        const double value = Cmnfg[tau];
+        if (value < bestValue) {
+            bestValue = value;
+            tauEstimate = tau;
+        }
+    }
+
+    for (size_t tau = minTau; tau <= maxTau; ++tau) {
+        const double value = Cmnfg[tau];
+        if (value < m_YINThreshold) {
+            double prevValue = value;
+            tauEstimate = tau;
+            while (tau + 1 <= maxTau && Cmnfg[tau + 1] < prevValue) {
+                prevValue = Cmnfg[++tau];
+                tauEstimate = tau;
+            }
+            bestValue = prevValue;
+            break;
+        }
+    }
+
+    if (tauEstimate == 0 || !std::isfinite(bestValue)) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
+    }
+
+    double refinedTau = static_cast<double>(tauEstimate);
+    if (tauEstimate > minTau && tauEstimate + 1 <= maxTau) {
+        const double left = Cmnfg[tauEstimate - 1];
+        const double center = Cmnfg[tauEstimate];
+        const double right = Cmnfg[tauEstimate + 1];
+        const double denominator = left - (2.0 * center) + right;
+        if (std::abs(denominator) > 1e-12) {
+            const double offset = 0.5 * (left - right) / denominator;
+            refinedTau += std::clamp(offset, -1.0, 1.0);
+        }
+    }
+
+    const double confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
+    if (refinedTau <= 0.0 || confidence <= 0.0) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
+    }
+
+    const double pitch = sampleRate / refinedTau;
+    if (pitch < m_YINMinFrequency || pitch > m_YINMaxFrequency) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
+    }
+
+    Desc.Pitch = pitch;
+    Desc.PitchConfidence = confidence;
 }
 
 // ─────────────────────────────────────
-void MIR::GetFFTDescriptions(Description &Desc) {
+void MIR::GetSpectralDescriptions(Description &Desc) {
     const size_t NHalf = m_FFTSize / 2 + 1;
+    const double binWidth = static_cast<double>(m_Sr) / static_cast<double>(m_FFTSize);
+    const size_t hfStart = NHalf / 4;
 
     fftw_execute(m_FFTPlan);
 
@@ -327,9 +406,15 @@ void MIR::GetFFTDescriptions(Description &Desc) {
     double logSumPower = 0.0;
     double linSumPower = 0.0;
     double flux = 0.0;
+    double irregularityNumerator = 0.0;
+    double irregularityDenominator = 0.0;
     double harmonicityPeak = 0.0;
     double harmonicitySum = 0.0;
+    double highFreqEnergy = 0.0;
+    double weightedSumFreqs = 0.0;
     constexpr double amin = 1e-10;
+    double previousSpectralBin = 0.0;
+    bool hasPreviousSpectralBin = false;
 
     if (m_PreviousSpectralPower.size() != NHalf) {
         m_PreviousSpectralPower.assign(NHalf, 0.0);
@@ -352,6 +437,18 @@ void MIR::GetFFTDescriptions(Description &Desc) {
             Desc.MaxAmp = sp;
 
         SumPower += sp;
+        weightedSumFreqs += (static_cast<double>(i) * binWidth) * sp;
+        irregularityDenominator += sp * sp;
+        if (i >= hfStart) {
+            highFreqEnergy += sp;
+        }
+
+        if (hasPreviousSpectralBin) {
+            const double binDelta = previousSpectralBin - sp;
+            irregularityNumerator += binDelta * binDelta;
+        }
+        previousSpectralBin = sp;
+        hasPreviousSpectralBin = true;
 
         // Flatness on power spectrum.
         const double v = std::max(amin, p);
@@ -378,19 +475,30 @@ void MIR::GetFFTDescriptions(Description &Desc) {
         }
     }
 
+    const bool hasSpectralEnergy = SumPower > 1e-12;
+    const double centroid = hasSpectralEnergy ? (weightedSumFreqs / SumPower) : 0.0;
+    Desc.SpectralCentroid = centroid;
+    Desc.CentroidVelocity = std::abs(centroid - m_PrevCentroid);
+    m_PrevCentroid = centroid;
+
     // FUSE 2: Normalize and calculate mean/variance simultaneously.
     const double SumPowerEps = SumPower + 1e-12;
     const double Mean = 1.0 / NHalf;
     double Variance = 0.0;
+    double weightedSpreadVariance = 0.0;
 
     for (size_t i = 0; i < NHalf; ++i) {
         double normSp = (Desc.SpectralPower[i] + 1e-12) / SumPowerEps;
         Desc.NormSpectralPower[i] = normSp;
         double Diff = normSp - Mean;
         Variance += Diff * Diff;
+
+        const double freqDiff = (static_cast<double>(i) * binWidth) - centroid;
+        weightedSpreadVariance += (freqDiff * freqDiff) * Desc.SpectralPower[i];
     }
 
     Desc.StdDev = std::sqrt(Variance / NHalf);
+    Desc.SpectralSpread = hasSpectralEnergy ? std::sqrt(weightedSpreadVariance / SumPower) : 0.0;
 
     // Finalize descriptors derived from the fused pass.
     const double chromaSum = std::accumulate(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
@@ -401,14 +509,12 @@ void MIR::GetFFTDescriptions(Description &Desc) {
     }
 
     Desc.SpectralFlux = flux;
-    Desc.SpectralFlatness = std::exp(logSumPower / static_cast<double>(NHalf)) /
-                            (linSumPower / static_cast<double>(NHalf));
+    Desc.SpectralIrregularity = irregularityDenominator > 0.0 ? (irregularityNumerator / irregularityDenominator) : 0.0;
+    Desc.SpectralCrest = Desc.MaxAmp / ((SumPower / static_cast<double>(NHalf)) + 1e-12);
+    Desc.SpectralFlatness =
+        std::exp(logSumPower / static_cast<double>(NHalf)) / (linSumPower / static_cast<double>(NHalf));
     Desc.Harmonicity = harmonicityPeak / (harmonicitySum + 1e-12);
-
-    // Pseudo-CQT with prefix sums reduces O(bands * bins) to O(bands).
-    if (m_FakeCQT.size() != Desc.PseudoCQT.size()) {
-        Desc.PseudoCQT.resize(m_FakeCQT.size());
-    }
+    Desc.HighFreqRatio = highFreqEnergy / (SumPower + 1e-12);
 
     const size_t prefixSize = NHalf + 1;
     if (m_SpectralPrefix.size() != prefixSize) {
@@ -420,15 +526,10 @@ void MIR::GetFFTDescriptions(Description &Desc) {
         m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.SpectralPower[i];
     }
 
-    for (size_t k = 0; k < m_FakeCQT.size(); ++k) {
-        auto [b0, b1] = m_FakeCQT[k];
-        const double sum = m_SpectralPrefix[static_cast<size_t>(b1) + 1] - m_SpectralPrefix[static_cast<size_t>(b0)];
-        Desc.PseudoCQT[k] = sum / static_cast<double>(b1 - b0 + 1);
-    }
-
     // Remaining descriptors that require their own transforms.
     OnsetExec(Desc);
     MFCCExec(Desc);
+    SpectralChromaExec(Desc);
 }
 
 // ╭─────────────────────────────────────╮
@@ -476,33 +577,36 @@ void MIR::MFCCInit() {
         hz_pts[i] = mel_to_hz(mel_pts[i]);
     }
 
-    // Slaney triangular filters (area normalized)
+    // Slaney triangular filters (area normalized), matching librosa.filters.mel
     m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
     m_MFCCActiveBins.assign(m_MFCCMels, {0, -1});
 
+    std::vector<double> fdiff(m_MFCCMels + 1);
+    for (int i = 0; i < m_MFCCMels + 1; ++i) {
+        fdiff[i] = hz_pts[i + 1] - hz_pts[i];
+    }
+
     for (int m = 0; m < m_MFCCMels; ++m) {
-        const double f_left = hz_pts[m];
-        const double f_center = hz_pts[m + 1];
-        const double f_right = hz_pts[m + 2];
+        const double enorm = 2.0 / (hz_pts[m + 2] - hz_pts[m]);
 
-        const double norm = 2.0 / (f_right - f_left);
+        int first = -1;
+        int last = -1;
+        for (int k = 0; k < n_f; ++k) {
+            const double ramp = hz_pts[m] - fft_freqs[k];
+            const double lower = -ramp / fdiff[m];
+            const double upper = (hz_pts[m + 2] - fft_freqs[k]) / fdiff[m + 1];
+            const double w = std::max(0.0, std::min(lower, upper));
+            const double v = w * enorm;
+            m_MFCCFilter[m][k] = v;
 
-        const int startBin = std::max(0, static_cast<int>(std::ceil(f_left * m_FFTSize / m_Sr)));
-        const int endBin = std::min(n_f - 1, static_cast<int>(std::floor(f_right * m_FFTSize / m_Sr)));
-        m_MFCCActiveBins[m] = {startBin, endBin};
-
-        for (int k = startBin; k <= endBin; ++k) {
-            const double f = fft_freqs[k];
-            double w = 0.0;
-
-            if (f >= f_left && f <= f_center) {
-                w = (f - f_left) / (f_center - f_left);
-            } else if (f > f_center && f <= f_right) {
-                w = (f_right - f) / (f_right - f_center);
+            if (v > 0.0) {
+                if (first < 0)
+                    first = k;
+                last = k;
             }
-
-            m_MFCCFilter[m][k] = (w > 0.0 ? w * norm : 0.0);
         }
+
+        m_MFCCActiveBins[m] = {first < 0 ? 0 : first, last};
     }
 
     // Orthonormal DCT-II (librosa: dct_type=2, norm="ortho")
@@ -513,7 +617,7 @@ void MIR::MFCCInit() {
 
     for (int k = 0; k < m_MFCC; ++k) {
         for (int n = 0; n < m_MFCCMels; ++n) {
-            m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(PI * (n + 0.5) * k / m_MFCCMels);
+            m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(std::numbers::pi * (n + 0.5) * k / m_MFCCMels);
         }
     }
 
@@ -537,8 +641,8 @@ void MIR::MFCCExec(Description &Desc) {
         return;
     }
 
-    constexpr double kAmin = 1e-10;
-    constexpr double kTopDb = 80.0;
+    constexpr float kAmin = 1e-10f;
+    constexpr float kTopDb = 80.0f;
 
     if (static_cast<int>(m_MFCCEnergy.size()) != n_mels)
         m_MFCCEnergy.resize(n_mels);
@@ -546,39 +650,30 @@ void MIR::MFCCExec(Description &Desc) {
     // Mel projection (power domain)
     for (int m = 0; m < n_mels; ++m) {
         const double *filter = m_MFCCFilter[m].data();
-        double mel = 0.0;
-        const auto [startBinRaw, endBinRaw] = m_MFCCActiveBins[m];
-        const int startBin = std::clamp(startBinRaw, 0, n_f - 1);
-        const int endBin = std::clamp(endBinRaw, 0, n_f - 1);
-
-        if (endBin < startBin) {
-            m_MFCCEnergy[m] = 0.0;
-            continue;
+        float mel = 0.0f;
+        for (int k = 0; k < n_f; ++k) {
+            mel += static_cast<float>(filter[k]) * static_cast<float>(Desc.Power[k]);
         }
 
-        for (int k = startBin; k <= endBin; ++k) {
-            mel += filter[k] * Desc.Power[k];
-        }
-
-        m_MFCCEnergy[m] = mel;
+        m_MFCCEnergy[m] = static_cast<double>(mel);
     }
 
     // power_to_db(ref=1.0, top_db=80)
-    double maxLog = -std::numeric_limits<double>::infinity();
+    float maxLog = -std::numeric_limits<float>::infinity();
 
     for (int m = 0; m < n_mels; ++m) {
-        const double v = 10.0 * std::log10(std::max(kAmin, m_MFCCEnergy[m]));
+        const float v = 10.0f * std::log10(std::max(kAmin, static_cast<float>(m_MFCCEnergy[m])));
 
-        m_MFCCEnergy[m] = v;
+        m_MFCCEnergy[m] = static_cast<double>(v);
         if (v > maxLog)
             maxLog = v;
     }
 
     if (std::isfinite(maxLog)) {
-        const double floor = maxLog - kTopDb;
+        const float floor = maxLog - kTopDb;
         for (int m = 0; m < n_mels; ++m) {
-            if (m_MFCCEnergy[m] < floor)
-                m_MFCCEnergy[m] = floor;
+            if (static_cast<float>(m_MFCCEnergy[m]) < floor)
+                m_MFCCEnergy[m] = static_cast<double>(floor);
         }
     }
 
@@ -587,13 +682,13 @@ void MIR::MFCCExec(Description &Desc) {
     // DCT-II
     for (int k = 0; k < n_mfcc; ++k) {
         const double *basis = m_DCTBasis[k].data();
-        double coeff = 0.0;
+        float coeff = 0.0f;
 
         for (int n = 0; n < n_mels; ++n) {
-            coeff += basis[n] * m_MFCCEnergy[n];
+            coeff += static_cast<float>(basis[n]) * static_cast<float>(m_MFCCEnergy[n]);
         }
 
-        Desc.MFCC[k] = coeff;
+        Desc.MFCC[k] = static_cast<double>(coeff);
     }
 }
 
@@ -825,25 +920,28 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
 void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
-    if (m_FFTIn == nullptr || m_FFTPlan == nullptr || m_WindowingFunc.size() != In.size()) {
-        spdlog::error("MIR audio parameters are not ready for current input size {}", In.size());
-        return;
-    }
-
-    // 1. Calculate power on the PURE, un-windowed signal
+    // 1. Temporal Domain
     GetSignalPower(In, Desc);
+    YINExec(In, Desc);
     ZeroCrossingRateExec(In, Desc);
 
-    // 2. FUSE: Apply window and copy directly to FFT buffer
-    const double *__restrict x = In.data();
-    const double *__restrict w = m_WindowingFunc.data();
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC ivdep
-#endif
+    // 2. Frequency Domain (windowing + FFT)
+    const double *x = In.data();
+    const double *w = m_WindowingFunc.data();
     for (size_t i = 0; i < m_FFTSize; ++i) {
         m_FFTIn[i] = x[i] * w[i];
     }
+    GetSpectralDescriptions(Desc);
 
-    GetFFTDescriptions(Desc);
+    // Perc vs Pitch
+    // Take the strongest percussive indicator: energy burst OR noise burst
+    double inst_perc = std::max(Desc.SpectralFlux / (Desc.Harmonicity + 1e-6), Desc.ZeroCrossingRate);
+
+    inst_perc *= (1.0 - Desc.SilenceProb * Desc.Harmonicity);
+    inst_perc = std::min(1.0, std::max(0.0, inst_perc));
+
+    Desc.PercussiveProb = inst_perc;
+    m_PrevPercussiveProb = Desc.PercussiveProb;
 }
+
 } // namespace OpenScofo

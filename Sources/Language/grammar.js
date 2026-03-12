@@ -13,7 +13,7 @@ module.exports = grammar({
     rules: {
         score: ($) => repeat($._statement),
         _statement: ($) => choice($.CONFIG, $.EVENT, $.LUA),
-        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent),
+        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent, $.techEvent),
         keyword: (_) => /[a-zA-Z_][a-zA-Z0-9_]*/,
 
         //╭─────────────────────────────────────╮
@@ -46,7 +46,6 @@ module.exports = grammar({
             ),
 
         symbolConfigId: ($) => field("configId", choice(alias("DUMMY", $.keyword))),
-
         pathConfigId: ($) => field("configId", choice(alias("TIMBREMODEL", $.keyword))),
 
         numberConfig: ($) => seq($.numberConfigId, $.number),
@@ -56,13 +55,14 @@ module.exports = grammar({
         //╭─────────────────────────────────────╮
         //│                Events               │
         //╰─────────────────────────────────────╯
-        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent),
+        EVENT: ($) => choice($.noteEvent, $.multiPitchEvent, $.restEvent, $.freeEvent, $.techEvent),
 
         noteEvent: ($) =>
             seq(
                 field("keyword", alias("NOTE", $.keyword)),
                 field("pitch", $.pitch),
                 field("duration", $.duration),
+                optional(field("attribute", $.attributeId)),
                 repeat(field("ACTION", $.ACTION)),
             ),
         multiPitchEvent: ($) =>
@@ -70,8 +70,17 @@ module.exports = grammar({
 
         restEvent: ($) => seq(alias("REST", $.keyword), $.duration, repeat($.ACTION)),
         freeEvent: ($) => seq(alias("EVENT", $.keyword), $.eventId, $.duration, repeat1($.ACTION)),
+        techEvent: ($) =>
+            seq(
+                field("keyword", alias("TECH", $.keyword)),
+                field("technique", $.techniqueId),
+                field("duration", $.duration),
+                repeat(field("ACTION", $.ACTION)),
+            ),
 
         eventId: (_) => choice("timed", "internal"),
+        techniqueId: (_) => token(/[a-zA-Z][a-zA-Z0-9_-]*/),
+        attributeId: (_) => seq("@", field("type", choice("percussive", "other"))),
 
         // Pitch
         pitches: ($) => seq("(", repeat1($.pitch), ")"),
