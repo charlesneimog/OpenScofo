@@ -88,7 +88,7 @@ class pytrain(pd.NewObject):
             iterations=self.iterations,
             depth=6,
             learning_rate=0.1,
-            loss_function="MultiClass",
+            loss_function="Logloss",
             random_seed=self.random_state,
             verbose=100,
             early_stopping_rounds=20,

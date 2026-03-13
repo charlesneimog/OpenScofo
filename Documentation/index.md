@@ -46,7 +46,6 @@ hide:
         <hr>
       </div>
     </a>
-
     <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
       <div class="card">
         <hr>

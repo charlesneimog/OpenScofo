@@ -1,0 +1,117 @@
+[project]
+site_name = "OpenScofo"
+docs_dir = "Documentation"
+copyright = "Copyright &copy 2026 | Charles K. Neimog"
+hooks = ["Documentation/copy-editor.py"]
+extra_css = ["stylesheets/extra.css"]
+repo_url = "https://github.com/charlesneimog/OpenScofo"
+nav = [
+  "index.md",
+  { "Score" = [
+    "score/intro.md",
+    "score/config.md",
+    "score/events.md",
+    "score/actions.md",
+    "score/lua.md",
+  ] },
+  { "Python" = "python.md" },
+  { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
+  { "Downloads" = "https://github.com/charlesneimog/OpenScofo/releases/latest" },
+]
+extra_javascript = [
+    "javascripts/mathjax.js",
+    "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+]
+
+[project.theme]
+logo = "assets/favicon.svg"
+logo_dark_mode = "assets/favicon-dark.svg"
+logo_light_mode = "assets/favicon.svg"
+favicon = "assets/logo.png"
+name = "material"
+features = [
+  "navigation.top",
+  "navigation.sections",
+  "navigation.footer",
+  "content.code.annotate",
+  "content.code.copy",
+  "navigation.tabs",
+  "search.highlight",
+  "search.suggest",
+  "toc.integrate",
+  "toc.follow",
+  "navigation.instant",
+]
+
+# Palette toggle for automatic mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+# Palette toggle for light mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+# Palette toggle for dark mode
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+# ╭──────────────────────────────────────╮
+# │              EXTENSIONS              │
+# ╰──────────────────────────────────────╯
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.blocks.caption]
+
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true
+
+# Emojis
+[project.markdown_extensions.pymdownx.emoji]
+emoji_index = "zensical.extensions.emoji.twemoji" 
+emoji_generator = "zensical.extensions.emoji.to_svg"
+
+# Code blocks
+[project.markdown_extensions.pymdownx.highlight]
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.snippets]
+
+# Admonition
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.superfences]
+
+
+#   { "pymdownx.emoji" = { emoji_index = "material.extensions.emoji.twemoji", emoji_generator = "material.extensions.emoji.to_svg" } },
+
+# ╭──────────────────────────────────────╮
+# │               Plugins                │
+# ╰──────────────────────────────────────╯
+
+# plugins = [
+#   "search",
+#   { "git-revision-date-localized" = { type = "timeago", custom_format = "%d. %B %Y", timezone = "Europe/Amsterdam", locale = "en", fallback_to_build_date = false, enable_creation_date = true, enable_git_follow = true, enabled = true, strict = true } },
+# ]
+
+#╭──────────────────────────────────────╮
+#│          NOT SUPPORTED YET           │
+#╰──────────────────────────────────────╯
+
+# [project.extra.social]
+# icon = "fontawesome/brands/instagram"
+# link = "https://www.instagram.com/charlesneimog/"
+#
+# [project.extra.social]
+# icon = "fontawesome/brands/github"
+# link = "https://www.github.com/charlesneimog/"
+#
+# [project.extra.social]
+# icon = "fontawesome/solid/paper-plane"
+# link = "mailto:charlesneimog@outlook.com"

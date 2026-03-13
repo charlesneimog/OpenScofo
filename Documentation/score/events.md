@@ -19,9 +19,7 @@ On OpenScofo pitches are represented by `name` or `MIDI`.
 ---
 ### `TIME`
 
-On `OpenScofo` you represent `<DURATION>` using number of **tempos**.
-
-So **fraction representation is not support**, mainly because something like `1` is ambiguous with `1/1`. And, for me, in fraction will be necessary to define the Time Unity to be a more precise language.
+On `OpenScofo` you represent `<DURATION>` using **number of tempos** relative to the Time Unit. Fractions like `(1/2)`, `(1/1)`, `(1/8)` are not supported.
 
 Because that `OpenScofo` uses time representation relative to the value of `BPM` define previously. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
 
@@ -38,18 +36,13 @@ if in your score you have the `BPM` set as **:material-music-note-eighth: = 60**
 - :material-music-note-eighth: is `1`,
 - :material-music-note-sixteenth: is `0.5`
 
-For duration with dot, you sum it.
-
-!!! tip "Compound Time Signatures"
-    Avoid to use Compound Time Signatures as **:material-music-note-quarter-dotted: = 60**, because this means that the :material-music-note-eighth: will be equal to 0.33, prefer to use **:material-music-note-eighth: = 180**.
-
 ---
 ## Events
 ---
 
 ### `NOTE`
 
-`NOTE` events describes normal pitches. It must be defined as `NOTE <PITCH> <DURATION>`.
+`NOTE` events describes tradicional pitches. It must be defined as `NOTE <PITCH> <DURATION>`.
 
 - `NOTE C4 2`
 - `NOTE 60 2`
@@ -65,6 +58,13 @@ For duration with dot, you sum it.
 - `TRILL (60 67) 2`
 - `TRILL (C#5 E5) 0.3`
 - `TRILL (Bb4 D5) 0.25`
+
+On [Cânticos de Silício I](https://charlesneimog.github.io/Canticos-de-Silicio-I/) I have this:
+
+<figure markdown="span">
+  ![Image title](assets/canticos_example-1.png){ width="300" }
+  <figcaption>Image caption</figcaption>
+</figure>
 
 ---
 ### `CHORD`
