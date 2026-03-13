@@ -195,8 +195,8 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             outlet_anything(x->DescOut, gensym("harmonicity"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::PERCUSSIVEPROB) {
             std::vector<t_atom> Atoms(1);
-            SETFLOAT(&Atoms[0], (t_float)Desc.PercussiveProb);
-            outlet_anything(x->DescOut, gensym("percussive"), 1, Atoms.data());
+            SETFLOAT(&Atoms[0], (t_float)Desc.ExtendedTechProb);
+            outlet_anything(x->DescOut, gensym("ext"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::ONSET) {
             if (Desc.Onset) {
                 std::vector<t_atom> Atoms(1);
@@ -624,7 +624,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
             } else if (strcmp(sym->s_name, "harmonicity") == 0) {
                 DescOut = true;
                 x->RequestMIR.push_back(OpenScofo::Descriptors::HARMONICITY);
-            } else if (strcmp(sym->s_name, "percussive") == 0) {
+            } else if (strcmp(sym->s_name, "ext") == 0) {
                 DescOut = true;
                 x->RequestMIR.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
             } else if (strcmp(sym->s_name, "onset") == 0) {

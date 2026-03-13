@@ -20,7 +20,17 @@ export async function initParser() {
     this.LuaParser.setLanguage(luaParser);
 
     this.OScofoQuery = new Query(scoreScofo, this.OpenScofoHighlightQuery);
-    this.LuaQuery = new Query(luaParser, this.LuaStringQuery);
+
+    if (!this.LuaStringQuery) {
+        await this.fetchTextFile("highlight/lua.scm");
+    }
+
+    if (this.LuaStringQuery) {
+        this.LuaQuery = new Query(luaParser, this.LuaStringQuery);
+    } else {
+        this.LuaQuery = null;
+        console.warn("Lua highlight query was not loaded; Lua syntax highlighting is disabled.");
+    }
 }
 
 export function handleCodeChange(_, changes) {
@@ -90,7 +100,10 @@ export function runFormatterAfterParse(_) {
     const shouldFormatStructure = _.hasError;
 
     function ensureLineStart(instance, node, indentText) {
-        const nodeStart = instance.codeEditor.indexFromPos({ line: node.startPosition.row, ch: node.startPosition.column });
+        const nodeStart = instance.codeEditor.indexFromPos({
+            line: node.startPosition.row,
+            ch: node.startPosition.column,
+        });
         const lineStart = instance.codeEditor.indexFromPos({ line: node.startPosition.row, ch: 0 });
 
         let wsStart = nodeStart;
@@ -137,14 +150,8 @@ export function runFormatterAfterParse(_) {
             ensureLineStart(this, node, "");
         }
 
-        if (shouldFormatStructure && node.type === "ACTION") {
-            ensureLineStart(this, node, "    ");
-        }
-
-        if (shouldFormatStructure && node.type === "timedAction") {
-            if (!(node.parent && node.parent.type === "ACTION" && node.parent.startPosition.row === node.startPosition.row && node.parent.startPosition.column === node.startPosition.column)) {
-                ensureLineStart(this, node, "    ");
-            }
+        if (node.type === "action") {
+            ensureLineStart(this, node, "\t");
         }
 
         if (node.type === "lua_body") {
@@ -158,8 +165,14 @@ export function runFormatterAfterParse(_) {
                 return;
             }
 
-            const parentStart = this.codeEditor.indexFromPos({ line: luaParent.startPosition.row, ch: luaParent.startPosition.column });
-            const parentEnd = this.codeEditor.indexFromPos({ line: luaParent.endPosition.row, ch: luaParent.endPosition.column });
+            const parentStart = this.codeEditor.indexFromPos({
+                line: luaParent.startPosition.row,
+                ch: luaParent.startPosition.column,
+            });
+            const parentEnd = this.codeEditor.indexFromPos({
+                line: luaParent.endPosition.row,
+                ch: luaParent.endPosition.column,
+            });
             const bodyText = node.text.trim();
             if (bodyText === "") {
                 return;
@@ -180,7 +193,6 @@ export function runFormatterAfterParse(_) {
                 text: formattedLua,
             });
         }
-
     });
 
     if (edits.length === 0) {
@@ -215,11 +227,43 @@ export function checkErrors(node) {
     var lineWithErrors = [];
     var lineWithUnexpected = [];
     const errorContainer = document.getElementById("editor-console");
+    errorContainer.style.color = "var(--red)";
     errorContainer.innerHTML = "";
+    console.log(node.toString());
 
     function checkNode(node) {
         for (let i = 0; i < node.namedChildCount; i++) {
             let child = node.namedChild(i);
+
+            if (child.isMissing) {
+                const missingElement = document.createElement("p");
+                missingElement.style.color = "var(--red)";
+                let missingLabel = child.type;
+
+                if (child.type === "number" && child.parent) {
+                    const parentType = child.parent.type;
+                    if (
+                        parentType === "note_event" ||
+                        parentType === "rest_event" ||
+                        parentType === "chord_event" ||
+                        parentType === "trill_event" ||
+                        parentType === "tech_event"
+                    ) {
+                        missingLabel = "duration";
+                    } else if (parentType === "delay") {
+                        missingLabel = "amount";
+                    }
+                }
+
+                missingElement.textContent =
+                    "Missing " +
+                    missingLabel +
+                    " at line " +
+                    (child.startPosition.row + 1) +
+                    ", column " +
+                    (child.startPosition.column + 1);
+                errorContainer.appendChild(missingElement);
+            }
 
             if (child.hasError) {
                 let message = "";
@@ -239,6 +283,7 @@ export function checkErrors(node) {
 
                 if (message !== "") {
                     const errorElement = document.createElement("p");
+                    errorElement.style.color = "var(--red)";
                     errorElement.textContent = message;
                     errorContainer.appendChild(errorElement);
                 }
@@ -248,6 +293,7 @@ export function checkErrors(node) {
             if (treeString.startsWith("(UNEXPECTED") && !lineWithUnexpected.includes(child.startPosition.row + 1)) {
                 lineWithUnexpected.push(child.startPosition.row + 1);
                 const unexpectedElement = document.createElement("p");
+                unexpectedElement.style.color = "var(--red)";
                 unexpectedElement.textContent = "UNEXPECTED keyword at line " + (child.startPosition.row + 1);
                 errorContainer.appendChild(unexpectedElement);
             }
@@ -258,3 +304,4 @@ export function checkErrors(node) {
 
     checkNode(node);
 }
+

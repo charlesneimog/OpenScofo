@@ -2,8 +2,9 @@ import os
 import time
 import numpy as np
 import librosa
-import OpenScofo
+from concurrent.futures import ProcessPoolExecutor
 
+import OpenScofo
 from pysr import PySRRegressor
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -11,309 +12,254 @@ from sklearn.model_selection import train_test_split
 SR = 48000
 FFTSIZE = 2048
 HOPSIZE = 512
-CLASSIFICATION_THRESHOLD = 0.3
-MARGIN_PENALTY_WEIGHT = 30.0
-RANGE_PENALTY_WEIGHT = 0.5
 
-os.chdir(os.path.dirname(__file__))
+ACTIVE_DB_THRESHOLD = -60.0
+CLASSIFICATION_THRESHOLD = 0.5
+
+RANDOM_STATE = 42
+MAX_PER_CLASS = 5000
+
+CACHE_FILE = "percussion_descriptor_dataset.npz"
+
+VIOLATION_PENALTY = 500.0
+STRICT_MAX_VIOLATIONS = 0
+
+
+FEATURE_SPECS = [
+    ("Harmonicity", "harmonicity"),
+    ("SpectralFlatness", "spectral_flatness"),
+    ("SpectralFlux", "spectral_flux"),
+    ("SpectralCrest", "spectral_crest"),
+    ("CentroidVelocity", "centroid_velocity"),
+    ("HighFreqRatio", "high_freq_ratio"),
+    ("Peakiness", "peakiness"),
+    ("PitchConfidence", "pitch_confidence"),
+]
+
+feature_names = [name for name, _ in FEATURE_SPECS]
+feature_attrs = [attr for _, attr in FEATURE_SPECS]
+
 base_folder = "/home/neimog/Nextcloud/MusicData/Samples/Orchidea"
 
 folder_labels = {
-    f"{base_folder}/Winds/Flute/pizzicato": "e",
-    f"{base_folder}/Winds/Flute/key_click": "e",
-    f"{base_folder}/Winds/Flute/tongue_ram": "e",
-    f"{base_folder}/Winds/Flute/jet_whistle": "e",
-    f"{base_folder}/Winds/Flute/ordinario": "o",
-    f"{base_folder}/Winds/Flute/ordinario_quartertones": "o",
-    f"{base_folder}/Winds/Flute/flatterzunge_to_ordinario": "o",
-    f"{base_folder}/Winds/Flute/aeolian": "o",
-    f"{base_folder}/Winds/Flute/discolored_fingering": "o",
-    f"{base_folder}/Winds/Flute/sforzato": "o",
-    f"{base_folder}/Winds/Flute/play_and_sing_unison": "o",
-    f"{base_folder}/Winds/Flute/whistle_tones": "o",
-    f"{base_folder}/Winds/Flute/decrescendo": "o",
-    f"{base_folder}/Winds/Flute/ordinario_to_flatterzunge": "o",
-    f"{base_folder}/Winds/Flute/note_lasting": "o",
-    f"{base_folder}/Winds/Flute/play_and_sing": "o",
-    f"{base_folder}/Winds/Flute/crescendo": "o",
-    f"{base_folder}/Winds/Flute/crescendo_to_decrescendo": "o",
-    f"{base_folder}/Winds/Flute/aeolian_and_ordinario": "o",
-    f"{base_folder}/Winds/Flute/aeolian_to_ordinario": "o",
-    f"{base_folder}/Winds/Flute/chromatic_scale": "o",
-    f"{base_folder}/Winds/Flute/ordinario_to_aeolian": "o",
-    f"{base_folder}/Winds/Flute/trill_minor_second_up": "o",
-    f"{base_folder}/Winds/Flute/staccato": "o",
-    f"{base_folder}/Brass/Bass_Tuba/slap_pitched": "e",
-    f"{base_folder}/Brass/Trombone/slap_pitched": "e",
-    f"{base_folder}/Keyboards/Accordion/breath/Acc-breath-N-mf-2-N.wav": "e",
-    f"{base_folder}/Strings/Violoncello/pizzicato_secco": "e",
-    f"{base_folder}/Strings/Violoncello/pizzicato_bartok/Vc-pizz_bartok-B3-ff-1c-N.wav": "e",
-    f"{base_folder}/Strings/Violoncello/hit_on_body": "e",
-    f"{base_folder}/Strings/Violin/pizzicato_secco": "e",
-    f"{base_folder}/Winds/Bassoon/key_click": "e",
-    f"{base_folder}/Winds/Clarinet_Bb/key_click": "e",
-    f"{base_folder}/Winds/Oboe/key_click": "e",
-    f"{base_folder}/Winds/Oboe/kiss": "e",
-    f"{base_folder}/Winds/Sax_Alto/exploding_slap_pitched": "e",
-    f"{base_folder}/Winds/Sax_Alto/key_click": "e",
-    f"{base_folder}/Winds/Sax_Alto/slap_pitched": "e",
-    f"{base_folder}/Winds/Sax_Alto/slap_unpitched": "e",
+    f"{base_folder}/Winds/Flute/pizzicato": 1.0,
+    f"{base_folder}/Winds/Flute/key_click": 1.0,
+    f"{base_folder}/Winds/Flute/tongue_ram": 1.0,
+    f"{base_folder}/Winds/Flute/jet_whistle": 1.0,
+    f"{base_folder}/Winds/Flute/ordinario": 0.0,
+    f"{base_folder}/Winds/Flute/aeolian": 0.0,
+    f"{base_folder}/Winds/Flute/staccato": 0.0,
+    f"{base_folder}/Strings/Violoncello/pizzicato_secco": 1.0,
+    f"{base_folder}/Strings/Violoncello/hit_on_body": 1.0,
+    f"{base_folder}/Strings/Violin/pizzicato_secco": 1.0,
+    f"{base_folder}/Winds/Bassoon/key_click": 1.0,
+    f"{base_folder}/Winds/Clarinet_Bb/key_click": 1.0,
+    f"{base_folder}/Winds/Oboe/key_click": 1.0,
 }
 
-files_percussive = []
-files_pitch = []
 
-for root, label in folder_labels.items():
-    if os.path.isdir(root):
-        wav_files = [
-            os.path.join(root, f)
-            for f in os.listdir(root)
-            if f.lower().endswith(".wav")
-        ]
-    elif os.path.isfile(root) and root.lower().endswith(".wav"):
-        wav_files = [root]
-    else:
-        continue
-
-    if label == "e":
-        files_percussive.extend(wav_files)
-    elif label == "o":
-        files_pitch.extend(wav_files)
-
-if len(files_percussive) == 0 or len(files_pitch) == 0:
-    raise Exception("Invalid audio files")
-
-scofo = OpenScofo.OpenScofo(SR, FFTSIZE, HOPSIZE)
-
-feature_names = [
-    "Flatness",
-    "SpectralFlux",
-    "Harmonicity",
-    "ZeroCrossingRate",
-    "DeltaRMS",
-    "SpectralIrregularity",
-    "SpectralCrest",
-    "CentroidVelocity",
-    "HighFreqRatio",
-    "Peakiness",
-    "SilenceGate",
-    "FluxOverHarmonicity",
-    "InstPercSeed",
-]
+def list_files():
+    files = []
+    for root, label in folder_labels.items():
+        if os.path.isdir(root):
+            for f in os.listdir(root):
+                if f.lower().endswith(".wav"):
+                    files.append((os.path.join(root, f), label))
+        elif os.path.isfile(root):
+            files.append((root, label))
+    if len(files) == 0:
+        raise RuntimeError("No audio files found")
+    return files
 
 
-def build_feature_vector(desc, delta_rms):
-    silence_gate = 1.0 - desc.silence_prob
-    flux_over_harmonicity = desc.spectral_flux / (desc.harmonicity + 1e-6)
-    inst_perc_seed = 0.21974495 * flux_over_harmonicity * silence_gate
-
-    return [
-        desc.spectral_flatness,
-        desc.spectral_flux,
-        desc.harmonicity,
-        desc.zero_crossing_rate,
-        delta_rms,
-        desc.spectral_irregularity,
-        desc.spectral_crest,
-        desc.centroid_velocity,
-        desc.high_freq_ratio,
-        desc.peakiness,
-        silence_gate,
-        flux_over_harmonicity,
-        inst_perc_seed,
-    ]
+def build_feature_vector(desc):
+    return [float(getattr(desc, attr)) for attr in feature_attrs]
 
 
-def extract_features(file_list, target_label):
-    X_temp, y_temp = [], []
-    for file in file_list:
-        x_audio, sr = librosa.load(file, sr=SR)
-        frames = librosa.util.frame(x_audio, frame_length=FFTSIZE, hop_length=HOPSIZE).T
-        prev_rms = 0.0
-
-        for frame in frames:
-            desc = scofo.get_audio_description(frame)
-            delta_rms = max(0.0, desc.rms - prev_rms)
-
-            if desc.db > -60.0:
-                X_temp.append(build_feature_vector(desc, delta_rms))
-                y_temp.append(target_label)
-
-            prev_rms = desc.rms
-
+def process_file(args):
+    file, label = args
+    scofo = OpenScofo.OpenScofo(SR, FFTSIZE, HOPSIZE)
+    X_temp = []
+    y_temp = []
+    x_audio, _ = librosa.load(file, sr=SR)
+    for i in range(0, len(x_audio) - FFTSIZE, HOPSIZE):
+        frame = x_audio[i : i + FFTSIZE]
+        desc = scofo.get_audio_description(frame)
+        if desc.db <= ACTIVE_DB_THRESHOLD:
+            continue
+        features = build_feature_vector(desc)
+        if not np.all(np.isfinite(features)):
+            continue
+        X_temp.append(features)
+        y_temp.append(label)
     return X_temp, y_temp
 
 
-X_file = "X.npy"
-y_file = "y.npy"
+def extract_dataset(files):
+    X = []
+    y = []
+    with ProcessPoolExecutor() as executor:
+        for X_part, y_part in executor.map(process_file, files):
+            X.extend(X_part)
+            y.extend(y_part)
+    return np.array(X), np.array(y)
 
-if os.path.exists(X_file) and os.path.exists(y_file):
-    print("Loading cached dataset...")
-    X = np.load(X_file)
-    y = np.load(y_file)
-else:
+
+def load_cached():
+    if not os.path.exists(CACHE_FILE):
+        return None
+    cache = np.load(CACHE_FILE, allow_pickle=False)
+    if cache["feature_names"].tolist() != feature_names:
+        return None
+    return cache["X"], cache["y"]
+
+
+def save_cache(X, y):
+    np.savez_compressed(CACHE_FILE, X=X, y=y, feature_names=np.array(feature_names))
+
+
+files = list_files()
+file_labels = [label for _, label in files]
+train_files, test_files = train_test_split(
+    files,
+    test_size=0.2,
+    random_state=RANDOM_STATE,
+    stratify=file_labels,
+)
+
+cached = load_cached()
+
+if cached is None:
     print("Extracting features...")
     start = time.perf_counter()
-
-    X_perc, y_perc = extract_features(files_percussive, 1.0)
-    X_pitch, y_pitch = extract_features(files_pitch, 0.0)
-
+    X_train, y_train = extract_dataset(train_files)
+    X_test, y_test = extract_dataset(test_files)
+    save_cache(
+        np.vstack((X_train, X_test)),
+        np.concatenate((y_train, y_test)),
+    )
     end = time.perf_counter()
-    print(f"Elapsed time: {end - start:.3f} seconds")
+    print(f"Feature extraction time: {end-start:.2f}s")
 
-    X = np.array(X_perc + X_pitch)
-    y = np.array(y_perc + y_pitch)
+else:
+    print("Loading cached dataset")
+    X_all, y_all = cached
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_all,
+        y_all,
+        test_size=0.2,
+        random_state=RANDOM_STATE,
+        stratify=y_all,
+    )
 
-    np.save(X_file, X)
-    np.save(y_file, y)
 
-print(f"Original dataset size: {len(X)}")
+rng = np.random.default_rng(RANDOM_STATE)
 
-MAX_PER_CLASS = 5000
 
-perc_idx = np.where(y == 1.0)[0]
-pitch_idx = np.where(y == 0.0)[0]
+def balance(X, y):
+    perc_idx = np.where(y == 1.0)[0]
+    pitch_idx = np.where(y == 0.0)[0]
+    perc_sample = rng.choice(perc_idx, min(MAX_PER_CLASS, len(perc_idx)), replace=False)
+    pitch_sample = rng.choice(
+        pitch_idx, min(MAX_PER_CLASS, len(pitch_idx)), replace=False
+    )
+    idx = np.concatenate((perc_sample, pitch_sample))
+    rng.shuffle(idx)
+    return X[idx], y[idx]
 
-perc_sample = np.random.choice(
-    perc_idx, min(MAX_PER_CLASS, len(perc_idx)), replace=False
-)
-pitch_sample = np.random.choice(
-    pitch_idx, min(MAX_PER_CLASS, len(pitch_idx)), replace=False
-)
 
-idx = np.concatenate([perc_sample, pitch_sample])
-np.random.shuffle(idx)
+X_train, y_train = balance(X_train, y_train)
+X_test, y_test = balance(X_test, y_test)
 
-X = X[idx].astype(np.float32)
-y = y[idx].astype(np.float32)
+mean = X_train.mean(axis=0)
+std = X_train.std(axis=0) + 1e-8
 
-print(f"Extracted {len(X)} active frames for training.")
+X_train = (X_train - mean) / std
+X_test = (X_test - mean) / std
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y,
-)
+print("Training frames:", len(X_train))
+print("Validation frames:", len(X_test))
 
-print(f"Training frames: {len(X_train)} | Validation frames: {len(X_test)}")
+constraints = {"const": lambda x: -0.01 <= x <= 0.01}
 
-elementwise_loss = (
-    "loss(prediction, target) = begin "
-    f"threshold = {CLASSIFICATION_THRESHOLD:.8f}f0; "
-    "p = clamp(prediction, 0.0f0, 1.0f0); "
-    "range_penalty = (prediction - p)^2; "
-    "perc_violation = target * max(0.0f0, threshold - p)^2; "
-    "pitch_violation = (1.0f0 - target) * max(0.0f0, p - threshold)^2; "
-    "target_penalty = (p - target)^2; "
-    f"return target_penalty + {MARGIN_PENALTY_WEIGHT:.8f}f0 * (perc_violation + pitch_violation) + "
-    f"{RANGE_PENALTY_WEIGHT:.8f}f0 * range_penalty; "
-    "end"
-)
 
-# Setup Symbolic Regression
 model = PySRRegressor(
-    niterations=40,
-    binary_operators=["+", "*", "-", "/"],
-    unary_operators=[
-        "exp",
-        "log",
-    ],
-    # Force it to find simple equations, not complex unreadable ones
-    # Use logistic loss to map the output equation to probabilities [0, 1]
-    elementwise_loss="loss(prediction, target) = (prediction - target)^2",
+    niterations=150,
+    populations=12,
+    maxsize=18,
+    binary_operators=["*", "/"],
+    unary_operators=["exp", "log"],  # allows some non-linearity
+    model_selection="best",
+    elementwise_loss="loss(x, y) = sum((x - y)^2)",  # or your ELEMENTWISE_LOSS
+    loss_scale="linear",
+    parsimony=1e-3,
+    parallelism="serial",
+    deterministic=True,
+    random_state=RANDOM_STATE,
 )
 
-# Run the evolutionary search
-model.fit(X_train, y_train, variable_names=feature_names)
+model.fit(
+    X_train,
+    y_train,
+    variable_names=feature_names,
+)
 
-# Print the discovered equations
-print("\n=== Best Discovered Equations ===")
+print("\nBest equation:")
 print(model.sympy())
 
-print("\n=== Classification Accuracy ===")
+pred = model.predict(X_test)
+pred = np.clip(pred, 0, 1)
+binary = (pred > CLASSIFICATION_THRESHOLD).astype(int)
+acc = accuracy_score(y_test, binary)
+print("\nValidation accuracy:", acc)
 
-equations = model.equations_
-if equations is None:
-    raise Exception("Not found equations")
+perc_mask = y_test == 1
+pitch_mask = y_test == 0
 
+perc_violations = np.sum(pred[perc_mask] < CLASSIFICATION_THRESHOLD)
+pitch_violations = np.sum(pred[pitch_mask] > CLASSIFICATION_THRESHOLD)
 
-def summarize_predictions(y_true, y_pred):
-    y_pred_clipped = np.clip(y_pred, 0.0, 1.0)
-    y_pred_binary = (y_pred_clipped > CLASSIFICATION_THRESHOLD).astype(int)
-
-    acc = accuracy_score(y_true, y_pred_binary)
-
-    perc_mask = y_true == 1
-    pitch_mask = y_true == 0
-    perc_acc = np.mean(y_pred_binary[perc_mask] == 1)
-    pitch_acc = np.mean(y_pred_binary[pitch_mask] == 0)
-    perc_mean = float(np.mean(y_pred_clipped[perc_mask]))
-    pitch_mean = float(np.mean(y_pred_clipped[pitch_mask]))
-    perc_min = float(np.min(y_pred_clipped[perc_mask]))
-    pitch_max = float(np.max(y_pred_clipped[pitch_mask]))
-    perc_violations = int(np.sum(y_pred_clipped[perc_mask] < CLASSIFICATION_THRESHOLD))
-    pitch_violations = int(
-        np.sum(y_pred_clipped[pitch_mask] > CLASSIFICATION_THRESHOLD)
-    )
-
-    return (
-        acc,
-        perc_acc,
-        pitch_acc,
-        perc_mean,
-        pitch_mean,
-        perc_min,
-        pitch_max,
-        perc_violations,
-        pitch_violations,
-    )
+print("Percussive violations:", perc_violations)
+print("Pitch violations:", pitch_violations)
 
 
-for i in range(len(equations)):
-    row = equations.iloc[i]
+def validate_files(files, label_name, n_frames=5):
+    print(f"=== Random {label_name} Sounds ====")
+    scofo = OpenScofo.OpenScofo(SR, FFTSIZE, HOPSIZE)
+    max_name_len = 50  # adjust width if needed
+    for file, label in rng.choice(files, size=5, replace=False):
+        x_audio, _ = librosa.load(file, sr=SR)
+        frame_indices = np.arange(0, len(x_audio) - FFTSIZE, HOPSIZE)
+        rng.shuffle(frame_indices)
+        preds = []
+        count = 0
+        for idx in frame_indices:
+            frame = x_audio[idx : idx + FFTSIZE]
+            desc = scofo.get_audio_description(frame)
+            if desc.db <= ACTIVE_DB_THRESHOLD:
+                continue
+            features = build_feature_vector(desc)
+            if not np.all(np.isfinite(features)):
+                continue
+            features = (np.array(features) - mean) / std
+            pred = model.predict([features])[0]
+            preds.append(pred)
+            count += 1
+            if count >= n_frames:
+                break
+        if len(preds) == 0:
+            print(f"{os.path.basename(file):{max_name_len}} | no valid frames")
+            continue
+        avg_pred = np.mean(preds)
+        print(
+            f"{os.path.basename(file):{max_name_len}} | avg result eq: {avg_pred:.4f}"
+        )
 
-    train_pred = model.predict(X_train, index=i)
-    test_pred = model.predict(X_test, index=i)
 
-    (
-        train_acc,
-        train_perc_acc,
-        train_pitch_acc,
-        train_perc_mean,
-        train_pitch_mean,
-        train_perc_min,
-        train_pitch_max,
-        train_perc_violations,
-        train_pitch_violations,
-    ) = summarize_predictions(y_train, train_pred)
-    (
-        test_acc,
-        test_perc_acc,
-        test_pitch_acc,
-        test_perc_mean,
-        test_pitch_mean,
-        test_perc_min,
-        test_pitch_max,
-        test_perc_violations,
-        test_pitch_violations,
-    ) = summarize_predictions(y_test, test_pred)
+# select percussive and pitch files separately
+perc_files = [f for f in files if f[1] == 1.0]
+pitch_files = [f for f in files if f[1] == 0.0]
 
-    hard_pass = test_perc_violations == 0 and test_pitch_violations == 0
+validate_files(perc_files, "Percussive")
+validate_files(pitch_files, "Pitch")
 
-    print(
-        f"Equation {i:2d} | Complexity {row['complexity']:2d} | "
-        f"Train Global: {train_acc*100:.2f}% | "
-        f"Train Perc: {train_perc_acc*100:.2f}% | "
-        f"Train Pitch: {train_pitch_acc*100:.2f}% | "
-        f"Train Bounds => perc min: {train_perc_min:.3f}, pitch max: {train_pitch_max:.3f} | "
-        f"Train Violations => perc: {train_perc_violations}, pitch: {train_pitch_violations} | "
-        f"Val Global: {test_acc*100:.2f}% | "
-        f"Val Perc: {test_perc_acc*100:.2f}% | "
-        f"Val Pitch: {test_pitch_acc*100:.2f}% | "
-        f"Val Means => perc: {test_perc_mean:.3f}, pitch: {test_pitch_mean:.3f} | "
-        f"Val Bounds => perc min: {test_perc_min:.3f}, pitch max: {test_pitch_max:.3f} | "
-        f"Val Violations => perc: {test_perc_violations}, pitch: {test_pitch_violations} | "
-        f"HardPass: {hard_pass}"
-    )

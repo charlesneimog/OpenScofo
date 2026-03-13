@@ -96,21 +96,37 @@ bool Score::isNumber(std::string str) {
 
 // ─────────────────────────────────────
 void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &State) {
-    TSNode pitch = ts_node_child(node, 0);
+    TSNode pitch = node;
     std::string type = ts_node_type(pitch);
     if (type == "midi") {
         int midi = std::stof(GetCodeStr(ScoreStr, pitch));
         State.Midi = midi;
         State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);
-    } else if (type != "noteName") {
+        State.Type = PITCH;
+        return;
+    } else if (type != "pitch") {
         TSPoint Pos = ts_node_start_point(pitch);
         spdlog::error("Invalid pitch type on line {}", std::to_string(Pos.row + 1));
         return;
     }
 
-    char pitchName = GetChildStringFromField(ScoreStr, pitch, "pitchname")[0];
-    std::string alt = GetChildStringFromField(ScoreStr, pitch, "alteration");
+    std::string pitchNameStr = GetChildStringFromField(ScoreStr, pitch, "pitch_name");
+    if (pitchNameStr.empty()) {
+        pitchNameStr = GetChildStringFromField(ScoreStr, pitch, "pitchname");
+    }
+    if (pitchNameStr.empty()) {
+        pitchNameStr = GetChildStringFromField(ScoreStr, pitch, "noteName");
+    }
+
     std::string octave = GetChildStringFromField(ScoreStr, pitch, "octave");
+    if (pitchNameStr.empty() || octave.empty()) {
+        TSPoint Pos = ts_node_start_point(pitch);
+        spdlog::error("Invalid pitch on line {}", std::to_string(Pos.row + 1));
+        return;
+    }
+
+    char pitchName = static_cast<char>(std::toupper(static_cast<unsigned char>(pitchNameStr[0])));
+    std::string alt = GetChildStringFromField(ScoreStr, pitch, "alteration");
 
     int classNote = -1;
     switch (pitchName) {
@@ -180,20 +196,23 @@ std::string Score::GetCodeStr(const std::string &ScoreStr, TSNode Node) {
 
 // ─────────────────────────────────────
 double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
-    uint32_t count = ts_node_child_count(Node);
-    if (count != 1) {
-        TSPoint Pos = ts_node_start_point(Node);
-        spdlog::error("Invalid duration count on line {}.", Pos.row + 1);
-        return 0;
-    }
-
-    TSNode dur = ts_node_child(Node, 0);
-    std::string dur_type = ts_node_type(dur);
+    std::string dur_type = ts_node_type(Node);
     if (dur_type == "number") {
-        std::string dur_str = GetCodeStr(ScoreStr, dur);
+        std::string dur_str = GetCodeStr(ScoreStr, Node);
         return std::stof(dur_str);
     }
-    TSPoint Pos = ts_node_start_point(dur);
+
+    uint32_t count = ts_node_child_count(Node);
+    if (count == 1) {
+        TSNode dur = ts_node_child(Node, 0);
+        dur_type = ts_node_type(dur);
+        if (dur_type == "number") {
+            std::string dur_str = GetCodeStr(ScoreStr, dur);
+            return std::stof(dur_str);
+        }
+    }
+
+    TSPoint Pos = ts_node_start_point(Node);
     spdlog::error("Invalid duration type on line {}", Pos.row + 1);
     return 0;
 }
@@ -251,53 +270,29 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
-    TSNode TypeNode = ts_node_child_by_field_name(Node, "keyword", 7);
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
     TSNode AttributeNode = ts_node_child_by_field_name(Node, "attribute", 9);
 
-    bool Percurssive = false;
+    bool Percussive = false;
     if (!ts_node_is_null(AttributeNode)) {
-        TSNode type = ts_node_child(AttributeNode, 1); // skip "@"
-
-        uint32_t start = ts_node_start_byte(type);
-        uint32_t end = ts_node_end_byte(type);
-        std::string attr_type(ScoreStr.data() + start, end - start);
-        if (attr_type == "percurssive") {
-            Percurssive = true;
-        }
+        std::string attr_type = GetChildStringFromField(ScoreStr, AttributeNode, "type");
+        Percussive = (attr_type == "percussive");
     }
 
-    if (ts_node_is_null(TypeNode) || ts_node_is_null(PitchNode) || ts_node_is_null(DurationNode)) {
+    if (ts_node_is_null(PitchNode) || ts_node_is_null(DurationNode)) {
         TSPoint Init = ts_node_start_point(Node);
         spdlog::error("Invalid NOTE event structure on line {}", Init.row + 1);
         return {};
     }
 
-    if (std::string(ts_node_type(TypeNode)) != "keyword" || std::string(ts_node_type(PitchNode)) != "pitch" ||
-        std::string(ts_node_type(DurationNode)) != "duration") {
+    if (std::string(ts_node_type(PitchNode)) != "pitch" || std::string(ts_node_type(DurationNode)) != "number") {
         TSPoint Init = ts_node_start_point(Node);
         spdlog::error("Unexpected NOTE event tokens on line {}", Init.row + 1);
         return {};
     }
 
-    // Type
-    std::string id = GetCodeStr(ScoreStr, TypeNode);
-    if (id == "NOTE") {
-        Event.Type = NOTE;
-    } else {
-        TSPoint Init = ts_node_start_point(TypeNode);
-        spdlog::error("Wrong Type on {}", Init.row + 1);
-        return {};
-    }
-
-    TSNode ActionNode = ts_node_child_by_field_name(Node, "ACTION", 6);
-    while (!ts_node_is_null(ActionNode)) {
-        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
-            NewEventAction(ScoreStr, ActionNode, Event);
-        }
-        ActionNode = ts_node_next_named_sibling(ActionNode);
-    }
+    Event.Type = NOTE;
 
     // Pitch
     AudioState SubState;
@@ -305,10 +300,10 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     Event.AudioStates.push_back(SubState);
 
     // Silence
-    if (Percurssive) {
-        AudioState PercurssiveDesc;
-        PercurssiveDesc.Type = SILENCE;
-        Event.AudioStates.push_back(PercurssiveDesc);
+    if (Percussive) {
+        AudioState PercussiveDesc;
+        PercussiveDesc.Type = SILENCE;
+        Event.AudioStates.push_back(PercussiveDesc);
     }
 
     // Duration
@@ -335,23 +330,22 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
         return {};
     }
 
-    TSNode TypeNode = ts_node_named_child(Node, 0);
-    TSNode PitchesNode = ts_node_named_child(Node, 1);
-    TSNode DurationNode = ts_node_named_child(Node, 2);
+    TSNode PitchesNode = ts_node_child_by_field_name(Node, "pitches", 7);
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
 
-    if (ts_node_is_null(TypeNode) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
+    if (ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
         TSPoint Init = ts_node_start_point(Node);
         spdlog::error("Invalid multi pitch event structure on line {}", Init.row + 1);
         return {};
     }
 
-    std::string id = GetCodeStr(ScoreStr, TypeNode);
-    if (id == "TRILL") {
+    std::string nodeType = ts_node_type(Node);
+    if (nodeType == "trill_event") {
         Event.Type = TRILL;
-    } else if (id == "CHORD") {
+    } else if (nodeType == "chord_event") {
         Event.Type = CHORD;
     } else {
-        TSPoint Init = ts_node_start_point(TypeNode);
+        TSPoint Init = ts_node_start_point(Node);
         spdlog::error("Wrong Type on {}", Init.row + 1);
         return {};
     }
@@ -375,14 +369,6 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
 
     double duration = GetDurationFromNode(ScoreStr, DurationNode);
     Event.Duration = duration;
-
-    TSNode ActionNode = ts_node_next_named_sibling(DurationNode);
-    while (!ts_node_is_null(ActionNode)) {
-        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
-            NewEventAction(ScoreStr, ActionNode, Event);
-        }
-        ActionNode = ts_node_next_named_sibling(ActionNode);
-    }
 
     ProcessEventTime(Event);
     return Event;
@@ -413,19 +399,11 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
-    TSNode TypeNode = ts_node_named_child(Node, 0);
-    TSNode DurationNode = ts_node_named_child(Node, 1);
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
 
-    if (ts_node_is_null(TypeNode) || ts_node_is_null(DurationNode)) {
+    if (ts_node_is_null(DurationNode)) {
         TSPoint Init = ts_node_start_point(Node);
         spdlog::error("Invalid REST event structure on line {}", Init.row + 1);
-        return {};
-    }
-
-    std::string id = GetCodeStr(ScoreStr, TypeNode);
-    if (id != "REST") {
-        TSPoint Init = ts_node_start_point(TypeNode);
-        spdlog::error("Wrong Type on {}", Init.row + 1);
         return {};
     }
 
@@ -437,14 +415,6 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     AudioState Silence;
     Silence.Type = SILENCE;
     Event.AudioStates.push_back(Silence);
-
-    TSNode ActionNode = ts_node_next_named_sibling(DurationNode);
-    while (!ts_node_is_null(ActionNode)) {
-        if (std::string(ts_node_type(ActionNode)) == "ACTION") {
-            NewEventAction(ScoreStr, ActionNode, Event);
-        }
-        ActionNode = ts_node_next_named_sibling(ActionNode);
-    }
 
     ProcessEventTime(Event);
     return Event;
@@ -481,6 +451,11 @@ void Score::ProcessEventTime(MarkovState &Event) {
 
 // ─────────────────────────────────────
 std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode node, std::string id) {
+    TSNode field = ts_node_child_by_field_name(node, id.c_str(), id.length());
+    if (!ts_node_is_null(field)) {
+        return GetCodeStr(ScoreStr, field);
+    }
+
     int child_count = ts_node_child_count(node);
     for (int i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(node, i);
@@ -494,32 +469,44 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 
 // ─────────────────────────────────────
 void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
+    MarkovState Event;
+
+    TSNode definition = GetField(Node, "definition");
+    if (ts_node_is_null(definition)) {
+        TSPoint Pos = ts_node_start_point(Node);
+        spdlog::error("Invalid EVENT on line {}", Pos.row + 1);
+        return;
+    }
+
+    std::string defType = ts_node_type(definition);
+    if (defType == "note_event") {
+        Event = NewPitchEvent(ScoreStr, definition);
+    } else if (defType == "chord_event" || defType == "trill_event") {
+        Event = NewMultiPitchEvent(ScoreStr, definition);
+    } else if (defType == "rest_event") {
+        Event = NewRestEvent(ScoreStr, definition);
+    } else {
+        TSPoint Pos = ts_node_start_point(definition);
+        spdlog::error("Type not implemented {} on line {}.", defType, Pos.row + 1);
+        return;
+    }
+
+    if (Event.AudioStates.empty()) {
+        return;
+    }
 
     uint32_t child_count = ts_node_child_count(Node);
     for (uint32_t i = 0; i < child_count; i++) {
-        MarkovState Event;
         TSNode child = ts_node_child(Node, i);
         std::string type = ts_node_type(child);
-        TSPoint Pos = ts_node_start_point(child);
-        Event.Line = Pos.row + 1;
-        if (type == "noteEvent") {
-            Event = NewPitchEvent(ScoreStr, child);
-            m_PrevDuration = Event.Duration;
-            m_LastOnset = Event.OnsetExpected;
-        } else if (type == "multiPitchEvent") {
-            Event = NewMultiPitchEvent(ScoreStr, child);
-            m_PrevDuration = Event.Duration;
-            m_LastOnset = Event.OnsetExpected;
-        } else if (type == "restEvent") {
-            Event = NewRestEvent(ScoreStr, child);
-            m_PrevDuration = Event.Duration;
-            m_LastOnset = Event.OnsetExpected;
-        } else {
-            spdlog::error("Type not implemented {}.", type);
+        if (type == "action") {
+            NewEventAction(ScoreStr, child, Event);
         }
-
-        m_ScoreStates.emplace_back(Event);
     }
+
+    m_PrevDuration = Event.Duration;
+    m_LastOnset = Event.OnsetExpected;
+    m_ScoreStates.emplace_back(Event);
 }
 
 // ─────────────────────────────────────
@@ -542,166 +529,205 @@ std::string GetChildStringFromType(const std::string &source, TSNode parent, con
 
 // ─────────────────────────────────────
 void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
-    uint32_t child_count = ts_node_child_count(node);
+    TSNode keyNode = GetField(node, "key");
+    TSNode valueNode = GetField(node, "value");
+    TSPoint pos = ts_node_start_point(node);
 
-    for (uint32_t i = 0; i < child_count; ++i) {
-        TSNode child = ts_node_child(node, i);
-        std::string type = ts_node_type(child);
-        TSPoint pos = ts_node_start_point(child);
+    if (ts_node_is_null(keyNode) || ts_node_is_null(valueNode)) {
+        spdlog::error("Invalid CONFIG on line {}.", pos.row + 1);
+        return;
+    }
 
-        if (type == "numberConfig") {
-            std::string id = GetChildStringFromType(ScoreStr, child, "numberConfigId");
-            std::string value = GetChildStringFromType(ScoreStr, child, "number");
-            float v = std::stof(value);
-            if (id == "BPM") {
-                m_CurrentBPM = v;
-                MarkovState Begin = GetFirstEvent();
-                ProcessEventTime(Begin);
-                Begin.BPMExpected = v;
-                m_ScoreStates.emplace_back(Begin);
-            } else if (id == "TRANSPOSE") {
-                if (v < -36 || v > 36) {
-                    spdlog::warn("Weird transpose value on line {}.", pos.row + 1);
-                }
-                m_Transpose = v;
-            } else if (id == "PHASECOUPLING") {
-                if (v < 0 || v > 2) {
-                    spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
-                } else {
-                    m_PhaseCoupling = v;
-                }
+    std::string id = GetCodeStr(ScoreStr, keyNode);
+    std::string valueType = ts_node_type(valueNode);
+    std::string value = GetCodeStr(ScoreStr, valueNode);
 
-            } else if (id == "SYNCSTRENGTH") {
-                if (v < 0 || v > 1) {
-                    spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
-                } else {
-                    m_SyncStrength = v;
-                }
-            } else if (id == "PITCHTEMPLATESIGMA") {
-                if (v < 0 || v > 1) {
-                    spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);
-                } else {
-                    m_PitchTemplateSigma = v;
-                }
-            } else if (id == "FFTSIZE") {
-                int fft = static_cast<int>(v);
-                if (fft > 0 && (fft & (fft - 1)) == 0) {
-                    m_FFTSize = fft;
-                } else {
-                    spdlog::error("FFTSIZE must be a power of two");
-                }
-            } else if (id == "HOPSIZE") {
-                int hop = static_cast<int>(v);
-                if (hop > 0 && (hop & (hop - 1)) == 0) {
-                    m_HopSize = hop;
-                } else {
-                    spdlog::error("HopSize must be a power of two");
-                }
-            }
-        } else if (type == "pathConfig") {
-            std::string id = GetChildStringFromField(ScoreStr, child, "pathConfigId");
-            std::string path = GetChildStringFromType(ScoreStr, child, "path");
-            if (!path.empty() && path.front() == '"') {
-                path = path.substr(1, path.size() - 2);
-            }
-
-            if (id == "TIMBREMODEL") {
-                m_TimbreModel = m_ScoreRootPath / fs::path(path);
-                if (!fs::exists(m_TimbreModel)) {
-                    spdlog::error("Timbre Model not found");
-                }
-            }
-
-        } else if (type == "symbolConfig") {
-            std::string id = GetChildStringFromField(ScoreStr, child, "configId");
-            std::string symbol = GetChildStringFromType(ScoreStr, child, "symbol");
+    if (id == "BPM" || id == "TRANSPOSE" || id == "PHASECOUPLING" || id == "SYNCSTRENGTH" ||
+        id == "PITCHTEMPLATESIGMA" || id == "FFTSIZE" || id == "HOPSIZE") {
+        if (valueType != "number") {
+            spdlog::error("Invalid numeric value for {} on line {}.", id, pos.row + 1);
+            return;
         }
+
+        float v = std::stof(value);
+        if (id == "BPM") {
+            m_CurrentBPM = v;
+            MarkovState Begin = GetFirstEvent();
+            ProcessEventTime(Begin);
+            Begin.BPMExpected = v;
+            m_ScoreStates.emplace_back(Begin);
+        } else if (id == "TRANSPOSE") {
+            if (v < -36 || v > 36) {
+                spdlog::warn("Weird transpose value on line {}.", pos.row + 1);
+            }
+            m_Transpose = v;
+        } else if (id == "PHASECOUPLING") {
+            if (v < 0 || v > 2) {
+                spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
+            } else {
+                m_PhaseCoupling = v;
+            }
+        } else if (id == "SYNCSTRENGTH") {
+            if (v < 0 || v > 1) {
+                spdlog::error("Invalid value for SYNCSTRENGTH on line {}.", pos.row + 1);
+            } else {
+                m_SyncStrength = v;
+            }
+        } else if (id == "PITCHTEMPLATESIGMA") {
+            if (v < 0 || v > 1) {
+                spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);
+            } else {
+                m_PitchTemplateSigma = v;
+            }
+        } else if (id == "FFTSIZE") {
+            int fft = static_cast<int>(v);
+            if (fft > 0 && (fft & (fft - 1)) == 0) {
+                m_FFTSize = fft;
+            } else {
+                spdlog::error("FFTSIZE must be a power of two.");
+            }
+        } else if (id == "HOPSIZE") {
+            int hop = static_cast<int>(v);
+            if (hop > 0 && (hop & (hop - 1)) == 0) {
+                m_HopSize = hop;
+            } else {
+                spdlog::error("HOPSIZE must be a power of two.");
+            }
+        }
+        return;
+    }
+
+    if (id == "ONNXMODEL" || id == "TIMBREMODEL") {
+        if (valueType != "path") {
+            spdlog::error("Invalid path value for {} on line {}.", id, pos.row + 1);
+            return;
+        }
+
+        std::string path = value;
+        if (!path.empty() && path.front() == '"' && path.size() >= 2 && path.back() == '"') {
+            path = path.substr(1, path.size() - 2);
+        }
+
+        m_TimbreModel = m_ScoreRootPath / fs::path(path);
+        if (!fs::exists(m_TimbreModel)) {
+            spdlog::error("Model path not found: {}", m_TimbreModel.string());
+        }
+        return;
     }
 }
 
 // ─────────────────────────────────────
 void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
-    Action NewAction;
-    NewAction.AbsoluteTime = true;
-    NewAction.Time = 0;
+    Action BaseAction;
+    BaseAction.AbsoluteTime = true;
+    BaseAction.Time = 0;
 
-    TSNode actionKeyNode = GetField(Node, "timedAction");
-    if (!ts_node_is_null(actionKeyNode)) {
-        TSNode key = GetField(actionKeyNode, "actionKey");
-        TSNode number = GetField(actionKeyNode, "value");
-        TSNode timeUnit = GetField(actionKeyNode, "timeUnit");
+    TSNode timingNode = GetField(Node, "timing");
+    if (!ts_node_is_null(timingNode)) {
+        TSNode amountNode = GetField(timingNode, "amount");
+        TSNode unitNode = GetField(timingNode, "unit");
 
-        if (!ts_node_is_null(key)) {
-            std::string keyStr = GetCodeStr(ScoreStr, key);
-            TSPoint pos = ts_node_start_point(key);
-            if (keyStr != "delay") {
-                spdlog::error("Invalid action key on line {}.", std::to_string(pos.row + 1));
-                return;
-            }
+        if (!ts_node_is_null(amountNode)) {
+            BaseAction.Time = std::stof(GetCodeStr(ScoreStr, amountNode));
         }
 
-        if (!ts_node_is_null(number)) {
-            NewAction.Time = std::stof(GetCodeStr(ScoreStr, number));
-        }
-
-        if (!ts_node_is_null(timeUnit)) {
-            std::string unit = GetCodeStr(ScoreStr, timeUnit);
+        if (!ts_node_is_null(unitNode)) {
+            std::string unit = GetCodeStr(ScoreStr, unitNode);
             if (unit == "sec") {
-                NewAction.Time *= 1000;
-                NewAction.AbsoluteTime = true;
+                BaseAction.Time *= 1000.0;
+                BaseAction.AbsoluteTime = true;
             } else if (unit == "ms") {
-                NewAction.AbsoluteTime = true;
+                BaseAction.AbsoluteTime = true;
             } else if (unit == "tempo") {
-                NewAction.AbsoluteTime = false;
+                BaseAction.AbsoluteTime = false;
             }
         }
     }
 
-    TSNode execNode = GetField(Node, "exec");
-    if (!ts_node_is_null(execNode)) {
-        TSNode key = GetField(execNode, "keyword");
-        if (!ts_node_is_null(key)) {
-            std::string keyStr = GetCodeStr(ScoreStr, key);
-            if (keyStr == "luacall") {
-                std::string luacall = GetChildStringFromField(ScoreStr, execNode, "lua_call");
-                NewAction.Lua = luacall;
-                NewAction.isLua = true;
-            } else if (keyStr == "sendto") {
-                std::string receiver = GetChildStringFromField(ScoreStr, execNode, "receiver");
-                NewAction.Receiver = receiver;
-                NewAction.isLua = false;
-            }
+    uint32_t childCount = ts_node_child_count(Node);
+    for (uint32_t i = 0; i < childCount; ++i) {
+        const char *fieldName = ts_node_field_name_for_child(Node, i);
+        if (fieldName == nullptr || std::string(fieldName) != "command") {
+            continue;
+        }
 
-            // Arguments
-            TSNode args = GetField(execNode, "pdargs");
+        TSNode execNode = ts_node_child(Node, i);
+        if (std::string(ts_node_type(execNode)) != "exec") {
+            continue;
+        }
+
+        Action NewAction = BaseAction;
+
+        TSNode luaNode = GetField(execNode, "lua");
+        TSNode receiverNode = GetField(execNode, "receiver");
+
+        if (!ts_node_is_null(luaNode)) {
+            NewAction.Lua = GetCodeStr(ScoreStr, luaNode);
+            NewAction.isLua = true;
+        } else if (!ts_node_is_null(receiverNode)) {
+            NewAction.Receiver = GetCodeStr(ScoreStr, receiverNode);
+            NewAction.isLua = false;
+
+            TSNode args = GetField(execNode, "args");
             if (!ts_node_is_null(args)) {
-                int argsCount = ts_node_child_count(args);
-                for (int i = 0; i < argsCount; i++) {
-                    TSNode arg = ts_node_child(args, i);
+                uint32_t argsCount = ts_node_child_count(args);
+                std::string pendingErrorPrefix;
+                for (uint32_t j = 0; j < argsCount; j++) {
+                    TSNode arg = ts_node_child(args, j);
                     std::string argType = ts_node_type(arg);
-                    if (argType == "pdarg") {
-                        TSNode pdarg = ts_node_child(arg, 0);
-                        std::string pdargType = ts_node_type(pdarg);
-                        std::string token = GetCodeStr(ScoreStr, pdarg);
-                        if (pdargType == "number") {
-                            std::variant<float, int, std::string> number = 0;
-                            if (isNumber(token)) {
-                                number = std::stof(token);
-                                NewAction.Args.push_back(number);
-                            } else {
-                                spdlog::error("Invalid number argument on line {}.",
-                                              ts_node_start_point(pdarg).row + 1);
-                                return;
-                            }
-                        } else if (pdargType == "symbol") {
-                            NewAction.Args.push_back(token);
+
+                    if (argType == "ERROR") {
+                        std::string token = GetCodeStr(ScoreStr, arg);
+                        token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) {
+                            return std::isspace(c);
+                        }),
+                                    token.end());
+                        pendingErrorPrefix += token;
+                        continue;
+                    }
+
+                    if (argType != "pdarg") {
+                        continue;
+                    }
+
+                    TSNode pdarg = ts_node_child(arg, 0);
+                    if (ts_node_is_null(pdarg)) {
+                        continue;
+                    }
+
+                    std::string pdargType = ts_node_type(pdarg);
+                    std::string token = GetCodeStr(ScoreStr, pdarg);
+                    if (!pendingErrorPrefix.empty()) {
+                        token = pendingErrorPrefix + token;
+                        pendingErrorPrefix.clear();
+                    }
+
+                    if (pdargType == "number") {
+                        if (isNumber(token)) {
+                            NewAction.Args.push_back(std::stof(token));
+                        } else {
+                            spdlog::error("Invalid number argument on line {}.", ts_node_start_point(pdarg).row + 1);
+                            return;
                         }
+                    } else if (pdargType == "identifier" || pdargType == "symbol") {
+                        NewAction.Args.push_back(token);
+                    } else if (!token.empty()) {
+                        NewAction.Args.push_back(token);
                     }
                 }
+
+                if (!pendingErrorPrefix.empty()) {
+                    NewAction.Args.push_back(pendingErrorPrefix);
+                }
             }
+        } else {
+            TSPoint Pos = ts_node_start_point(execNode);
+            spdlog::error("Invalid action command on line {}.", Pos.row + 1);
+            continue;
         }
+
+        Event.Actions.push_back(NewAction);
     }
-    Event.Actions.push_back(NewAction);
 }
 
 // ─────────────────────────────────────
@@ -785,7 +811,7 @@ States Score::Parse(std::string ScoreFile) {
 
     // Proceed with parsing ScoreStr...
     // Config Values
-    m_CurrentBPM = 60;
+    m_CurrentBPM = -1;
     m_Transpose = 0;
     m_PitchTemplateSigma = 0.5;
 

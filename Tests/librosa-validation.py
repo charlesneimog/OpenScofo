@@ -248,7 +248,7 @@ def run_test_zcr(window, label):
 
 
 # ---------------- TESTES ALEATÓRIOS ----------------
-n_tests = 20
+n_tests = 100
 
 for _ in range(n_tests):
     max_start = len(y) - n_fft

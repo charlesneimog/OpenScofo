@@ -38,7 +38,7 @@ class MIR {
     void AddReverb(Description &Desc, double decay);
 
     double GetdB();
-    void LoadONNXModel(fs::path path);
+    void ONNXInit(fs::path path);
 
   private:
     double Mtof(double Note, double Tunning);
@@ -57,6 +57,8 @@ class MIR {
     // Onset
     void OnsetInit();
     void OnsetExec(Description &Desc);
+    // Extended Technique
+    void ExtendedTechExec(Description &Desc);
     // Spectral Flux
     void SpectralFluxInit();
     void SpectralFluxExec(Description &Desc);
@@ -76,8 +78,7 @@ class MIR {
     // FFTW
     void FFTWInit();
 
-    // CQT
-    void CQTInit();
+    void ONNXExec(Description &Desc);
 
     // Get Signal
     void GetSignalPower(std::vector<double> &In, Description &Desc);
@@ -105,6 +106,7 @@ class MIR {
     int m_OnsetFFTSize = 512;
     int m_MedSpan = 50;
     int m_Accum = 0;
+    std::vector<float> m_OnsetFFTFrame;
 
     // MFCC
     int m_MFCCMels = 40;
@@ -133,9 +135,7 @@ class MIR {
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;
-    struct onnx_context_t *m_OnnxCTX = nullptr;
-    int m_TensorCount = 0;
-    std::unordered_map<std::string, float> m_ONNXResults;
+    struct onnx_context_t *m_OnnxContext = nullptr;
 
     // Env
     double m_dBTreshold = -50;

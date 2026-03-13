@@ -6,4 +6,9 @@ ENTROPY 0.15
 FFTSIZE 2048
 HOPSIZE 512
 
-NOTE C4 2
+LUA {
+    print("Ok")
+}
+
+NOTE C#4 2 @percussive
+    delay 200 ms luacall(hello())

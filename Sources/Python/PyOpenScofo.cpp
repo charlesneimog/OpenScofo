@@ -56,9 +56,12 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("chroma", &OpenScofo::Description::Chroma)
         .def_readwrite("onset", &OpenScofo::Description::Onset)
         .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
+        .def_readwrite("percussive_prob", &OpenScofo::Description::ExtendedTechProb)
         .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
         .def_readwrite("norm_spectral_power", &OpenScofo::Description::NormSpectralPower)
+        .def_readwrite("reverb_spectral_power", &OpenScofo::Description::ReverbSpectralPower)
 
+        .def_readwrite("max_amp", &OpenScofo::Description::MaxAmp)
         .def_readwrite("loudness", &OpenScofo::Description::Loudness)
         .def_readwrite("spectral_flux", &OpenScofo::Description::SpectralFlux)
         .def_readwrite("spectral_irregularity", &OpenScofo::Description::SpectralIrregularity)
@@ -71,6 +74,9 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
         .def_readwrite("peakiness", &OpenScofo::Description::Peakiness)
         .def_readwrite("zero_crossing_rate", &OpenScofo::Description::ZeroCrossingRate)
+        .def_readwrite("std_dev", &OpenScofo::Description::StdDev)
+        .def_readwrite("pitch", &OpenScofo::Description::Pitch)
+        .def_readwrite("pitch_confidence", &OpenScofo::Description::PitchConfidence)
 
         .def_readwrite("db", &OpenScofo::Description::dB)
         .def_readwrite("rms", &OpenScofo::Description::RMS)
