@@ -7,7 +7,7 @@ Instead of writing separate methods for each platform — such as Pd, Max, Super
 This approach allows development to focus on improving the core functionality of `OpenScofo`, rather than maintaining platform-specific integration layers.
 
 !!! tip "Always try on `OpenScofo` Editor"
-    Always try the examples on [`OpenScofo` Online Score Editor](./../../Editor), with color highlight, write scores its easier.
+    Always try the examples on [OpenScofo Online Score Editor](https://charlesneimog.github.io/OpenScofo/Editor){:target="_blank"}, with color highlight. Writing scores is easier there.
 
 ---
 ## <h2 align="center">Audio Configuration</h2>
@@ -71,7 +71,7 @@ This value must be between 0 and 2 and captures the amount of force exerted on a
 - `Default is 0.5`
 - `Range 0-1`
 
-Set the value of $\eta_s$ (Sync Strength) corresponds to what [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119){:target="_blank"} (1999) refer to as the adaptation rate. This value determines how much of the previous predictions will be considered for the next BPM prediction and must be between 0 and 1. According to [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119) (1999, p. 131): 
+Set the value of $\eta_s$ (Sync Strength) corresponds to what [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119){:target="_blank"} (1999) refer to as the adaptation rate. *This value determines how much of the previous predictions will be considered for the next BPM prediction and must be between 0 and 1*. According to [Large and Jones](https://psycnet.apa.org/doi/10.1037/0033-295X.106.1.119) (1999, p. 131): 
 > if it is set to 1, each estimate of $\kappa$ will be based solely on the current onsets. If $\eta_s$ < 1, the focus adapts more slowly because the previous context is taken into account.
 
 ```
@@ -82,12 +82,16 @@ SYNCSTRENGTH 0.4
 ## <h2 align="center">Listening Module Configuration</h2>
 ---
 
-### `PITCHSIGMA`
+### `PITCHTEMPLATESIGMA`
 
 - `Default is 0.5`
 - `Range -12 - 12`
 
-Defines the width of the pitch template: wider values increase flexibility, narrower values increase precision. This value scale using `MIDI`, so using `0.5` will give you a flexibility of half-tone more or less.
+Defines the width of the pitch template: wider values increase flexibility, narrower values increase precision. This value scale using `MIDI`, so using `0.5` will give you a flexibility of half-tone more or less. In anothers words, even if the player play a half-tone low or upper the pitch will yet 'match' with the Pitch.
+
+```
+PITCHTEMPLATESIGMA 0.8
+```
 
 ### `TIMBREMODEL`
 
@@ -96,4 +100,15 @@ Defines a path to a `.onnx` model trained with `py.train` for identification of 
 ```
 TIMBREMODEL "flute.onnx"
 ```
+
+### `ONNXDESCRIPTORS`
+
+Defines with descriptors did you use for the train of the `ONNX` model.
+
+```
+
+ONNXDESCRIPTORS mfcc zcr centroid spread
+```
+
+!!! warning "Order matters, use `zcr mfcc` when in the train you specify `mfcc zcr` will change the result."
 

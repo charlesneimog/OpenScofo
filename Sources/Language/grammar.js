@@ -29,20 +29,20 @@ module.exports = grammar({
         descriptor_list: ($) => seq("[", repeat1(field("descriptor", $.descriptor)), "]"),
         descriptor: (_) =>
             choice(
-                "MFCC",
-                "LOUDNESS",
-                "RMS",
-                "POWER",
-                "CHROMA",
-                "ZCR",
-                "HFR",
-                "CENTROID",
-                "SPREAD",
-                "FLATNESS",
-                "FLUX",
-                "IRREGULARITY",
-                "HARMONICITY",
-                "YIN",
+                "mfcc",
+                "loudness",
+                "rms",
+                "power",
+                "chroma",
+                "zcr",
+                "hfr",
+                "centroid",
+                "spread",
+                "flatness",
+                "flux",
+                "irregularity",
+                "harmonicity",
+                "yin",
             ),
 
         //╭─────────────────────────────────────╮
@@ -55,16 +55,20 @@ module.exports = grammar({
             token(
                 choice(
                     "BPM",
+
+                    // Audio
+                    "FFTSIZE",
+                    "HOPSIZE",
+
+                    // Tempo
                     "PHASECOUPLING",
                     "SYNCSTRENGTH",
                     "TRANSPOSE",
-                    "ENTROPY",
+
+                    // Listening model
                     "PITCHTEMPLATESIGMA",
-                    "FFTSIZE",
-                    "HOPSIZE",
-                    "DUMMY",
                     "ONNXMODEL",
-                    "ONNXTENSOR",
+                    "ONNXDESCRIPTORS",
                 ),
             ),
 

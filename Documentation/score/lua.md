@@ -10,7 +10,7 @@ I am not present the language here, there are a lot of tutorials on the internet
 * Text [here](https://tylerneylon.com/a/learn-lua/){target="_blank"}.
 
 
-All these modules are for the `OpenScofo` language; What I will present is how to create actions using `lua` and `oscofo`, `pd` and `max` lua module.
+Inside `OpenScofo` you can use `Lua` to create interactive events. `OpenScofo` provide a module where you can create deep interactions with the listening and follower module. Also `OpenScofo` Pure Data and Max object provide `pd` and `max` module to interact with the patches. Below I present the module and its methods.
 
 !!! danger "Under developement yet"
     Lua Module for Pure Data, Max, and OpenScofo are in developement yet.
@@ -18,9 +18,9 @@ All these modules are for the `OpenScofo` language; What I will present is how t
 
 ### <h2 align="center">:simple-lua: `OpenScofo` Lua Module</h2>
 
-The `OpenScofo` module exposes classes and functions.
+The `OpenScofo` module exposes classes and functions to interact with the `OpenScofo` follower and listening module.
 
-### Creating an `OpenScofo` object
+### Import `OpenScofo` as object
 
 ```lua
 local oscofo = require("OpenScofo")

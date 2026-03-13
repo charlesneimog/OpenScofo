@@ -1,22 +1,29 @@
----
-name: Docs
+name: Documentation
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - uses: actions/cache@v4
+      - run: pip install zensical
+      - run: zensical build --clean 
+      - uses: actions/upload-pages-artifact@v4
         with:
-          key: ${{ github.ref }}
-          path: .cache
-      - run: pip install -r Documentation/requirements.txt
-      - run: mkdocs gh-deploy --force
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment
