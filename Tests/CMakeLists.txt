@@ -27,3 +27,7 @@ endif()
 add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
 target_link_libraries(openscofo_perf PRIVATE OpenScofo)
 target_compile_options(openscofo_perf PRIVATE -O3 -g -fno-omit-frame-pointer -Wno-shadow)
+
+add_executable(score "${CMAKE_CURRENT_SOURCE_DIR}/score.cpp")
+target_link_libraries(score PRIVATE OpenScofo)
+target_compile_options(score PRIVATE -O3 -g -fno-omit-frame-pointer -Wno-shadow)

@@ -593,8 +593,8 @@ void MDP::GetAudioObservations(int T) {
     double ObsNoSound = 0;
     double ObsSilence = m_Desc.SilenceProb;
     double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
-    double nonPercussiveWeight = 1.0 - m_Desc.PercussiveProb;
-    double PercussiveWeight = m_Desc.PercussiveProb;
+    double nonPercussiveWeight = 1.0 - m_Desc.ExtendedTechProb;
+    double PercussiveWeight = m_Desc.ExtendedTechProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())

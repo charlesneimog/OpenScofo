@@ -4,6 +4,7 @@
 #include <vector>
 #include <variant>
 #include <span>
+#include <unordered_map>
 
 namespace OpenScofo {
 
@@ -129,7 +130,7 @@ class Description {
 
     // Probability
     double SilenceProb;
-    double PercussiveProb;
+    double ExtendedTechProb;
 
     // Amplitude
     double dB;
@@ -158,6 +159,9 @@ class Description {
     std::vector<double> ReverbSpectralPower;
     std::vector<double> MFCC;
     std::vector<double> Chroma; // size 12
+
+    // ONNX
+    std::unordered_map<std::string, float> ONNX;
 };
 
 // ─────────────────────────────────────

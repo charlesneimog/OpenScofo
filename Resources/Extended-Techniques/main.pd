@@ -81,6 +81,7 @@
 #X restore 278 327 graph;
 #X obj 125 378 nbx 5 16 -1e+37 1e+37 0 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 256;
 #X obj 120 326 nbx 10 16 -1e+37 1e+37 0 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 256;
+#X obj 279 240 bng 18 250 50 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000;
 #X connect 1 0 22 0;
 #X connect 2 0 22 0;
 #X connect 7 0 22 0;
@@ -95,6 +96,7 @@
 #X connect 19 0 14 0;
 #X connect 20 0 14 0;
 #X connect 21 0 14 0;
+#X connect 22 0 31 0;
 #X connect 22 1 12 0;
 #X connect 25 0 14 0;
 #X connect 26 1 27 0;

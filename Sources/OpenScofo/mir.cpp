@@ -35,9 +35,9 @@ MIR::~MIR() {
     }
 
     if (m_ONNXModelLoaded) {
-        if (m_OnnxCTX) {
-            onnx_context_free(m_OnnxCTX);
-            m_OnnxCTX = nullptr;
+        if (m_OnnxContext) {
+            onnx_context_free(m_OnnxContext);
+            m_OnnxContext = nullptr;
         }
         m_ONNXModelLoaded = false;
     }
@@ -73,6 +73,7 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     m_HopSize = HopSize;
     m_FFTSize = FftSize;
     m_Sr = Sr;
+    m_OnsetFFTSize = std::max(2, static_cast<int>(std::lround(FftSize)));
     m_BlockSize = HopSize;
     m_Accum = 0;
     m_PrevCentroid = 0.0;
@@ -137,19 +138,19 @@ void MIR::FFTWInit() {
 // ╭─────────────────────────────────────╮
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
-void MIR::LoadONNXModel(fs::path path) {
+void MIR::ONNXInit(fs::path path) {
     auto u8 = path.u8string();
     std::string path_utf8(u8.begin(), u8.end());
 
-    m_OnnxCTX = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
+    m_OnnxContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
 
-    if (m_OnnxCTX == nullptr) {
+    if (m_OnnxContext == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
         return;
     }
 
-    if (m_OnnxCTX && m_OnnxCTX->g != nullptr) {
-        struct onnx_graph_t *g = m_OnnxCTX->g;
+    if (m_OnnxContext && m_OnnxContext->g != nullptr) {
+        struct onnx_graph_t *g = m_OnnxContext->g;
         for (int i = 0; i < g->nlen; i++) {
             struct onnx_node_t *n = &g->nodes[i];
             if (n->opset > CURRENT_ONNX_OPSET) {
@@ -161,7 +162,7 @@ void MIR::LoadONNXModel(fs::path path) {
 
     // Get labels
     bool TreeEnsembleClassifierFound = false;
-    struct onnx_graph_t *g = m_OnnxCTX->g;
+    struct onnx_graph_t *g = m_OnnxContext->g;
     for (int i = 0; i < g->nlen; i++) {
         struct onnx_node_t *n = &g->nodes[i];
         if (!n || strcmp(n->proto->op_type, "TreeEnsembleClassifier") != 0)
@@ -174,7 +175,6 @@ void MIR::LoadONNXModel(fs::path path) {
                 for (size_t v = 0; v < attr->n_strings; v++) {
                     ProtobufCBinaryData *str = &attr->strings[v];
                     std::string label(reinterpret_cast<char *>(str->data), str->len);
-                    m_ONNXResults[label] = 0.0f;
                 }
             }
         }
@@ -185,32 +185,89 @@ void MIR::LoadONNXModel(fs::path path) {
         return;
     }
 
+    bool found = false;
+    for (int i = 0; i < g->nlen; i++) {
+        struct onnx_node_t *n = &g->nodes[i];
+        Onnx__NodeProto *proto = n->proto;
+        for (size_t k = 0; k < proto->n_attribute; k++) {
+            Onnx__AttributeProto *attr = proto->attribute[k];
+            if (strcmp(attr->name, "classlabels_strings") == 0) {
+                size_t n_metadata_props = attr->n_strings;
+                for (size_t m = 0; m < n_metadata_props; m++) {
+                    ProtobufCBinaryData s = attr->strings[m];
+                    std::string str(reinterpret_cast<char *>(s.data), s.len);
+                    found = true;
+                }
+                if (found) {
+                    return;
+                }
+            }
+        }
+    }
     m_ONNXModelLoaded = true;
+}
+
+// ─────────────────────────────────────
+void MIR::ONNXExec(Description &Desc) {
+    // Do something to get the
 }
 
 // ╭─────────────────────────────────────╮
 // │           Onset Detector            │
 // ╰─────────────────────────────────────╯
 void MIR::OnsetInit() {
-    size_t nbytes = onsetsds_memneeded(ODS_ODF_MKL, m_FFTSize, m_MedSpan);
+    m_OnsetInit = false;
+
+    const int onsetFFTSize = std::max(2, m_OnsetFFTSize);
+    const size_t nbytes = onsetsds_memneeded(ODS_ODF_MKL, onsetFFTSize, m_MedSpan);
     delete[] m_ODSData;
+    m_ODSData = nullptr;
     delete m_ODS;
+    m_ODS = nullptr;
+
     m_ODSData = new float[nbytes / sizeof(float)];
     m_ODS = new OnsetsDS();
-    onsetsds_init(m_ODS, m_ODSData, ODS_FFT_FFTW3_R2C, ODS_ODF_MKL, m_OnsetFFTSize, m_MedSpan, m_Sr);
-    if (!m_ODS) {
+    if (!m_ODS || !m_ODSData) {
         spdlog::critical("Not possible to initialize the onset detector");
         return;
     }
+
+    onsetsds_init(m_ODS, m_ODSData, ODS_FFT_FFTW3_R2C, ODS_ODF_MKL, onsetFFTSize, m_MedSpan, m_Sr);
+    m_OnsetFFTFrame.assign(static_cast<size_t>(2 * (onsetFFTSize / 2 + 1)), 0.0f);
     m_OnsetInit = true;
 }
 
 // ─────────────────────────────────────
 void MIR::OnsetExec(Description &Desc) {
-    if (!m_OnsetInit) {
+    if (!m_OnsetInit)
         return;
+
+    const size_t nBins = static_cast<size_t>(m_OnsetFFTSize / 2 + 1);
+    const size_t requiredSize = 2 * nBins;
+    if (m_OnsetFFTFrame.size() != requiredSize) {
+        m_OnsetFFTFrame.assign(requiredSize, 0.0f);
     }
-    Desc.Onset = onsetsds_process(m_ODS, reinterpret_cast<float *>(m_FFTOut));
+
+    for (size_t i = 0; i < nBins; ++i) {
+        m_OnsetFFTFrame[2 * i] = static_cast<float>(m_FFTOut[i][0]);
+        m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FFTOut[i][1]);
+    }
+
+    Desc.Onset = onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
+}
+
+// ╭─────────────────────────────────────╮
+// │    Extended Technique Detection     │
+// ╰─────────────────────────────────────╯
+void MIR::ExtendedTechExec(Description &Desc) {
+    Desc.ExtendedTechProb = (1 - Desc.SilenceProb);
+    Desc.ExtendedTechProb *= (1 - Desc.PitchConfidence);
+    Desc.ExtendedTechProb *= (1 - Desc.Harmonicity);
+    Desc.ExtendedTechProb *= (1 - Desc.SpectralFlux);
+
+    // Sigmoid curve to push values < 0.5 to 0, and > 0.5 to 1
+    float steepness = 25.0f; // Higher number = sharper jump at 0.5
+    Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
 }
 
 // ╭─────────────────────────────────────╮
@@ -266,6 +323,7 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
     }
 
     // Compute silence probability
+    // TODO: Add the capability to set this via Score
     const double L0 = -60.0;
     const double alpha = 0.25;
     Desc.SilenceProb = 1.0 / (1.0 + std::exp(alpha * (Desc.Loudness - L0)));
@@ -740,9 +798,10 @@ void MIR::SpectralChromaInit() {
             }
         }
 
-        const double octaveWeight = std::exp(
-            -0.5 * std::pow((frqbins[k] / static_cast<double>(m_ChromaSize) - m_ChromaCenterOctave) / m_ChromaOctaveWidth,
-                            2.0));
+        const double octaveWeight =
+            std::exp(-0.5 * std::pow((frqbins[k] / static_cast<double>(m_ChromaSize) - m_ChromaCenterOctave) /
+                                         m_ChromaOctaveWidth,
+                                     2.0));
         for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
             m_ChromaFilter[chroma][k] *= octaveWeight;
         }
@@ -969,15 +1028,7 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
     }
     GetSpectralDescriptions(Desc);
 
-    // Perc vs Pitch
-    // Take the strongest percussive indicator: energy burst OR noise burst
-    double inst_perc = Desc.SpectralFlux / (Desc.Harmonicity + 1e-6);
-
-    inst_perc *= (1.0 - Desc.SilenceProb * Desc.Harmonicity);
-    inst_perc = std::min(1.0, std::max(1e-300, inst_perc));
-
-    Desc.PercussiveProb = inst_perc;
-    m_PrevPercussiveProb = Desc.PercussiveProb;
+    ExtendedTechExec(Desc);
 }
 
 } // namespace OpenScofo

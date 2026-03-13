@@ -18,8 +18,10 @@ export async function fetchTextFile(filePath) {
         }
         const text = await response.text();
         this.LuaStringQuery = text;
+        return text;
     } catch (error) {
         console.error("Error:", error);
+        return null;
     }
 }
 
@@ -32,6 +34,10 @@ export function getHighlights(language, capture) {
 }
 
 export function luaHighlight(luaNode, luaPositionStart) {
+    if (!this.LuaParser || !this.LuaQuery) {
+        return;
+    }
+
     let luaTxt = luaNode.text;
     let luaTree = this.LuaParser.parse(luaTxt);
 
@@ -191,29 +197,70 @@ export function runTreeQuery(_, startRow, endRow) {
                 endPosition: { row: endRow, column: 0 },
             });
 
-            let lastNodeId;
             for (const { name, node } of captures) {
-                if (node.id === lastNodeId) continue;
-                lastNodeId = node.id;
                 const { startPosition, endPosition } = node;
-                if (!node.hasError) {
-                    if (name === "lua_body" && !this.luaChildOfLuaBody(node)) {
-                        this.luaHighlight(node, startPosition);
-                    } else {
-                        this.codeEditor.markText(
-                            { line: startPosition.row, ch: startPosition.column },
-                            { line: endPosition.row, ch: endPosition.column },
-                            {
-                                inclusiveLeft: true,
-                                inclusiveRight: true,
-                                css: this.getHighlights("oscofo", name),
-                            },
-                        );
+                const isErrorCapture = name === "error";
+                if (node.hasError && !isErrorCapture) {
+                    continue;
+                }
+
+                if (name === "lua_body" && !this.luaChildOfLuaBody(node)) {
+                    this.luaHighlight(node, startPosition);
+                } else {
+                    const css = this.getHighlights("oscofo", name);
+                    if (!css) {
+                        continue;
                     }
+
+                    this.codeEditor.markText(
+                        { line: startPosition.row, ch: startPosition.column },
+                        { line: endPosition.row, ch: endPosition.column },
+                        {
+                            inclusiveLeft: true,
+                            inclusiveRight: true,
+                            css,
+                        },
+                    );
                 }
             }
 
             this.highlightTechFallback(startRow, endRow);
+
+            const markMissingNodes = (node) => {
+                for (let i = 0; i < node.namedChildCount; i++) {
+                    const child = node.namedChild(i);
+                    if (child.isMissing) {
+                        const row = child.startPosition.row;
+                        if (row >= startRow && row < endRow) {
+                            const lineText = this.codeEditor.getLine(row) || "";
+                            if (lineText.length > 0) {
+                                let fromCh = child.startPosition.column;
+                                let toCh = fromCh + 1;
+
+                                if (fromCh >= lineText.length) {
+                                    fromCh = Math.max(0, lineText.length - 1);
+                                    toCh = lineText.length;
+                                }
+
+                                if (toCh > fromCh) {
+                                    this.codeEditor.markText(
+                                        { line: row, ch: fromCh },
+                                        { line: row, ch: toCh },
+                                        {
+                                            inclusiveLeft: true,
+                                            inclusiveRight: true,
+                                            css: this.getHighlights("oscofo", "error"),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    markMissingNodes(child);
+                }
+            };
+
+            markMissingNodes(this.tree.rootNode);
         }
     });
 }

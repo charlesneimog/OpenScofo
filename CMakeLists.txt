@@ -18,8 +18,7 @@ option(OSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" OFF)
 
 option(OSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
-
-option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" OFF)
+option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 
 if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_PY_MODULE ON)
@@ -98,19 +97,17 @@ set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(score_parser generate_tree_sitter_parser)
 
 # Custom command to generate the WASM file if it doesn't exist
-if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
+if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OSCOFO_LANGUAGE})
 
     add_custom_command(
         OUTPUT "${OSCOFO_ONLINE_EDITOR_WASM}"
-        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}"
-                ${TREE_SITTER_EXECUTABLE} build --wasm
-        COMMAND ${CMAKE_COMMAND} -E copy
-                "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
+        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
+                --wasm
+        COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
         DEPENDS "${GRAMMAR_JS_SRC}"
         COMMENT "Generating Tree-sitter parser for OScofo Online Editor and WASM..."
-        VERBATIM
-    )
+        VERBATIM)
 
     set(TS_URL
         "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/web-tree-sitter.tar.gz"
@@ -125,12 +122,7 @@ if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
 
     # Download archive if missing
     if(NOT EXISTS "${TS_ARCHIVE}")
-        file(DOWNLOAD
-            "${TS_URL}"
-            "${TS_ARCHIVE}"
-            SHOW_PROGRESS
-            STATUS download_status
-        )
+        file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" SHOW_PROGRESS STATUS download_status)
         list(GET download_status 0 status_code)
         if(NOT status_code EQUAL 0)
             message(FATAL_ERROR "Failed to download web-tree-sitter archive")
@@ -138,29 +130,20 @@ if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}")
     endif()
 
     # Extract
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
-        WORKING_DIRECTORY "${TS_TEMP_DIR}"
-    )
+    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
+                    WORKING_DIRECTORY "${TS_TEMP_DIR}")
 
     # Verify files exist
-    if(NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.js" OR
-       NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.wasm")
+    if(NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.js" OR NOT EXISTS
+                                                         "${TS_TEMP_DIR}/web-tree-sitter.wasm")
         message(FATAL_ERROR "web-tree-sitter extraction failed")
     endif()
 
     # Copy required runtime files
-    file(COPY
-        "${TS_TEMP_DIR}/web-tree-sitter.js"
-        "${TS_TEMP_DIR}/web-tree-sitter.wasm"
-        DESTINATION "${TS_DEST}"
-    )
+    file(COPY "${TS_TEMP_DIR}/web-tree-sitter.js" "${TS_TEMP_DIR}/web-tree-sitter.wasm"
+         DESTINATION "${TS_DEST}")
 
-    add_custom_target(
-        build_online_editor_wasm
-        ALL
-        DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}"
-    )
+    add_custom_target(build_online_editor_wasm ALL DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}")
 
 endif()
 

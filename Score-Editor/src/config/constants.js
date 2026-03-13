@@ -24,7 +24,7 @@ export const HIGHLIGHTS = {
         error: "text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--red);",
         action: "color: var(--red); font-weight: normal;",
         actionKey: "color: var(--red); font-weight: normal;",
-        timeUnit: "color: var(--purple); font-weight: normal;",
+        timeUnit: "color: var(--yellow); font-weight: bold;",
         number: "color: var(--fg);",
         exec: "color: var(--fg); font-weight: normal;",
         receiver: "color: var(--green); font-weight: normal;",
@@ -47,56 +47,49 @@ export const HIGHLIGHTS = {
 };
 
 export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
-        ; LUA keyword
-        (LUA (identifier) @luaKeyword)
-
-    ; Primary event keywords
-        ((keyword) @eventKeyword
-            (#match? @eventKeyword "^(NOTE|REST|TRILL|CHORD|EVENT|TECH)$"))
-
-        ; Primary config keywords
-        ((keyword) @config
-            (#match? @config "^(BPM|PHASECOUPLING|SYNCSTRENGTH|TRANSPOSE|ENTROPY|PITCHTEMPLATESIGMA|FFTSIZE|HOPSIZE|DUMMY|TIMBREMODEL)$"))
-
-        ; Secondary action keywords
-        (ACTION (keyword) @action)
-        "sendto" @action
-        "luacall" @action
-        "delay" @actionKey
-        ((keyword) @action
-            (#match? @action "^(sendto|luacall)$"))
-        ((keyword) @actionKey
-            (#match? @actionKey "^delay$"))
-
-        ; Generic identifiers
-        (identifier) @keyword
-
-        ; Configuration nodes
-    (numberConfigId) @config
-    (symbolConfigId) @config
-    (pathConfigId) @config
-
-    ; Musical Attributes
-    (pitch) @pitch
-    (duration (number) @duration)
-    (techniqueId) @techniqueId
-    (attributeId) @attributeId
-
-    ; Actions and Executions
-    (timedAction) @timedAction
-    (timedAction value: (number) @duration)
-    (timeUnit) @timeUnit
-    (exec) @exec
-    (receiver) @receiver
-
-    ; Literals and Comments
-    (number) @number
-    (pdargs) @pdargs
-    (pdarg) @pdarg
-    (comment) @comment
-    (lua_comment) @comment
+    ; LUA
+    (LUA) @luaKeyword
     (lua_body) @lua_body
     (lua_call) @lua_body
+    (lua_comment) @comment
+
+    ; Event keywords
+    (note_event) @eventKeyword
+    (rest_event) @eventKeyword
+    (chord_event) @eventKeyword
+    (trill_event) @eventKeyword
+    (tech_event) @eventKeyword
+
+    ; Config
+    (config_key) @config
+    (number) @number
+
+    ; Musical data
+    (pitch) @pitch
+    (pitch_name) @pitch
+    (note_event duration: (number) @duration)
+    (rest_event duration: (number) @duration)
+    (chord_event duration: (number) @duration)
+    (trill_event duration: (number) @duration)
+    (tech_event duration: (number) @duration)
+    (tech_event technique: (identifier) @techniqueId)
+    (attribute) @attributeId
+
+    ; Actions
+    (action) @timedAction
+    (delay) @actionKey
+    (delay amount: (number) @duration)
+    (delay unit: (time_unit) @timeUnit)
+    (exec) @exec
+    (exec "sendto" @actionKey)
+    (exec "luacall" @actionKey)
+    (exec receiver: (identifier) @receiver)
+    (pdargs) @pdargs
+    (pdarg (identifier) @pdarg)
+    (pdarg (number) @pdarg)
+
+    ; Numbers and comments
+    (comment) @comment
 
     ; Errors
     (ERROR) @error

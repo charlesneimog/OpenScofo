@@ -341,18 +341,10 @@ class pytrain(pd.NewObject):
         if prob_name is None:
             raise RuntimeError("Probability tensor not found in ONNX graph")
 
-        log_node = helper.make_node(
-            "Log",
-            [prob_name],
-            ["log_p"],
-            name="Entropy_Log"
-        )
+        log_node = helper.make_node("Log", [prob_name], ["log_p"], name="Entropy_Log")
 
         mul_node = helper.make_node(
-            "Mul",
-            [prob_name, "log_p"],
-            ["p_log_p"],
-            name="Entropy_Mul"
+            "Mul", [prob_name, "log_p"], ["p_log_p"], name="Entropy_Mul"
         )
 
         sum_node = helper.make_node(
@@ -361,24 +353,17 @@ class pytrain(pd.NewObject):
             ["sum_p_log_p"],
             axes=[1],
             keepdims=0,
-            name="Entropy_Sum"
+            name="Entropy_Sum",
         )
 
         neg_node = helper.make_node(
-            "Neg",
-            ["sum_p_log_p"],
-            ["entropy"],
-            name="Entropy_Neg"
+            "Neg", ["sum_p_log_p"], ["entropy"], name="Entropy_Neg"
         )
 
         graph.node.extend([log_node, mul_node, sum_node, neg_node])
 
         graph.output.append(
-            helper.make_tensor_value_info(
-                "entropy",
-                TensorProto.FLOAT,
-                [None]
-            )
+            helper.make_tensor_value_info("entropy", TensorProto.FLOAT, [None])
         )
 
         onnx.save(model, model_path)

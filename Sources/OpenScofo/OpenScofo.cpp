@@ -346,7 +346,7 @@ bool OpenScofo::ParseScore(std::string ScorePath) {
 
     // Timbre detection
     if (m_Score.HasTimbreModel()) {
-        m_MIR.LoadONNXModel(m_Score.GetTimbreModel());
+        m_MIR.ONNXInit(m_Score.GetTimbreModel());
     }
 
     m_FFTSize = m_Score.GetFFTSize();
