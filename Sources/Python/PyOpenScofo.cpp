@@ -116,8 +116,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
                                     self.GetHopSize());
              })
 
-        //
-        // .def("get_kappa", &InverseA2)
 
         // Score
         .def("parse_score", &OpenScofo::OpenScofo::ParseScore)
@@ -127,6 +125,9 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def("set_tuning", &OpenScofo::OpenScofo::SetTunning)
         .def("set_current_event", &OpenScofo::OpenScofo::SetCurrentEvent)
 
+        // Onnx
+        .def("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)
+        
         // pitch template
         .def("set_amplitude_decay", &OpenScofo::OpenScofo::SetAmplitudeDecay)
         .def("set_harmonics", &OpenScofo::OpenScofo::SetHarmonics)

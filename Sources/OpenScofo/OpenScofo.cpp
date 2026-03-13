@@ -110,6 +110,18 @@ void OpenScofo::ClearErrors() {
 }
 
 // ╭─────────────────────────────────────╮
+// │                ONNX                 │
+// ╰─────────────────────────────────────╯
+void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors) {
+    if (Model.extension() != ".onnx") {
+        spdlog::error("OpenScofo just work with onnx models trained with the object py.train from pd-xlab library");
+        return;
+    }
+
+    m_MIR.ONNXInit(Model, Descriptors);
+}
+
+// ╭─────────────────────────────────────╮
 // │                 Lua                 │
 // ╰─────────────────────────────────────╯
 #if defined(OSCOFO_LUA)

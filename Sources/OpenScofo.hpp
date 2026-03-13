@@ -34,27 +34,7 @@ extern "C" {
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-class Timer {
-  public:
-    Timer(const std::string &name = "") : m_Name(name), m_Start(std::chrono::high_resolution_clock::now()) {
-    }
-
-    ~Timer() {
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - m_Start).count();
-        if (!m_Name.empty())
-            std::cout << m_Name << " ";
-        std::cout << "Time elapsed: " << duration << " µs" << std::endl;
-    }
-
-  private:
-    std::string m_Name;
-    std::chrono::high_resolution_clock::time_point m_Start;
-};
-
 namespace OpenScofo {
-
-class OpenScofo;
 
 class OpenScofo {
   public:
@@ -63,6 +43,9 @@ class OpenScofo {
     bool ParseScore(std::string ScorePath);
     bool ProcessBlock(std::vector<double> &AudioBuffer);
     bool ScoreIsLoaded();
+
+    // ONNX
+    void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
 
     // Set Functions
     void SetAmplitudeDecay(double decay);

@@ -221,6 +221,50 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
 }
 
 // ─────────────────────────────────────
+static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x, int start, int argc, t_atom *argv) {
+    std::vector<OpenScofo::Descriptors> Descriptors;
+    for (int i = start; i < argc; i++) {
+        t_symbol *sym = atom_getsymbol(argv);
+        if (strcmp(sym->s_name, "mfcc") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::MFCC);
+        } else if (strcmp(sym->s_name, "rms") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::RMS);
+        } else if (strcmp(sym->s_name, "loudness") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::LOUDNESS);
+        } else if (strcmp(sym->s_name, "chroma") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::CHROMA);
+        } else if (strcmp(sym->s_name, "silence") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::SILENCEPROB);
+        } else if (strcmp(sym->s_name, "centroid") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::CENTROID);
+        } else if (strcmp(sym->s_name, "zcr") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::ZCR);
+        } else if (strcmp(sym->s_name, "hfr") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::HFR);
+        } else if (strcmp(sym->s_name, "spread") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::SPREAD);
+        } else if (strcmp(sym->s_name, "flatness") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::FLATNESS);
+        } else if (strcmp(sym->s_name, "flux") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::FLUX);
+        } else if (strcmp(sym->s_name, "irregularity") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::IRREGULARITY);
+        } else if (strcmp(sym->s_name, "harmonicity") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
+        } else if (strcmp(sym->s_name, "ext") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
+        } else if (strcmp(sym->s_name, "onset") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::ONSET);
+        } else if (strcmp(sym->s_name, "yin") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::YIN);
+        } else {
+            pd_error(x, "[o.scofo~] Invalid argument: %s", sym->s_name);
+        }
+    }
+    return Descriptors;
+}
+
+// ─────────────────────────────────────
 static void oscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     (void)s;
     if (argc < 1) {
@@ -308,6 +352,10 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         int f = atom_getint(argv + 1);
         x->Event = f;
         x->OpenScofo->SetCurrentEvent(f);
+    } else if (method == "onnxmodel") {
+        const char *Path = atom_getsymbol(argv + 1)->s_name;
+        std::vector<OpenScofo::Descriptors> Desc = oscofo_get_descriptors(x, 2, argc, argv);
+        x->OpenScofo->LoadONNXModel(Path, Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
         switch (f) {

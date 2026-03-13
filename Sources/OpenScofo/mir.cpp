@@ -35,9 +35,9 @@ MIR::~MIR() {
     }
 
     if (m_ONNXModelLoaded) {
-        if (m_OnnxContext) {
-            onnx_context_free(m_OnnxContext);
-            m_OnnxContext = nullptr;
+        if (m_ONNXContext) {
+            onnx_context_free(m_ONNXContext);
+            m_ONNXContext = nullptr;
         }
         m_ONNXModelLoaded = false;
     }
@@ -138,19 +138,17 @@ void MIR::FFTWInit() {
 // ╭─────────────────────────────────────╮
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
-void MIR::ONNXInit(fs::path path) {
+void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     auto u8 = path.u8string();
     std::string path_utf8(u8.begin(), u8.end());
-
-    m_OnnxContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
-
-    if (m_OnnxContext == nullptr) {
+    m_ONNXContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
+    if (m_ONNXContext == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
         return;
     }
 
-    if (m_OnnxContext && m_OnnxContext->g != nullptr) {
-        struct onnx_graph_t *g = m_OnnxContext->g;
+    if (m_ONNXContext && m_ONNXContext->g != nullptr) {
+        struct onnx_graph_t *g = m_ONNXContext->g;
         for (int i = 0; i < g->nlen; i++) {
             struct onnx_node_t *n = &g->nodes[i];
             if (n->opset > CURRENT_ONNX_OPSET) {
@@ -162,7 +160,7 @@ void MIR::ONNXInit(fs::path path) {
 
     // Get labels
     bool TreeEnsembleClassifierFound = false;
-    struct onnx_graph_t *g = m_OnnxContext->g;
+    struct onnx_graph_t *g = m_ONNXContext->g;
     for (int i = 0; i < g->nlen; i++) {
         struct onnx_node_t *n = &g->nodes[i];
         if (!n || strcmp(n->proto->op_type, "TreeEnsembleClassifier") != 0)
@@ -175,40 +173,29 @@ void MIR::ONNXInit(fs::path path) {
                 for (size_t v = 0; v < attr->n_strings; v++) {
                     ProtobufCBinaryData *str = &attr->strings[v];
                     std::string label(reinterpret_cast<char *>(str->data), str->len);
+                    m_ONNXLabels[label] = 0.0f;
                 }
             }
         }
     }
 
     if (!TreeEnsembleClassifierFound) {
-        spdlog::error("TreeEnsembleClassifier not found in model, please use py.train to train models for OpenScofo");
+        spdlog::error(
+            "TreeEnsembleClassifier not found in model, please use PureData py.train to train models for OpenScofo");
         return;
     }
 
-    bool found = false;
-    for (int i = 0; i < g->nlen; i++) {
-        struct onnx_node_t *n = &g->nodes[i];
-        Onnx__NodeProto *proto = n->proto;
-        for (size_t k = 0; k < proto->n_attribute; k++) {
-            Onnx__AttributeProto *attr = proto->attribute[k];
-            if (strcmp(attr->name, "classlabels_strings") == 0) {
-                size_t n_metadata_props = attr->n_strings;
-                for (size_t m = 0; m < n_metadata_props; m++) {
-                    ProtobufCBinaryData s = attr->strings[m];
-                    std::string str(reinterpret_cast<char *>(s.data), s.len);
-                    found = true;
-                }
-                if (found) {
-                    return;
-                }
-            }
-        }
-    }
     m_ONNXModelLoaded = true;
+    m_ONNXDescriptors = Descriptors;
+    spdlog::info("ONNX Model Loaded");
 }
 
 // ─────────────────────────────────────
 void MIR::ONNXExec(Description &Desc) {
+    if (!m_ONNXModelLoaded) {
+        return;
+    }
+
     // Do something to get the
 }
 

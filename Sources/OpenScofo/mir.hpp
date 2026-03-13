@@ -38,7 +38,7 @@ class MIR {
     void AddReverb(Description &Desc, double decay);
 
     double GetdB();
-    void ONNXInit(fs::path path);
+    void ONNXInit(fs::path path, std::vector<Descriptors> Descriptors);
 
   private:
     double Mtof(double Note, double Tunning);
@@ -135,7 +135,9 @@ class MIR {
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;
-    struct onnx_context_t *m_OnnxContext = nullptr;
+    struct onnx_context_t *m_ONNXContext = nullptr;
+    std::unordered_map<std::string, float> m_ONNXLabels;
+    std::vector<Descriptors> m_ONNXDescriptors;
 
     // Env
     double m_dBTreshold = -50;
