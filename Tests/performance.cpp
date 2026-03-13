@@ -29,11 +29,8 @@ std::vector<double> load_mp3_as_wave(const char *path, int &sr, int &ch) {
 // ─────────────────────────────────────
 void run_scofo(OpenScofo::OpenScofo &scofo, const std::vector<double> &samples) {
     const int WINDOW = 2048;
-    const int HOP = 64;                      // 64-sample blocks
     std::vector<double> window(WINDOW, 0.0); // contiguous sliding window
     int currentEvent = -1;
-
-    size_t pos = 0;
 
     size_t blockIndex = 0;
     const int SCORE_HOP = 512; // or whatever OpenScofo expects

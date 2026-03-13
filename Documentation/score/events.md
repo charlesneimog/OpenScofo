@@ -85,5 +85,12 @@ For duration with dot, you sum it.
 - `REST 4`
 
 
+### `TECH`
+
+`TECH` events describes extended techniques events. It must be defined as `TECH <LABEL> <DURATION>`. These events require that you train a ONNX model. It is a simple process describe in [Training a ONNX model](onnx.md). Basically you put audio from specific techniques inside folders with labels (for example **tongue-ram**) and execute a Pd patch, this will generate a `.onnx` file that you load using `TIMBREMODEL` in the score.
+
+- `TECH tongue-ram C4 1`
+- `TECH jet-whiste 1`
+
 
 ---

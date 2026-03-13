@@ -20,13 +20,11 @@ target_compile_definitions(score_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SO
 target_compile_definitions(math_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 cpmaddpackage("gh:lieff/minimp3#master")
-if(minimp3_ADDED)
-    include_directories("${minimp3_SOURCE_DIR}")
-endif()
-
 add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
 target_link_libraries(openscofo_perf PRIVATE OpenScofo)
 target_compile_options(openscofo_perf PRIVATE -O3 -g -fno-omit-frame-pointer -Wno-shadow)
+target_compile_options(openscofo_perf PRIVATE -Wno-shadow -Wno-unused-variable)
+target_include_directories(openscofo_perf SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
 
 add_executable(score "${CMAKE_CURRENT_SOURCE_DIR}/score.cpp")
 target_link_libraries(score PRIVATE OpenScofo)
