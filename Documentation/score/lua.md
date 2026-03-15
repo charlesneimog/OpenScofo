@@ -12,8 +12,11 @@ I am not present the language here, there are a lot of tutorials on the internet
 
 Inside `OpenScofo` you can use `Lua` to create interactive events. `OpenScofo` provide a module where you can create deep interactions with the listening and follower module. Also `OpenScofo` Pure Data and Max object provide `pd` and `max` module to interact with the patches. Below I present the module and its methods.
 
+Also check the [LUAEVENT](events/#luaevent){ data-preview } event type.
+
 !!! danger "Under developement yet"
     Lua Module for Pure Data, Max, and OpenScofo are in developement yet.
+
 
 
 ### <h2 align="center">:simple-lua: `OpenScofo` Lua Module</h2>

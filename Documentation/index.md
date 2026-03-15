@@ -42,23 +42,13 @@ hide:
           class="card-img"
           style="width: 80%; object-fit: cover; object-position: left;"
         />
-        <p><i>Part of my PhD Thesis, will be published soon!</i></p>
+        <p><i>Performed by Sérgio Monteiro Freire</i></p>
         <hr>
       </div>
     </a>
     <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
       <div class="card">
-        <hr>
-        <img
-          src="./assets/pieces/001-canticos.png"
-          class="card-img"
-          style="width: 80%; object-fit: cover; object-position: left;"
-        />
-        <p><i>Part of my PhD Thesis, will be published soon!</i></p>
-        <hr>
       </div>
     </a>
   
 </div>
-
----

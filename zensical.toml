@@ -3,31 +3,35 @@ site_name = "OpenScofo"
 docs_dir = "Documentation"
 copyright = "Copyright &copy 2026 | Charles K. Neimog"
 hooks = ["Documentation/copy-editor.py"]
-extra_css = ["stylesheets/extra.css"]
 repo_url = "https://github.com/charlesneimog/OpenScofo"
+edit_uri = "edit/main/Documentation/"
 nav = [
   "index.md",
   { "Score" = [
     "score/intro.md",
+    "score/fundaments.md",
+    "score/conventions.md",
     "score/config.md",
     "score/events.md",
     "score/actions.md",
     "score/lua.md",
   ] },
+  { "Listening Module" = "listening.md" },
   { "Python" = "python.md" },
   { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
   { "Downloads" = "https://github.com/charlesneimog/OpenScofo/releases/latest" },
 ]
+
 extra_javascript = [
-    "javascripts/mathjax.js",
-    "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+  { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
+  { path = "javascript/vexflow.mjs" },
 ]
+extra_css = ["stylesheets/extra.css"]
 
 [project.theme]
+custom_dir = "Documentation/overrides"
 logo = "assets/favicon.svg"
-logo_dark_mode = "assets/favicon-dark.svg"
-logo_light_mode = "assets/favicon.svg"
-favicon = "assets/logo.png"
+favicon = "assets/logo.svg"
 name = "material"
 features = [
   "navigation.top",
@@ -41,7 +45,21 @@ features = [
   "toc.integrate",
   "toc.follow",
   "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.instant.progress",
+  "navigation.tracking",
+  "navigation.tabs.sticky",
+  "navigation.expand",
+  "content.tabs.link",
+  "content.footnote.tooltips",
 ]
+
+[project.extra]
+logo_dark_mode = "assets/favicon-dark.svg"
+logo_light_mode = "assets/favicon.svg"
+
+[project.theme.icon.admonition]
+equation = "custom/equation"
 
 # Palette toggle for automatic mode
 [[project.theme.palette]]
@@ -69,17 +87,22 @@ toggle.name = "Switch to system preference"
 [project.markdown_extensions.attr_list]
 [project.markdown_extensions.md_in_html]
 [project.markdown_extensions.pymdownx.blocks.caption]
-
+[project.markdown_extensions.footnotes]
 [project.markdown_extensions.pymdownx.arithmatex]
 generic = true
 
 # Emojis
 [project.markdown_extensions.pymdownx.emoji]
-emoji_index = "zensical.extensions.emoji.twemoji" 
+emoji_index = "zensical.extensions.emoji.twemoji"
 emoji_generator = "zensical.extensions.emoji.to_svg"
+options.custom_icons = ["Documentation/overrides/.icons"]
 
 # Code blocks
 [project.markdown_extensions.pymdownx.highlight]
+extend_pygments_lang = [
+  { name = "openscofo", lang = "openscofo", options = {} },
+]
+
 [project.markdown_extensions.pymdownx.inlinehilite]
 [project.markdown_extensions.pymdownx.snippets]
 
@@ -87,9 +110,13 @@ emoji_generator = "zensical.extensions.emoji.to_svg"
 [project.markdown_extensions.admonition]
 [project.markdown_extensions.pymdownx.details]
 [project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
 
-
-#   { "pymdownx.emoji" = { emoji_index = "material.extensions.emoji.twemoji", emoji_generator = "material.extensions.emoji.to_svg" } },
+# Preview
+[project.markdown_extensions.zensical.extensions.preview]
+configurations = [{ targets.include = ["score/*"] }]
 
 # ╭──────────────────────────────────────╮
 # │               Plugins                │

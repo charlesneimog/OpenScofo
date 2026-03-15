@@ -48,6 +48,11 @@ class Score {
         return m_TimbreModel;
     }
 
+    std::vector<Descriptors> GetTimbreModelDescriptors(){
+        return m_ONNXDescriptors;
+    }
+
+
   private:
     States m_ScoreStates;
     std::string m_LuaCode;
@@ -108,6 +113,7 @@ class Score {
     // Paths
     fs::path m_ScoreRootPath;
     fs::path m_TimbreModel;
+    std::vector<Descriptors> m_ONNXDescriptors;
 
     // Variables
     int m_ScorePosition = 1;

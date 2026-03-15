@@ -82,6 +82,8 @@
 #X obj 125 378 nbx 5 16 -1e+37 1e+37 0 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 256;
 #X obj 120 326 nbx 10 16 -1e+37 1e+37 0 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 256;
 #X obj 279 240 bng 18 250 50 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000;
+#X obj 318 299 onnx flute.onnx;
+#X msg 318 277 dump output_tensors;
 #X connect 1 0 22 0;
 #X connect 2 0 22 0;
 #X connect 7 0 22 0;
@@ -101,3 +103,4 @@
 #X connect 25 0 14 0;
 #X connect 26 1 27 0;
 #X connect 26 1 30 0;
+#X connect 33 0 32 0;

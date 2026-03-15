@@ -1,7 +1,7 @@
 
-`OpenScofo` support actions as consequences of `EVENTS`, these actions are very tied with the program where `OpenScofo` is running and for now just are supported on `PureData`. 
+`OpenScofo` support actions as consequences of `EVENTS`, these actions are very tied with the program where `OpenScofo` is running and for now just are supported on `PureData` and `Max`. 
 
-The actions can be run immediately after the `EVENT` detection or after some delay specified using the `delay` keyword. There are two types of actions for now `sendto` and `luacall`. Both functions can be delay specified as followed: 
+There are currently two types of actions: `sendto` and `luacall`. Actions can be executed immediately after the `EVENT` detection or after a delay specified using the `delay` keyword.
 
 --- 
 ## Delayed Messages
@@ -22,7 +22,7 @@ NOTE C4 2
     delay 2000 ms sendto e1 [1 2 3 4]
 ```
 
-!!! note "The syntax highlight of the Editor make this easier to read!!!"
+!!! tip "The syntax highlight of the Editor make this easier to read!!!"
 
 Will send the list `1 2 3 4` to the receiver `e1` after 2 seconds. 
 
@@ -41,14 +41,14 @@ Relative time are music time, they change if the performer plays your must faste
 
 ### `sendto`
 
-* `sendto e1`: Send a bang to the receiver `e1`
+* `sendto e1`: Send a bang to the receiver `e1`.
 * `sendto myreceiver [hello world]`: Send `hello world` to the receiver `myreceiver`.
 * `delay 1 tempo sendto e1`: Send a bang to the receiver `e1` after the duration on 1 tempo.
 
 ### `luacall`
 
 ---
-!!! warning "Advanced Users"
+!!! danger "Advanced Users"
     This is designed for advances users, but if you are starting you can ask questions using the `OpenScofo` Github Discussions.
 
 ---

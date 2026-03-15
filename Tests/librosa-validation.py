@@ -1,6 +1,6 @@
 import os
+import math
 import random
-
 import OpenScofo
 import librosa
 
@@ -18,9 +18,34 @@ y, sr = librosa.load(
 )
 
 
+# ---------------- Helper function ----------------
+def format_diff(diff):
+    if diff == 0:
+        return "0.0e+00", "0"
+    else:
+        order = math.floor(math.log10(diff))
+        return f"{diff:.5e}", f"10^{order}"
+
+
+# ---------------- Track max difference globally ----------------
+max_diffs = {
+    "MFCC": 0.0,
+    "CENT": 0.0,
+    "SPRE": 0.0,
+    "FLAT": 0.0,
+    "CHRO": 0.0,
+    "RMS": 0.0,
+    "ZCR": 0.0,
+}
+
+
+def update_max(desc, diff):
+    if diff > max_diffs[desc]:
+        max_diffs[desc] = diff
+
+
 # ---------------- MFCC TEST ----------------
 def run_test_mfcc(window, label):
-
     scofo_desc = scofo.get_audio_description(window)
 
     mfcc = librosa.feature.mfcc(
@@ -40,25 +65,19 @@ def run_test_mfcc(window, label):
     scofo_mfcc = scofo_desc.mfcc
 
     max_diff = 0.0
-    max_idx = -1
     max_vals = (0.0, 0.0)
 
-    # print(librosa_mfcc)
-    # print(scofo_mfcc)
-
-    for i, (l, s) in enumerate(zip(librosa_mfcc, scofo_mfcc)):
+    for l, s in zip(librosa_mfcc, scofo_mfcc):
         abs_diff = abs(l - s)
         if abs_diff > max_diff:
             max_diff = abs_diff
-            max_idx = i
             max_vals = (l, s)
 
+    update_max("MFCC", max_diff)
+    diff_str, order_str = format_diff(max_diff)
+
     print(
-        f"{label} | "
-        f"MFCC | "
-        f"L: {max_vals[0]:+012.5f} | "
-        f"S: {max_vals[1]:+012.5f} | "
-        f"D: {max_diff:+012.5f}"
+        f"{label} | MFCC  | L: {max_vals[0]:+012.5f} | S: {max_vals[1]:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
@@ -66,29 +85,24 @@ def run_test_mfcc(window, label):
 def run_test_centroid(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
-    # Librosa spectral centroid
     l_centroid = librosa.feature.spectral_centroid(
         y=window,
-        sr=sr,  # make sure sr is defined
+        sr=sr,
         n_fft=n_fft,
         hop_length=hop,
         win_length=n_fft,
         window="hann",
         center=False,
-    )[
-        0, 0
-    ]  # first frame
+    )[0, 0]
 
-    # SCOFO spectral centroid
     s_centroid = scofo_desc.spectral_centroid
     diff = abs(l_centroid - s_centroid)
 
+    update_max("CENT", diff)
+    diff_str, order_str = format_diff(diff)
+
     print(
-        f"{label} | "
-        f"CENT | "
-        f"L: {l_centroid:+012.5f} | "
-        f"S: {s_centroid:+012.5f} | "
-        f"D: {diff:+012.5f}"
+        f"{label} | CENT  | L: {l_centroid:+012.5f} | S: {s_centroid:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
@@ -96,30 +110,25 @@ def run_test_centroid(window, label):
 def run_test_spread(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
-    # Librosa spectral spread
     l_spread = librosa.feature.spectral_bandwidth(
         y=window,
-        sr=sr,  # make sure sr is defined
+        sr=sr,
         n_fft=n_fft,
         hop_length=hop,
         win_length=n_fft,
         window="hann",
         center=False,
-        p=2,  # second-order → spectral spread
-    )[
-        0, 0
-    ]  # first frame
+        p=2,
+    )[0, 0]
 
-    # SCOFO spectral spread
     s_spread = scofo_desc.spectral_spread
     diff = abs(l_spread - s_spread)
 
+    update_max("SPRE", diff)
+    diff_str, order_str = format_diff(diff)
+
     print(
-        f"{label} | "
-        f"SPRE | "
-        f"L: {l_spread:+012.5f} | "
-        f"S: {s_spread:+012.5f} | "
-        f"D: {diff:+012.5f}"
+        f"{label} | SPRE  | L: {l_spread:+012.5f} | S: {s_spread:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
@@ -139,12 +148,11 @@ def run_test_flatness(window, label):
     s_flatness = scofo_desc.spectral_flatness
     diff = abs(l_flatness - s_flatness)
 
+    update_max("FLAT", diff)
+    diff_str, order_str = format_diff(diff)
+
     print(
-        f"{label} | "
-        f"FLAT | "
-        f"L: {l_flatness:+012.5f} | "
-        f"S: {s_flatness:+012.5f} | "
-        f"D: {diff:+012.5f}"
+        f"{label} | FLAT  | L: {l_flatness:+012.5f} | S: {s_flatness:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
@@ -169,38 +177,24 @@ def run_test_chroma(window, label):
     max_diff = 0.0
     max_vals = (0.0, 0.0)
 
-    for i, (l_val, s_val) in enumerate(zip(librosa_chroma, scofo_chroma)):
+    for l_val, s_val in zip(librosa_chroma, scofo_chroma):
         abs_diff = abs(l_val - s_val)
         if abs_diff > max_diff:
             max_diff = abs_diff
             max_vals = (l_val, s_val)
 
+    update_max("CHRO", max_diff)
+    diff_str, order_str = format_diff(max_diff)
+
     print(
-        f"{label} | "
-        f"CHRO | "
-        f"L: {max_vals[0]:+012.5f} | "
-        f"S: {max_vals[1]:+012.5f} | "
-        f"D: {max_diff:+012.5f}"
+        f"{label} | CHRO  | L: {max_vals[0]:+012.5f} | S: {max_vals[1]:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
-
-
-# ---------------- FLUX TEST ----------------
-def run_test_harmonicity(window, label):
-    scofo_desc = scofo.get_audio_description(window)
-    l_flux = librosa.feature.spectral_flux(
-        y=window,
-        frame_length=n_fft,
-        hop_length=hop,
-        center=False,
-    )[0, 0]
-    pass
 
 
 # ---------------- RMS TEST ----------------
 def run_test_rms(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
-    # RMS-based loudness (power=2.0 equivalent)
     l_loudness = librosa.feature.rms(
         y=window,
         frame_length=n_fft,
@@ -211,16 +205,15 @@ def run_test_rms(window, label):
     s_loudness = scofo_desc.rms
     diff = abs(l_loudness - s_loudness)
 
+    update_max("RMS", diff)
+    diff_str, order_str = format_diff(diff)
+
     print(
-        f"{label} | "
-        f"RMS  | "
-        f"L: {l_loudness:+012.5f} | "
-        f"S: {s_loudness:+012.5f} | "
-        f"D: {diff:+012.5f}"
+        f"{label} | RMS   | L: {l_loudness:+012.5f} | S: {s_loudness:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
-# ---------------- ZEROCROSS-RATING TEST --------
+# ---------------- ZEROCROSS-RATE TEST ----------------
 def run_test_zcr(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
@@ -238,16 +231,15 @@ def run_test_zcr(window, label):
     s_zcr = scofo_desc.zero_crossing_rate
     diff = abs(l_zcr - s_zcr)
 
+    update_max("ZCR", diff)
+    diff_str, order_str = format_diff(diff)
+
     print(
-        f"{label} | "
-        f"ZCR  | "
-        f"L: {l_zcr:+012.5f} | "
-        f"S: {s_zcr:+012.5f} | "
-        f"D: {diff:+012.5f}"
+        f"{label} | ZCR   | L: {l_zcr:+012.5f} | S: {s_zcr:+012.5f} | D: {diff_str} | Order: {order_str}"
     )
 
 
-# ---------------- TESTES ALEATÓRIOS ----------------
+# ---------------- RUN TESTS ----------------
 n_tests = 100
 
 for _ in range(n_tests):
@@ -264,3 +256,10 @@ for _ in range(n_tests):
     run_test_chroma(window, f"Start {start:08d}")
 
     print("")
+
+
+# ---------------- PRINT MAX DIFFERENCE ----------------
+print("========== MAX DIFFERENCES (worst-case precision) ==========")
+for desc, diff in max_diffs.items():
+    _, order_str = format_diff(diff)
+    print(f"{desc}: {diff:.5e} | Order: {order_str}")

@@ -31,7 +31,10 @@ enum Descriptors {
     HARMONICITY,
     YIN,
 
-    //
+    // AI
+    ONNX,
+
+    // Percussive
     SILENCEPROB,
     PERCUSSIVEPROB,
     ONSET,

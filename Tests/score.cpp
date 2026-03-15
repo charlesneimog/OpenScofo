@@ -6,6 +6,7 @@
 
 namespace {
 
+// ─────────────────────────────────────
 std::string NodeText(TSNode node, const std::string &source) {
     uint32_t start = ts_node_start_byte(node);
     uint32_t end = ts_node_end_byte(node);

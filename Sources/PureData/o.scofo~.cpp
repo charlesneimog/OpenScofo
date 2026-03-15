@@ -216,6 +216,14 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.ZeroCrossingRate);
             outlet_anything(x->DescOut, gensym("zcr"), 1, mfccAtoms.data());
+
+        } else if (v == OpenScofo::Descriptors::ONNX) {
+            for (const auto &ONNXDesc : Desc.ONNX) {
+                std::vector<t_atom> onnxAtoms(2);
+                SETSYMBOL(&onnxAtoms[0], gensym(ONNXDesc.first.c_str()));
+                SETFLOAT(&onnxAtoms[1], ONNXDesc.second);
+                outlet_anything(x->DescOut, gensym("onnx"), 2, onnxAtoms.data());
+            }
         }
     }
 }
@@ -224,7 +232,7 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
 static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x, int start, int argc, t_atom *argv) {
     std::vector<OpenScofo::Descriptors> Descriptors;
     for (int i = start; i < argc; i++) {
-        t_symbol *sym = atom_getsymbol(argv);
+        t_symbol *sym = atom_getsymbol(argv + i);
         if (strcmp(sym->s_name, "mfcc") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::MFCC);
         } else if (strcmp(sym->s_name, "rms") == 0) {
@@ -257,6 +265,8 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
             Descriptors.push_back(OpenScofo::Descriptors::ONSET);
         } else if (strcmp(sym->s_name, "yin") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::YIN);
+        } else if (strcmp(sym->s_name, "onnx") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::ONNX);
         } else {
             pd_error(x, "[o.scofo~] Invalid argument: %s", sym->s_name);
         }
@@ -355,6 +365,12 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     } else if (method == "onnxmodel") {
         const char *Path = atom_getsymbol(argv + 1)->s_name;
         std::vector<OpenScofo::Descriptors> Desc = oscofo_get_descriptors(x, 2, argc, argv);
+
+        if (Desc.size() == 0) {
+            pd_error(x, "[o.scofo~] ONNX models required the Descriptors order used on train");
+            return;
+        }
+
         x->OpenScofo->LoadONNXModel(Path, Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
@@ -629,67 +645,8 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->TempoOut = outlet_new(&x->PdObject, &s_float);
 
     // Args
-    bool DescOut = false;
-    while (argc) {
-        if ((argv)->a_type == A_SYMBOL) {
-            t_symbol *sym = atom_getsymbol(argv);
-            if (strcmp(sym->s_name, "mfcc") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::MFCC);
-            } else if (strcmp(sym->s_name, "rms") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::RMS);
-            } else if (strcmp(sym->s_name, "loudness") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::LOUDNESS);
-            } else if (strcmp(sym->s_name, "chroma") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::CHROMA);
-            } else if (strcmp(sym->s_name, "silence") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::SILENCEPROB);
-            } else if (strcmp(sym->s_name, "centroid") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::CENTROID);
-            } else if (strcmp(sym->s_name, "zcr") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::ZCR);
-            } else if (strcmp(sym->s_name, "hfr") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::HFR);
-            } else if (strcmp(sym->s_name, "spread") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::SPREAD);
-            } else if (strcmp(sym->s_name, "flatness") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::FLATNESS);
-            } else if (strcmp(sym->s_name, "flux") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::FLUX);
-            } else if (strcmp(sym->s_name, "irregularity") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::IRREGULARITY);
-            } else if (strcmp(sym->s_name, "harmonicity") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::HARMONICITY);
-            } else if (strcmp(sym->s_name, "ext") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
-            } else if (strcmp(sym->s_name, "onset") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::ONSET);
-            } else if (strcmp(sym->s_name, "yin") == 0) {
-                DescOut = true;
-                x->RequestMIR.push_back(OpenScofo::Descriptors::YIN);
-            } else {
-                pd_error(x, "[o.scofo~] Invalid argument: %s", sym->s_name);
-            }
-
-            argc--, argv++;
-        }
-    }
-
-    if (DescOut) {
+    x->RequestMIR = oscofo_get_descriptors(x, 0, argc, argv);
+    if (x->RequestMIR.size() > 0) {
         x->DescOut = outlet_new(&x->PdObject, &s_list);
         x->MirOutput = true;
     }
