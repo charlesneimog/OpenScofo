@@ -1,5 +1,7 @@
 # Spectral Descriptors
 
+Spectral descriptors are used after a `FFT`. For `FFT` we use a Hann window. 
+
 ---
 
 ## `Harmonicity` 

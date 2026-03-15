@@ -1,5 +1,6 @@
 [project]
 site_name = "OpenScofo"
+site_url = "https://charlesneimog.github.io/OpenScofo"
 docs_dir = "Documentation"
 copyright = "Copyright &copy 2026 | Charles K. Neimog"
 hooks = ["Documentation/copy-editor.py"]
@@ -16,7 +17,12 @@ nav = [
     "score/actions.md",
     "score/lua.md",
   ] },
-  { "Listening Module" = "listening.md" },
+  { "Listening Module" = [
+    "descriptors/index.md",
+    "descriptors/amplitude.md",
+    "descriptors/onset.md",
+    "descriptors/spectral.md",
+  ] },
   { "Python" = "python.md" },
   { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
   { "Downloads" = "https://github.com/charlesneimog/OpenScofo/releases/latest" },
@@ -44,14 +50,15 @@ features = [
   "search.suggest",
   "toc.integrate",
   "toc.follow",
-  "navigation.instant",
   "navigation.instant.prefetch",
-  "navigation.instant.progress",
   "navigation.tracking",
   "navigation.tabs.sticky",
   "navigation.expand",
   "content.tabs.link",
   "content.footnote.tooltips",
+  # Preview
+  "navigation.instant",
+  "navigation.instant.progress",
 ]
 
 [project.extra]
