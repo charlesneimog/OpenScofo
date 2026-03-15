@@ -78,17 +78,9 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "high_freq_ratio");
     lua_pushnumber(L, desc.Peakiness);
     lua_setfield(L, -2, "peakiness");
-    lua_pushnumber(L, desc.StdDev);
-    lua_setfield(L, -2, "std_dev");
 
-    PushNumberVector(L, desc.Power);
-    lua_setfield(L, -2, "power");
-    PushNumberVector(L, desc.SpectralPower);
-    lua_setfield(L, -2, "spectral_power");
-    PushNumberVector(L, desc.NormSpectralPower);
-    lua_setfield(L, -2, "norm_spectral_power");
-    PushNumberVector(L, desc.ReverbSpectralPower);
-    lua_setfield(L, -2, "reverb_spectral_power");
+    PushNumberVector(L, desc.SpectralMagnitudeNorm);
+    lua_setfield(L, -2, "spectral_magnitude");
     PushNumberVector(L, desc.MFCC);
     lua_setfield(L, -2, "mfcc");
     PushNumberVector(L, desc.Chroma);

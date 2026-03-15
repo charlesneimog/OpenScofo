@@ -57,9 +57,8 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("onset", &OpenScofo::Description::Onset)
         .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
         .def_readwrite("percussive_prob", &OpenScofo::Description::ExtendedTechProb)
-        .def_readwrite("spectral_power", &OpenScofo::Description::SpectralPower)
-        .def_readwrite("norm_spectral_power", &OpenScofo::Description::NormSpectralPower)
-        .def_readwrite("reverb_spectral_power", &OpenScofo::Description::ReverbSpectralPower)
+
+        .def_readwrite("spectral_magnitude", &OpenScofo::Description::SpectralMagnitudeNorm)
 
         .def_readwrite("max_amp", &OpenScofo::Description::MaxAmp)
         .def_readwrite("loudness", &OpenScofo::Description::Loudness)
@@ -81,7 +80,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("db", &OpenScofo::Description::dB)
         .def_readwrite("rms", &OpenScofo::Description::RMS)
 
-        .def_readwrite("power", &OpenScofo::Description::Power);
+        .def_readwrite("power", &OpenScofo::Description::Magnitude);
 
     // State Class
     py::class_<OpenScofo::MarkovState>(m, "MarkovState")
@@ -116,7 +115,6 @@ PYBIND11_MODULE(_OpenScofo, m) {
                                     self.GetHopSize());
              })
 
-
         // Score
         .def("parse_score", &OpenScofo::OpenScofo::ParseScore)
 
@@ -127,7 +125,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
 
         // Onnx
         .def("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)
-        
+
         // pitch template
         .def("set_amplitude_decay", &OpenScofo::OpenScofo::SetAmplitudeDecay)
         .def("set_harmonics", &OpenScofo::OpenScofo::SetHarmonics)

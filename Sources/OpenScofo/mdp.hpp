@@ -41,7 +41,7 @@ class MDP {
 
     // Get Functions
     int GetTunning();
-    ActionVec GetEventActions(int Index);
+    EventActions GetEventActions(int Index);
     std::vector<MarkovState> GetStates();
     MarkovState GetState(int Index);
     double GetKappa();

@@ -51,7 +51,7 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
 //  ─────────────────────────────────────
 void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
     size_t NHalf = FFTSize / 2 + 1;
-    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr && m_Desc.Power.size() == NHalf) {
+    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr && m_Desc.Magnitude.size() == NHalf) {
         spdlog::debug("Everything allocated for FFTSize {}, NHalf {}", FFTSize, NHalf);
         return;
     }
@@ -67,10 +67,10 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
 
     spdlog::debug("Allocated Description size for Window Size {}, NHalf {}", FFTSize, NHalf);
 
-    if (NHalf != m_Desc.Power.size()) {
-        m_Desc.Power.resize(NHalf);
-        m_Desc.SpectralPower.resize(NHalf);
-        m_Desc.NormSpectralPower.resize(NHalf);
+    if (NHalf != m_Desc.Magnitude.size()) {
+        m_Desc.Magnitude.resize(NHalf);
+        m_Desc.SpectralMagnitudeNorm.resize(NHalf);
+        m_Desc.SpectralMagnitudeFrameNorm.resize(NHalf);
         m_Desc.ReverbSpectralPower.resize(NHalf);
     }
 }
@@ -277,7 +277,7 @@ double OpenScofo::GetLiveBPM() {
 }
 
 // ─────────────────────────────────────
-ActionVec OpenScofo::GetEventActions(int Index) {
+EventActions OpenScofo::GetEventActions(int Index) {
     return m_MDP.GetEventActions(Index);
 }
 
@@ -321,7 +321,7 @@ std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
 
 // ─────────────────────────────────────
 std::vector<double> OpenScofo::GetSpectrumPower() const {
-    return m_Desc.NormSpectralPower;
+    return m_Desc.SpectralMagnitudeFrameNorm;
 }
 
 // ─────────────────────────────────────

@@ -229,7 +229,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 
         case POWER:
             m_Writers.push_back([](const Description &desc, float *&out) {
-                for (double v : desc.Power)
+                for (double v : desc.Magnitude)
                     *out++ = v;
             });
             break;
@@ -346,7 +346,7 @@ void MIR::ONNXExec(Description &Desc) {
     case ONNX_TENSOR_TYPE_FLOAT64: {
         double *data = (double *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i];
+            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.ExtendedTechProb;
         }
         break;
     }
@@ -403,13 +403,21 @@ void MIR::OnsetExec(Description &Desc) {
 // │    Extended Technique Detection     │
 // ╰─────────────────────────────────────╯
 void MIR::ExtendedTechExec(Description &Desc) {
-    Desc.ExtendedTechProb = (1 - Desc.SilenceProb);
-    Desc.ExtendedTechProb *= (1 - Desc.PitchConfidence);
+    if (Desc.Onset) {
+        Desc.ExtendedTechProb = 1;
+    } else {
+        Desc.ExtendedTechProb = 0.5;
+    }
+
     Desc.ExtendedTechProb *= (1 - Desc.Harmonicity);
-    Desc.ExtendedTechProb *= (1 - Desc.SpectralFlux);
+    Desc.ExtendedTechProb *= Desc.SpectralFlux;            // grandes mudanças espectrais
+    Desc.ExtendedTechProb *= Desc.HighFreqRatio;           // mais energia aguda
+    Desc.ExtendedTechProb *= Desc.SpectralIrregularity;    // micro-oscilação espectral
+    Desc.ExtendedTechProb *= (1.0 - Desc.Peakiness);       // evita falsos fortes
+    Desc.ExtendedTechProb *= (1.0 - Desc.PitchConfidence); // evita falsos fortes
 
     // Sigmoid curve to push values < 0.5 to 0, and > 0.5 to 1
-    float steepness = 25.0f; // Higher number = sharper jump at 0.5
+    float steepness = 10.0f; // Higher number = sharper jump at 0.5
     Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
 }
 
@@ -654,47 +662,46 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     for (size_t i = 0; i < NHalf; ++i) {
         const double re = m_FFTOut[i][0];
         const double im = m_FFTOut[i][1];
-        const double p = re * re + im * im;
-        const double sp = std::sqrt(p) * invN;
 
-        Desc.Power[i] = p;
-        Desc.SpectralPower[i] = sp;
+        const double mag = sqrt(re * re + im * im);
+        Desc.Magnitude[i] = mag;
+        Desc.SpectralMagnitudeNorm[i] = mag * invN;
 
-        if (sp > Desc.MaxAmp)
-            Desc.MaxAmp = sp;
+        if (mag > Desc.MaxAmp)
+            Desc.MaxAmp = mag;
 
-        SumPower += sp;
-        weightedSumFreqs += (static_cast<double>(i) * binWidth) * sp;
-        irregularityDenominator += sp * sp;
+        SumPower += mag;
+        weightedSumFreqs += (static_cast<double>(i) * binWidth) * mag;
+        irregularityDenominator += mag * mag;
         if (i >= hfStart) {
-            highFreqEnergy += sp;
+            highFreqEnergy += mag;
         }
 
         if (hasPreviousSpectralBin) {
-            const double binDelta = previousSpectralBin - sp;
+            const double binDelta = previousSpectralBin - mag;
             irregularityNumerator += binDelta * binDelta;
         }
-        previousSpectralBin = sp;
+        previousSpectralBin = mag;
         hasPreviousSpectralBin = true;
 
         // Flatness on power spectrum.
-        const double v = std::max(amin, p);
+        const double v = std::max(amin, mag);
         logSumPower += std::log(v);
         linSumPower += v;
 
         // Flux and harmonicity skip DC to match previous behavior.
         if (i > 0) {
-            const double diff = sp - m_PreviousSpectralPower[i];
+            const double diff = mag - m_PreviousSpectralPower[i];
             if (diff > 0.0) {
                 flux += diff;
             }
 
-            harmonicitySum += sp;
-            if (sp > harmonicityPeak) {
-                harmonicityPeak = sp;
+            harmonicitySum += mag;
+            if (mag > harmonicityPeak) {
+                harmonicityPeak = mag;
             }
         }
-        m_PreviousSpectralPower[i] = sp;
+        m_PreviousSpectralPower[i] = mag;
     }
 
     const bool hasSpectralEnergy = SumPower > 1e-12;
@@ -710,13 +717,13 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     double weightedSpreadVariance = 0.0;
 
     for (size_t i = 0; i < NHalf; ++i) {
-        double normSp = (Desc.SpectralPower[i] + 1e-12) / SumPowerEps;
-        Desc.NormSpectralPower[i] = normSp;
+        double normSp = (Desc.SpectralMagnitudeNorm[i] + 1e-12) / SumPowerEps;
+        Desc.SpectralMagnitudeFrameNorm[i] = normSp;
         double Diff = normSp - Mean;
         Variance += Diff * Diff;
 
         const double freqDiff = (static_cast<double>(i) * binWidth) - centroid;
-        weightedSpreadVariance += (freqDiff * freqDiff) * Desc.SpectralPower[i];
+        weightedSpreadVariance += (freqDiff * freqDiff) * Desc.SpectralMagnitudeNorm[i];
     }
 
     Desc.StdDev = std::sqrt(Variance / NHalf);
@@ -738,7 +745,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     m_SpectralPrefix[0] = 0.0;
     for (size_t i = 0; i < NHalf; ++i) {
-        m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.SpectralPower[i];
+        m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.SpectralMagnitudeNorm[i];
     }
 
     // Remaining descriptors that require their own transforms.
@@ -844,66 +851,62 @@ void MIR::MFCCExec(Description &Desc) {
     const int n_mels = std::min<int>(m_MFCCMels, static_cast<int>(m_MFCCFilter.size()));
     const int n_mfcc = std::min<int>(m_MFCCCount, static_cast<int>(m_DCTBasis.size()));
 
-    if (n_mels <= 0 || n_mfcc <= 0 || Desc.Power.empty()) {
+    if (n_mels <= 0 || n_mfcc <= 0 || Desc.Magnitude.empty()) {
         Desc.MFCC.assign(std::max(0, n_mfcc), 0.0);
+        Desc.Melogram.assign(n_mels, 0.0);
         return;
     }
 
-    const int n_f = std::min<int>(static_cast<int>(Desc.Power.size()), static_cast<int>(m_MFCCFilter[0].size()));
-
+    const int n_f = std::min<int>(static_cast<int>(Desc.Magnitude.size()), static_cast<int>(m_MFCCFilter[0].size()));
     if (n_f <= 0) {
         Desc.MFCC.assign(n_mfcc, 0.0);
+        Desc.Melogram.assign(n_mels, 0.0);
         return;
     }
 
-    constexpr float kAmin = 1e-10f;
-    constexpr float kTopDb = 80.0f;
+    constexpr double kAmin = 1e-10f;
+    constexpr double kTopDb = 80.0f;
 
     if (static_cast<int>(m_MFCCEnergy.size()) != n_mels)
         m_MFCCEnergy.resize(n_mels);
 
-    // Mel projection (power domain)
+    // Mel projection (power domain) → preenche m_MFCCEnergy e Melogram
+    Desc.Melogram.resize(n_mels);
     for (int m = 0; m < n_mels; ++m) {
         const double *filter = m_MFCCFilter[m].data();
-        float mel = 0.0f;
+        double melEnergy = 0.0;
         for (int k = 0; k < n_f; ++k) {
-            mel += static_cast<float>(filter[k]) * static_cast<float>(Desc.Power[k]);
+            melEnergy += filter[k] * Desc.Magnitude[k];
         }
 
-        m_MFCCEnergy[m] = static_cast<double>(mel);
+        m_MFCCEnergy[m] = melEnergy;
+
+        // opcional: converter para dB
+        Desc.Melogram[m] = 10.0 * std::log10(std::max(kAmin, melEnergy));
     }
 
-    // power_to_db(ref=1.0, top_db=80)
+    // limitar top_db
     float maxLog = -std::numeric_limits<float>::infinity();
-
-    for (int m = 0; m < n_mels; ++m) {
-        const float v = 10.0f * std::log10(std::max(kAmin, static_cast<float>(m_MFCCEnergy[m])));
-
-        m_MFCCEnergy[m] = static_cast<double>(v);
-        if (v > maxLog)
-            maxLog = v;
-    }
+    for (int m = 0; m < n_mels; ++m)
+        if (Desc.Melogram[m] > maxLog)
+            maxLog = static_cast<float>(Desc.Melogram[m]);
 
     if (std::isfinite(maxLog)) {
         const float floor = maxLog - kTopDb;
         for (int m = 0; m < n_mels; ++m) {
-            if (static_cast<float>(m_MFCCEnergy[m]) < floor)
-                m_MFCCEnergy[m] = static_cast<double>(floor);
+            if (Desc.Melogram[m] < floor)
+                Desc.Melogram[m] = floor;
         }
     }
 
+    // calcular MFCCs usando DCT-II
     Desc.MFCC.assign(n_mfcc, 0.0);
-
-    // DCT-II
     for (int k = 0; k < n_mfcc; ++k) {
         const double *basis = m_DCTBasis[k].data();
-        float coeff = 0.0f;
-
-        for (int n = 0; n < n_mels; ++n) {
-            coeff += static_cast<float>(basis[n]) * static_cast<float>(m_MFCCEnergy[n]);
-        }
-
-        Desc.MFCC[k] = static_cast<double>(coeff);
+        double coeff = 0.0;
+        for (int n = 0; n < n_mels; ++n)
+            coeff += basis[n] * m_MFCCEnergy[n];
+        Desc.MFCC[k] = coeff;
     }
 }
 
@@ -915,6 +918,7 @@ double MIR::HzToOcts(double frequency, double tuning, int binsPerOctave) const {
     return std::log2(frequency / (a440 / 16.0));
 }
 
+// ─────────────────────────────────────
 double MIR::PositiveRemainder(double value, double modulus) const {
     double result = std::fmod(value, modulus);
     if (result < 0.0) {
@@ -998,17 +1002,17 @@ void MIR::SpectralChromaExec(Description &Desc) {
 
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
 
-    if (m_ChromaFilter.empty() || m_ChromaFilter[0].empty() || Desc.Power.empty()) {
+    if (m_ChromaFilter.empty() || m_ChromaFilter[0].empty() || Desc.Magnitude.empty()) {
         return;
     }
 
-    const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
+    const size_t nHalf = std::min(Desc.Magnitude.size(), m_ChromaFilter[0].size());
     for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
         double energy = 0.0;
         const auto &filter = m_ChromaFilter[chroma];
 
         for (size_t k = 0; k < nHalf; ++k) {
-            energy += filter[k] * Desc.Power[k];
+            energy += filter[k] * Desc.Magnitude[k];
         }
 
         Desc.Chroma[chroma] = energy;
@@ -1116,7 +1120,9 @@ void MIR::ZeroCrossingRateExec(std::vector<double> &In, Description &Desc) {
 // │        Spectral Descriptions        │
 // ╰─────────────────────────────────────╯
 void MIR::SpectralFluxExec(Description &Desc) {
-    const auto &S = Desc.SpectralPower;
+
+    // Must be magnitude spectrum, not power
+    const auto &S = Desc.Magnitude;
     const size_t N = S.size();
 
     if (m_PreviousSpectralPower.size() != N) {
@@ -1124,19 +1130,24 @@ void MIR::SpectralFluxExec(Description &Desc) {
     }
 
     double flux = 0.0;
-    for (size_t k = 1; k < N; ++k) {
+
+    // Essentia uses all bins
+    for (size_t k = 0; k < N; ++k) {
         double diff = S[k] - m_PreviousSpectralPower[k];
-        if (diff > 0.0) {
-            flux += diff;
-        }
-        m_PreviousSpectralPower[k] = S[k];
+        flux += diff * diff;
     }
+
+    flux = std::sqrt(flux);
+
+    // store spectrum for next frame
+    m_PreviousSpectralPower = S;
+
     Desc.SpectralFlux = flux;
 }
 
 // ─────────────────────────────────────
 void MIR::SpectralFlatnessExec(Description &Desc) {
-    const auto &S = Desc.Power; // usar potência
+    const auto &S = Desc.Magnitude; // usar potência
     const size_t N = S.size();
 
     constexpr double amin = 1e-10; // mesmo default do librosa
@@ -1158,7 +1169,7 @@ void MIR::SpectralFlatnessExec(Description &Desc) {
 
 // ─────────────────────────────────────
 void MIR::SpectralHarmonicityExec(Description &Desc) {
-    const auto &S = Desc.SpectralPower;
+    const auto &S = Desc.SpectralMagnitudeNorm;
     const size_t N = S.size();
 
     double sum = 0.0;
@@ -1179,7 +1190,7 @@ void MIR::SpectralHarmonicityExec(Description &Desc) {
 // ─────────────────────────────────────
 void MIR::AddReverb(Description &Desc, double decay) {
     (void)decay;
-    for (size_t i = 0; i < Desc.NormSpectralPower.size(); i++) {
+    for (size_t i = 0; i < Desc.SpectralMagnitudeFrameNorm.size(); i++) {
         Desc.ReverbSpectralPower[i] = 0; //(Desc.ReverbSpectralPower[i] * decay) * (Desc.NormSpectralPower[i] * decay);
     }
 }

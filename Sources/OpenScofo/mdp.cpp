@@ -79,9 +79,9 @@ void MDP::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
 }
 
 // ─────────────────────────────────────
-ActionVec MDP::GetEventActions(int Index) {
+EventActions MDP::GetEventActions(int Index) {
     if (Index < 0 || Index >= (int)m_States.size()) {
-        return ActionVec();
+        return EventActions();
     }
 
     MarkovState State = m_States[(size_t)Index];
@@ -685,7 +685,7 @@ double MDP::GetPitchSimilarity(double Freq) {
 
     const PitchTemplateArray &PitchTemplate = it->second;
     const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
-    const auto &normSpectralPower = m_Desc.NormSpectralPower;
+    const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
     size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
 
     for (size_t i = 0; i < halfFft; i++) {
