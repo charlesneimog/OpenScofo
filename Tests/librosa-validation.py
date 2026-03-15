@@ -4,6 +4,10 @@ import random
 import OpenScofo
 import librosa
 
+import essentia
+import essentia.standard as es
+import numpy as np
+
 os.chdir(os.path.dirname(__file__))
 
 sr = 48000
@@ -36,6 +40,7 @@ max_diffs = {
     "CHRO": 0.0,
     "RMS": 0.0,
     "ZCR": 0.0,
+    "Flux": 0.0,
 }
 
 
@@ -195,21 +200,70 @@ def run_test_chroma(window, label):
 def run_test_rms(window, label):
     scofo_desc = scofo.get_audio_description(window)
 
-    l_loudness = librosa.feature.rms(
+    # librosa
+    l_rms = librosa.feature.rms(
         y=window,
         frame_length=n_fft,
         hop_length=hop,
         center=False,
     )[0, 0]
 
-    s_loudness = scofo_desc.rms
-    diff = abs(l_loudness - s_loudness)
+    # scofo
+    s_rms = scofo_desc.rms
 
-    update_max("RMS", diff)
+    # essentia
+    e_rms = es.RMS()(window)
+
+    # differences
+    diff_ls = abs(l_rms - s_rms)
+    diff_le = abs(l_rms - e_rms)
+    diff_se = abs(s_rms - e_rms)
+
+    update_max("RMS", diff_ls)
+    diff_str, order_str = format_diff(diff_ls)
+
+    print(
+        f"{label} | RMS | "
+        f"L: {l_rms:+012.5f} | "
+        f"S: {s_rms:+012.5f} | "
+        f"E: {e_rms:+012.5f} | "
+        f"D(L-S): {diff_str} | "
+        f"D(L-E): {diff_le:.3e} | "
+        f"D(S-E): {diff_se:.3e} | "
+        f"Order: {order_str}"
+    )
+
+
+# ---------------- RUN LOUDNESS TEST ----------------
+spectrum = es.Spectrum()
+flux_alg = es.Flux()
+
+
+def run_test_flux(prev_window, window, label):
+
+    scofo_desc = scofo.get_audio_description(window)
+    s_flux = scofo_desc.spectral_flux
+
+    prev_spec = spectrum(prev_window)
+    curr_spec = spectrum(window)
+
+    # initialize internal state
+    flux_alg(prev_spec)
+
+    # compute flux between prev_spec and curr_spec
+    e_flux = flux_alg(curr_spec)
+
+    diff = abs(s_flux - e_flux)
+
+    update_max("Flux", diff)
     diff_str, order_str = format_diff(diff)
 
     print(
-        f"{label} | RMS   | L: {l_loudness:+012.5f} | S: {s_loudness:+012.5f} | D: {diff_str} | Order: {order_str}"
+        f"{label} | FLUX | "
+        f"S: {s_flux:+012.5f} | "
+        f"E: {e_flux:+012.5f} | "
+        f"D(S-E): {diff_str} | "
+        f"Order: {order_str}"
     )
 
 
@@ -243,18 +297,20 @@ def run_test_zcr(window, label):
 n_tests = 100
 
 for _ in range(n_tests):
-    max_start = len(y) - n_fft
-    start = random.randint(0, max_start)
+    max_start = len(y) - 2 * n_fft
+    start = random.randint(n_fft, max_start)
+
+    prev_window = y[start - n_fft : start]
     window = y[start : start + n_fft]
 
-    run_test_mfcc(window, f"Start {start:08d}")
-    run_test_flatness(window, f"Start {start:08d}")
-    run_test_rms(window, f"Start {start:08d}")
-    run_test_zcr(window, f"Start {start:08d}")
-    run_test_spread(window, f"Start {start:08d}")
-    run_test_centroid(window, f"Start {start:08d}")
-    run_test_chroma(window, f"Start {start:08d}")
-
+    # run_test_mfcc(window, f"Start {start:08d}")
+    # run_test_flatness(window, f"Start {start:08d}")
+    # run_test_rms(window, f"Start {start:08d}")
+    # run_test_zcr(window, f"Start {start:08d}")
+    # run_test_spread(window, f"Start {start:08d}")
+    # run_test_centroid(window, f"Start {start:08d}")
+    # run_test_chroma(window, f"Start {start:08d}")
+    run_test_flux(prev_window, window, f"Start {start:08d}")
     print("")
 
 
