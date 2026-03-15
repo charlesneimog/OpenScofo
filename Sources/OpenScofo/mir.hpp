@@ -81,6 +81,7 @@ class MIR {
     void ONNXExec(Description &Desc);
 
     // Get Signal
+    void InitITURFilters(void);
     void GetSignalPower(std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
     void YINInit();
@@ -110,7 +111,7 @@ class MIR {
 
     // MFCC
     int m_MFCCMels = 40;
-    int m_MFCC = 13;
+    int m_MFCCCount = 13;
     std::vector<std::vector<double>> m_MFCCFilter;
     std::vector<std::vector<double>> m_DCTBasis;
     std::vector<double> m_MFCCEnergy;
@@ -118,7 +119,7 @@ class MIR {
 
     // Chroma
     Matrix m_ChromaFilter;
-    size_t m_ChromaSize = 12;
+    int m_ChromaSize = 12;
     double m_ChromaA440 = 440.0;
     double m_ChromaTuning = 0.0;
     double m_ChromaCenterOctave = 5.0;
@@ -136,11 +137,25 @@ class MIR {
     // Machine Learning
     bool m_ONNXModelLoaded = false;
     struct onnx_context_t *m_ONNXContext = nullptr;
-    std::unordered_map<std::string, float> m_ONNXLabels;
+    std::vector<std::string> m_ONNXLabels;
     std::vector<Descriptors> m_ONNXDescriptors;
+    std::vector<float> m_ONNXDescriptorsArray;
+    std::vector<std::function<void(const Description &, float *&)>> m_Writers;
+    struct onnx_tensor_t *m_InputTensor;
+    struct onnx_tensor_t *m_OutputTensor;
+    int m_ONNXDescriptorsSize = 0;
 
     // Env
     double m_dBTreshold = -50;
+    const std::array<double, 3> m_48kB1 = {1.53512485958697, -2.69169618940638, 1.19839281085285};
+    const std::array<double, 3> m_48kA1 = {1.0, -1.69065929318241, 0.73248077421585};
+    const std::array<double, 3> m_48kB2 = {1.0, -2.0, 1.0};
+    const std::array<double, 3> m_48kA2 = {1.0, -1.99004745483398, 0.99007225036621};
+
+    std::array<double, 3> m_B1;
+    std::array<double, 3> m_A1;
+    std::array<double, 3> m_B2;
+    std::array<double, 3> m_A2;
 
     // Audio
     float m_FFTSize;

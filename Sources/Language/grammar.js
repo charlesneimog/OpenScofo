@@ -45,11 +45,16 @@ module.exports = grammar({
                 "yin",
             ),
 
+        onset_function: (_) => choice("pow", "pd", "wpd", "sf", "cd", "rcd", "hfc", "mkl"),
+
         //╭─────────────────────────────────────╮
         //│                Config               │
         //╰─────────────────────────────────────╯
         CONFIG: ($) =>
-            seq(field("key", $.config_key), field("value", choice($.number, $.identifier, $.path, $.descriptor_list))),
+            seq(
+                field("key", $.config_key),
+                field("value", choice($.number, $.identifier, $.path, $.descriptor_list, $.onset_function)),
+            ),
 
         config_key: (_) =>
             token(
@@ -69,6 +74,7 @@ module.exports = grammar({
                     "PITCHTEMPLATESIGMA",
                     "ONNXMODEL",
                     "ONNXDESCRIPTORS",
+                    "ONSETFUNCTION",
                 ),
             ),
 

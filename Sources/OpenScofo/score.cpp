@@ -99,7 +99,7 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &
     TSNode pitch = node;
     std::string type = ts_node_type(pitch);
     if (type == "midi") {
-        int midi = std::stof(GetCodeStr(ScoreStr, pitch));
+        float midi = std::stof(GetCodeStr(ScoreStr, pitch));
         State.Midi = midi;
         State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);
         State.Type = PITCH;
@@ -166,10 +166,18 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &
             classNote += 2;
         } else if (alt == "bb") {
             classNote -= 2;
+        } else if (alt == "+"){
+            classNote += 0.5;
+        } else if (alt == "#+"){
+            classNote += 1.5;
+        } else if (alt == "-"){
+            classNote -= 0.5;
+        } else if (alt == "b-"){
+            classNote -= 1.5;
         }
     }
 
-    int midi = classNote + 12 + (12 * std::stoi(octave));
+    float midi = classNote + 12 + (12 * std::stoi(octave));
     midi = midi + m_Transpose;
     State.Midi = midi;
     State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);

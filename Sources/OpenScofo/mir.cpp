@@ -99,6 +99,7 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     SpectralChromaInit();
     ZeroCrossingRateInit();
     YINInit();
+    InitITURFilters();
 
     spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
 }
@@ -159,6 +160,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     }
 
     // Get labels
+    m_ONNXLabels.clear();
     bool TreeEnsembleClassifierFound = false;
     struct onnx_graph_t *g = m_ONNXContext->g;
     for (int i = 0; i < g->nlen; i++) {
@@ -173,7 +175,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
                 for (size_t v = 0; v < attr->n_strings; v++) {
                     ProtobufCBinaryData *str = &attr->strings[v];
                     std::string label(reinterpret_cast<char *>(str->data), str->len);
-                    m_ONNXLabels[label] = 0.0f;
+                    m_ONNXLabels.push_back(label);
                 }
             }
         }
@@ -188,6 +190,135 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     m_ONNXModelLoaded = true;
     m_ONNXDescriptors = Descriptors;
     spdlog::info("ONNX Model Loaded");
+    // Count
+    m_ONNXDescriptorsSize = 0;
+    for (size_t i = 0; i < m_ONNXDescriptors.size(); i++) {
+        switch (m_ONNXDescriptors[i]) {
+        case MFCC:
+            m_ONNXDescriptorsSize += m_MFCCCount;
+            break;
+        case CHROMA:
+            m_ONNXDescriptorsSize += m_ChromaSize;
+            break;
+        default:
+            m_ONNXDescriptorsSize++;
+        }
+
+        spdlog::info("Descriptors ID: {}, {}", (int)m_ONNXDescriptors[i], m_ONNXDescriptorsSize);
+    }
+
+    spdlog::info("ONNX Model array is {}", m_ONNXDescriptorsSize);
+
+    m_ONNXDescriptorsArray.resize(m_ONNXDescriptorsSize);
+
+    for (auto d : m_ONNXDescriptors) {
+        switch (d) {
+        case MFCC:
+            m_Writers.push_back([this](const Description &desc, float *&out) {
+                for (int i = 0; i < m_MFCCCount; ++i)
+                    *out++ = desc.MFCC[i];
+            });
+            break;
+
+        case CHROMA:
+            m_Writers.push_back([this](const Description &desc, float *&out) {
+                for (int i = 0; i < m_ChromaSize; ++i)
+                    *out++ = desc.Chroma[i];
+            });
+            break;
+
+        case POWER:
+            m_Writers.push_back([](const Description &desc, float *&out) {
+                for (double v : desc.Power)
+                    *out++ = v;
+            });
+            break;
+
+        case LOUDNESS:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Loudness; });
+            break;
+
+        case RMS:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.RMS; });
+            break;
+
+        case ZCR:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ZeroCrossingRate; });
+            break;
+
+        case HFR:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.HighFreqRatio; });
+            break;
+
+        case CENTROID:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralCentroid; });
+            break;
+
+        case SPREAD:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSpread; });
+            break;
+
+        case FLATNESS:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlatness; });
+            break;
+
+        case FLUX:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlux; });
+            break;
+
+        case IRREGULARITY:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralIrregularity; });
+            break;
+
+        case HARMONICITY:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Harmonicity; });
+            break;
+
+        case YIN:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Pitch; });
+            break;
+
+        case SILENCEPROB:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SilenceProb; });
+            break;
+
+        case PERCUSSIVEPROB:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ExtendedTechProb; });
+            break;
+
+        case ONSET:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Onset ? 1.0f : 0.0f; });
+            break;
+        case ONNX:
+            break;
+        }
+    }
+
+    m_InputTensor = onnx_tensor_search(m_ONNXContext, "features");
+    if (m_InputTensor == nullptr) {
+        spdlog::error("Tensor 'features', for input, not found");
+        return;
+    }
+
+    // probabilities
+    m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probabilities");
+    if (m_OutputTensor == nullptr) {
+        spdlog::error("Tensor 'probabilities', for output, not found");
+        return;
+    }
+
+    if ((size_t)m_ONNXDescriptorsSize != m_InputTensor->ndata) {
+        spdlog::error("Tensor input expect {} values, selected descriptors give {}", m_InputTensor->ndata,
+                      m_ONNXDescriptorsSize);
+        return;
+    }
+
+    size_t LabelSize = m_ONNXLabels.size();
+    if (LabelSize != m_OutputTensor->ndata) {
+        spdlog::error("Tensor output expect {} values, but labels provided are {}", m_InputTensor->ndata,
+                      m_ONNXDescriptorsSize);
+        return;
+    }
 }
 
 // ─────────────────────────────────────
@@ -196,7 +327,32 @@ void MIR::ONNXExec(Description &Desc) {
         return;
     }
 
-    // Do something to get the
+    float *out = m_ONNXDescriptorsArray.data();
+    for (auto &w : m_Writers) {
+        w(Desc, out);
+    }
+
+    onnx_tensor_apply(m_InputTensor, m_ONNXDescriptorsArray.data(), m_ONNXDescriptorsSize);
+    onnx_run(m_ONNXContext);
+
+    switch (m_OutputTensor->type) {
+    case ONNX_TENSOR_TYPE_FLOAT32: {
+        float *data = (float *)m_OutputTensor->datas;
+        for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
+            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.ExtendedTechProb;
+        }
+        break;
+    }
+    case ONNX_TENSOR_TYPE_FLOAT64: {
+        double *data = (double *)m_OutputTensor->datas;
+        for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
+            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i];
+        }
+        break;
+    }
+    default:
+        spdlog::error("Tensor output type not supported {}", (int)m_OutputTensor->type);
+    }
 }
 
 // ╭─────────────────────────────────────╮
@@ -258,16 +414,51 @@ void MIR::ExtendedTechExec(Description &Desc) {
 }
 
 // ╭─────────────────────────────────────╮
-// │          Audio Descriptors          │
+// │         Power and Amplitude         │
 // ╰─────────────────────────────────────╯
-void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
-    // TODO: Recalculate this based on the sample rate
-    const std::array<double, 3> b1 = {1.53512485958697, -2.69169618940638, 1.19839281085285};
-    const std::array<double, 3> a1 = {1.0, -1.69065929318241, 0.73248077421585};
-    const std::array<double, 3> b2 = {1.0, -2.0, 1.0};
-    const std::array<double, 3> a2 = {1.0, -1.99004745483398, 0.99007225036621};
+// Check https://github.com/klangfreund/LUFSMeter
+void MIR::InitITURFilters() {
+    // Stage 1: shelving filter
+    double KoverQ1 = (2.0 - 2.0 * m_48kA1[2]) / (m_48kA1[2] - m_48kA1[1] + 1.0);
+    double K1 = std::sqrt((m_48kA1[1] + m_48kA1[2] + 1.0) / (m_48kA1[2] - m_48kA1[1] + 1.0));
+    double Q1 = K1 / KoverQ1;
+    double arctanK1 = std::atan(K1);
+    double VB1 = (m_48kB1[0] - m_48kB1[2]) / (1.0 - m_48kA1[2]);
+    double VH1 = (m_48kB1[0] - m_48kB1[1] + m_48kB1[2]) / (m_48kA1[2] - m_48kA1[1] + 1.0);
+    double VL1 = (m_48kB1[0] + m_48kB1[1] + m_48kB1[2]) / (m_48kA1[1] + m_48kA1[2] + 1.0);
 
-    // Filter states (local variables)
+    double Knew1 = std::tan(arctanK1 * 48000.0 / m_Sr);
+    double commonFactor1 = 1.0 / (1.0 + Knew1 / Q1 + Knew1 * Knew1);
+
+    m_B1[0] = (VH1 + VB1 * Knew1 / Q1 + VL1 * Knew1 * Knew1) * commonFactor1;
+    m_B1[1] = 2.0 * (VL1 * Knew1 * Knew1 - VH1) * commonFactor1;
+    m_B1[2] = (VH1 - VB1 * Knew1 / Q1 + VL1 * Knew1 * Knew1) * commonFactor1;
+    m_A1[0] = 1.0;
+    m_A1[1] = 2.0 * (Knew1 * Knew1 - 1.0) * commonFactor1;
+    m_A1[2] = (1.0 - Knew1 / Q1 + Knew1 * Knew1) * commonFactor1;
+
+    // Stage 2: high-pass filter
+    double KoverQ2 = (2.0 - 2.0 * m_48kA2[2]) / (m_48kA2[2] - m_48kA2[1] + 1.0);
+    double K2 = std::sqrt((m_48kA2[1] + m_48kA2[2] + 1.0) / (m_48kA2[2] - m_48kA2[1] + 1.0));
+    double Q2 = K2 / KoverQ2;
+    double arctanK2 = std::atan(K2);
+    double VB2 = (m_48kB2[0] - m_48kB2[2]) / (1.0 - m_48kA2[2]);
+    double VH2 = (m_48kB2[0] - m_48kB2[1] + m_48kB2[2]) / (m_48kA2[2] - m_48kA2[1] + 1.0);
+    double VL2 = (m_48kB2[0] + m_48kB2[1] + m_48kB2[2]) / (m_48kA2[1] + m_48kA2[2] + 1.0);
+
+    double Knew2 = std::tan(arctanK2 * 48000.0 / m_Sr);
+    double commonFactor2 = 1.0 / (1.0 + Knew2 / Q2 + Knew2 * Knew2);
+
+    m_B2[0] = (VH2 + VB2 * Knew2 / Q2 + VL2 * Knew2 * Knew2) * commonFactor2;
+    m_B2[1] = 2.0 * (VL2 * Knew2 * Knew2 - VH2) * commonFactor2;
+    m_B2[2] = (VH2 - VB2 * Knew2 / Q2 + VL2 * Knew2 * Knew2) * commonFactor2;
+    m_A2[0] = 1.0;
+    m_A2[1] = 2.0 * (Knew2 * Knew2 - 1.0) * commonFactor2;
+    m_A2[2] = (1.0 - Knew2 / Q2 + Knew2 * Knew2) * commonFactor2;
+}
+
+// ─────────────────────────────────────
+void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
     double x1_1 = 0.0, x2_1 = 0.0;
     double y1_1 = 0.0, y2_1 = 0.0;
     double x1_2 = 0.0, x2_2 = 0.0;
@@ -276,12 +467,12 @@ void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
     double z = 0.0;
     double z_loudness = 0.0;
     for (double sample : In) {
-        double s1 = b1[0] * sample + b1[1] * x1_1 + b1[2] * x2_1 - a1[1] * y1_1 - a1[2] * y2_1;
+        double s1 = m_B1[0] * sample + m_B1[1] * x1_1 + m_B1[2] * x2_1 - m_A1[1] * y1_1 - m_A1[2] * y2_1;
         x2_1 = x1_1;
         x1_1 = sample;
         y2_1 = y1_1;
         y1_1 = s1;
-        double s2 = b2[0] * s1 + b2[1] * x1_2 + b2[2] * x2_2 - a2[1] * y1_2 - a2[2] * y2_2;
+        double s2 = m_B2[0] * s1 + m_B2[1] * x1_2 + m_B2[2] * x2_2 - m_A2[1] * y1_2 - m_A2[2] * y2_2;
         x2_2 = x1_2;
         x1_2 = s1;
         y2_2 = y1_2;
@@ -327,17 +518,11 @@ void MIR::YINInit() {
     m_YINCMNDF.assign(allocSize, 1.0);
 }
 
+// ─────────────────────────────────────
 void MIR::YINExec(std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
-    if (frame < 2 || m_YINDifference.empty() || m_YINCMNDF.empty()) {
-        Desc.Pitch = 0.0;
-        Desc.PitchConfidence = 0.0;
-        return;
-    }
-
-    const double sampleRate = std::max(1.0, static_cast<double>(m_Sr));
-    const size_t minTau = std::max<size_t>(1, static_cast<size_t>(sampleRate / m_YINMaxFrequency));
-    const size_t maxTauByPitch = std::max(minTau + 1, static_cast<size_t>(std::ceil(sampleRate / m_YINMinFrequency)));
+    const size_t minTau = m_Sr / m_YINMaxFrequency;
+    const size_t maxTauByPitch = std::ceil(m_Sr / m_YINMinFrequency);
     const size_t maxTau = std::min({frame / 2, m_YINDifference.size() - 1, maxTauByPitch});
     if (maxTau <= minTau) {
         Desc.Pitch = 0.0;
@@ -418,22 +603,22 @@ void MIR::YINExec(std::vector<double> &In, Description &Desc) {
         }
     }
 
-    const double confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
-    if (refinedTau <= 0.0 || confidence <= 0.0) {
+    const double Confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
+    if (refinedTau <= 0.0 || Confidence <= 0.0) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    const double pitch = sampleRate / refinedTau;
-    if (pitch < m_YINMinFrequency || pitch > m_YINMaxFrequency) {
+    const double Pitch = m_Sr / refinedTau;
+    if (Pitch < m_YINMinFrequency || Pitch > m_YINMaxFrequency) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    Desc.Pitch = pitch;
-    Desc.PitchConfidence = confidence;
+    Desc.Pitch = Pitch;
+    Desc.PitchConfidence = Confidence;
 }
 
 // ─────────────────────────────────────
@@ -640,12 +825,12 @@ void MIR::MFCCInit() {
     }
 
     // Orthonormal DCT-II (librosa: dct_type=2, norm="ortho")
-    m_DCTBasis.assign(m_MFCC, std::vector<double>(m_MFCCMels));
+    m_DCTBasis.assign(m_MFCCCount, std::vector<double>(m_MFCCMels));
 
     const double scale0 = std::sqrt(1.0 / m_MFCCMels);
     const double scale = std::sqrt(2.0 / m_MFCCMels);
 
-    for (int k = 0; k < m_MFCC; ++k) {
+    for (int k = 0; k < m_MFCCCount; ++k) {
         for (int n = 0; n < m_MFCCMels; ++n) {
             m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(std::numbers::pi * (n + 0.5) * k / m_MFCCMels);
         }
@@ -657,7 +842,7 @@ void MIR::MFCCInit() {
 // ─────────────────────────────────────
 void MIR::MFCCExec(Description &Desc) {
     const int n_mels = std::min<int>(m_MFCCMels, static_cast<int>(m_MFCCFilter.size()));
-    const int n_mfcc = std::min<int>(m_MFCC, static_cast<int>(m_DCTBasis.size()));
+    const int n_mfcc = std::min<int>(m_MFCCCount, static_cast<int>(m_DCTBasis.size()));
 
     if (n_mels <= 0 || n_mfcc <= 0 || Desc.Power.empty()) {
         Desc.MFCC.assign(std::max(0, n_mfcc), 0.0);
@@ -768,7 +953,7 @@ void MIR::SpectralChromaInit() {
     const double nChroma2 = std::round(static_cast<double>(m_ChromaSize) / 2.0);
     for (size_t k = 0; k < nHalf; ++k) {
         double columnNorm = 0.0;
-        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
             const double distance = PositiveRemainder(frqbins[k] - static_cast<double>(chroma) + nChroma2 +
                                                           10.0 * static_cast<double>(m_ChromaSize),
                                                       static_cast<double>(m_ChromaSize)) -
@@ -780,7 +965,7 @@ void MIR::SpectralChromaInit() {
 
         if (columnNorm > 0.0) {
             const double invNorm = 1.0 / std::sqrt(columnNorm);
-            for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+            for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
                 m_ChromaFilter[chroma][k] *= invNorm;
             }
         }
@@ -789,15 +974,15 @@ void MIR::SpectralChromaInit() {
             std::exp(-0.5 * std::pow((frqbins[k] / static_cast<double>(m_ChromaSize) - m_ChromaCenterOctave) /
                                          m_ChromaOctaveWidth,
                                      2.0));
-        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
             m_ChromaFilter[chroma][k] *= octaveWeight;
         }
     }
 
-    const size_t chromaShift = 3 * (m_ChromaSize / 12);
+    const int chromaShift = 3 * (m_ChromaSize / 12);
     if (chromaShift > 0 && chromaShift < m_ChromaSize) {
         Matrix rolled(m_ChromaSize, std::vector<double>(nHalf, 0.0));
-        for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
             rolled[chroma] = m_ChromaFilter[(chroma + chromaShift) % m_ChromaSize];
         }
         m_ChromaFilter.swap(rolled);
@@ -806,7 +991,9 @@ void MIR::SpectralChromaInit() {
 
 // ─────────────────────────────────────
 void MIR::SpectralChromaExec(Description &Desc) {
-    if (Desc.Chroma.size() != m_ChromaSize)
+
+    // TODO:
+    if (Desc.Chroma.size() != static_cast<size_t>(m_ChromaSize))
         Desc.Chroma.resize(m_ChromaSize);
 
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
@@ -816,8 +1003,7 @@ void MIR::SpectralChromaExec(Description &Desc) {
     }
 
     const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
-
-    for (size_t chroma = 0; chroma < m_ChromaSize; ++chroma) {
+    for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
         double energy = 0.0;
         const auto &filter = m_ChromaFilter[chroma];
 
@@ -1016,6 +1202,7 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
     GetSpectralDescriptions(Desc);
 
     ExtendedTechExec(Desc);
+    ONNXExec(Desc);
 }
 
 } // namespace OpenScofo

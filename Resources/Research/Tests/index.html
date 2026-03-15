@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Pitch Template Graph</title>
+        <style>
+            canvas {
+                border: 1px solid #ccc;
+                display: block;
+                margin: 20px auto;
+            }
+            .slider-container {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <h2 style="text-align: center">Pitch Template Graph</h2>
+
+        <div class="slider-container">
+            <label for="sigmaSlider">Sigma: <span id="sigmaValue">0.5</span></label
+            ><br />
+            <input type="range" id="sigmaSlider" min="0.1" max="2" step="0.01" value="0.5" />
+        </div>
+
+        <canvas id="pitchCanvas" width="1000" height="400"></canvas>
+
+        <script>
+            const canvas = document.getElementById("pitchCanvas");
+            const ctx = canvas.getContext("2d");
+            const sigmaSlider = document.getElementById("sigmaSlider");
+            const sigmaValueLabel = document.getElementById("sigmaValue");
+
+            // Fixed parameters
+            const m_Sr = 44100;
+            const m_FFTSize = 1024;
+            const m_Harmonics = 10;
+            const m_PitchTemplateAmplitudeDecay = 1;
+            const m_MinHarmonicDecay = 0.2;
+            const m_MaxHarmonicDecay = 1.8;
+            const m_MinF0 = 32.7;
+            const m_MaxF0 = 4186.0;
+            const Freq = 440;
+
+            const binWidth = m_Sr / m_FFTSize;
+            const maxFreq = 10000;
+            const maxBin = Math.min(Math.floor(maxFreq / binWidth), m_FFTSize / 2 - 1);
+
+            // Compute beta (fixed)
+            let f0Norm = Math.log2(Freq / m_MinF0) / Math.log2(m_MaxF0 / m_MinF0);
+            f0Norm = Math.min(1.0, Math.max(0.0, f0Norm));
+            const shaped = Math.pow(1.0 - f0Norm, m_PitchTemplateAmplitudeDecay);
+            const beta = m_MaxHarmonicDecay - shaped * (m_MaxHarmonicDecay - m_MinHarmonicDecay);
+
+            function drawPitchTemplate(sigma) {
+                sigmaValueLabel.textContent = sigma.toFixed(2);
+
+                const templateBins = Array(m_FFTSize / 2).fill(1e-24);
+                const sigmaLog = sigma / 12.0;
+                const sigmaConst = Math.pow(2.0, sigmaLog) - 1.0;
+                const B = 0.0001;
+
+                for (let k = 1; k <= m_Harmonics; k++) {
+                    const stretch = Math.sqrt(1 + B * k * k);
+                    const harmonicFreqHz = Freq * k * stretch;
+                    if (harmonicFreqHz >= m_Sr / 2) break;
+
+                    let sigmaHz = harmonicFreqHz * sigmaConst;
+                    // ADD THIS:
+                    if (sigmaHz < binWidth * 0.75) {
+                        sigmaHz = binWidth * 0.75;
+                    }
+
+                    let envelope = Math.exp(-beta * (k - 1));
+                    if (k > 1) envelope *= 1.25;
+                    if (envelope < 1e-5) break;
+
+                    const rangeHz = 4 * sigmaHz;
+                    const minBin = Math.max(0, Math.floor((harmonicFreqHz - rangeHz) / binWidth));
+                    const maxBinH = Math.min(m_FFTSize / 2 - 1, Math.ceil((harmonicFreqHz + rangeHz) / binWidth));
+                    const twoSigmaSq = 2 * sigmaHz * sigmaHz;
+                    const normalizationFactor = 1 / (sigmaHz * Math.sqrt(2 * Math.PI));
+
+                    for (let i = minBin; i <= maxBinH; i++) {
+                        const binFreq = i * binWidth;
+                        const diff = binFreq - harmonicFreqHz;
+                        const exponent = (-diff * diff) / twoSigmaSq;
+                        const gaussian = normalizationFactor * Math.exp(exponent);
+                        templateBins[i] += envelope * gaussian;
+                    }
+                }
+
+                // Normalize
+                const sum = templateBins.reduce((a, b) => a + b, 0);
+                let normalizedBins = templateBins;
+                if (sum > 1e-12) {
+                    normalizedBins = templateBins.map((v) => v / sum);
+                }
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw line
+                ctx.beginPath();
+                for (let i = 0; i <= maxBin; i++) {
+                    const x = (i / maxBin) * canvas.width;
+                    const y = canvas.height - normalizedBins[i] * canvas.height * 2;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = "blue";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Draw points
+                ctx.fillStyle = "red";
+                const pointSize = 3;
+                for (let i = 0; i <= maxBin; i++) {
+                    const x = (i / maxBin) * canvas.width;
+                    const y = canvas.height - normalizedBins[i] * canvas.height * 2;
+                    ctx.fillRect(x - pointSize / 2, y - pointSize / 2, pointSize, pointSize);
+                }
+            }
+
+            // Initial draw
+            drawPitchTemplate(parseFloat(sigmaSlider.value));
+
+            // Update on slider change
+            sigmaSlider.addEventListener("input", (e) => {
+                drawPitchTemplate(parseFloat(e.target.value));
+            });
+        </script>
+    </body>
+</html>

@@ -358,7 +358,7 @@ bool OpenScofo::ParseScore(std::string ScorePath) {
 
     // Timbre detection
     if (m_Score.HasTimbreModel()) {
-        m_MIR.ONNXInit(m_Score.GetTimbreModel());
+        m_MIR.ONNXInit(m_Score.GetTimbreModel(), m_Score.GetTimbreModelDescriptors());
     }
 
     m_FFTSize = m_Score.GetFFTSize();
@@ -392,7 +392,6 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
         return {};
     }
 
-    SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
     m_MIR.GetDescription(AudioBuffer, m_Desc);
     return m_Desc;
 }
