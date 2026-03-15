@@ -5,7 +5,7 @@ Before we begin, let’s establish some fundaments of the `OpenScofo` score stru
 ---
 ## Score Structure
 
-The OpenScofo **Score** is the root of a composition. It organizes all components of your interactive score into four main sections:
+The `OpenScofo` **Score** serves as the foundation for creating an interactive piece with `OpenScofo`. It is the framework through which all interactions are built, organizing the components of your interactive score into four primary sections:
 
 * **Comments** – Optional textual notes or explanations in your score.
 * **Config** – Global configuration settings such as tempo, FFT size, or machine learning models, etc.

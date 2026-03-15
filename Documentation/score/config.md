@@ -16,7 +16,7 @@ This approach allows development to focus on improving the core functionality of
 ### `FFTSIZE`
 
 - `Default is 2048`
-- `Must be a power of 2, I recomend 1024, 2048 or 4096`
+- `Must be a power of 2.`
 
 
 Define the FFT Size used in decoding.
@@ -30,12 +30,12 @@ FFTSIZE 2048
 ### `HOPSIZE`
 
 - `Default is 1024`
-- `Must be a power of 2, I recomend 512 or 1024`
+- `Must be a power of 2.`
 
 Define the Hop Size used in decoding.
 
 ```
-HOPSIZE 4096
+HOPSIZE 256
 ```
 
 ---
@@ -135,28 +135,6 @@ Defines the onset detection function (ODF), each emphasizing different signal ch
 
 
 ??? question "More details for Onset Detection"
-    | sigla | name                      | description                                                                                                                                                                             |
-    | ----- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | **pow**   | Power                     | Measures frame-to-frame changes in signal energy. Works well for signals with clear amplitude attacks (e.g., percussion) because onsets often correspond to sudden increases in energy. |
-    | **pd**    | Phase Deviation           | Detects onsets by measuring irregularities in the phase progression of spectral bins. Effective when phase continuity breaks at note attacks.                                           |
-    | **wpd**   | Weighted Phase Deviation  | Similar to phase deviation but weights bins by magnitude, emphasizing stronger spectral components. Improves robustness when relevant partials dominate the spectrum.                   |
-    | **sf**    | Spectral Flux             | Measures the positive change in magnitude spectrum between consecutive frames. Commonly used for onset detection since note attacks typically introduce new spectral energy.            |
-    | **cd**    | Complex Domain            | Uses both magnitude and phase to estimate expected spectral evolution and measures the deviation from this prediction. Captures subtle onset cues in complex signals.                   |
-    | **rcd**   | Rectified Complex Domain  | A rectified version of the complex-domain method that counts only increases in deviation. Helps suppress false detections from decreases or cancellations.                              |
-    | **hfc** | High Frequency Content    | Emphasizes changes in high-frequency bins. Effective for percussive sounds where attacks introduce strong high-frequency components.                                                    |
-    | **mkl**   | Modified Kullback–Leibler | Measures divergence between spectral distributions of consecutive frames. Sensitive to structural changes in the spectrum, which often correspond to note onsets.                       |
-
-
-    In a review of Tables 1 and 2 from the article *Adaptive Whitening for Improved Real‑Time Audio Onset Detection*, it is possible to conclude that no single onset detection function consistently dominates across all types of audio material. Performance varies according to signal characteristics such as percussiveness, harmonic content, and polyphonic complexity. Energy-based and high-frequency methods tend to perform well for percussive signals, while approaches that incorporate phase or spectral distribution information—particularly the complex-domain method—show stronger and more stable performance across a wider range of datasets. The results also indicate that adaptive whitening generally improves detection accuracy for complex mixtures and pitched material, suggesting that preprocessing the spectrum can significantly enhance the robustness of onset detection functions.
-
-
-    | situation                  | best odf     | reason                                                                                                                      |
-    | -------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-    | percussive / drums         | cd, pow, hfc | Strong transient attacks produce large energy increases and high-frequency bursts, which these methods capture effectively. |
-    | polyphonic pitched music   | cd           | Combines magnitude and phase prediction, allowing it to detect subtle spectral changes in harmonic textures.                |
-    | monophonic pitched signals | mkl, cd      | Sensitive to distribution changes in the spectrum, which helps when attacks are softer and energy change is smaller.        |
-    | complex mixtures           | cd, pow      | More robust to heterogeneous signals where both energy changes and spectral deviations occur.                               |
-    | general-purpose            | cd           | Typically the most robust overall because it models expected spectral evolution using both magnitude and phase information. |
 
 
 

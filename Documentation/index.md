@@ -11,9 +11,7 @@ hide:
   }
 </style>
 
-# Introduction
-
----
+# OpenScofo
 
 <p align="center" markdown>
   ![Image title](./assets/logo.svg#only-light){ width="15%" }

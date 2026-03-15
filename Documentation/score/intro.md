@@ -4,19 +4,18 @@
 
 ---
 <div class="grid cards" style="font-weigth:bold" markdown>
--   :fontawesome-solid-1: __How to Configure the Score?__
-    [:octicons-arrow-right-24: Config Docs :fontawesome-solid-gear:](config.md)
 
--   :fontawesome-solid-2: __How to Set New Events?__
-    [:octicons-arrow-right-24: Events Docs :material-music-note-sixteenth:](events.md)
+-   :fontawesome-solid-1: [__How to Configure the Score?__](config.md)
+
+-   :fontawesome-solid-2: [__How to Set New Events?__](events.md)
+
 </div>
 
 <div class="grid cards" style="font-weigth:bold" markdown>
--   :fontawesome-solid-3: __How to add Actions?__
-    [:octicons-arrow-right-24: Actions Docs :material-run-fast:](actions.md)
+-   :fontawesome-solid-3: [__How to add Actions?__](actions.md)
 
--   :fontawesome-solid-4: __How to use Lua?__
-    [:octicons-arrow-right-24: Lua Doc :simple-lua:](lua.md)
+-   :fontawesome-solid-4: [__How to use Lua?__](lua.md)
+
 </div>
 
 ---
