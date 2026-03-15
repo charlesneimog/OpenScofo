@@ -89,9 +89,7 @@ These are all functions exposed using `oscofo`.
     - `mfcc`
     - `onset`
     - `silence_prob`
-    - `spectral_power`
-    - `norm_spectral_power`
-    - `pseudo_cqt`
+    - `spectral_magnitude`
     - `loudness`
     - `spectral_flux`
     - `spectral_flatness`

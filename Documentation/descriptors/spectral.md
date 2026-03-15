@@ -1,0 +1,282 @@
+# Spectral Descriptors
+
+---
+
+## `Harmonicity` 
+
+Harmonicity measures how tone-like a sound is: high harmonicity means clear pitched tones with strong harmonics, while low harmonicity indicates noisy or texture-rich sounds.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $$Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$$
+
+-   ??? note "Notes"
+
+</div>
+
+
+
+
+---
+
+## `Spectral Flatness` 
+
+:custom-librosa:[^2]
+
+Spectral flatness indicates how noisy versus tonal a sound is. A high flatness means the spectrum is uniform like white noise, while a low flatness shows clear peaks, like a sustained musical note.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $$Flatness = \frac{\exp\left( \frac{1}{K} \sum_{k=0}^{K-1} \ln(|X[k]|^2) \right)}{\frac{1}{K} \sum_{k=0}^{K-1} |X[k]|^2}$$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Spectral Flux`
+
+Spectral flux measures how quickly the spectrum of a sound changes over time. High flux indicates sudden changes or transients, like drum hits, while low flux corresponds to steady, continuous sounds.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Flux = \sum_{k=1}^{K-1} \max(0, |X[k]| - |X_{prev}[k]|)$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Spectral Irregularity`
+
+Spectral irregularity quantifies how uneven or jagged a spectrum is between adjacent frequency bins. High irregularity indicates complex, inharmonic, or noisy timbres, while low values suggest smooth, harmonic sounds.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Irregularity = \frac{\sum_{k=1}^{K-1} (|X[k]| - |X[k-1]|)^2}{\sum_{k=0}^{K-1} |X[k]|^2}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Spectral Crest`
+
+Spectral crest measures the ratio of the highest spectral peak to the average spectral amplitude. A high crest indicates a tone dominated by strong harmonics or transients, while a low crest corresponds to more even, noise-like spectra.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Crest = \frac{\max_{k} |X[k]|}{\frac{1}{K} \sum_{k=0}^{K-1} |X[k]|}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Spectral Centroid` 
+
+:custom-librosa:[^3]
+
+Spectral centroid indicates the “center of mass” of a sound’s spectrum. Higher values make the sound perceptually brighter, while lower values make it darker or warmer.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $$Centroid = \frac{\sum_{k=0}^{K-1} f_k |X[k]|}{\sum_{k=0}^{K-1} |X[k]|}$$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Centroid Velocity`
+
+Centroid velocity measures how quickly the spectral centroid changes over time, reflecting dynamic shifts in brightness or timbre.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Velocity = |Centroid_t - Centroid_{t-1}|$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Spectral Spread` 
+:custom-librosa:[^3]
+
+Spectral spread quantifies how dispersed the energy is around the spectral centroid, indicating whether the sound is focused (narrow) or diffuse (wide) in frequency.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Spread = \sqrt{\frac{\sum_{k=0}^{K-1} (f_k - Centroid)^2 |X[k]|}{\sum_{k=0}^{K-1} |X[k]|}}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `High Frequency Ratio`
+
+High Frequency Ratio measures the proportion of energy in the upper part of the spectrum, reflecting the brightness or presence of high-pitched content in a sound.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $HFR = \frac{\sum_{k=K/4}^{K-1} |X[k]|}{\sum_{k=0}^{K-1} |X[k]|}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Zero Crossing Rate`
+:custom-librosa:[^5]
+
+Zero Crossing Rate counts how often the waveform crosses the zero amplitude line, indicating the noisiness or percussiveness of a sound.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $ZCR = \frac{1}{N} \sum_{n=1}^{N-1} \mathbb{I}\{\text{sgn}(x[n]) \neq \text{sgn}(x[n-1])\}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Standard Deviation`
+
+Standard deviation of the normalized spectral power compared to the mean ($\mu = \frac{1}{K}$):
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $StdDev = \sqrt{\frac{1}{K} \sum_{k=0}^{K-1} \left( |X_{norm}[k]| - \mu \right)^2}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Pitch` & `PitchConfidence`
+
+Estimated fundamental frequency and confidence, calculated using the YIN algorithm's cumulative mean normalized difference function (CMNDF):
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $d'_t(\tau) = \begin{cases} 1 & \text{if } \tau = 0 \\ \frac{d_t(\tau)}{\frac{1}{\tau} \sum_{j=1}^{\tau} d_t(j)} & \text{otherwise} \end{cases}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `Normalized Magnitude`
+
+Vector of magnitude values normalized by the FFT size $N$:
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $|X[k]| = \frac{Power[k]}{N}$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+## `MFCC` 
+:custom-librosa:[^3]
+
+MFCCs summarize the shape of a sound’s spectrum on a perceptual, mel-based scale, giving a compact representation of timbre and tone color as humans hear it.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $MFCC[i] = \sum_{m=0}^{M-1} \cos\left( \frac{\pi i (m + 0.5)}{M} \right) \max(L_{min}, 10 \log_{10}(E_m))$
+
+-   ??? note "Notes"
+
+
+</div>
+
+
+---
+
+## `Chroma`
+:custom-librosa:[^4]
+
+Chroma features capture the intensity of the twelve pitch classes (C, C♯, …, B) in a sound, representing its harmonic and melodic content independently of octave.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Chroma[c] = \sum_{k=0}^{K-1} W_{c}[k] \cdot Power[k]$
+
+-   ??? note "Notes"
+
+
+</div>
+
+---
+
+[^1]: `OpenScofo` uses a Hann window and FFTW3 for FFT.
+[^2]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-9}$.
+[^3]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-5}$.
+[^4]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-3}$.
+[^5]: `Descriptor` full compatible with [`librosa`](https://librosa.org/).

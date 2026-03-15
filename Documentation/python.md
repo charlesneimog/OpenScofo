@@ -149,9 +149,8 @@ Attributes:
 - `chroma`
 - `onset`
 - `silence_prob`
-- `spectral_power`
-- `norm_spectral_power`
-- `pseudo_cqt`
+- `spectral_magniture`
+- `normalized_spectral_magniture`
 - `loudness`
 - `spectral_flux`
 - `spectral_flatness`
