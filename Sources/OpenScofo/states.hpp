@@ -69,7 +69,7 @@ class Action {
     double Time;
 };
 
-using ActionVec = std::vector<Action>;
+using EventActions = std::vector<Action>;
 
 // ─────────────────────────────────────
 class AudioState {
@@ -86,39 +86,35 @@ class MarkovState {
   public:
     int Index;
     int ScorePos;
-    int SubStateIndex = 0;
-    EventType Type;
-    HMMType HSMMType;
     int MarkovIndex = -1;
-
-    // States Actions
-    ActionVec Actions;
     std::vector<AudioState> AudioStates;
 
-    // Forward Algorithm — Right-Censored Forward (Cuvillier 2014)
-    // F_j(t) = sum_u obs_prod(u) * F_j^i(t-u) * D_j(u)
-    // F_j^o(t) = sum_u obs_prod(u) * F_j^i(t-u) * d_j(u)   [d_j = D_j(u)-D_j(u+1)]
-    // F_j^i(t) = sum_{i!=j} p_ij * F_i^o(t)                [= F_{j-1}^o(t) for linear chain]
-    // obs_prod(u) = prod_{v=0}^{u-1} b_j(x_{t-v}) / N(t-v)  [normalized, stable]
+    // States Actions
+    HMMType HSMMType;
+    EventType Type;
+    EventActions Actions;
+
+    // Inference
     double InitProb;
-    std::vector<double> Forward;  // F_j(t): current-state prob, circular buffer
-    std::vector<double> ExitProb; // F_j^o(t): exit prob, circular buffer
-    std::vector<double> BestObs;  // b_j(x_t): observation, circular buffer
+    std::vector<double> Forward;
+    std::vector<double> ExitProb;
+    std::vector<double> BestObs;
 
     // Time
-    int UpperBound;
-    double BPMExpected;
+    int UpperBound = 0;
+    double BPMExpected = 0;
     double BPMObserved = 0;
     double OnsetExpected = 0.0;
     double OnsetObserved = 0;
     double PhaseExpected;
     double PhaseObserved = 0;
-    double IOIPhiN;
-    double IOIHatPhiN;
+    double IOIPhiN = 0;
+    double IOIHatPhiN = 0;
     double Duration = 0.0;
-    double PhaseCoupling;
-    double SyncStrength;
-    double TimeProb;
+
+    // Configuration for each event
+    double PhaseCoupling = 0;
+    double SyncStrength = 0;
 
     // Error Handling
     int Line;
@@ -156,10 +152,13 @@ class Description {
     double StdDev;
     double Pitch = 0.0;
     double PitchConfidence = 0.0;
-    std::vector<double> Power;
-    std::vector<double> SpectralPower;
-    std::vector<double> NormSpectralPower;
+    std::vector<double> Magnitude;
+    std::vector<double> SpectralMagnitudeNorm;
+    std::vector<double> SpectralMagnitudeFrameNorm;
+
+    std::vector<double> Melogram;
     std::vector<double> ReverbSpectralPower;
+
     std::vector<double> MFCC;
     std::vector<double> Chroma; // size 12
 

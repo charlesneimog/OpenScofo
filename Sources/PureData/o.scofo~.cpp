@@ -149,10 +149,10 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             }
             outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
         } else if (v == OpenScofo::Descriptors::POWER) {
-            size_t mfccSize = Desc.Power.size();
+            size_t mfccSize = Desc.Magnitude.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
             for (size_t i = 0; i < mfccSize; ++i) {
-                SETFLOAT(&mfccAtoms[i], (t_float)Desc.Power[i]);
+                SETFLOAT(&mfccAtoms[i], (t_float)Desc.Magnitude[i]);
             }
             outlet_anything(x->DescOut, gensym("power"), mfccSize, mfccAtoms.data());
         } else if (v == OpenScofo::Descriptors::LOUDNESS) {
@@ -503,7 +503,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
-    OpenScofo::ActionVec Actions = x->OpenScofo->GetEventActions(x->Event);
+    OpenScofo::EventActions Actions = x->OpenScofo->GetEventActions(x->Event);
 
     for (OpenScofo::Action &Act : Actions) {
         double time = Act.Time;
