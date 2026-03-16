@@ -166,13 +166,13 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &
             classNote += 2;
         } else if (alt == "bb") {
             classNote -= 2;
-        } else if (alt == "+"){
+        } else if (alt == "+") {
             classNote += 0.5;
-        } else if (alt == "#+"){
+        } else if (alt == "#+") {
             classNote += 1.5;
-        } else if (alt == "-"){
+        } else if (alt == "-") {
             classNote -= 0.5;
-        } else if (alt == "b-"){
+        } else if (alt == "b-") {
             classNote -= 1.5;
         }
     }
@@ -626,7 +626,7 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
 
 // ─────────────────────────────────────
 void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
-    Action BaseAction;
+    ScoreAction BaseAction;
     BaseAction.AbsoluteTime = true;
     BaseAction.Time = 0;
 
@@ -664,7 +664,7 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
             continue;
         }
 
-        Action NewAction = BaseAction;
+        ScoreAction NewAction = BaseAction;
 
         TSNode luaNode = GetField(execNode, "lua");
         TSNode receiverNode = GetField(execNode, "receiver");
@@ -686,10 +686,9 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
 
                     if (argType == "ERROR") {
                         std::string token = GetCodeStr(ScoreStr, arg);
-                        token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) {
-                            return std::isspace(c);
-                        }),
-                                    token.end());
+                        token.erase(
+                            std::remove_if(token.begin(), token.end(), [](unsigned char c) { return std::isspace(c); }),
+                            token.end());
                         pendingErrorPrefix += token;
                         continue;
                     }
