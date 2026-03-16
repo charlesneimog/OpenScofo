@@ -102,19 +102,19 @@ jobs:
       # Upload artifacts
       # -----------------------
       - name: Upload PureData Object
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
             runner.os }}
           path: ${{env.LIBNAME}}
       - name: Upload Max Object
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         if: runner.os != 'Linux'
         with:
           name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: max
       - name: Upload Python Object
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
