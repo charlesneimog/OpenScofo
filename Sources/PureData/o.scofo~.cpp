@@ -14,7 +14,7 @@ int luaopen_pd(lua_State *L);
 #endif
 
 // ─────────────────────────────────────
-struct Action {
+struct PdAction {
     double time;
     bool isLua;
     std::string Receiver;
@@ -39,7 +39,7 @@ class PdOpenScofo {
     spdlog::level::level_enum log;
 
     // Actions
-    std::vector<Action> Actions;
+    std::vector<PdAction> Actions;
 
     // Mir
     std::vector<OpenScofo::Descriptors> RequestMIR;
@@ -446,7 +446,7 @@ static void oscofo_pdsend(PdOpenScofo *x, std::string r, int argc, t_atom *argv)
 }
 
 // ─────────────────────────────────────
-static t_atom *oscofo_convertargs(OpenScofo::Action &action) {
+static t_atom *oscofo_convertargs(OpenScofo::ScoreAction &action) {
     int size = action.Args.size();
     t_atom *PdArgs = new t_atom[size];
 
@@ -469,9 +469,9 @@ static void oscofo_tickactions(PdOpenScofo *x) {
     const double nextBlock = 1000.0 / x->Sr * x->BlockSize;
     const double NextTime = clock_getsystimeafter(nextBlock);
 
-    std::vector<Action>::iterator it = x->Actions.begin();
+    std::vector<PdAction>::iterator it = x->Actions.begin();
     while (it != x->Actions.end()) {
-        Action &CurAction = *it;
+        PdAction &CurAction = *it;
         if (CurrentTime <= CurAction.time && CurAction.time <= NextTime) {
             if (CurAction.isLua) {
                 oscofo_luaexecute(x, CurAction.LuaCode);
@@ -511,7 +511,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
     outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
     OpenScofo::EventActions Actions = x->OpenScofo->GetEventActions(x->Event);
 
-    for (OpenScofo::Action &Act : Actions) {
+    for (OpenScofo::ScoreAction &Act : Actions) {
         double time = Act.Time;
         if (!Act.AbsoluteTime) {
             Act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * Act.Time * 1000;
@@ -531,7 +531,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
             int size = Act.Args.size();
             std::string receiver = Act.Receiver;
             t_atom *PdArgs = oscofo_convertargs(Act);
-            Action action = {sysTime, Act.isLua, receiver, Act.Lua, PdArgs, size};
+            PdAction action = {sysTime, Act.isLua, receiver, Act.Lua, PdArgs, size};
             x->Actions.push_back(action);
         }
     }

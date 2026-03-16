@@ -60,7 +60,7 @@ enum EventType {
 enum HMMType { SEMIMARKOV, MARKOV };
 
 // ─────────────────────────────────────
-class Action {
+class ScoreAction {
   public:
     bool isLua;
     std::string Lua;
@@ -70,7 +70,7 @@ class Action {
     double Time;
 };
 
-using EventActions = std::vector<Action>;
+using EventActions = std::vector<ScoreAction>;
 
 // ─────────────────────────────────────
 class AudioState {
