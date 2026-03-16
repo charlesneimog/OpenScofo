@@ -18,12 +18,12 @@ jobs:
         precision: [32]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 1
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
@@ -102,19 +102,19 @@ jobs:
       # Upload artifacts
       # -----------------------
       - name: Upload PureData Object
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
             runner.os }}
           path: ${{env.LIBNAME}}
       - name: Upload Max Object
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: runner.os != 'Linux'
         with:
           name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: max
       - name: Upload Python Object
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
