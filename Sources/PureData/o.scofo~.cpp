@@ -195,12 +195,16 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             outlet_anything(x->DescOut, gensym("harmonicity"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::PERCUSSIVEPROB) {
             std::vector<t_atom> Atoms(1);
-            SETFLOAT(&Atoms[0], (t_float)Desc.ExtendedTechProb);
+            SETFLOAT(&Atoms[0], (t_float)Desc.PercussiveTechProb);
+            outlet_anything(x->DescOut, gensym("perc"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::EXTENDEDPROB) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.NoiseTechProb);
             outlet_anything(x->DescOut, gensym("ext"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::ONSET) {
             if (Desc.Onset) {
                 std::vector<t_atom> Atoms(1);
-                SETSYMBOL(&Atoms[0], gensym("bang"));
+                SETFLOAT(&Atoms[0], Desc.Onset);
                 outlet_anything(x->DescOut, gensym("onset"), 1, Atoms.data());
             }
         } else if (v == OpenScofo::Descriptors::RMS) {
@@ -260,6 +264,8 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
         } else if (strcmp(sym->s_name, "harmonicity") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
         } else if (strcmp(sym->s_name, "ext") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::EXTENDEDPROB);
+        } else if (strcmp(sym->s_name, "perc") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
         } else if (strcmp(sym->s_name, "onset") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::ONSET);

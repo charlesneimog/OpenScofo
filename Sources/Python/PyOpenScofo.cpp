@@ -56,7 +56,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("chroma", &OpenScofo::Description::Chroma)
         .def_readwrite("onset", &OpenScofo::Description::Onset)
         .def_readwrite("silence_prob", &OpenScofo::Description::SilenceProb)
-        .def_readwrite("percussive_prob", &OpenScofo::Description::ExtendedTechProb)
+        .def_readwrite("percussive_prob", &OpenScofo::Description::NoiseTechProb)
 
         .def_readwrite("spectral_magnitude", &OpenScofo::Description::SpectralMagnitudeNorm)
 
@@ -77,10 +77,10 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("pitch", &OpenScofo::Description::Pitch)
         .def_readwrite("pitch_confidence", &OpenScofo::Description::PitchConfidence)
 
+        // Amp
         .def_readwrite("db", &OpenScofo::Description::dB)
         .def_readwrite("rms", &OpenScofo::Description::RMS)
-
-        .def_readwrite("power", &OpenScofo::Description::Magnitude);
+        .def_readwrite("magnitude", &OpenScofo::Description::Magnitude);
 
     // State Class
     py::class_<OpenScofo::MarkovState>(m, "MarkovState")
