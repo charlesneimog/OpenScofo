@@ -37,6 +37,7 @@ enum Descriptors {
     // Percussive
     SILENCEPROB,
     PERCUSSIVEPROB,
+    EXTENDEDPROB,
     ONSET,
 };
 
@@ -125,11 +126,13 @@ using States = std::vector<MarkovState>;
 // ─────────────────────────────────────
 class Description {
   public:
-    bool Onset;
+    double Onset;
 
     // Probability
     double SilenceProb;
-    double ExtendedTechProb;
+    double NoiseTechProb;
+    double PercussiveTechProb;
+    int WindowLastOnset = 0;
 
     // Amplitude
     double dB;

@@ -283,7 +283,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             break;
 
         case PERCUSSIVEPROB:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ExtendedTechProb; });
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.NoiseTechProb; });
             break;
 
         case ONSET:
@@ -339,14 +339,14 @@ void MIR::ONNXExec(Description &Desc) {
     case ONNX_TENSOR_TYPE_FLOAT32: {
         float *data = (float *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.ExtendedTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.PercussiveTechProb;
         }
         break;
     }
     case ONNX_TENSOR_TYPE_FLOAT64: {
         double *data = (double *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.ExtendedTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.PercussiveTechProb;
         }
         break;
     }
@@ -396,29 +396,26 @@ void MIR::OnsetExec(Description &Desc) {
         m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FFTOut[i][1]);
     }
 
-    Desc.Onset = onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
+    (void)onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
+    Desc.Onset = m_ODS->odfvalpost;
 }
 
 // ╭─────────────────────────────────────╮
-// │    Extended Technique Detection     │
+// │        Percussive Technique         │
 // ╰─────────────────────────────────────╯
-void MIR::ExtendedTechExec(Description &Desc) {
-    if (Desc.Onset) {
-        Desc.ExtendedTechProb = 1;
-    } else {
-        Desc.ExtendedTechProb = 0.5;
-    }
+void MIR::PercussiveTechExec(Description &Desc) {
+    Desc.PercussiveTechProb = (1.0f - Desc.Harmonicity);
+    Desc.PercussiveTechProb *= Desc.SpectralFlux;
+    Desc.PercussiveTechProb *= Desc.HighFreqRatio;
+    Desc.PercussiveTechProb *= (1.0f - Desc.Peakiness);
+    Desc.PercussiveTechProb *= (1.0f - Desc.PitchConfidence);
 
-    Desc.ExtendedTechProb *= (1 - Desc.Harmonicity);
-    Desc.ExtendedTechProb *= Desc.SpectralFlux;            // grandes mudanças espectrais
-    Desc.ExtendedTechProb *= Desc.HighFreqRatio;           // mais energia aguda
-    Desc.ExtendedTechProb *= Desc.SpectralIrregularity;    // micro-oscilação espectral
-    Desc.ExtendedTechProb *= (1.0 - Desc.Peakiness);       // evita falsos fortes
-    Desc.ExtendedTechProb *= (1.0 - Desc.PitchConfidence); // evita falsos fortes
+    // Onset
+    Desc.PercussiveTechProb *= m_ODS->odfvalpost;
 
     // Sigmoid curve to push values < 0.5 to 0, and > 0.5 to 1
-    float steepness = 10.0f; // Higher number = sharper jump at 0.5
-    Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
+    float steepness = 5.0f;
+    Desc.PercussiveTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.PercussiveTechProb - 0.5f)));
 }
 
 // ╭─────────────────────────────────────╮
@@ -1212,7 +1209,10 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
     }
     GetSpectralDescriptions(Desc);
 
-    ExtendedTechExec(Desc);
+    // Perc
+    PercussiveTechExec(Desc);
+
+    // ONNX
     ONNXExec(Desc);
 }
 

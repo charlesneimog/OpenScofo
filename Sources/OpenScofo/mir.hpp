@@ -58,7 +58,8 @@ class MIR {
     void OnsetInit();
     void OnsetExec(Description &Desc);
     // Extended Technique
-    void ExtendedTechExec(Description &Desc);
+    void PercussiveTechExec(Description &Desc);
+
     // Spectral Flux
     void SpectralFluxInit();
     void SpectralFluxExec(Description &Desc);
