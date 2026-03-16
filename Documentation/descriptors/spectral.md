@@ -19,9 +19,6 @@ Harmonicity measures how tone-like a sound is: high harmonicity means clear pitc
 
 </div>
 
-
-
-
 ---
 
 ## `Spectral Flatness` 
