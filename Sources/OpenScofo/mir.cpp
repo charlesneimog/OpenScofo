@@ -15,18 +15,18 @@ MIR::MIR(float Sr, float FftSize, float HopSize) {
 
 // ─────────────────────────────────────
 MIR::~MIR() {
-    if (m_FFTPlan != nullptr) {
-        fftw_destroy_plan(m_FFTPlan);
-        m_FFTPlan = nullptr;
+    if (m_FullFFTPlan != nullptr) {
+        fftw_destroy_plan(m_FullFFTPlan);
+        m_FullFFTPlan = nullptr;
     }
 
-    if (m_FFTIn != nullptr) {
-        fftw_free(m_FFTIn);
-        m_FFTIn = nullptr;
+    if (m_FullFFTIn != nullptr) {
+        fftw_free(m_FullFFTIn);
+        m_FullFFTIn = nullptr;
     }
-    if (m_FFTOut != nullptr) {
-        fftw_free(m_FFTOut);
-        m_FFTOut = nullptr;
+    if (m_FullFFTOut != nullptr) {
+        fftw_free(m_FullFFTOut);
+        m_FullFFTOut = nullptr;
     }
 
     if (m_OnsetInit) {
@@ -65,8 +65,8 @@ double MIR::Freq2Bin(double Freq, double n, double sr) {
 // ─────────────────────────────────────
 void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     const bool sameAudioConfig = (m_HopSize == HopSize && m_FFTSize == FftSize && m_Sr == Sr);
-    if (sameAudioConfig && m_FFTPlan != nullptr && m_FFTIn != nullptr && m_FFTOut != nullptr &&
-        m_WindowingFunc.size() == static_cast<size_t>(FftSize)) {
+    if (sameAudioConfig && m_FullFFTPlan != nullptr && m_FullFFTIn != nullptr && m_FullFFTOut != nullptr &&
+        m_FullWindowingFunc.size() == static_cast<size_t>(FftSize)) {
         return;
     }
 
@@ -78,17 +78,17 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     m_Accum = 0;
     m_PrevCentroid = 0.0;
 
-    if (m_FFTPlan != nullptr) {
-        fftw_destroy_plan(m_FFTPlan);
-        m_FFTPlan = nullptr;
+    if (m_FullFFTPlan != nullptr) {
+        fftw_destroy_plan(m_FullFFTPlan);
+        m_FullFFTPlan = nullptr;
     }
-    if (m_FFTIn != nullptr) {
-        fftw_free(m_FFTIn);
-        m_FFTIn = nullptr;
+    if (m_FullFFTIn != nullptr) {
+        fftw_free(m_FullFFTIn);
+        m_FullFFTIn = nullptr;
     }
-    if (m_FFTOut != nullptr) {
-        fftw_free(m_FFTOut);
-        m_FFTOut = nullptr;
+    if (m_FullFFTOut != nullptr) {
+        fftw_free(m_FullFFTOut);
+        m_FullFFTOut = nullptr;
     }
 
     m_PreviousSpectralPower.assign(static_cast<size_t>(round(m_FFTSize / 2)), 0.0);
@@ -114,25 +114,25 @@ void MIR::SetdBTreshold(double dB) {
 // ─────────────────────────────────────
 void MIR::FFTWInit() {
     int WindowHalf = round(m_FFTSize / 2);
-    m_FFTIn = fftw_alloc_real(m_FFTSize);
-    if (!m_FFTIn) {
+    m_FullFFTIn = fftw_alloc_real(m_FFTSize);
+    if (!m_FullFFTIn) {
         spdlog::critical("fftw_alloc_real failed");
         return;
     }
 
-    m_FFTOut = fftw_alloc_complex(WindowHalf + 1);
-    if (!m_FFTOut) {
-        fftw_free(m_FFTIn);
+    m_FullFFTOut = fftw_alloc_complex(WindowHalf + 1);
+    if (!m_FullFFTOut) {
+        fftw_free(m_FullFFTIn);
         spdlog::critical("fftw_alloc_complex failed");
         return;
     }
 
-    m_FFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FFTIn, m_FFTOut, FFTW_PATIENT);
+    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_PATIENT);
 
     // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
-    m_WindowingFunc.resize(m_FFTSize);
+    m_FullWindowingFunc.resize(m_FFTSize);
     for (size_t i = 0; i < m_FFTSize; i++) {
-        m_WindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_FFTSize));
+        m_FullWindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_FFTSize));
     }
 }
 
@@ -227,7 +227,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             });
             break;
 
-        case POWER:
+        case MAGNITUDE:
             m_Writers.push_back([](const Description &desc, float *&out) {
                 for (double v : desc.Magnitude)
                     *out++ = v;
@@ -282,8 +282,8 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SilenceProb; });
             break;
 
-        case PERCUSSIVEPROB:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.NoiseTechProb; });
+        case EXTENDEDPROB:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ExtendedTechProb; });
             break;
 
         case ONSET:
@@ -339,14 +339,14 @@ void MIR::ONNXExec(Description &Desc) {
     case ONNX_TENSOR_TYPE_FLOAT32: {
         float *data = (float *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.PercussiveTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.ExtendedTechProb;
         }
         break;
     }
     case ONNX_TENSOR_TYPE_FLOAT64: {
         double *data = (double *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.PercussiveTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.ExtendedTechProb;
         }
         break;
     }
@@ -392,8 +392,8 @@ void MIR::OnsetExec(Description &Desc) {
     }
 
     for (size_t i = 0; i < nBins; ++i) {
-        m_OnsetFFTFrame[2 * i] = static_cast<float>(m_FFTOut[i][0]);
-        m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FFTOut[i][1]);
+        m_OnsetFFTFrame[2 * i] = static_cast<float>(m_FullFFTOut[i][0]);
+        m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FullFFTOut[i][1]);
     }
 
     (void)onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
@@ -403,19 +403,19 @@ void MIR::OnsetExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │        Percussive Technique         │
 // ╰─────────────────────────────────────╯
-void MIR::PercussiveTechExec(Description &Desc) {
-    Desc.PercussiveTechProb = (1.0f - Desc.Harmonicity);
-    Desc.PercussiveTechProb *= Desc.SpectralFlux;
-    Desc.PercussiveTechProb *= Desc.HighFreqRatio;
-    Desc.PercussiveTechProb *= (1.0f - Desc.Peakiness);
-    Desc.PercussiveTechProb *= (1.0f - Desc.PitchConfidence);
+void MIR::ExtendedTechExec(Description &Desc) {
+    Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
+    Desc.ExtendedTechProb *= Desc.SpectralFlux;
+    Desc.ExtendedTechProb *= Desc.HighFreqRatio;
+    Desc.ExtendedTechProb *= (1.0f - Desc.Peakiness);
+    Desc.ExtendedTechProb *= (1.0f - Desc.PitchConfidence);
 
     // Onset
-    Desc.PercussiveTechProb *= m_ODS->odfvalpost;
+    Desc.ExtendedTechProb *= m_ODS->odfvalpost;
 
     // Sigmoid curve to push values < 0.5 to 0, and > 0.5 to 1
     float steepness = 5.0f;
-    Desc.PercussiveTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.PercussiveTechProb - 0.5f)));
+    Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
 }
 
 // ╭─────────────────────────────────────╮
@@ -632,7 +632,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     const double binWidth = static_cast<double>(m_Sr) / static_cast<double>(m_FFTSize);
     const size_t hfStart = NHalf / 4;
 
-    fftw_execute(m_FFTPlan);
+    fftw_execute(m_FullFFTPlan);
 
     Desc.MaxAmp = 0;
     double SumPower = 0.0;
@@ -657,8 +657,8 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     }
 
     for (size_t i = 0; i < NHalf; ++i) {
-        const double re = m_FFTOut[i][0];
-        const double im = m_FFTOut[i][1];
+        const double re = m_FullFFTOut[i][0];
+        const double im = m_FullFFTOut[i][1];
 
         const double mag = sqrt(re * re + im * im);
         Desc.Magnitude[i] = mag;
@@ -1203,14 +1203,15 @@ void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
 
     // 2. Frequency Domain (windowing + FFT)
     const double *x = In.data();
-    const double *w = m_WindowingFunc.data();
+    const double *w = m_FullWindowingFunc.data();
     for (size_t i = 0; i < m_FFTSize; ++i) {
-        m_FFTIn[i] = x[i] * w[i];
+        m_FullFFTIn[i] = x[i] * w[i];
     }
+
     GetSpectralDescriptions(Desc);
 
     // Perc
-    PercussiveTechExec(Desc);
+    ExtendedTechExec(Desc);
 
     // ONNX
     ONNXExec(Desc);

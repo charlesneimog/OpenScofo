@@ -593,7 +593,7 @@ void MDP::GetAudioObservations(int T) {
     double ObsNoSound = 0;
     double ObsSilence = m_Desc.SilenceProb;
     double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
-    double nonPercussiveWeight = 1.0 - m_Desc.NoiseTechProb;
+    double nonPercussiveWeight = 1.0 - m_Desc.ExtendedTechProb;
     // double PercussiveWeight = m_Desc.ExtendedTechProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
@@ -607,16 +607,17 @@ void MDP::GetAudioObservations(int T) {
         case NOTE:
         case TRILL: {
             for (AudioState &AS : StateJ.AudioStates) {
-                if (AS.Type != PITCH) {
-                    spdlog::error("Memory error on creation of Audio States, please report");
-                }
-                auto it = PitchObs.find(AS.Freq);
-                if (it != PitchObs.end()) {
-                    BestObs = std::max(BestObs, it->second);
-                } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
-                    PitchObs.emplace(AS.Freq, kl);
-                    BestObs = std::max(BestObs, kl);
+                if (AS.Type == PITCH) {
+                    auto it = PitchObs.find(AS.Freq);
+                    if (it != PitchObs.end()) {
+                        BestObs = std::max(BestObs, it->second);
+                    } else {
+                        double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
+                        PitchObs.emplace(AS.Freq, kl);
+                        BestObs = std::max(BestObs, kl);
+                    }
+                } else if (AS.Type == SILENCE) {
+                    BestObs = std::max(BestObs, m_Desc.SilenceProb);
                 }
             }
             ObsNoSound = std::max(ObsNoSound, BestObs);
