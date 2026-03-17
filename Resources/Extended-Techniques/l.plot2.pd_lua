@@ -5,7 +5,7 @@ function lplot:initialize(_, args)
 	self.inlets = 1
 	self.args = args
 
-	self.tick_ms = 35
+	self.tick_ms = 50
 	self.tick_count = 0
 	self.dx_per_tick = 2
 	self.background = { 225, 225, 225 }
@@ -199,5 +199,4 @@ function lplot:in_1_reload()
 	self:dofilex(self._scriptname)
 	self:initialize("l.plot", self.args)
 	self:postinitialize()
-	--self:repaint()
 end
