@@ -148,7 +148,7 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
                 SETFLOAT(&chromaAtoms[i], (t_float)Desc.Chroma[i]);
             }
             outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
-        } else if (v == OpenScofo::Descriptors::POWER) {
+        } else if (v == OpenScofo::Descriptors::MAGNITUDE) {
             size_t mfccSize = Desc.Magnitude.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
             for (size_t i = 0; i < mfccSize; ++i) {
@@ -159,6 +159,10 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             std::vector<t_atom> mfccAtoms(1);
             SETFLOAT(&mfccAtoms[0], (t_float)Desc.Loudness);
             outlet_anything(x->DescOut, gensym("loudness"), 1, mfccAtoms.data());
+        } else if (v == OpenScofo::Descriptors::STDDEV) {
+            std::vector<t_atom> mfccAtoms(1);
+            SETFLOAT(&mfccAtoms[0], (t_float)Desc.StdDev);
+            outlet_anything(x->DescOut, gensym("stddev"), 1, mfccAtoms.data());
         } else if (v == OpenScofo::Descriptors::SILENCEPROB) {
             std::vector<t_atom> Atoms(1);
             SETFLOAT(&Atoms[0], (t_float)Desc.SilenceProb);
@@ -193,13 +197,9 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             std::vector<t_atom> Atoms(1);
             SETFLOAT(&Atoms[0], (t_float)Desc.Harmonicity);
             outlet_anything(x->DescOut, gensym("harmonicity"), 1, Atoms.data());
-        } else if (v == OpenScofo::Descriptors::PERCUSSIVEPROB) {
-            std::vector<t_atom> Atoms(1);
-            SETFLOAT(&Atoms[0], (t_float)Desc.PercussiveTechProb);
-            outlet_anything(x->DescOut, gensym("perc"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::EXTENDEDPROB) {
             std::vector<t_atom> Atoms(1);
-            SETFLOAT(&Atoms[0], (t_float)Desc.NoiseTechProb);
+            SETFLOAT(&Atoms[0], (t_float)Desc.ExtendedTechProb);
             outlet_anything(x->DescOut, gensym("ext"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::ONSET) {
             if (Desc.Onset) {
@@ -243,6 +243,8 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
             Descriptors.push_back(OpenScofo::Descriptors::RMS);
         } else if (strcmp(sym->s_name, "loudness") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::LOUDNESS);
+        } else if (strcmp(sym->s_name, "stddev") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::STDDEV);
         } else if (strcmp(sym->s_name, "chroma") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::CHROMA);
         } else if (strcmp(sym->s_name, "silence") == 0) {
@@ -265,8 +267,6 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
             Descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
         } else if (strcmp(sym->s_name, "ext") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::EXTENDEDPROB);
-        } else if (strcmp(sym->s_name, "perc") == 0) {
-            Descriptors.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
         } else if (strcmp(sym->s_name, "onset") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::ONSET);
         } else if (strcmp(sym->s_name, "yin") == 0) {
@@ -396,6 +396,7 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
             break;
         }
 
+    } else if (method == "mfcc") {
     } else if (method == "section") {
         pd_error(x, "[o.scofo~] Section method not implemented");
     } else if (method == "justdescription") {

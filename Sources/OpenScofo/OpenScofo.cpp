@@ -69,6 +69,7 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
 
     if (NHalf != m_Desc.Magnitude.size()) {
         m_Desc.Magnitude.resize(NHalf);
+        m_Desc.Power.resize(NHalf);
         m_Desc.SpectralMagnitudeNorm.resize(NHalf);
         m_Desc.SpectralMagnitudeFrameNorm.resize(NHalf);
         m_Desc.ReverbSpectralPower.resize(NHalf);

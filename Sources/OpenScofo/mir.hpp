@@ -47,6 +47,10 @@ class MIR {
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
     double PositiveRemainder(double value, double modulus) const;
     void GetSpectralDescriptions(Description &Desc);
+
+    // Timbre Detection
+    void GetHopDescription(std::vector<double> &In, Description &Desc);
+
     // MFCC
     void MFCCInit();
     void MFCCExec(Description &Desc);
@@ -58,7 +62,7 @@ class MIR {
     void OnsetInit();
     void OnsetExec(Description &Desc);
     // Extended Technique
-    void PercussiveTechExec(Description &Desc);
+    void ExtendedTechExec(Description &Desc);
 
     // Spectral Flux
     void SpectralFluxInit();
@@ -90,11 +94,16 @@ class MIR {
 
   private:
     // FFT
-    double *m_FFTIn = nullptr;
-    fftw_complex *m_FFTOut = nullptr;
-    fftw_plan m_FFTPlan = nullptr;
-    std::vector<std::pair<int, int>> m_FakeCQT;
-    std::vector<double> m_WindowingFunc;
+    double *m_FullFFTIn = nullptr;
+    fftw_complex *m_FullFFTOut = nullptr;
+    fftw_plan m_FullFFTPlan = nullptr;
+    std::vector<double> m_FullWindowingFunc;
+
+    double *m_HopFFTIn = nullptr;
+    fftw_complex *m_HopFFTOut = nullptr;
+    fftw_plan m_HopFFTPlan = nullptr;
+    std::vector<double> m_HopWindowingFunc;
+
     double m_PrevPercussiveProb;
     double m_PrevRMS;
     double m_PeakFlux;

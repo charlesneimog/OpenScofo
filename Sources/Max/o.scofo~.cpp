@@ -145,7 +145,7 @@ static void oscofo_output_descriptiors(MaxOpenScofo *x, OpenScofo::Description &
                 atom_setfloat(&chromaAtoms[i], (float)Desc.Chroma[i]);
             }
             outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
-        } else if (v == OpenScofo::Descriptors::POWER) {
+        } else if (v == OpenScofo::Descriptors::MAGNITUDE) {
             size_t powerSize = Desc.Magnitude.size();
             std::vector<t_atom> powerAtoms(powerSize);
             for (size_t i = 0; i < powerSize; ++i) {
@@ -189,13 +189,9 @@ static void oscofo_output_descriptiors(MaxOpenScofo *x, OpenScofo::Description &
             std::vector<t_atom> atoms(1);
             atom_setfloat(&atoms[0], (float)Desc.Harmonicity);
             outlet_anything(x->DescOut, gensym("harmonicity"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::PERCUSSIVEPROB) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.PercussiveTechProb);
-            outlet_anything(x->DescOut, gensym("perc"), 1, atoms.data());
         } else if (v == OpenScofo::Descriptors::EXTENDEDPROB) {
             std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.NoiseTechProb);
+            atom_setfloat(&atoms[0], (float)Desc.ExtendedTechProb);
             outlet_anything(x->DescOut, gensym("ext"), 1, atoms.data());
         } else if (v == OpenScofo::Descriptors::ONSET) {
             if (Desc.Onset) {

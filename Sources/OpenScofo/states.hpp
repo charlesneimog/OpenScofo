@@ -16,10 +16,16 @@ enum AudioDescType {
 
 // ─────────────────────────────────────
 enum Descriptors {
-    MFCC,
+    ONSET,
+
+    // Amplitude
     LOUDNESS,
     RMS,
-    POWER,
+    STDDEV,
+    MAGNITUDE,
+    SILENCEPROB,
+
+    MFCC,
     CHROMA,
     ZCR,
     HFR,
@@ -31,14 +37,11 @@ enum Descriptors {
     HARMONICITY,
     YIN,
 
+    // Percussive
+    EXTENDEDPROB,
+
     // AI
     ONNX,
-
-    // Percussive
-    SILENCEPROB,
-    PERCUSSIVEPROB,
-    EXTENDEDPROB,
-    ONSET,
 };
 
 // ─────────────────────────────────────
@@ -130,8 +133,7 @@ class Description {
 
     // Probability
     double SilenceProb;
-    double NoiseTechProb;
-    double PercussiveTechProb;
+    double ExtendedTechProb;
     int WindowLastOnset = 0;
 
     // Amplitude
@@ -155,6 +157,7 @@ class Description {
     double StdDev;
     double Pitch = 0.0;
     double PitchConfidence = 0.0;
+    std::vector<double> Power;
     std::vector<double> Magnitude;
     std::vector<double> SpectralMagnitudeNorm;
     std::vector<double> SpectralMagnitudeFrameNorm;
@@ -163,7 +166,7 @@ class Description {
     std::vector<double> ReverbSpectralPower;
 
     std::vector<double> MFCC;
-    std::vector<double> Chroma; // size 12
+    std::vector<double> Chroma;
 
     // ONNX
     std::unordered_map<std::string, float> ONNX;
