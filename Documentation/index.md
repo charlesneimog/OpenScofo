@@ -20,7 +20,8 @@ hide:
 
 ---
 
-!!! warning "This docs are being prepared and tested for new release"
+!!! warning "These documents are currently under preparation and testing for the upcoming release."
+
 
 `OpenScofo` is an open-source score-following system specifically designed for contemporary music. Its development builds upon the research conducted by Arshia Cont and the `Antescofo` team at IRCAM. Current efforts in the development of `OpenScofo` focus on extending its capabilities to accommodate extended instrumental techniques. It should be noted that the software remains in an alpha stage of development.
 
