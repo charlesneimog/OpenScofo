@@ -100,7 +100,7 @@ def run_test_centroid(window, label):
         center=False,
     )[0, 0]
 
-    s_centroid = scofo_desc.spectral_centroid
+    s_centroid = scofo_desc.centroid
     diff = abs(l_centroid - s_centroid)
 
     update_max("CENT", diff)
@@ -126,7 +126,7 @@ def run_test_spread(window, label):
         p=2,
     )[0, 0]
 
-    s_spread = scofo_desc.spectral_spread
+    s_spread = scofo_desc.spread
     diff = abs(l_spread - s_spread)
 
     update_max("SPRE", diff)
@@ -150,7 +150,7 @@ def run_test_flatness(window, label):
         power=2.0,
     )[0, 0]
 
-    s_flatness = scofo_desc.spectral_flatness
+    s_flatness = scofo_desc.flatness
     diff = abs(l_flatness - s_flatness)
 
     update_max("FLAT", diff)
@@ -242,7 +242,7 @@ flux_alg = es.Flux()
 def run_test_flux(prev_window, window, label):
 
     scofo_desc = scofo.get_audio_description(window)
-    s_flux = scofo_desc.spectral_flux
+    s_flux = scofo_desc.flux
 
     prev_spec = spectrum(prev_window)
     curr_spec = spectrum(window)
@@ -282,7 +282,7 @@ def run_test_zcr(window, label):
         zero_pos=True,
     )[0, 0]
 
-    s_zcr = scofo_desc.zero_crossing_rate
+    s_zcr = scofo_desc.zcr
     diff = abs(l_zcr - s_zcr)
 
     update_max("ZCR", diff)
@@ -303,13 +303,13 @@ for _ in range(n_tests):
     prev_window = y[start - n_fft : start]
     window = y[start : start + n_fft]
 
-    # run_test_mfcc(window, f"Start {start:08d}")
-    # run_test_flatness(window, f"Start {start:08d}")
-    # run_test_rms(window, f"Start {start:08d}")
-    # run_test_zcr(window, f"Start {start:08d}")
-    # run_test_spread(window, f"Start {start:08d}")
-    # run_test_centroid(window, f"Start {start:08d}")
-    # run_test_chroma(window, f"Start {start:08d}")
+    run_test_mfcc(window, f"Start {start:08d}")
+    run_test_flatness(window, f"Start {start:08d}")
+    run_test_rms(window, f"Start {start:08d}")
+    run_test_zcr(window, f"Start {start:08d}")
+    run_test_spread(window, f"Start {start:08d}")
+    run_test_centroid(window, f"Start {start:08d}")
+    run_test_chroma(window, f"Start {start:08d}")
     run_test_flux(prev_window, window, f"Start {start:08d}")
     print("")
 
@@ -317,5 +317,10 @@ for _ in range(n_tests):
 # ---------------- PRINT MAX DIFFERENCE ----------------
 print("========== MAX DIFFERENCES (worst-case precision) ==========")
 for desc, diff in max_diffs.items():
+    if diff > 0.01:
+        print(diff)
+        raise Exception("Difference between librosa/essentia and OScofo is too right")
+
     _, order_str = format_diff(diff)
+
     print(f"{desc}: {diff:.5e} | Order: {order_str}")
