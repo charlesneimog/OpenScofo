@@ -148,6 +148,13 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
                 SETFLOAT(&chromaAtoms[i], (t_float)Desc.Chroma[i]);
             }
             outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
+        } else if (v == OpenScofo::Descriptors::MELOGRAM) {
+            size_t size = Desc.LogMelSpectrum.size();
+            std::vector<t_atom> atoms(size);
+            for (size_t i = 0; i < size; ++i) {
+                SETFLOAT(&atoms[i], (t_float)Desc.LogMelSpectrum[i]);
+            }
+            outlet_anything(x->DescOut, gensym("logmelspectrum"), size, atoms.data());
         } else if (v == OpenScofo::Descriptors::MAGNITUDE) {
             size_t mfccSize = Desc.Magnitude.size();
             std::vector<t_atom> mfccAtoms(mfccSize);
@@ -173,12 +180,24 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
             outlet_anything(x->DescOut, gensym("centroid"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::SPREAD) {
             std::vector<t_atom> Atoms(1);
-            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralSpread);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralSpreadHz);
             outlet_anything(x->DescOut, gensym("spread"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::FLATNESS) {
             std::vector<t_atom> Atoms(1);
             SETFLOAT(&Atoms[0], (t_float)Desc.SpectralFlatness);
             outlet_anything(x->DescOut, gensym("flatness"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::SKEWNESS) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralSkewness);
+            outlet_anything(x->DescOut, gensym("skewness"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::SLOPE) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralSlope);
+            outlet_anything(x->DescOut, gensym("slope"), 1, Atoms.data());
+        } else if (v == OpenScofo::Descriptors::KURTOSIS) {
+            std::vector<t_atom> Atoms(1);
+            SETFLOAT(&Atoms[0], (t_float)Desc.SpectralKurtosis);
+            outlet_anything(x->DescOut, gensym("kurtosis"), 1, Atoms.data());
         } else if (v == OpenScofo::Descriptors::FLUX) {
             std::vector<t_atom> Atoms(1);
             SETFLOAT(&Atoms[0], (t_float)Desc.SpectralFlux);
@@ -228,6 +247,8 @@ static void oscofo_output_descriptiors(PdOpenScofo *x, OpenScofo::Description &D
                 SETFLOAT(&onnxAtoms[1], ONNXDesc.second);
                 outlet_anything(x->DescOut, gensym("onnx"), 2, onnxAtoms.data());
             }
+        } else {
+            pd_error(x, "[o.scofo~] Descriptors output '%d' not implemented", v);
         }
     }
 }
@@ -239,6 +260,8 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
         t_symbol *sym = atom_getsymbol(argv + i);
         if (strcmp(sym->s_name, "mfcc") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::MFCC);
+        } else if (strcmp(sym->s_name, "logmelspectrum") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::MELOGRAM);
         } else if (strcmp(sym->s_name, "rms") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::RMS);
         } else if (strcmp(sym->s_name, "loudness") == 0) {
@@ -261,10 +284,12 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
             Descriptors.push_back(OpenScofo::Descriptors::FLATNESS);
         } else if (strcmp(sym->s_name, "flux") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::FLUX);
-        } else if (strcmp(sym->s_name, "irregularity") == 0) {
-            Descriptors.push_back(OpenScofo::Descriptors::IRREGULARITY);
-        } else if (strcmp(sym->s_name, "harmonicity") == 0) {
-            Descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
+        } else if (strcmp(sym->s_name, "skewness") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::SKEWNESS);
+        } else if (strcmp(sym->s_name, "slope") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::SLOPE);
+        } else if (strcmp(sym->s_name, "kurtosis") == 0) {
+            Descriptors.push_back(OpenScofo::Descriptors::KURTOSIS);
         } else if (strcmp(sym->s_name, "ext") == 0) {
             Descriptors.push_back(OpenScofo::Descriptors::EXTENDEDPROB);
         } else if (strcmp(sym->s_name, "onset") == 0) {
@@ -369,7 +394,6 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         x->Event = f;
         x->OpenScofo->SetCurrentEvent(f);
     } else if (method == "onnxmodel") {
-        const char *Path = atom_getsymbol(argv + 1)->s_name;
         std::vector<OpenScofo::Descriptors> Desc = oscofo_get_descriptors(x, 2, argc, argv);
 
         if (Desc.size() == 0) {
@@ -377,7 +401,12 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
             return;
         }
 
-        x->OpenScofo->LoadONNXModel(Path, Desc);
+        char dirbuf[MAXPDSTRING], *nameptr;
+        char fullpath[MAXPDSTRING];
+        int fd = canvas_open(x->Canvas, atom_getsymbol(argv + 1)->s_name, "", dirbuf, &nameptr, MAXPDSTRING, 1);
+        sys_close(fd);
+        snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
+        x->OpenScofo->LoadONNXModel(fullpath, Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
         switch (f) {
