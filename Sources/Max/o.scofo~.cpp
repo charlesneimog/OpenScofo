@@ -166,7 +166,7 @@ static void oscofo_output_descriptiors(MaxOpenScofo *x, OpenScofo::Description &
             outlet_anything(x->DescOut, gensym("centroid"), 1, atoms.data());
         } else if (v == OpenScofo::Descriptors::SPREAD) {
             std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralSpread);
+            atom_setfloat(&atoms[0], (float)Desc.SpectralSpreadHz);
             outlet_anything(x->DescOut, gensym("spread"), 1, atoms.data());
         } else if (v == OpenScofo::Descriptors::FLATNESS) {
             std::vector<t_atom> atoms(1);
