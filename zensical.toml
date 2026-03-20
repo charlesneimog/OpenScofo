@@ -29,10 +29,16 @@ nav = [
 ]
 
 extra_javascript = [
-  { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
   { path = "javascript/vexflow.mjs" },
+  { path = "javascripts/mathjax.js" },
+  { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
+
+
 ]
-extra_css = ["stylesheets/extra.css"]
+extra_css = [
+  "stylesheets/extra.css",
+  "https://unpkg.com/katex@0/dist/katex.min.css",
+]
 
 [project.theme]
 custom_dir = "Documentation/overrides"
