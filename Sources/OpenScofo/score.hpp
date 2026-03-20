@@ -22,7 +22,7 @@ class Score {
         m_HopSize = HopSize;
     }
 
-        void UpdateAudioParameters(float FftSize, float HopSize);
+    void UpdateAudioParameters(float FftSize, float HopSize);
 
     States Parse(std::string ScoreFile);
     void SetTunning(double Tunning);
@@ -48,10 +48,9 @@ class Score {
         return m_TimbreModel;
     }
 
-    std::vector<Descriptors> GetTimbreModelDescriptors(){
+    std::vector<Descriptors> GetTimbreModelDescriptors() {
         return m_ONNXDescriptors;
     }
-
 
   private:
     States m_ScoreStates;
@@ -86,15 +85,12 @@ class Score {
     MarkovState NewRestEvent(const std::string &Score, TSNode Node);
     MarkovState NewPitchEvent(const std::string &Score, TSNode Node);
     MarkovState NewMultiPitchEvent(const std::string &Score, TSNode Node);
+    MarkovState NewPTechEvent(const std::string &ScoreStr, TSNode Node);
+    MarkovState NewUTechEvent(const std::string &ScoreStr, TSNode Node);
 
     // Add events
     MarkovState GetFirstEvent();
-    MarkovState AddNote(std::vector<std::string> Tokens);
-    MarkovState AddChord(std::vector<std::string> Tokens);
-    MarkovState AddTrill(std::vector<std::string> Tokens);
-    MarkovState AddMulti(std::vector<std::string> Tokens);
     MarkovState AddDumpSilence();
-    MarkovState AddRest(std::vector<std::string> Tokens);
     void AddAction(std::vector<std::string> Tokens);
 
     // Configurations

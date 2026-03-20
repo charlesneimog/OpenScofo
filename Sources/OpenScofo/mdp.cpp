@@ -594,7 +594,6 @@ void MDP::GetAudioObservations(int T) {
     double ObsSilence = m_Desc.SilenceProb;
     double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
     double nonPercussiveWeight = 1.0 - m_Desc.ExtendedTechProb;
-    // double PercussiveWeight = m_Desc.ExtendedTechProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
@@ -642,13 +641,25 @@ void MDP::GetAudioObservations(int T) {
             ObsNoSound = std::max(ObsNoSound, BestObs);
             break;
         }
-        case REST: {
-            BestObs = std::max(BestObs, m_Desc.SilenceProb);
+        case PTECH: {
+            for (AudioState &AS : StateJ.AudioStates) {
+                double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
+                double tech = m_Desc.ONNX[AS.Label] * m_Desc.ExtendedTechProb * nonSilenceWeight;
+                PitchObs.emplace(AS.Freq, kl);
+                BestObs = std::max(kl * tech, BestObs);
+            }
             break;
         }
-        case EXTENDED: {
+
+        case UTECH: {
+            for (AudioState &AS : StateJ.AudioStates) {
+                double tech = m_Desc.ONNX[AS.Label] * m_Desc.ExtendedTechProb * nonSilenceWeight;
+                BestObs = std::max(tech, BestObs);
+            }
+            break;
+        }
+        case REST: {
             BestObs = std::max(BestObs, m_Desc.SilenceProb);
-            spdlog::error("Observation not implemented yet");
             break;
         }
 

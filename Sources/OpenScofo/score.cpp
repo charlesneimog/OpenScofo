@@ -383,6 +383,71 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
 }
 
 // ─────────────────────────────────────
+MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    MarkovState Event;
+    Event.Line = ts_node_start_point(Node).row + 1;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
+
+    if (ts_node_has_error(Node)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Pitch event with syntax error on line {}", Init.row + 1);
+        return {};
+    }
+
+    TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
+
+    Event.Type = PTECH;
+
+    // Pitch
+    AudioState SubState;
+    PitchNode2Freq(ScoreStr, PitchNode, SubState);
+    SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+    Event.AudioStates.push_back(SubState);
+
+    // Duration
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+    double Duration = GetDurationFromNode(ScoreStr, DurationNode);
+    Event.Duration = Duration;
+
+    ProcessEventTime(Event);
+    return Event;
+}
+
+// ─────────────────────────────────────
+MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    MarkovState Event;
+    Event.Line = ts_node_start_point(Node).row + 1;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
+
+    if (ts_node_has_error(Node)) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("Pitch event with syntax error on line {}", Init.row + 1);
+        return {};
+    }
+
+    Event.Type = UTECH;
+    AudioState SubState;
+    SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+    Event.AudioStates.push_back(SubState);
+
+    // Duration
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+    double Duration = GetDurationFromNode(ScoreStr, DurationNode);
+    Event.Duration = Duration;
+
+    ProcessEventTime(Event);
+    return Event;
+}
+
+// ─────────────────────────────────────
 MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     // m_ScorePosition++;
     // Note that Rest do not count for the score position, as they are not considered in the evaluation
@@ -491,6 +556,10 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
         Event = NewPitchEvent(ScoreStr, definition);
     } else if (defType == "chord_event" || defType == "trill_event") {
         Event = NewMultiPitchEvent(ScoreStr, definition);
+    } else if (defType == "ptech_event") {
+        Event = NewPTechEvent(ScoreStr, definition);
+    } else if (defType == "utech_event") {
+        Event = NewUTechEvent(ScoreStr, definition);
     } else if (defType == "rest_event") {
         Event = NewRestEvent(ScoreStr, definition);
     } else {

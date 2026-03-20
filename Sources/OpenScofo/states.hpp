@@ -25,16 +25,25 @@ enum Descriptors {
     MAGNITUDE,
     SILENCEPROB,
 
+    // Spectral Arrays
     MFCC,
     CHROMA,
+    MELOGRAM,
+
+    // Spectral
     ZCR,
     HFR,
     CENTROID,
     SPREAD,
     FLATNESS,
     FLUX,
+    SKEWNESS,
+    SLOPE,
+    KURTOSIS,
     IRREGULARITY,
     HARMONICITY,
+
+    // Pitch
     YIN,
 
     // Percussive
@@ -52,9 +61,8 @@ enum EventType {
     CHORD,
     TRILL,
     MULTI,
-
-    //  AI model
-    EXTENDED,
+    PTECH,
+    UTECH,
 
     // Cort Lippe event (event is just count)
     EVENT,
@@ -150,19 +158,23 @@ class Description {
     double SpectralCrest = 0.0;
     double SpectralCentroid = 0.0;
     double CentroidVelocity = 0.0;
-    double SpectralSpread = 0.0;
+    double SpectralSpreadHz = 0.0;
+    double SpectralSpreadVariance = 0.0;
+    double SpectralSkewness = 0.0;
+    double SpectralSlope = 0.0;
+    double SpectralKurtosis = 0.0;
     double HighFreqRatio = 0.0;
-    double Peakiness = 0.0;
     double ZeroCrossingRate;
     double StdDev;
     double Pitch = 0.0;
     double PitchConfidence = 0.0;
+
     std::vector<double> Power;
     std::vector<double> Magnitude;
     std::vector<double> SpectralMagnitudeNorm;
     std::vector<double> SpectralMagnitudeFrameNorm;
 
-    std::vector<double> Melogram;
+    std::vector<double> LogMelSpectrum;
     std::vector<double> ReverbSpectralPower;
 
     std::vector<double> MFCC;

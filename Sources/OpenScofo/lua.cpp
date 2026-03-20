@@ -42,7 +42,7 @@ static void PushAudioState(lua_State *L, const AudioState &state) {
 
 // // ─────────────────────────────────────
 static void PushDescription(lua_State *L, const Description &desc) {
-    lua_createtable(L, 0, 21);
+    lua_createtable(L, 0, 20);
 
     lua_pushboolean(L, desc.Onset);
     lua_setfield(L, -2, "onset");
@@ -72,12 +72,10 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "spectral_centroid");
     lua_pushnumber(L, desc.CentroidVelocity);
     lua_setfield(L, -2, "centroid_velocity");
-    lua_pushnumber(L, desc.SpectralSpread);
-    lua_setfield(L, -2, "spectral_spread");
+    lua_pushnumber(L, desc.SpectralSpreadHz);
+    lua_setfield(L, -2, "spectral_spread_hz");
     lua_pushnumber(L, desc.HighFreqRatio);
     lua_setfield(L, -2, "high_freq_ratio");
-    lua_pushnumber(L, desc.Peakiness);
-    lua_setfield(L, -2, "peakiness");
 
     PushNumberVector(L, desc.SpectralMagnitudeNorm);
     lua_setfield(L, -2, "spectral_magnitude");
