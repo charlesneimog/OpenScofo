@@ -8,7 +8,6 @@ function lplot:initialize(_, args)
 	self.tick_ms = 50
 	self.tick_count = 0
 	self.dx_per_tick = 2
-	self.background = { 225, 225, 225 }
 
 	if #args == 2 then
 		self.width = args[1]
@@ -18,12 +17,23 @@ function lplot:initialize(_, args)
 		self.height = 200
 	end
 
-	self.draws = {}
-	self.color = { 255, 0, 0 }
 	self.background = { 245, 245, 245 }
 	self:set_size(self.width, self.height)
 
 	self.draws = {}
+
+	-- color system
+	self.color_index = 0
+	self.BASE_COUNT = 6
+	self.base_colors = {}
+	self.current_max_category_name = ""
+	self.current_max_category_value = 0
+
+	for i = 0, self.BASE_COUNT - 1 do
+		local hue = (i / self.BASE_COUNT) * 360
+		local val = (i % 2 == 0) and 0.9 or 0.7
+		self.base_colors[i + 1] = self:hsv_to_rgb(hue, 0.8, val)
+	end
 
 	return true
 end
@@ -42,6 +52,40 @@ function lplot:tick()
 		self.clock:delay(self.tick_ms)
 	end
 end
+
+-- ─────────────────────────────────────
+function lplot:properties(p)
+	local i = 0
+	p:new_frame("Colors", #self.draws)
+
+	for k, v in pairs(self.draws) do
+		local method = "update_color_" .. i
+		self[method] = function(obj, color)
+			obj.draws[k].color = color[1]
+		end
+		p:add_color(k, method, v.color)
+		i = i + 1
+	end
+end
+
+-- ─────────────────────────────────────
+function lplot:get_next_color()
+	self.color_index = self.color_index + 1
+
+	if self.color_index <= self.BASE_COUNT then
+		return self.base_colors[self.color_index]
+	end
+
+	-- generate near color
+	local base_idx = ((self.color_index - 1) % self.BASE_COUNT) + 1
+	local base_hue = ((base_idx - 1) / self.BASE_COUNT) * 360
+
+	local sat = 0.6 + 0.3 * math.random()
+	local val = 0.7 + 0.25 * math.random()
+
+	return self:hsv_to_rgb(base_hue, sat, val)
+end
+
 -- ─────────────────────────────────────
 function lplot:in_1(sel, args)
 	if #args > 1 then
@@ -49,14 +93,21 @@ function lplot:in_1(sel, args)
 		return
 	end
 
-	local val = tonumber(args[1]) or 0
+	local raw = args[1]
+	local isbang = raw == "bang"
+
+	if raw > self.current_max_category_value then
+		self.current_max_category_name = sel
+		self.current_max_category_value = raw
+	end
+
+	local val = tonumber(raw) or 0
 	val = math.max(0, math.min(1, val))
-	local isbang = val == "bang"
 
 	-- Ensure selector exists
 	if not self.draws[sel] then
 		self.draws[sel] = {
-			color = { math.random(0, 255), math.random(0, 255), math.random(0, 255) },
+			color = self:get_next_color(),
 			points = {},
 			count_since_last_draw = 0,
 		}
@@ -65,7 +116,6 @@ function lplot:in_1(sel, args)
 	local draw = self.draws[sel]
 
 	if isbang then
-		-- Determine the maximum length among all other draws
 		local max_len = 0
 		for _, d in pairs(self.draws) do
 			if #d.points > max_len then
@@ -73,28 +123,22 @@ function lplot:in_1(sel, args)
 			end
 		end
 
-		-- Fill missing points with 0 so the bang will appear at the end
 		while #draw.points < max_len do
 			table.insert(draw.points, 0)
 		end
 
-		-- Append 1 for the bang
 		table.insert(draw.points, 1)
 	else
-		-- Number input: append value normally
-		local numval = tonumber(val) or 0
-		table.insert(draw.points, numval)
+		table.insert(draw.points, val)
 	end
 
 	draw.count_since_last_draw = draw.count_since_last_draw + 1
 
-	-- Discard oldest if exceeding max points
 	local max_points = math.floor(self.width / self.dx_per_tick)
 	if #draw.points > max_points then
 		table.remove(draw.points, 1)
 	end
 
-	-- Align all arrays to the same length
 	local max_len = 0
 	for _, d in pairs(self.draws) do
 		if #d.points > max_len then
@@ -111,11 +155,12 @@ function lplot:in_1(sel, args)
 end
 
 -- ─────────────────────────────────────
-local function hsv_to_rgb(h, s, v)
+function lplot:hsv_to_rgb(h, s, v)
 	local c = v * s
 	local x = c * (1 - math.abs((h / 60) % 2 - 1))
 	local m = v - c
 	local r, g, b
+
 	if h < 60 then
 		r, g, b = c, x, 0
 	elseif h < 120 then
@@ -129,19 +174,12 @@ local function hsv_to_rgb(h, s, v)
 	else
 		r, g, b = c, 0, x
 	end
-	return { math.floor((r + m) * 255), math.floor((g + m) * 255), math.floor((b + m) * 255) }
-end
 
--- ─────────────────────────────────────
-function lplot:string_to_color(sel)
-	local hash = 0
-	for i = 1, #sel do
-		hash = (hash * 31 + sel:byte(i)) % 360 -- keep hash in 0..359
-	end
-	local hue = hash
-	local sat = 0.8 -- fixed saturation
-	local val = 0.9 -- fixed brightness
-	return hsv_to_rgb(hue, sat, val)
+	return {
+		math.floor((r + m) * 255),
+		math.floor((g + m) * 255),
+		math.floor((b + m) * 255),
+	}
 end
 
 -- ─────────────────────────────────────
@@ -150,20 +188,25 @@ function lplot:paint(g)
 	g:fill_all()
 
 	local margin = 5
-	local line_height = 8 -- adjust font size/spacing as needed
+	local line_height = 8
 	local y_text = margin
+
+	local w, h = self:get_size()
 
 	for sel, draw in pairs(self.draws) do
 		local col = draw.color
 		g:set_color(table.unpack(col))
 
-		local name = sel:sub(1, 8) -- truncate if longer
-		name = name .. string.rep(" ", 8 - #name) -- pad if shorter
-		local text_x = margin
-		g:draw_text(name, text_x, y_text, 200, 3) -- width nil, fontsize 10
+		local name = sel:sub(1, 8)
+		name = name .. string.rep(" ", 8 - #name)
+		g:draw_text(name, margin, y_text, 200, 3)
 		y_text = y_text + line_height
 
-		-- Fill missing value if nothing added
+		if sel == self.current_max_category_name then
+			g:draw_text(name, w - (9 * margin), margin, 200, 8)
+			self.current_max_category_value = 0
+		end
+
 		if draw.count_since_last_draw == 0 then
 			table.insert(draw.points, 0)
 		end

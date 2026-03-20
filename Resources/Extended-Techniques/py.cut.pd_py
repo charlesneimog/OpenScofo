@@ -1,0 +1,75 @@
+import sys
+
+sys.path.append("/home/neimog/Documents/Git/OpenScofo/build/Sources/Python/")
+sys.path.append("/home/neimog/Documents/Git/OpenScofo/Sources/Python/")
+
+import OpenScofo
+
+import os
+import numpy as np
+import soundfile as sf
+
+import puredata as pd
+
+
+class pycut(pd.NewObject):
+    name = "py.cut"
+
+    def __init__(self, args):
+        self.inlets = 1
+        self.outlets = 0
+        self.sr = pd.get_sample_rate()
+        self.fftsize = 2048
+        self.hopsize = 512
+        self.db = -60
+        self.oscofo = OpenScofo.OpenScofo(self.sr, self.fftsize, self.hopsize)
+
+    def in_0_cut(self, args):
+        array = args[0]
+        tag = args[1]
+        path = os.path.join(self.get_current_dir(), tag)
+        os.makedirs(path, exist_ok=True)
+
+        samples = np.array(self.tabread(array))
+        segments = []  # store tuples of (start_idx, end_idx)
+        begin = None
+
+        for i in range(0, len(samples) - self.fftsize + 1, self.hopsize):
+            window = samples[i : i + self.fftsize]
+            desc = self.oscofo.get_audio_description(window)
+
+            if desc.db > self.db:
+                if begin is None:
+                    begin = i  # mark segment start
+
+            elif desc.db < self.db and begin is not None:
+                # segment ends at current window
+                end = i + self.fftsize
+                segments.append((begin, end))
+                begin = None
+
+        # handle case where signal ends above threshold
+        if begin is not None:
+            segments.append((begin, len(samples)))
+
+        extra_ms = 250  # max extra duration in ms
+        extra_samples = int((extra_ms / 1000) * self.sr)  # convert ms to samples
+        fade_len = 64
+
+        for idx, (start, end) in enumerate(segments):
+            end_extended = min(end + extra_samples, len(samples))
+            chunk = samples[start:end_extended]  # convert to NumPy array if needed
+
+            n = len(chunk)
+            actual_fade = min(fade_len, n // 2)
+            fade_in = np.linspace(0, 1, actual_fade)
+            fade_out = np.linspace(1, 0, actual_fade)
+            chunk[:actual_fade] *= fade_in
+            chunk[-actual_fade:] *= fade_out
+
+            filename = os.path.join(path, f"{tag}_{idx:04d}.wav")
+            sf.write(filename, chunk, samplerate=self.sr)
+            self.last_segments = segments
+
+    def in_0_reload(self, _):
+        self.reload()
