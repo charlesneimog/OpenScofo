@@ -58,7 +58,8 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
     (rest_event) @eventKeyword
     (chord_event) @eventKeyword
     (trill_event) @eventKeyword
-    (tech_event) @eventKeyword
+    (ptech_event) @eventKeyword
+    (utech_event) @eventKeyword
 
     ; Config
     (config_key) @config
@@ -71,8 +72,14 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
     (rest_event duration: (number) @duration)
     (chord_event duration: (number) @duration)
     (trill_event duration: (number) @duration)
-    (tech_event duration: (number) @duration)
-    (tech_event technique: (identifier) @techniqueId)
+
+    (ptech_event duration: (number) @duration)
+    (ptech_event duration: (number) @duration)
+    (ptech_event technique: (identifier) @techniqueId)
+
+    (utech_event duration: (number) @duration)
+    (utech_event duration: (number) @duration)
+    (utech_event technique: (identifier) @techniqueId)
     (attribute) @attributeId
 
     ; Actions
