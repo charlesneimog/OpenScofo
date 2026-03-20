@@ -85,7 +85,15 @@ module.exports = grammar({
             seq(
                 field(
                     "definition",
-                    choice($.note_event, $.rest_event, $.chord_event, $.trill_event, $.tech_event, $.lua_event),
+                    choice(
+                        $.note_event,
+                        $.rest_event,
+                        $.chord_event,
+                        $.trill_event,
+                        $.ptech_event,
+                        $.utech_event,
+                        $.lua_event,
+                    ),
                 ),
                 repeat(field("action", $.action)),
             ),
@@ -101,13 +109,22 @@ module.exports = grammar({
         rest_event: ($) => seq("REST", field("duration", $.number)),
         chord_event: ($) => seq("CHORD", field("pitches", $.pitch_group), field("duration", $.number)),
         trill_event: ($) => seq("TRILL", field("pitches", $.pitch_group), field("duration", $.number)),
-        tech_event: ($) =>
+        ptech_event: ($) =>
             seq(
-                "TECH",
+                "PTECH",
                 field("technique", $.identifier),
-                optional(field("pitch", $.pitch)),
+                field("pitch", $.pitch),
                 field("duration", $.number),
+                //
             ),
+        utech_event: ($) =>
+            seq(
+                "UTECH",
+                field("technique", $.identifier),
+                field("duration", $.number),
+                //
+            ),
+
         lua_event: ($) => seq("LUAEVENT", field("luacall", $.lua_call, field("duration", $.number))),
 
         // TODO: Add events attribute
