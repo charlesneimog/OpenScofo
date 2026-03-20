@@ -48,16 +48,10 @@ class MIR {
     double PositiveRemainder(double value, double modulus) const;
     void GetSpectralDescriptions(Description &Desc);
 
-    // Timbre Detection
-    void GetHopDescription(std::vector<double> &In, Description &Desc);
-
     // MFCC
     void MFCCInit();
     void MFCCExec(Description &Desc);
-    // Time coherence
-    void BuildSingleEventPdf(MarkovState &ev, double dt);
 
-    const std::vector<float> &GetTimeCoherenceGaussianKernel(double sigmaSeconds, double dt, int templateMax) const;
     // Onset
     void OnsetInit();
     void OnsetExec(Description &Desc);
