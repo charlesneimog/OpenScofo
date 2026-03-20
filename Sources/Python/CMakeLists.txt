@@ -26,15 +26,11 @@ add_custom_command(
 
 # collect python sources
 file(GLOB OSCOFO_PY_MODULE ${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo/*.py)
-
-# install compiled module
 install(TARGETS _OpenScofo LIBRARY DESTINATION OpenScofo)
-
-# install python files
 install(FILES ${OSCOFO_PY_MODULE} DESTINATION OpenScofo)
-
-# install generated stub
 install(FILES ${STUB_DIR}/_OpenScofo.pyi DESTINATION OpenScofo)
-
-# install typing marker (PEP 561)
 install(FILES ${TYPED_FILE} DESTINATION OpenScofo)
+
+# add_custom_target( run_descriptors_validation ALL COMMAND ${CMAKE_COMMAND} -E env
+# PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE}
+# ${CMAKE_SOURCE_DIR}/Tests/librosa-essentia-validation.py DEPENDS _OpenScofo)
