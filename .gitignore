@@ -79,3 +79,9 @@ test.csv
 /Tests/X.npy
 /Tests/y.npy
 /site
+/Resources/Extended-Techniques/catboost.onnx
+/Resources/Extended-Techniques/dataset.npz
+/Resources/Extended-Techniques/madeira.wav
+/Resources/Extended-Techniques/prato.wav
+/Resources/Extended-Techniques/taca.wav
+/Sources/Python/OpenScofo/__pycache__
