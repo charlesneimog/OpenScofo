@@ -1,4 +1,4 @@
-from ._OpenScofo import (
+from _OpenScofo import (
     OpenScofo,
     EventType,
     HMMType,
