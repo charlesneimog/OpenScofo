@@ -433,6 +433,10 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
+    if (m_TimbreONNXModel.empty()) {
+        spdlog::error("The ONNXMODEL must be defined to enable UTECH and PTECH events.");
+    }
+
     Event.Type = UTECH;
     AudioState SubState;
     SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
@@ -685,9 +689,9 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
             path = path.substr(1, path.size() - 2);
         }
 
-        m_TimbreModel = m_ScoreRootPath / fs::path(path);
-        if (!fs::exists(m_TimbreModel)) {
-            spdlog::error("Model path not found: {}", m_TimbreModel.string());
+        m_TimbreONNXModel = m_ScoreRootPath / fs::path(path);
+        if (!fs::exists(m_TimbreONNXModel)) {
+            spdlog::error("Model path not found: {}", m_TimbreONNXModel.string());
         }
         return;
     }

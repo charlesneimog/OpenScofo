@@ -1,10 +1,10 @@
 #pragma once
 
-#include <OpenScofo/mdp.hpp>
-#include <OpenScofo/mir.hpp>
-#include <OpenScofo/score.hpp>
-#include <OpenScofo/states.hpp>
-#include <OpenScofo/log.hpp>
+#include "mdp.hpp"
+#include "mir.hpp"
+#include "score.hpp"
+#include "states.hpp"
+#include "log.hpp"
 
 #if defined(OSCOFO_LUA)
 extern "C" {
@@ -74,8 +74,11 @@ class OpenScofo {
     double GetBlockDuration();
     Description GetAudioDescription(std::vector<double> &AudioBuffer);
     Description GetDescription();
-    std::vector<float> GetTimeCoherenceTemplate(int pos, int timeInEvent = 0);
-    double GetTimeCoherenceConfiability(const std::vector<double> &eventValues);
+
+    Descriptors GetDescriptorsEnum(const char *s);
+    const char *GetDescriptionId(Descriptors d);
+    double GetDescriptionFloat(Description &Desc, Descriptors d);
+    std::vector<double> &GetDescriptionArray(Description &Desc, Descriptors d);
 
     // Config
     void ClearErrors();

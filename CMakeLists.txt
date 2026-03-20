@@ -23,9 +23,8 @@ option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_PY_MODULE ON)
     set(OSCOFO_BUILD_PD_OBJECT ON)
-    if(NOT LINUX)
-        set(OSCOFO_BUILD_MAX_OBJECT ON)
-    endif()
+    set(OSCOFO_BUILD_MAX_OBJECT ON)
+    set(OSCOFO_BUILD_VAMP_PLUGIN ON)
 endif()
 
 if(OSCOFO_BUILD_PD_OBJECT)
@@ -209,7 +208,7 @@ list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
 
-target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/")
+target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 target_compile_definitions(OpenScofo PUBLIC OPENSCOFO_VERSION="${PROJECT_VERSION}")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
@@ -336,31 +335,33 @@ endif()
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_PY_MODULE)
-    add_subdirectory(Sources/Python)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Python")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │           PureData Object            │
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_PD_OBJECT)
-    add_subdirectory(Sources/PureData)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/PureData")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX)
-    add_subdirectory(Sources/Max)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Vamp Obj                  │
 # ╰──────────────────────────────────────╯
-add_subdirectory(Sources/Vamp)
+if(OSCOFO_BUILD_VAMP_PLUGIN)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Vamp")
+endif()
 
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_TESTS)
-    add_subdirectory(Tests)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
 endif()

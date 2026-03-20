@@ -277,7 +277,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         case CENTROID:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralCentroid; });
             break;
-        case SPREAD:
+        case SPREADHZ:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSpreadHz; });
             break;
         case FLATNESS:

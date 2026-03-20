@@ -616,6 +616,7 @@ void MDP::GetAudioObservations(int T) {
                         BestObs = std::max(BestObs, kl);
                     }
                 } else if (AS.Type == SILENCE) {
+                    // with @percussive
                     BestObs = std::max(BestObs, m_Desc.SilenceProb);
                 }
             }
@@ -650,7 +651,6 @@ void MDP::GetAudioObservations(int T) {
             }
             break;
         }
-
         case UTECH: {
             for (AudioState &AS : StateJ.AudioStates) {
                 double tech = m_Desc.ONNX[AS.Label] * m_Desc.ExtendedTechProb * nonSilenceWeight;
@@ -662,7 +662,6 @@ void MDP::GetAudioObservations(int T) {
             BestObs = std::max(BestObs, m_Desc.SilenceProb);
             break;
         }
-
         default:
             spdlog::error("Observation not implemented yet");
         }

@@ -304,6 +304,190 @@ bool OpenScofo::ScoreIsLoaded() {
     return m_Score.ScoreIsLoaded();
 }
 
+// ─────────────────────────────────────
+const char *OpenScofo::GetDescriptionId(Descriptors d) {
+    switch (d) {
+    case Descriptors::MFCC:
+        return "mfcc";
+    case Descriptors::MELOGRAM:
+        return "logmelspectrum";
+    case Descriptors::RMS:
+        return "rms";
+    case Descriptors::LOUDNESS:
+        return "loudness";
+    case Descriptors::STDDEV:
+        return "stddev";
+    case Descriptors::CHROMA:
+        return "chroma";
+    case Descriptors::SILENCEPROB:
+        return "silence";
+    case Descriptors::CENTROID:
+        return "centroid";
+    case Descriptors::ZCR:
+        return "zcr";
+    case Descriptors::HFR:
+        return "hfr";
+    case Descriptors::SPREADHZ:
+        return "spread";
+    case Descriptors::FLATNESS:
+        return "flatness";
+    case Descriptors::FLUX:
+        return "flux";
+    case Descriptors::SKEWNESS:
+        return "skewness";
+    case Descriptors::SLOPE:
+        return "slope";
+    case Descriptors::KURTOSIS:
+        return "kurtosis";
+    case Descriptors::EXTENDEDPROB:
+        return "ext";
+    case Descriptors::ONSET:
+        return "onset";
+    case Descriptors::YIN:
+        return "yin";
+    case Descriptors::ONNX:
+        return "onnx";
+    default:
+        return "unknown";
+    }
+}
+
+// ─────────────────────────────────────
+Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
+    if (strcmp(s, "mfcc") == 0) {
+        return Descriptors::MFCC;
+    } else if (strcmp(s, "logmelspectrum") == 0) {
+        return Descriptors::MELOGRAM;
+    } else if (strcmp(s, "rms") == 0) {
+        return Descriptors::RMS;
+    } else if (strcmp(s, "loudness") == 0) {
+        return Descriptors::LOUDNESS;
+    } else if (strcmp(s, "stddev") == 0) {
+        return Descriptors::STDDEV;
+    } else if (strcmp(s, "chroma") == 0) {
+        return Descriptors::CHROMA;
+    } else if (strcmp(s, "silence") == 0) {
+        return Descriptors::SILENCEPROB;
+    } else if (strcmp(s, "centroid") == 0) {
+        return Descriptors::CENTROID;
+    } else if (strcmp(s, "zcr") == 0) {
+        return Descriptors::ZCR;
+    } else if (strcmp(s, "hfr") == 0) {
+        return Descriptors::HFR;
+    } else if (strcmp(s, "spread") == 0) {
+        return Descriptors::SPREADHZ;
+    } else if (strcmp(s, "flatness") == 0) {
+        return Descriptors::FLATNESS;
+    } else if (strcmp(s, "flux") == 0) {
+        return Descriptors::FLUX;
+    } else if (strcmp(s, "skewness") == 0) {
+        return Descriptors::SKEWNESS;
+    } else if (strcmp(s, "slope") == 0) {
+        return Descriptors::SLOPE;
+    } else if (strcmp(s, "kurtosis") == 0) {
+        return Descriptors::KURTOSIS;
+    } else if (strcmp(s, "ext") == 0) {
+        return Descriptors::EXTENDEDPROB;
+    } else if (strcmp(s, "onset") == 0) {
+        return Descriptors::ONSET;
+    } else if (strcmp(s, "yin") == 0) {
+        return Descriptors::YIN;
+    } else if (strcmp(s, "onnx") == 0) {
+        return Descriptors::ONNX;
+    } else {
+        spdlog::error("Invalid descriptors argument: {}", s);
+        return Descriptors::INVALID;
+    }
+}
+
+// ─────────────────────────────────────
+double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
+    switch (d) {
+    // Scalar descriptors
+    case Descriptors::ONSET:
+        return Desc.Onset;
+    case Descriptors::SILENCEPROB:
+        return Desc.SilenceProb;
+    case Descriptors::EXTENDEDPROB:
+        return Desc.ExtendedTechProb;
+    case Descriptors::DB:
+        return Desc.dB;
+    case Descriptors::RMS:
+        return Desc.RMS;
+    case Descriptors::MAXAMP:
+        return Desc.MaxAmp;
+    case Descriptors::LOUDNESS:
+        return Desc.Loudness;
+    case Descriptors::HARMONICITY:
+        return Desc.Harmonicity;
+    case Descriptors::FLATNESS:
+        return Desc.SpectralFlatness;
+    case Descriptors::FLUX:
+        return Desc.SpectralFlux;
+    case Descriptors::IRREGULARITY:
+        return Desc.SpectralIrregularity;
+    case Descriptors::CREST:
+        return Desc.SpectralCrest;
+    case Descriptors::CENTROID:
+        return Desc.SpectralCentroid;
+    case Descriptors::CENTROIDVEL:
+        return Desc.CentroidVelocity;
+    case Descriptors::SPREADHZ:
+        return Desc.SpectralSpreadHz;
+    case Descriptors::SPREADVARIANCE:
+        return Desc.SpectralSpreadVariance;
+    case Descriptors::SKEWNESS:
+        return Desc.SpectralSkewness;
+    case Descriptors::SLOPE:
+        return Desc.SpectralSlope;
+    case Descriptors::KURTOSIS:
+        return Desc.SpectralKurtosis;
+    case Descriptors::HFR:
+        return Desc.HighFreqRatio;
+    case Descriptors::ZCR:
+        return Desc.ZeroCrossingRate;
+    case Descriptors::STDDEV:
+        return Desc.StdDev;
+    case Descriptors::YIN:
+        return Desc.Pitch;
+    case Descriptors::YINCONFIDENCE:
+        return Desc.PitchConfidence;
+
+    // Vector descriptors: cannot return single value
+    case Descriptors::MFCC:
+    case Descriptors::MELOGRAM:
+    case Descriptors::MAGNITUDE:
+    case Descriptors::POWER:
+    case Descriptors::CHROMA:
+    case Descriptors::ONNX:
+        spdlog::error("Descriptor '{}' is vector-valued; cannot return a single double", GetDescriptionId(d));
+        return 0.0;
+
+    default:
+        spdlog::error("Invalid descriptor '{}'", static_cast<int>(d));
+        return 0.0;
+    }
+}
+
+// ─────────────────────────────────────
+std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descriptors d) {
+    switch (d) {
+    case Descriptors::MFCC:
+        return Desc.MFCC;
+    case Descriptors::CHROMA:
+        return Desc.Chroma;
+    case Descriptors::MELOGRAM:
+        return Desc.LogMelSpectrum;
+    case Descriptors::POWER:
+        return Desc.Power;
+    case Descriptors::MAGNITUDE:
+        return Desc.Magnitude;
+    default:
+        spdlog::error("Descriptor '{}' is not an array/vector type", GetDescriptionId(d));
+        throw std::runtime_error("Descriptor is not a vector");
+    }
+}
+
 // ╭─────────────────────────────────────╮
 // │ Python Research and Test Functions  │
 // ╰─────────────────────────────────────╯
