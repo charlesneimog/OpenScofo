@@ -236,6 +236,39 @@ Vector of magnitude values normalized by the FFT size $N$:
 
 ---
 
+## `Log-Mel Spectrogram`
+
+:custom-librosa:[^5]
+
+The log-mel spectrum represents how the **energy of a sound is distributed across perceptual frequency bands**, using the mel scale and a logarithmic (dB) compression to approximate human loudness perception.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-    ??? equation "Equation"
+
+        $$
+        E_m = \sum_{k=0}^{K-1} H_m(k)\,P[k]
+        $$
+
+        $$
+        \text{LogMel}[m] = \max\left(L_{min},\; 10 \log_{10}(E_m)\right)
+        $$
+
+-    ??? note "Notes"
+
+        - $P[k]$ is the **power spectrum** ($|X[k]|^2$)  
+        - $H_m(k)$ is the **mel filterbank** (triangular filters)  
+        - $E_m$ is the **energy in mel band $m$**  
+        - Log scaling (dB) approximates **human loudness perception**  
+        - $L_{min}$ prevents $-\infty$ (numerical stability)  
+        - Often followed by a **top-dB clipping** (e.g., 80 dB range)  
+        - This is computed **per frame**; stacking over time forms a **mel spectrogram**
+
+</div>
+
+
+---
+
 ## `MFCC` 
 :custom-librosa:[^3]
 
@@ -248,7 +281,6 @@ MFCCs summarize the shape of a sound’s spectrum on a perceptual, mel-based sca
         $MFCC[i] = \sum_{m=0}^{M-1} \cos\left( \frac{\pi i (m + 0.5)}{M} \right) \max(L_{min}, 10 \log_{10}(E_m))$
 
 -   ??? note "Notes"
-
 
 </div>
 
@@ -272,7 +304,6 @@ Chroma features capture the intensity of the twelve pitch classes (C, C♯, …,
 
 </div>
 
----
 
 [^1]: `OpenScofo` uses a Hann window and FFTW3 for FFT.
 [^2]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-9}$.
