@@ -261,8 +261,6 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(MaxOpenScofo *
             descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
         } else if (strcmp(sym->s_name, "ext") == 0) {
             descriptors.push_back(OpenScofo::Descriptors::EXTENDEDPROB);
-        } else if (strcmp(sym->s_name, "perc") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::PERCUSSIVEPROB);
         } else if (strcmp(sym->s_name, "onset") == 0) {
             descriptors.push_back(OpenScofo::Descriptors::ONSET);
         } else if (strcmp(sym->s_name, "yin") == 0) {
