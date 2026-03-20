@@ -53,6 +53,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
     py::class_<OpenScofo::Description>(m, "Description")
         .def(py::init<>())
         .def_readwrite("mfcc", &OpenScofo::Description::MFCC)
+        .def_readwrite("logmelspectrum", &OpenScofo::Description::LogMelSpectrum)
         .def_readwrite("chroma", &OpenScofo::Description::Chroma)
 
         .def_readwrite("onset", &OpenScofo::Description::Onset)
@@ -66,16 +67,19 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("crest", &OpenScofo::Description::SpectralCrest)
         .def_readwrite("centroid", &OpenScofo::Description::SpectralCentroid)
         .def_readwrite("magnitude", &OpenScofo::Description::SpectralMagnitudeNorm)
-        .def_readwrite("spread", &OpenScofo::Description::SpectralSpread)
+        .def_readwrite("spreadhz", &OpenScofo::Description::SpectralSpreadHz)
+        .def_readwrite("spread_variance", &OpenScofo::Description::SpectralSpreadVariance)
         .def_readwrite("flatness", &OpenScofo::Description::SpectralFlatness)
+        .def_readwrite("skewness", &OpenScofo::Description::SpectralSkewness)
+        .def_readwrite("slope", &OpenScofo::Description::SpectralSlope)
+        .def_readwrite("kurtosis", &OpenScofo::Description::SpectralKurtosis)
 
         .def_readwrite("centroid_velocity", &OpenScofo::Description::CentroidVelocity)
 
-        .def_readwrite("high_freq_ratio", &OpenScofo::Description::HighFreqRatio)
+        .def_readwrite("hfr", &OpenScofo::Description::HighFreqRatio)
         .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
-        .def_readwrite("peakiness", &OpenScofo::Description::Peakiness)
         .def_readwrite("zcr", &OpenScofo::Description::ZeroCrossingRate)
-        .def_readwrite("std_dev", &OpenScofo::Description::StdDev)
+        .def_readwrite("stddev", &OpenScofo::Description::StdDev)
         .def_readwrite("pitch", &OpenScofo::Description::Pitch)
         .def_readwrite("pitch_confidence", &OpenScofo::Description::PitchConfidence)
 
