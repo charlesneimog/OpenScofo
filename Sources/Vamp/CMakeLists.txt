@@ -1,8 +1,8 @@
-cpmaddpackage("gh:vamp-plugins/vamp-plugin-sdk#vamp-plugin-sdk-v2.10")
+cpmaddpackage("gh:vamp-plugins/vamp-plugin-sdk#master")
 
 add_library(VampOScofo SHARED "${CMAKE_CURRENT_SOURCE_DIR}/VampOpenScofo.cpp")
 target_include_directories(VampOScofo PRIVATE ${vamp-plugin-sdk_SOURCE_DIR})
-target_link_libraries(VampOScofo PRIVATE vamp-sdk OpenScofo)
+target_link_libraries(VampOScofo PRIVATE vamp-plugin-sdk::vamp-sdk OpenScofo)
 if(UNIX AND NOT WIN32)
 	target_compile_options(VampOScofo PRIVATE -fPIC)
 endif()
