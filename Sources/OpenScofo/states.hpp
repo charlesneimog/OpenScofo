@@ -16,13 +16,18 @@ enum AudioDescType {
 
 // ─────────────────────────────────────
 enum Descriptors {
+    INVALID,
+
     ONSET,
 
     // Amplitude
     LOUDNESS,
+    DB,
+    MAXAMP,
     RMS,
     STDDEV,
     MAGNITUDE,
+    POWER,
     SILENCEPROB,
 
     // Spectral Arrays
@@ -34,8 +39,11 @@ enum Descriptors {
     ZCR,
     HFR,
     CENTROID,
-    SPREAD,
+    SPREADHZ,
+    SPREADVARIANCE,
+    CREST,
     FLATNESS,
+    CENTROIDVEL,
     FLUX,
     SKEWNESS,
     SLOPE,
@@ -45,6 +53,7 @@ enum Descriptors {
 
     // Pitch
     YIN,
+    YINCONFIDENCE,
 
     // Percussive
     EXTENDEDPROB,
@@ -64,7 +73,7 @@ enum EventType {
     PTECH,
     UTECH,
 
-    // Cort Lippe event (event is just count)
+    // Cort Lippe event (TODO:)
     EVENT,
 };
 

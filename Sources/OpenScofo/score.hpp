@@ -38,14 +38,14 @@ class Score {
 
     // AI
     bool HasTimbreModel() {
-        if (m_TimbreModel.empty()) {
+        if (m_TimbreONNXModel.empty()) {
             return false;
         } else {
             return true;
         }
     }
     fs::path GetTimbreModel() {
-        return m_TimbreModel;
+        return m_TimbreONNXModel;
     }
 
     std::vector<Descriptors> GetTimbreModelDescriptors() {
@@ -108,7 +108,7 @@ class Score {
 
     // Paths
     fs::path m_ScoreRootPath;
-    fs::path m_TimbreModel;
+    fs::path m_TimbreONNXModel;
     std::vector<Descriptors> m_ONNXDescriptors;
 
     // Variables

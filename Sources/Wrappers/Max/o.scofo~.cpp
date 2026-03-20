@@ -128,150 +128,47 @@ static void oscofo_start(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_output_descriptiors(MaxOpenScofo *x, OpenScofo::Description &Desc) {
+static void oscofo_output_descriptors(MaxOpenScofo *x, OpenScofo::Description &Desc) {
     for (auto it = x->RequestMIR.rbegin(); it != x->RequestMIR.rend(); ++it) {
-        OpenScofo::Descriptors v = *it;
-        if (v == OpenScofo::Descriptors::MFCC) {
-            size_t mfccSize = Desc.MFCC.size();
-            std::vector<t_atom> mfccAtoms(mfccSize);
-            for (size_t i = 0; i < mfccSize; ++i) {
-                atom_setfloat(&mfccAtoms[i], (float)Desc.MFCC[i]);
+        OpenScofo::Descriptors d = *it;
+        switch (d) {
+        case OpenScofo::Descriptors::INVALID:
+            object_error((t_object *)x, "[o.scofo~] Invalid descriptors");
+            break;
+        case OpenScofo::Descriptors::MFCC:
+        case OpenScofo::Descriptors::CHROMA:
+        case OpenScofo::Descriptors::MELOGRAM:
+        case OpenScofo::Descriptors::MAGNITUDE: {
+            std::vector<double> DescArray = x->OpenScofo->GetDescriptionArray(Desc, d);
+            int DescSize = DescArray.size();
+            std::vector<t_atom> DescAtoms(DescSize);
+            for (int i = 0; i < DescSize; ++i) {
+                atom_setfloat(&DescAtoms[i], (t_float)DescArray[i]);
             }
-            outlet_anything(x->DescOut, gensym("mfcc"), mfccSize, mfccAtoms.data());
-        } else if (v == OpenScofo::Descriptors::CHROMA) {
-            size_t chromaSize = Desc.Chroma.size();
-            std::vector<t_atom> chromaAtoms(chromaSize);
-            for (size_t i = 0; i < chromaSize; ++i) {
-                atom_setfloat(&chromaAtoms[i], (float)Desc.Chroma[i]);
-            }
-            outlet_anything(x->DescOut, gensym("chroma"), chromaSize, chromaAtoms.data());
-        } else if (v == OpenScofo::Descriptors::MAGNITUDE) {
-            size_t powerSize = Desc.Magnitude.size();
-            std::vector<t_atom> powerAtoms(powerSize);
-            for (size_t i = 0; i < powerSize; ++i) {
-                atom_setfloat(&powerAtoms[i], (float)Desc.Magnitude[i]);
-            }
-            outlet_anything(x->DescOut, gensym("power"), powerSize, powerAtoms.data());
-        } else if (v == OpenScofo::Descriptors::LOUDNESS) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.Loudness);
-            outlet_anything(x->DescOut, gensym("loudness"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::SILENCEPROB) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SilenceProb);
-            outlet_anything(x->DescOut, gensym("silence"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::CENTROID) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralCentroid);
-            outlet_anything(x->DescOut, gensym("centroid"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::SPREAD) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralSpreadHz);
-            outlet_anything(x->DescOut, gensym("spread"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::FLATNESS) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralFlatness);
-            outlet_anything(x->DescOut, gensym("flatness"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::FLUX) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralFlux);
-            outlet_anything(x->DescOut, gensym("flux"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::IRREGULARITY) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.SpectralIrregularity);
-            outlet_anything(x->DescOut, gensym("irregularity"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::YIN) {
-            std::vector<t_atom> atoms(2);
-            atom_setfloat(&atoms[0], (float)Desc.Pitch);
-            atom_setfloat(&atoms[1], (float)Desc.PitchConfidence);
-            outlet_anything(x->DescOut, gensym("yin"), 2, atoms.data());
-        } else if (v == OpenScofo::Descriptors::HARMONICITY) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.Harmonicity);
-            outlet_anything(x->DescOut, gensym("harmonicity"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::EXTENDEDPROB) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.ExtendedTechProb);
-            outlet_anything(x->DescOut, gensym("ext"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::ONSET) {
-            if (Desc.Onset) {
-                std::vector<t_atom> atoms(1);
-                atom_setfloat(&atoms[0], (float)Desc.Onset);
-                outlet_anything(x->DescOut, gensym("onset"), 1, atoms.data());
-            }
-        } else if (v == OpenScofo::Descriptors::RMS) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.RMS);
-            outlet_anything(x->DescOut, gensym("rms"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::CHROMA) {
-        } else if (v == OpenScofo::Descriptors::HFR) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.HighFreqRatio);
-            outlet_anything(x->DescOut, gensym("hfr"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::ZCR) {
-            std::vector<t_atom> atoms(1);
-            atom_setfloat(&atoms[0], (float)Desc.ZeroCrossingRate);
-            outlet_anything(x->DescOut, gensym("zcr"), 1, atoms.data());
-        } else if (v == OpenScofo::Descriptors::ONNX) {
-            for (const auto &onnxDesc : Desc.ONNX) {
-                std::vector<t_atom> onnxAtoms(2);
-                atom_setsym(&onnxAtoms[0], gensym(onnxDesc.first.c_str()));
-                atom_setfloat(&onnxAtoms[1], (float)onnxDesc.second);
-                outlet_anything(x->DescOut, gensym("onnx"), 2, onnxAtoms.data());
-            }
+            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), DescSize, DescAtoms.data());
+            break;
+        }
+        case OpenScofo::Descriptors::ONNX: {
+            object_error((t_object *)x, "ONNX not implemented yet");
+        }
+        default:
+            double DescValue = x->OpenScofo->GetDescriptionFloat(Desc, d);
+            std::vector<t_atom> DescAtoms(1);
+            atom_setfloat(&DescAtoms[0], (t_float)DescValue);
+            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), DescValue, DescAtoms.data());
         }
     }
 }
 
 // ─────────────────────────────────────
-static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(MaxOpenScofo *x, int start, long argc, t_atom *argv) {
-    std::vector<OpenScofo::Descriptors> descriptors;
-    for (long i = start; i < argc; i++) {
-        if ((argv + i)->a_type != A_SYM) {
-            object_error((t_object *)x, "Invalid argument type at index %ld", i);
-            continue;
-        }
-
+static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(MaxOpenScofo *x, int start, int argc, t_atom *argv) {
+    std::vector<OpenScofo::Descriptors> Descriptors;
+    Descriptors.reserve(argc - start);
+    for (int i = start; i < argc; i++) {
         t_symbol *sym = atom_getsym(argv + i);
-        if (strcmp(sym->s_name, "mfcc") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::MFCC);
-        } else if (strcmp(sym->s_name, "rms") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::RMS);
-        } else if (strcmp(sym->s_name, "loudness") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::LOUDNESS);
-        } else if (strcmp(sym->s_name, "chroma") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::CHROMA);
-        } else if (strcmp(sym->s_name, "silence") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::SILENCEPROB);
-        } else if (strcmp(sym->s_name, "centroid") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::CENTROID);
-        } else if (strcmp(sym->s_name, "zcr") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::ZCR);
-        } else if (strcmp(sym->s_name, "hfr") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::HFR);
-        } else if (strcmp(sym->s_name, "spread") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::SPREAD);
-        } else if (strcmp(sym->s_name, "flatness") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::FLATNESS);
-        } else if (strcmp(sym->s_name, "flux") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::FLUX);
-        } else if (strcmp(sym->s_name, "irregularity") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::IRREGULARITY);
-        } else if (strcmp(sym->s_name, "harmonicity") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::HARMONICITY);
-        } else if (strcmp(sym->s_name, "ext") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::EXTENDEDPROB);
-        } else if (strcmp(sym->s_name, "onset") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::ONSET);
-        } else if (strcmp(sym->s_name, "yin") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::YIN);
-        } else if (strcmp(sym->s_name, "onnx") == 0) {
-            descriptors.push_back(OpenScofo::Descriptors::ONNX);
-        } else {
-            object_error((t_object *)x, "Invalid argument: %s", sym->s_name);
-        }
+        Descriptors.push_back(x->OpenScofo->GetDescriptorsEnum(sym->s_name));
     }
-    return descriptors;
+    return Descriptors;
 }
 
 // ─────────────────────────────────────
@@ -353,7 +250,7 @@ static void oscofo_get(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         object_free(bufferRef);
 
         OpenScofo::Description Desc = x->OpenScofo->GetAudioDescription(audioBuffer);
-        oscofo_output_descriptiors(x, Desc);
+        oscofo_output_descriptors(x, Desc);
     }
 }
 
@@ -493,7 +390,8 @@ static t_atom *oscofo_convertargs(OpenScofo::ScoreAction &action) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_tickactions(MaxOpenScofo *x) {
+static void oscofo_tickactions(void *xv) {
+    MaxOpenScofo *x = (MaxOpenScofo *)xv;
     const double currentTime = gettime();
     const double nextBlock = 1000.0 / x->Sr * x->BlockSize;
     const double nextTime = currentTime + nextBlock;
@@ -516,7 +414,8 @@ static void oscofo_tickactions(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_tickinfo(MaxOpenScofo *x) {
+static void oscofo_tickinfo(MaxOpenScofo *xv) {
+    MaxOpenScofo *x = (MaxOpenScofo *)xv;
     if (x->MirOutput) {
         OpenScofo::Description Desc;
         if (x->JustDescription && x->Desc) {
@@ -524,12 +423,14 @@ static void oscofo_tickinfo(MaxOpenScofo *x) {
         } else {
             Desc = x->OpenScofo->GetDescription();
         }
-        oscofo_output_descriptiors(x, Desc);
+        oscofo_output_descriptors(x, Desc);
     }
 }
 
 // ─────────────────────────────────────
-static void oscofo_ticknewevent(MaxOpenScofo *x) {
+static void oscofo_ticknewevent(void *xv) {
+    MaxOpenScofo *x = (MaxOpenScofo *)xv;
+
     int prevEvent = x->Event;
     x->Event = x->OpenScofo->GetEventIndex();
     if (prevEvent == x->Event || x->Event == 0) {

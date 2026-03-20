@@ -118,4 +118,11 @@ jobs:
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
-
+      - name: Upload Vamp Plugin
+        uses: actions/upload-artifact@v6
+        with:
+          name: Vamp-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+          path: |
+            build/Sources/Wrappers/Vamp/*.so
+            build/Sources/Wrappers/Vamp/*.dylib
+            build/Sources/Wrappers/Vamp/*.dll
