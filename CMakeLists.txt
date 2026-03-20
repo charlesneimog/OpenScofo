@@ -354,6 +354,11 @@ if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX)
 endif()
 
 # ╭──────────────────────────────────────╮
+# │            Vamp Obj                  │
+# ╰──────────────────────────────────────╯
+add_subdirectory(Sources/Vamp)
+
+# ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_TESTS)
