@@ -11,6 +11,14 @@ set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
 
+if(EMSCRIPTEN)
+    message(STATUS "Emscripten compilation")
+    set(CMAKE_CXX_FLAGS
+        "${CMAKE_CXX_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1"
+    )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128")
+endif()
+
 option(OSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
@@ -335,7 +343,7 @@ endif()
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_PY_MODULE)
+if(OSCOFO_BUILD_PY_MODULE AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Python")
 endif()
 
@@ -349,27 +357,34 @@ endif()
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX)
+if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Super Collider            │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_SC_PLUGIN)
+if(OSCOFO_BUILD_SC_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Vamp Obj                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_VAMP_PLUGIN)
+if(OSCOFO_BUILD_VAMP_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Vamp")
+endif()
+
+# ╭──────────────────────────────────────╮
+# │            WASM Obj                  │
+# ╰──────────────────────────────────────╯
+if(EMSCRIPTEN)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Wasm")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_TESTS)
+if(OSCOFO_BUILD_TESTS AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
 endif()

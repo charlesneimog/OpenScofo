@@ -52,7 +52,7 @@ OpenScofo : UGen {
         var value = if(enabled, 1, 0);
         ^this.cmd(synth, "setEventNotifications", value);
     }
-
+zr
     *getDescriptor { arg synth, descriptorId;
         ^this.cmd(synth, "getDescriptor", descriptorId.asString);
     }

@@ -3,8 +3,8 @@ import sys
 import random
 
 os.chdir(os.path.dirname(__file__))
-sys.path.append("../build/Sources/Python")
-sys.path.append("../Sources/Python")
+sys.path.append("../build/Sources/Wrappers/Python")
+sys.path.append("../Sources/Wrappers/Python")
 
 import OpenScofo
 

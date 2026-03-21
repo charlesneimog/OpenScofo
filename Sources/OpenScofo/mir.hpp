@@ -35,16 +35,13 @@ class MIR {
     void UpdateAudioParameters(float Sr, float WindowSize, float HopSize);
 
     void SetdBTreshold(double dB);
-    void GetDescription(std::vector<double> &In, Description &Desc);
+    void GetDescription(const std::vector<double> &In, Description &Desc);
     void AddReverb(Description &Desc, double decay);
 
     double GetdB();
     void ONNXInit(fs::path path, std::vector<Descriptors> Descriptors);
 
   private:
-    double Mtof(double Note, double Tunning);
-    double Ftom(double Freq, double Tunning);
-    double Freq2Bin(double freq, double n, double Sr);
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
     double PositiveRemainder(double value, double modulus) const;
     void GetSpectralDescriptions(Description &Desc);
@@ -73,7 +70,7 @@ class MIR {
     void SpectralChromaExec(Description &Desc);
     // Zero Crossing Rate
     void ZeroCrossingRateInit();
-    void ZeroCrossingRateExec(std::vector<double> &In, Description &Desc);
+    void ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc);
 
     // FFTW
     void FFTWInit();
@@ -82,10 +79,10 @@ class MIR {
 
     // Get Signal
     void InitITURFilters(void);
-    void GetSignalPower(std::vector<double> &In, Description &Desc);
+    void GetSignalPower(const std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
     void YINInit();
-    void YINExec(std::vector<double> &In, Description &Desc);
+    void YINExec(const std::vector<double> &In, Description &Desc);
 
   private:
     // FFT

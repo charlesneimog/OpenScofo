@@ -42,25 +42,6 @@ MIR::~MIR() {
     }
 }
 
-// ╭─────────────────────────────────────╮
-// │                Utils                │
-// ╰─────────────────────────────────────╯
-double MIR::Mtof(double note, double tunning) {
-    return tunning * std::pow(2.0, (note - 69) / 12.0);
-}
-
-// ─────────────────────────────────────
-double MIR::Ftom(double freq, double tunning) {
-    return 69 + 12 * log2(freq / tunning);
-}
-
-// ─────────────────────────────────────
-double MIR::Freq2Bin(double Freq, double n, double sr) {
-    double bin;
-    bin = Freq * n / sr;
-    return round(bin);
-}
-
 // ─────────────────────────────────────
 void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     const bool sameAudioConfig = (m_HopSize == HopSize && m_FFTSize == FftSize && m_Sr == Sr);
@@ -403,7 +384,7 @@ void MIR::OnsetExec(Description &Desc) {
     }
 
     (void)onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
-    Desc.Onset = m_ODS->odfvalpost;
+    Desc.Onset = m_ODS->odfvalpost < 0 ? 0 : m_ODS->odfvalpost;
 }
 
 // ╭─────────────────────────────────────╮
@@ -421,7 +402,7 @@ void MIR::ExtendedTechExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │         Power and Amplitude         │
 // ╰─────────────────────────────────────╯
-// Check https://github.com/klangfreund/LUFSMeter
+// Check https://github.com/klangfreund/LUFSMeter (use MIT)
 void MIR::InitITURFilters() {
     // Stage 1: shelving filter
     double KoverQ1 = (2.0 - 2.0 * m_48kA1[2]) / (m_48kA1[2] - m_48kA1[1] + 1.0);
@@ -463,7 +444,7 @@ void MIR::InitITURFilters() {
 }
 
 // ─────────────────────────────────────
-void MIR::GetSignalPower(std::vector<double> &In, Description &Desc) {
+void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
     double x1_1 = 0.0, x2_1 = 0.0;
     double y1_1 = 0.0, y2_1 = 0.0;
     double x1_2 = 0.0, x2_2 = 0.0;
@@ -524,7 +505,7 @@ void MIR::YINInit() {
 }
 
 // ─────────────────────────────────────
-void MIR::YINExec(std::vector<double> &In, Description &Desc) {
+void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
     const size_t minTau = m_Sr / m_YINMaxFrequency;
     const size_t maxTauByPitch = std::ceil(m_Sr / m_YINMinFrequency);
@@ -792,6 +773,37 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     for (size_t i = 0; i < NHalf; ++i) {
         m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.Power[i];
+    }
+
+    // Harmonicity
+    if (Desc.Pitch > 0.0 && Desc.PitchConfidence > 0.0) {
+        int maxHarmonics = 10;
+        double harmonicEnergy = 0.0;
+        for (int k = 1; k <= maxHarmonics; ++k) {
+            double targetFreq = k * Desc.Pitch;
+            int bin = round(targetFreq / binWidth);
+
+            // search +/- 1 bin for a local maximum
+            int bestBin = -1;
+            double bestMag = 0.0;
+            for (int offset = -1; offset <= 1; ++offset) {
+                int b = bin + offset;
+                if (b > 0 && b < (int)NHalf - 1) {
+                    if (Desc.Magnitude[b] > Desc.Magnitude[b - 1] && Desc.Magnitude[b] > Desc.Magnitude[b + 1]) {
+                        if (Desc.Magnitude[b] > bestMag) {
+                            bestMag = Desc.Magnitude[b];
+                            bestBin = b;
+                        }
+                    }
+                }
+            }
+
+            if (bestBin >= 0)
+                harmonicEnergy += Desc.Power[bestBin];
+        }
+        Desc.Harmonicity = harmonicEnergy;
+    } else {
+        Desc.Harmonicity = 0.0;
     }
 
     OnsetExec(Desc);
@@ -1084,7 +1096,7 @@ void MIR::ZeroCrossingRateInit() {
 }
 
 // ─────────────────────────────────────
-void MIR::ZeroCrossingRateExec(std::vector<double> &In, Description &Desc) {
+void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc) {
     if (In.empty()) {
         Desc.ZeroCrossingRate = 0.0;
         return;
@@ -1244,7 +1256,7 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // ╭─────────────────────────────────────╮
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
-void MIR::GetDescription(std::vector<double> &In, Description &Desc) {
+void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     // 1. Temporal Domain
     GetSignalPower(In, Desc);
     YINExec(In, Desc);
