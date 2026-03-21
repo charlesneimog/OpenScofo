@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(OpenScofo VERSION 0.1.4)
+project(OpenScofo VERSION 0.1.5)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,6 +25,7 @@ if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_PD_OBJECT ON)
     set(OSCOFO_BUILD_MAX_OBJECT ON)
     set(OSCOFO_BUILD_VAMP_PLUGIN ON)
+    set(OSCOFO_BUILD_SC_PLUGIN ON)
 endif()
 
 if(OSCOFO_BUILD_PD_OBJECT)
@@ -350,6 +351,13 @@ endif()
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
+endif()
+
+# ╭──────────────────────────────────────╮
+# │            Super Collider            │
+# ╰──────────────────────────────────────╯
+if(OSCOFO_BUILD_SC_PLUGIN)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
 endif()
 
 # ╭──────────────────────────────────────╮

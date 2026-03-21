@@ -128,34 +128,12 @@ void MIR::FFTWInit() {
         return;
     }
 
-    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_PATIENT);
+    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_ESTIMATE);
 
     // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
     m_FullWindowingFunc.resize(m_FFTSize);
     for (size_t i = 0; i < m_FFTSize; i++) {
         m_FullWindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_FFTSize));
-    }
-
-    int HalfHopSize = round(m_HopSize / 2);
-    m_HopFFTIn = fftw_alloc_real(m_FFTSize);
-    if (!m_HopFFTIn) {
-        spdlog::critical("fftw_alloc_real failed");
-        return;
-    }
-
-    m_HopFFTOut = fftw_alloc_complex(HalfHopSize + 1);
-    if (!m_HopFFTOut) {
-        fftw_free(m_HopFFTIn);
-        spdlog::critical("fftw_alloc_complex failed");
-        return;
-    }
-
-    m_HopFFTPlan = fftw_plan_dft_r2c_1d((int)m_HopSize, m_HopFFTIn, m_HopFFTOut, FFTW_PATIENT);
-
-    // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
-    m_HopWindowingFunc.resize(m_HopSize);
-    for (size_t i = 0; i < m_HopSize; i++) {
-        m_HopWindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_HopSize));
     }
 }
 
