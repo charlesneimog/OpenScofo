@@ -1,6 +1,6 @@
 #include "OpenScofo.hpp"
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
 #include <boost/math/special_functions/bessel.hpp>
 #define CYL_BESSEL_I(v, x) boost::math::cyl_bessel_i(v, x)
 #else

@@ -41,7 +41,7 @@ class OpenScofo {
     OpenScofo(float Sr, float WindowSize, float HopSize);
     // Main Functions
     bool ParseScore(std::string ScorePath);
-    bool ProcessBlock(std::vector<double> &AudioBuffer);
+    bool ProcessBlock(const std::vector<double> &AudioBuffer);
     bool ScoreIsLoaded();
 
     // ONNX
@@ -72,7 +72,7 @@ class OpenScofo {
     double GetFFTSize();
     double GetHopSize();
     double GetBlockDuration();
-    Description GetAudioDescription(std::vector<double> &AudioBuffer);
+    Description GetAudioDescription(const std::vector<double> &AudioBuffer);
     Description GetDescription();
 
     Descriptors GetDescriptorsEnum(const char *s);

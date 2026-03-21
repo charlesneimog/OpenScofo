@@ -567,7 +567,7 @@ Description OpenScofo::GetDescription() {
 }
 
 // ─────────────────────────────────────
-Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
+Description OpenScofo::GetAudioDescription(const std::vector<double> &AudioBuffer) {
     if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         return {};
     }
@@ -581,7 +581,7 @@ Description OpenScofo::GetAudioDescription(std::vector<double> &AudioBuffer) {
 }
 
 // ─────────────────────────────────────
-bool OpenScofo::ProcessBlock(std::vector<double> &AudioBuffer) {
+bool OpenScofo::ProcessBlock(const std::vector<double> &AudioBuffer) {
     spdlog::stopwatch sw;
     if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
         spdlog::error("Score not loaded");
