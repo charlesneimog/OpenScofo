@@ -3,10 +3,12 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>OpenScofo MIR</title>
+        <title>OpenScofo Descriptors</title>
+
         <script src="OpenScofo.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
         <script src="https://unpkg.com/wavesurfer.js@7"></script>
+
         <style>
             :root {
                 --bg-color: #f8f9fa;
@@ -31,10 +33,12 @@
 
             .header {
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
+                flex-direction: column;
+                align-items: center; /* or flex-start if you want left-aligned */
                 margin-bottom: 20px;
+                gap: 10px;
             }
+
             h1 {
                 font-weight: 300;
                 font-size: 28px;
@@ -51,13 +55,6 @@
                 color: var(--text-color);
                 border: 1px solid var(--border-color);
                 border-radius: 4px;
-                transition: background 0.2s;
-            }
-            .upload-btn:hover {
-                background-color: rgba(0, 0, 0, 0.05);
-            }
-            .header-spacer {
-                width: 80px;
             }
 
             .legend-group {
@@ -72,25 +69,28 @@
 
             .legend-group label {
                 cursor: pointer;
-                font-size: 12px;
-                font-weight: 500;
-                transition: color 0.2s;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
                 user-select: none;
                 color: #888;
+                transition: color 0.2s;
             }
+
             .legend-group input {
                 display: none;
             }
 
             .chart-container {
-                position: relative;
                 width: 100%;
                 height: 50vh;
+                position: relative;
             }
             #myChart {
                 width: 100%;
                 height: 100%;
             }
+
             #waveform {
                 width: 100%;
                 margin-top: 20px;
@@ -110,10 +110,6 @@
                 cursor: pointer;
                 color: var(--text-color);
             }
-            .ctrl-btn:disabled {
-                opacity: 0.3;
-                cursor: not-allowed;
-            }
             #timeDisplay {
                 font-size: 14px;
                 font-variant-numeric: tabular-nums;
@@ -127,34 +123,37 @@
             }
         </style>
     </head>
+
     <body>
         <div class="header">
-            <label class="upload-btn"> Upload <input type="file" id="audioUpload" accept="audio/*" hidden /> </label>
-            <h1>OpenScofo MIR</h1>
-            <div class="header-spacer"></div>
+            <h1>OpenScofo Descriptors</h1>
+            <label class="upload-btn">
+                Upload Audio File
+                <input type="file" id="audioUpload" accept="audio/*" hidden />
+            </label>
         </div>
 
         <div id="descriptor-selection" class="legend-group"></div>
 
         <div class="chart-container">
-            <canvas id="myChart"></canvas>
+            <div id="myChart"></div>
         </div>
 
         <div id="waveform"></div>
 
         <div class="controls">
-            <button class="ctrl-btn" id="playBtn" onclick="togglePlay()" disabled>&#9654;</button>
-            <button class="ctrl-btn" id="pauseBtn" onclick="wavesurfer.pause()" disabled>&#10074;&#10074;</button>
-            <button class="ctrl-btn" id="stopBtn" onclick="wavesurfer.stop()" disabled>&#9632;</button>
+            <button class="ctrl-btn" id="playBtn" onclick="togglePlay()" disabled>▶</button>
+            <button class="ctrl-btn" id="pauseBtn" onclick="wavesurfer.pause()" disabled>⏸</button>
+            <button class="ctrl-btn" id="stopBtn" onclick="wavesurfer.stop()" disabled>■</button>
             <span id="timeDisplay">0:00.00</span>
         </div>
-        <span id="status">Initializing...</span>
+
+        <span id="status">Initializing WebGL Engine...</span>
 
         <script>
             let wasmModule = null;
             let oscofo = null;
             let wavesurfer = null;
-            let chartInstance = null;
             let analyzedData = [];
             let currentAudioTime = null;
 
@@ -195,28 +194,16 @@
                 "#46F0F0",
                 "#F032E6",
                 "#BCF60C",
-                "#FABEBE",
                 "#008080",
                 "#E6BEFF",
                 "#9A6324",
-                "#FFFAC8",
-                "#800000",
-                "#AAFFC3",
-                "#808000",
-                "#FFD8B1",
-                "#000075",
-                "#808080",
-                "#4A90E2",
-                "#50E3C2",
-                "#B8E986",
-                "#7ED321",
             ];
 
             const defaultSelection = ["db", "flux", "flatness", "pitch"];
             const selectionContainer = document.getElementById("descriptor-selection");
 
-            descriptorList.forEach((desc, index) => {
-                const color = colors[index % colors.length];
+            descriptorList.forEach((desc, i) => {
+                const color = colors[i % colors.length];
                 const label = document.createElement("label");
                 const checkbox = document.createElement("input");
 
@@ -226,9 +213,7 @@
                 checkbox.checked = defaultSelection.includes(desc);
 
                 label.appendChild(checkbox);
-                label.appendChild(
-                    document.createTextNode(desc.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())),
-                );
+                label.appendChild(document.createTextNode(desc.replace("_", " ")));
 
                 const updateColor = () => {
                     label.style.color = checkbox.checked ? color : "";
@@ -238,221 +223,198 @@
                     updatePlot();
                 });
                 updateColor();
-
                 selectionContainer.appendChild(label);
             });
 
             const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
             wavesurfer = WaveSurfer.create({
                 container: "#waveform",
-                waveColor: isDarkMode ? "#555" : "#ccc",
-                progressColor: isDarkMode ? "#888" : "#777",
+                waveColor: isDarkMode ? "#444" : "#ccc",
+                progressColor: isDarkMode ? "#888" : "#555",
                 height: 60,
-                barWidth: 1,
-                cursorWidth: 1,
-                cursorColor: isDarkMode ? "#fff" : "#000",
+                barWidth: 2,
             });
 
-            wavesurfer.on("audioprocess", (time) => updateCursor(time));
+            wavesurfer.on("audioprocess", (t) => updateCursor(t));
             wavesurfer.on("seeking", () => updateCursor(wavesurfer.getCurrentTime()));
-            wavesurfer.on("finish", () => updateCursor(0));
-
-            const playbackCursorPlugin = {
-                id: "playbackCursor",
-                afterDraw: (chart) => {
-                    if (currentAudioTime === null || analyzedData.length === 0) return;
-
-                    const xAxis = chart.scales.x;
-                    const xPos = xAxis.getPixelForValue(currentAudioTime);
-
-                    if (xPos < xAxis.left || xPos > xAxis.right) return;
-
-                    const ctx = chart.ctx;
-                    ctx.save();
-
-                    ctx.beginPath();
-                    ctx.moveTo(xPos, chart.scales.y.top);
-                    ctx.lineTo(xPos, chart.scales.y.bottom);
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = isDarkMode ? "#888" : "#666";
-                    ctx.stroke();
-
-                    ctx.font = "11px sans-serif";
-                    ctx.textBaseline = "middle";
-
-                    chart.data.datasets.forEach((dataset, i) => {
-                        const meta = chart.getDatasetMeta(i);
-                        if (meta.hidden) return;
-
-                        const dataPoints = dataset.data;
-                        let nearestIdx = 0;
-                        let minDist = Infinity;
-                        for (let j = 0; j < dataPoints.length; j++) {
-                            let dist = Math.abs(dataPoints[j].x - currentAudioTime);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                nearestIdx = j;
-                            }
-                        }
-
-                        if (meta.data[nearestIdx]) {
-                            const pt = meta.data[nearestIdx];
-                            const val = dataPoints[nearestIdx].y;
-
-                            ctx.beginPath();
-                            ctx.arc(xPos, pt.y, 4.5, 0, 2 * Math.PI);
-                            ctx.fillStyle = dataset.borderColor;
-                            ctx.fill();
-
-                            const text = `${dataset.label.toUpperCase()}: ${val.toFixed(2)}`;
-                            const textWidth = ctx.measureText(text).width;
-                            const textX = xPos + 10;
-
-                            ctx.fillStyle = isDarkMode ? "rgba(18, 18, 18, 0.8)" : "rgba(248, 249, 250, 0.8)";
-                            ctx.fillRect(textX - 2, pt.y - 8, textWidth + 4, 16);
-
-                            ctx.fillStyle = dataset.borderColor;
-                            ctx.fillText(text, textX, pt.y);
-                        }
-                    });
-                    ctx.restore();
-                },
-            };
-
-            const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-            // Core analysis function separated for reuse
-            async function loadAndAnalyzeAudio(arrayBuffer, fileType = "audio/mp3") {
-                const statusEl = document.getElementById("status");
-                analyzedData = [];
-
-                try {
-                    wavesurfer.load(URL.createObjectURL(new Blob([arrayBuffer], { type: fileType })));
-                    ["playBtn", "pauseBtn", "stopBtn"].forEach((id) => (document.getElementById(id).disabled = false));
-
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
-                    const channelData = audioBuffer.getChannelData(0);
-
-                    if (audioBuffer.sampleRate !== 44100)
-                        oscofo = new wasmModule.OpenScofo(audioBuffer.sampleRate, 2048, 512);
-
-                    const windowSize = 2048,
-                        hopSize = 512;
-                    const totalSamples = channelData.length - windowSize;
-                    let framesProcessed = 0;
-
-                    for (let i = 0; i < totalSamples; i += hopSize) {
-                        const vec = new wasmModule.VectorDouble();
-                        for (let j = 0; j < windowSize; j++) vec.push_back(channelData[i + j]);
-
-                        const rawDesc = oscofo.get_audio_description(vec);
-                        const frameData = { time: i / audioBuffer.sampleRate };
-
-                        descriptorList.forEach((key) => (frameData[key] = rawDesc[key]));
-
-                        analyzedData.push(frameData);
-                        vec.delete();
-                        framesProcessed++;
-
-                        if (framesProcessed % 100 === 0) {
-                            statusEl.innerText = `Analyzing... ${((i / totalSamples) * 100).toFixed(0)}%`;
-                            await yieldToMain();
-                        }
-                    }
-
-                    statusEl.innerText = "";
-                    updatePlot();
-                } catch (error) {
-                    statusEl.innerText = "Error: " + error.message;
-                }
-            }
-
-            // Initialize OpenScofo and Auto-load default audio
-            OpenScofo().then(async (mod) => {
-                wasmModule = mod;
-                oscofo = new mod.OpenScofo(44100, 2048, 512);
-
-                const statusEl = document.getElementById("status");
-                statusEl.innerText = "Downloading default audio...";
-
-                try {
-                    const url =
-                        "https://raw.githubusercontent.com/charlesneimog/OpenScofo/main/Tests/assets/canticos.mp3";
-                    const response = await fetch(url);
-                    const arrayBuffer = await response.arrayBuffer();
-                    statusEl.innerText = "Analyzing audio...";
-                    await loadAndAnalyzeAudio(arrayBuffer);
-                } catch (err) {
-                    statusEl.innerText = "Failed to load default audio. You can upload a file manually.";
-                }
-            });
-
-            // Handle manual uploads
-            document.getElementById("audioUpload").addEventListener("change", async function (event) {
-                const file = event.target.files[0];
-                if (!file) return;
-                if (!oscofo || !wasmModule) return alert("OpenScofo is initializing, please wait.");
-
-                document.getElementById("status").innerText = "Reading file...";
-                const arrayBuffer = await file.arrayBuffer();
-                await loadAndAnalyzeAudio(arrayBuffer, file.type);
-            });
 
             function updatePlot() {
-                if (analyzedData.length === 0) return;
+                if (!analyzedData.length) return;
 
-                const checkboxes = Array.from(document.querySelectorAll("#descriptor-selection input:checked"));
+                const chartDiv = document.getElementById("myChart");
+                const selected = Array.from(document.querySelectorAll("#descriptor-selection input:checked"));
+                const totalDuration = analyzedData[analyzedData.length - 1].time;
 
-                const datasets = checkboxes.map((cb) => ({
-                    label: cb.value,
-                    data: analyzedData.map((d) => ({ x: d.time, y: d[cb.value] })),
-                    borderColor: cb.dataset.color,
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.4,
+                // 1. DETERMINE VIEWPORT WIDTH
+                // Default to full duration, otherwise use the user's current zoom width
+                let viewWidth = totalDuration;
+                if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
+                    const range = chartDiv.layout.xaxis.range;
+                    viewWidth = Math.abs(range[1] - range[0]);
+                }
+
+                // 2. CALCULATE "FOLLOW" RANGE
+                // If zoomed in, center the currentAudioTime.
+                // We also clamp the edges so we don't scroll past 0 or the end of the file.
+                let targetRange = [0, totalDuration];
+                if (viewWidth < totalDuration) {
+                    let start = currentAudioTime - viewWidth / 2;
+                    let end = currentAudioTime + viewWidth / 2;
+
+                    // Clamp to start
+                    if (start < 0) {
+                        start = 0;
+                        end = viewWidth;
+                    }
+                    // Clamp to end
+                    if (end > totalDuration) {
+                        end = totalDuration;
+                        start = totalDuration - viewWidth;
+                    }
+                    targetRange = [start, end];
+                }
+
+                const ratio = currentAudioTime / totalDuration;
+                const nearestIdx = Math.min(
+                    analyzedData.length - 1,
+                    Math.max(0, Math.floor(ratio * analyzedData.length)),
+                );
+
+                const traces = selected.map((cb) => ({
+                    x: analyzedData.map((d) => d.time),
+                    y: analyzedData.map((d) => d[cb.value]),
+                    mode: "lines",
+                    type: "scattergl",
+                    name: cb.value,
+                    line: { color: cb.dataset.color, width: 1.5, shape: "spline" },
+                    hoverinfo: "skip",
                 }));
 
-                const ctx = document.getElementById("myChart").getContext("2d");
-                Chart.defaults.color = isDarkMode ? "#aaa" : "#888";
-
-                if (chartInstance) chartInstance.destroy();
-
-                chartInstance = new Chart(ctx, {
-                    type: "line",
-                    data: { datasets: datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: false,
-                        interaction: { mode: "index", intersect: false },
-                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                        scales: {
-                            x: {
-                                type: "linear",
-                                display: false,
-                                min: 0,
-                                max: analyzedData[analyzedData.length - 1].time,
-                            },
-                            y: { display: false },
-                        },
-                    },
-                    plugins: [playbackCursorPlugin],
+                const annotations = selected.map((cb) => {
+                    const val = analyzedData[nearestIdx][cb.value];
+                    return {
+                        x: currentAudioTime,
+                        y: val,
+                        xref: "x",
+                        yref: "y",
+                        text: `${cb.value.toUpperCase()}: ${val.toFixed(2)}`,
+                        showarrow: false,
+                        xanchor: "left",
+                        font: { color: cb.dataset.color, size: 10, weight: "bold" },
+                        bgcolor: isDarkMode ? "rgba(18,18,18,0.8)" : "rgba(255,255,255,0.8)",
+                    };
                 });
-            }
 
-            function togglePlay() {
-                wavesurfer.playPause();
+                const layout = {
+                    margin: { l: 0, r: 0, t: 0, b: 0 },
+                    paper_bgcolor: "transparent",
+                    plot_bgcolor: "transparent",
+                    showlegend: false,
+                    xaxis: {
+                        visible: false,
+                        fixedrange: false,
+                        range: targetRange, // FOLLOWS THE PLAYHEAD
+                        spikemode: "across",
+                        spikethickness: 1,
+                        spikedash: "solid",
+                        spikecolor: isDarkMode ? "#333" : "#ddd",
+                    },
+                    yaxis: {
+                        visible: false,
+                        fixedrange: true,
+                    },
+                    annotations: annotations,
+                    shapes:
+                        currentAudioTime !== null
+                            ? [
+                                  {
+                                      type: "line",
+                                      x0: currentAudioTime,
+                                      x1: currentAudioTime,
+                                      y0: 0,
+                                      y1: 1,
+                                      yref: "paper",
+                                      line: { color: isDarkMode ? "#666" : "#aaa", width: 1 },
+                                  },
+                              ]
+                            : [],
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: false,
+                    scrollZoom: true,
+                    doubleClick: "reset",
+                };
+
+                Plotly.react("myChart", traces, layout, config);
             }
 
             function updateCursor(time) {
                 currentAudioTime = time;
-
                 const mins = Math.floor(time / 60);
                 const secs = (time % 60).toFixed(2).padStart(5, "0");
                 document.getElementById("timeDisplay").innerText = `${mins}:${secs}`;
+                updatePlot();
+            }
 
-                if (chartInstance) chartInstance.draw();
+            async function analyzeAudio(arrayBuffer, type) {
+                const status = document.getElementById("status");
+                analyzedData = [];
+
+                const blob = new Blob([arrayBuffer], { type });
+                wavesurfer.load(URL.createObjectURL(blob));
+
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+                const channelData = audioBuffer.getChannelData(0);
+
+                if (audioBuffer.sampleRate !== 44100)
+                    oscofo = new wasmModule.OpenScofo(audioBuffer.sampleRate, 2048, 512);
+
+                const windowSize = 2048,
+                    hopSize = 512;
+                for (let i = 0; i < channelData.length - windowSize; i += hopSize) {
+                    const vec = new wasmModule.VectorDouble();
+                    for (let j = 0; j < windowSize; j++) vec.push_back(channelData[i + j]);
+
+                    const desc = oscofo.get_audio_description(vec);
+                    const frame = { time: i / audioBuffer.sampleRate };
+                    descriptorList.forEach((k) => (frame[k] = desc[k]));
+                    analyzedData.push(frame);
+                    vec.delete();
+
+                    if (analyzedData.length % 100 === 0) {
+                        status.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
+                        await new Promise((r) => setTimeout(r, 0));
+                    }
+                }
+
+                status.innerText = "Ready.";
+                document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = false));
+                updatePlot();
+            }
+
+            OpenScofo().then(async (mod) => {
+                wasmModule = mod;
+                oscofo = new mod.OpenScofo(44100, 2048, 512);
+                document.getElementById("status").innerText = "Loading Canticos...";
+
+                const res = await fetch(
+                    "https://github.com/charlesneimog/OpenScofo/raw/refs/heads/main/Tests/assets/canticos.mp3",
+                );
+                const buffer = await res.arrayBuffer();
+                analyzeAudio(buffer, "audio/mp3");
+            });
+
+            document.getElementById("audioUpload").addEventListener("change", async (e) => {
+                const file = e.target.files[0];
+                if (file) analyzeAudio(await file.arrayBuffer(), file.type);
+            });
+
+            function togglePlay() {
+                wavesurfer.playPause();
             }
         </script>
     </body>
