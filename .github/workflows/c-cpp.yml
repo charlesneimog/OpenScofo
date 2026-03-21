@@ -126,3 +126,31 @@ jobs:
             build/Sources/Wrappers/Vamp/*.so
             build/Sources/Wrappers/Vamp/*.dylib
             build/Sources/Wrappers/Vamp/*.dll
+
+      - name: Prepare SuperCollider Final Folder
+        shell: bash
+        run: |
+          mkdir -p SuperCollider
+
+          # binaries
+          cp build/Sources/Wrappers/SuperCollider/*.so SuperCollider/ 2>/dev/null || true
+          cp build/Sources/Wrappers/SuperCollider/*.dylib SuperCollider/ 2>/dev/null || true
+          cp build/Sources/Wrappers/SuperCollider/*.dll SuperCollider/ 2>/dev/null || true
+          cp build/Sources/Wrappers/SuperCollider/*.scx SuperCollider/ 2>/dev/null || true
+
+          # sc files
+          cp Sources/Wrappers/SuperCollider/*.sc SuperCollider/ 2>/dev/null || true
+
+          # examples
+          mkdir -p SuperCollider/examples
+          cp Sources/Wrappers/SuperCollider/examples/*.scd SuperCollider/examples/ 2>/dev/null || true
+
+          # assets
+          mkdir -p SuperCollider/assets
+          cp Tests/assets/* SuperCollider/assets/
+
+      - name: Upload SuperCollider Plugin
+        uses: actions/upload-artifact@v6
+        with:
+          name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+          path: SuperCollider

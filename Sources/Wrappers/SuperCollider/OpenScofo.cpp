@@ -18,7 +18,6 @@ struct ScOpenScofo : public SCUnit {
         const float sampleRate = in0(1) > 0.0f ? in0(1) : 48000.0f;
         const float fftSize = in0(2) > 0.0f ? in0(2) : 2048.0f;
         const float hopSize = in0(3) > 0.0f ? in0(3) : 512.0f;
-        Print("sr: %f | fft: %f | hop: %f\n", sampleRate, fftSize, hopSize);
 
         m_FFTSize = std::max(1, static_cast<int>(fftSize));
         m_HopSize = std::max(1, static_cast<int>(hopSize));
@@ -172,6 +171,7 @@ struct ScOpenScofo : public SCUnit {
     }
 
     void next_a(int inNumSamples) {
+        (void)inNumSamples;
         int audioSamples = mWorld->mFullRate.mBufLength;
         const float *inBuf = in(0);
         const int size = (int)m_InBuffer.size();

@@ -16,7 +16,14 @@ s.waitForBoot {
         var eventIndex = msg[3].asInteger;
         if(eventIndex != ~lastEvent) {
             ~lastEvent = eventIndex;
-            ("OpenScofo event: " ++ eventIndex).postln;
+
+
+            ("Current Event Index is: " ++ eventIndex).postln;
+
+			if (eventIndex == 10){
+				"On this 10th event I will do a really cool thing".postln;
+			};
+
         };
     }, '/oscofo/currentEvent');
 
@@ -39,11 +46,15 @@ s.waitForBoot {
     s.sync;
 
     OpenScofo.parseScore(~oscofoSynth, ~scorePath);
-    OpenScofo.setEventNotifications(~oscofoSynth, true);
+    if(OpenScofo.respondsTo(\setEventNotifications)) {
+        OpenScofo.setEventNotifications(~oscofoSynth, true);
+    };
 
     CmdPeriod.doOnce({
         OSCdef(\oscofoCurrentEvent).free;
-        OpenScofo.setEventNotifications(~oscofoSynth, false);
+        if(OpenScofo.respondsTo(\setEventNotifications)) {
+            OpenScofo.setEventNotifications(~oscofoSynth, false);
+        };
         if(~oscofoSynth.notNil) { ~oscofoSynth.free; };
         if(~sndBuf.notNil) { ~sndBuf.free; };
     });
