@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 env:
   LIBNAME: OpenScofo
-  LIBVERSION: 0.1.4
+  LIBVERSION: 0.1.5
 permissions:
   contents: write
 jobs:
