@@ -1,7 +1,7 @@
 import sys
 
-sys.path.append("/home/neimog/Documents/Git/OpenScofo/build/Sources/Python/")
-sys.path.append("/home/neimog/Documents/Git/OpenScofo/Sources/Python/")
+sys.path.append("/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/Python/")
+sys.path.append("/home/neimog/Documents/Git/OpenScofo/Sources/Wrappers/Python/")
 
 import os
 import random
