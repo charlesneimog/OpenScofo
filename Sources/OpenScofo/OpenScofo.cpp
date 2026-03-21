@@ -89,7 +89,6 @@ void OpenScofo::SetErrorCallback(std::function<void(const spdlog::details::log_m
 #endif
     } else {
         std::cerr << "Not possible to create Log" << std::endl;
-        exit(-1);
     }
 }
 

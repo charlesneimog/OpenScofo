@@ -94,11 +94,6 @@ class MIR {
     fftw_plan m_FullFFTPlan = nullptr;
     std::vector<double> m_FullWindowingFunc;
 
-    double *m_HopFFTIn = nullptr;
-    fftw_complex *m_HopFFTOut = nullptr;
-    fftw_plan m_HopFFTPlan = nullptr;
-    std::vector<double> m_HopWindowingFunc;
-
     double m_PrevPercussiveProb;
     double m_PrevRMS;
     double m_PeakFlux;

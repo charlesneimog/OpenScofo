@@ -16,7 +16,7 @@ extern "C" {
 
 #define OSCOFO_VERSION_MAJOR 0
 #define OSCOFO_VERSION_MINOR 1
-#define OSCOFO_VERSION_PATCH 4
+#define OSCOFO_VERSION_PATCH 5
 
 #define OSCOFO_BUILD_TIME (__DATE__ " " __TIME__)
 
