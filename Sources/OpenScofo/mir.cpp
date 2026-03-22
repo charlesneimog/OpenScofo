@@ -384,7 +384,7 @@ void MIR::OnsetExec(Description &Desc) {
     }
 
     (void)onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
-    Desc.Onset = m_ODS->odfvalpost < 0 ? 0 : m_ODS->odfvalpost;
+    Desc.Onset = m_ODS->odfvalpost;
 }
 
 // ╭─────────────────────────────────────╮
@@ -775,36 +775,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.Power[i];
     }
 
-    // Harmonicity
-    if (Desc.Pitch > 0.0 && Desc.PitchConfidence > 0.0) {
-        int maxHarmonics = 10;
-        double harmonicEnergy = 0.0;
-        for (int k = 1; k <= maxHarmonics; ++k) {
-            double targetFreq = k * Desc.Pitch;
-            int bin = round(targetFreq / binWidth);
-
-            // search +/- 1 bin for a local maximum
-            int bestBin = -1;
-            double bestMag = 0.0;
-            for (int offset = -1; offset <= 1; ++offset) {
-                int b = bin + offset;
-                if (b > 0 && b < (int)NHalf - 1) {
-                    if (Desc.Magnitude[b] > Desc.Magnitude[b - 1] && Desc.Magnitude[b] > Desc.Magnitude[b + 1]) {
-                        if (Desc.Magnitude[b] > bestMag) {
-                            bestMag = Desc.Magnitude[b];
-                            bestBin = b;
-                        }
-                    }
-                }
-            }
-
-            if (bestBin >= 0)
-                harmonicEnergy += Desc.Power[bestBin];
-        }
-        Desc.Harmonicity = harmonicEnergy;
-    } else {
-        Desc.Harmonicity = 0.0;
-    }
+    
 
     OnsetExec(Desc);
     MFCCExec(Desc);
