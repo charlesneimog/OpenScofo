@@ -449,9 +449,7 @@
                 oscofo = new mod.OpenScofo(44100, 2048, 512);
                 document.getElementById("status").innerText = "Loading Canticos...";
 
-                const res = await fetch(
-                    "https://github.com/charlesneimog/OpenScofo/raw/refs/heads/main/Tests/assets/canticos.mp3",
-                );
+                const res = await fetch("./canticos.mp3");
                 const buffer = await res.arrayBuffer();
                 analyzeAudio(buffer, "audio/mp3");
             });
