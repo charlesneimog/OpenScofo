@@ -181,9 +181,11 @@ jobs:
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
-
-      - name: Upload Emscripten WebSite
+      - name: Upload CSound Plugin
         uses: actions/upload-artifact@v6
         with:
-          name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}
-          path: Emscripten
+          name: CSound-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+          path: |
+            build/Sources/Wrappers/CSound/*.so
+            build/Sources/Wrappers/CSound/*.dylib
+            build/Sources/Wrappers/CSound/*.dll
