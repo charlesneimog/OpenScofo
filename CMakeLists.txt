@@ -22,6 +22,7 @@ endif()
 option(OSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
+option(OSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
 option(OSCOFO_BUILD_TESTS "Build Tests" OFF)
 option(OSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
 
@@ -34,6 +35,7 @@ if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_MAX_OBJECT ON)
     set(OSCOFO_BUILD_VAMP_PLUGIN ON)
     set(OSCOFO_BUILD_SC_PLUGIN ON)
+    set(OSCOFO_BUILD_CSOUND_PLUGIN ON)
 endif()
 
 if(OSCOFO_BUILD_PD_OBJECT)
@@ -366,6 +368,13 @@ endif()
 # ╰──────────────────────────────────────╯
 if(OSCOFO_BUILD_SC_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
+endif()
+
+# ╭──────────────────────────────────────╮
+# │              CSound                  │
+# ╰──────────────────────────────────────╯
+if(OSCOFO_BUILD_CSOUND_PLUGIN AND NOT EMSCRIPTEN)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/CSound")
 endif()
 
 # ╭──────────────────────────────────────╮
