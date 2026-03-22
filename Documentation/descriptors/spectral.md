@@ -6,7 +6,9 @@ Spectral descriptors are used after a `FFT`. For `FFT` we use a Hann window.
 
 ## `Harmonicity` 
 
-Harmonicity measures how tone-like a sound is: high harmonicity means clear pitched tones with strong harmonics, while low harmonicity indicates noisy or texture-rich sounds.
+!!! bug "Not implemented yet"
+
+Harmonicity measures how well a sound’s spectrum aligns with a harmonic series (integer multiples of a fundamental frequency). High harmonicity indicates a clear pitched sound with harmonically related partials, while low harmonicity indicates inharmonic or noise-like spectra.
 
 
 <div class="grid cards" style="font-weigth:bold" markdown>
@@ -16,6 +18,8 @@ Harmonicity measures how tone-like a sound is: high harmonicity means clear pitc
         $$Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$$
 
 -   ??? note "Notes"
+
+        Probably will be Based on [Yu](https://doi.org/10.1121/1.2356838) (2006);
 
 </div>
 
@@ -42,6 +46,8 @@ Spectral flatness indicates how noisy versus tonal a sound is. A high flatness m
 ---
 
 ## `Spectral Flux`
+
+:custom-essentia:[^6]
 
 Spectral flux measures how quickly the spectrum of a sound changes over time. High flux indicates sudden changes or transients, like drum hits, while low flux corresponds to steady, continuous sounds.
 
@@ -78,6 +84,7 @@ Spectral irregularity quantifies how uneven or jagged a spectrum is between adja
 ---
 
 ## `Spectral Crest`
+:custom-essentia:[^6]
 
 Spectral crest measures the ratio of the highest spectral peak to the average spectral amplitude. A high crest indicates a tone dominated by strong harmonics or transients, while a low crest corresponds to more even, noise-like spectra.
 
@@ -89,8 +96,19 @@ Spectral crest measures the ratio of the highest spectral peak to the average sp
 
 -   ??? note "Notes"
 
-
 </div>
+
+## `Spectral Skewness`
+
+:custom-essentia:[^6]
+
+Spectral kurtosis measures the _peakedness_ or _tailedness_ of the spectral distribution around its centroid. It quantifies how concentrated the spectral energy is in a few frequency bins versus being evenly spread.
+
+## `Spectral Kurtois`
+
+:custom-essentia:[^6]
+    
+Spectral skewness measures the asymmetry of the spectral distribution around its centroid. It indicates whether the energy is biased toward low or high frequencies.
 
 ---
 
@@ -310,3 +328,5 @@ Chroma features capture the intensity of the twelve pitch classes (C, C♯, …,
 [^3]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-5}$.
 [^4]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-3}$.
 [^5]: `Descriptor` full compatible with [`librosa`](https://librosa.org/).
+
+[^6]: `Descriptor` compatible with [`essentia`](https://essentia.upf.edu/) in order of $10^{-4}$.
