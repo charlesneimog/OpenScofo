@@ -1,4 +1,5 @@
 import sys
+import puredata as pd
 
 sys.path.append("/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/Python/")
 sys.path.append("/home/neimog/Documents/Git/OpenScofo/Sources/Wrappers/Python/")
@@ -13,7 +14,7 @@ from queue import SimpleQueue, Empty
 import OpenScofo
 import numpy as np
 import librosa
-import puredata as pd
+
 from scipy.signal import fftconvolve
 
 from sklearn.metrics import classification_report
