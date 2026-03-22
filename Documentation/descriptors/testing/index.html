@@ -34,7 +34,7 @@
             .header {
                 display: flex;
                 flex-direction: column;
-                align-items: center;
+                align-items: center; /* or flex-start if you want left-aligned */
                 margin-bottom: 20px;
                 gap: 10px;
             }
@@ -86,35 +86,9 @@
                 height: 50vh;
                 position: relative;
             }
-
             #myChart {
                 width: 100%;
                 height: 100%;
-            }
-
-            /* NEW: Overlay for centered analysis text */
-            #analysisOverlay {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 2rem;
-                font-weight: bold;
-                background: rgba(248, 249, 250, 0.8);
-                color: var(--text-color);
-                padding: 15px 30px;
-                border-radius: 8px;
-                pointer-events: none;
-                display: none;
-                z-index: 10;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            }
-
-            @media (prefers-color-scheme: dark) {
-                #analysisOverlay {
-                    background: rgba(18, 18, 18, 0.8);
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-                }
             }
 
             #waveform {
@@ -162,7 +136,6 @@
         <div id="descriptor-selection" class="legend-group"></div>
 
         <div class="chart-container">
-            <div id="analysisOverlay">Analyzing...</div>
             <div id="myChart"></div>
         </div>
 
@@ -183,7 +156,6 @@
             let wavesurfer = null;
             let analyzedData = [];
             let currentAudioTime = null;
-            let isAnalyzing = false; // State flag to control zooming and rendering
 
             const descriptorList = [
                 "onset",
@@ -274,44 +246,40 @@
                 const selected = Array.from(document.querySelectorAll("#descriptor-selection input:checked"));
                 const totalDuration = analyzedData[analyzedData.length - 1].time;
 
-                let targetRange = [0, totalDuration];
-                let nearestIdx = 0;
-
-                // Only follow playhead or preserve zoom if NOT currently analyzing
-                if (!isAnalyzing) {
-                    let viewWidth = totalDuration;
-                    if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
-                        const range = chartDiv.layout.xaxis.range;
-                        viewWidth = Math.abs(range[1] - range[0]);
-                    }
-
-                    if (viewWidth < totalDuration && currentAudioTime !== null) {
-                        let start = currentAudioTime - viewWidth / 2;
-                        let end = currentAudioTime + viewWidth / 2;
-                        if (start < 0) {
-                            start = 0;
-                            end = viewWidth;
-                        }
-                        if (end > totalDuration) {
-                            end = totalDuration;
-                            start = totalDuration - viewWidth;
-                        }
-                        targetRange = [start, end];
-                    } else if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
-                        targetRange = chartDiv.layout.xaxis.range; // Preserve zoom while stationary
-                    }
-
-                    if (currentAudioTime !== null) {
-                        const ratio = currentAudioTime / totalDuration;
-                        nearestIdx = Math.min(
-                            analyzedData.length - 1,
-                            Math.max(0, Math.floor(ratio * analyzedData.length)),
-                        );
-                    }
-                } else {
-                    // While analyzing, force view to see everything processed so far
-                    targetRange = [0, totalDuration];
+                // 1. DETERMINE VIEWPORT WIDTH
+                // Default to full duration, otherwise use the user's current zoom width
+                let viewWidth = totalDuration;
+                if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
+                    const range = chartDiv.layout.xaxis.range;
+                    viewWidth = Math.abs(range[1] - range[0]);
                 }
+
+                // 2. CALCULATE "FOLLOW" RANGE
+                // If zoomed in, center the currentAudioTime.
+                // We also clamp the edges so we don't scroll past 0 or the end of the file.
+                let targetRange = [0, totalDuration];
+                if (viewWidth < totalDuration) {
+                    let start = currentAudioTime - viewWidth / 2;
+                    let end = currentAudioTime + viewWidth / 2;
+
+                    // Clamp to start
+                    if (start < 0) {
+                        start = 0;
+                        end = viewWidth;
+                    }
+                    // Clamp to end
+                    if (end > totalDuration) {
+                        end = totalDuration;
+                        start = totalDuration - viewWidth;
+                    }
+                    targetRange = [start, end];
+                }
+
+                const ratio = currentAudioTime / totalDuration;
+                const nearestIdx = Math.min(
+                    analyzedData.length - 1,
+                    Math.max(0, Math.floor(ratio * analyzedData.length)),
+                );
 
                 const traces = selected.map((cb) => ({
                     x: analyzedData.map((d) => d.time),
@@ -323,23 +291,20 @@
                     hoverinfo: "skip",
                 }));
 
-                const annotations =
-                    !isAnalyzing && currentAudioTime !== null
-                        ? selected.map((cb) => {
-                              const val = analyzedData[nearestIdx][cb.value];
-                              return {
-                                  x: currentAudioTime,
-                                  y: val,
-                                  xref: "x",
-                                  yref: "y",
-                                  text: `${cb.value.toUpperCase()}: ${val.toFixed(2)}`,
-                                  showarrow: false,
-                                  xanchor: "left",
-                                  font: { color: cb.dataset.color, size: 8, weight: "bold" },
-                                  bgcolor: isDarkMode ? "rgba(18,18,18,0.8)" : "rgba(255,255,255,0.8)",
-                              };
-                          })
-                        : [];
+                const annotations = selected.map((cb) => {
+                    const val = analyzedData[nearestIdx][cb.value];
+                    return {
+                        x: currentAudioTime,
+                        y: val,
+                        xref: "x",
+                        yref: "y",
+                        text: `${cb.value.toUpperCase()}: ${val.toFixed(2)}`,
+                        showarrow: false,
+                        xanchor: "left",
+                        font: { color: cb.dataset.color, size: 10, weight: "bold" },
+                        bgcolor: isDarkMode ? "rgba(18,18,18,0.8)" : "rgba(255,255,255,0.8)",
+                    };
+                });
 
                 const layout = {
                     margin: { l: 0, r: 0, t: 0, b: 0 },
@@ -348,10 +313,8 @@
                     showlegend: false,
                     xaxis: {
                         visible: false,
-                        fixedrange: isAnalyzing, // Disabled during analysis
-                        range: targetRange,
-                        minallowed: 0, // Prevent panning past the start
-                        maxallowed: Math.max(totalDuration, 0.01), // Prevent zooming out wider than the total duration
+                        fixedrange: false,
+                        range: targetRange, // FOLLOWS THE PLAYHEAD
                         spikemode: "across",
                         spikethickness: 1,
                         spikedash: "solid",
@@ -359,11 +322,11 @@
                     },
                     yaxis: {
                         visible: false,
-                        fixedrange: true, // Always lock Y axis height
+                        fixedrange: true,
                     },
                     annotations: annotations,
                     shapes:
-                        !isAnalyzing && currentAudioTime !== null
+                        currentAudioTime !== null
                             ? [
                                   {
                                       type: "line",
@@ -381,7 +344,7 @@
                 const config = {
                     responsive: true,
                     displayModeBar: false,
-                    scrollZoom: !isAnalyzing, // Mouse wheel zoom disabled during analysis
+                    scrollZoom: true,
                     doubleClick: "reset",
                 };
 
@@ -393,18 +356,12 @@
                 const mins = Math.floor(time / 60);
                 const secs = (time % 60).toFixed(2).padStart(5, "0");
                 document.getElementById("timeDisplay").innerText = `${mins}:${secs}`;
-                if (!isAnalyzing) updatePlot();
+                updatePlot();
             }
 
             async function analyzeAudio(arrayBuffer, type) {
-                isAnalyzing = true;
                 const status = document.getElementById("status");
-                const overlay = document.getElementById("analysisOverlay");
                 analyzedData = [];
-
-                overlay.style.display = "block";
-                overlay.innerText = "Reading Audio...";
-                status.innerText = "";
 
                 const blob = new Blob([arrayBuffer], { type });
                 wavesurfer.load(URL.createObjectURL(blob));
@@ -428,17 +385,12 @@
                     analyzedData.push(frame);
                     vec.delete();
 
-                    // Update live chart every 50 frames
-                    if (analyzedData.length % 50 === 0) {
-                        overlay.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
-                        updatePlot();
+                    if (analyzedData.length % 100 === 0) {
+                        status.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
                         await new Promise((r) => setTimeout(r, 0));
                     }
                 }
 
-                // Finish
-                isAnalyzing = false;
-                overlay.style.display = "none";
                 status.innerText = "Ready.";
                 document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = false));
                 updatePlot();
@@ -449,9 +401,7 @@
                 oscofo = new mod.OpenScofo(44100, 2048, 512);
                 document.getElementById("status").innerText = "Loading Canticos...";
 
-                const res = await fetch(
-                    "https://github.com/charlesneimog/OpenScofo/raw/refs/heads/main/Tests/assets/canticos.mp3",
-                );
+                const res = await fetch("./canticos.mp3");
                 const buffer = await res.arrayBuffer();
                 analyzeAudio(buffer, "audio/mp3");
             });
@@ -464,20 +414,6 @@
             function togglePlay() {
                 wavesurfer.playPause();
             }
-
-            // Global Spacebar listener for Play/Pause
-            document.addEventListener("keydown", function (event) {
-                if (event.code === "Space") {
-                    // Prevent default page scrolling
-                    event.preventDefault();
-
-                    // Only toggle if audio is loaded (play button is active)
-                    const playBtn = document.getElementById("playBtn");
-                    if (playBtn && !playBtn.disabled) {
-                        togglePlay();
-                    }
-                }
-            });
         </script>
     </body>
 </html>
