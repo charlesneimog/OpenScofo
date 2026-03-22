@@ -27,6 +27,12 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Setup Emscripten
+        if: runner.os == 'Linux'
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
       # -----------------------
       # Linux dependencies
       # -----------------------
@@ -98,6 +104,18 @@ jobs:
             "-Ccmake.args=-G Ninja"
           )
           python -m build --wheel @buildArgs
+
+      - name: Build Emscripten
+        if: runner.os == 'Linux'
+        run: |
+          source $EMSDK/emsdk_env.sh
+          emcmake cmake . -B build-wasm \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOSCOFO_BUILD_TESTS=OFF \
+            -DBUILD_ALL=ON
+
+          cmake --build build-wasm
+
       # -----------------------
       # Upload artifacts
       # -----------------------
@@ -149,8 +167,23 @@ jobs:
           mkdir -p SuperCollider/assets
           cp Tests/assets/* SuperCollider/assets/
 
+      - name: Upload Emscripten Build
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p Emscripten
+          mkdir -p Emscripten
+          cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
+          cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
+          cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
+
       - name: Upload SuperCollider Plugin
         uses: actions/upload-artifact@v6
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
+
+      - name: Upload Emscripten WebSite
+        uses: actions/upload-artifact@v6
+        with:
+          name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}
+          path: Emscripten
