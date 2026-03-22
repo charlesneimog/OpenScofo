@@ -151,8 +151,8 @@ static void oscofo_output_descriptors(MaxOpenScofo *x, OpenScofo::Description &D
         case OpenScofo::Descriptors::ONNX: {
             for (const auto &ONNXDesc : Desc.ONNX) {
                 std::vector<t_atom> onnxAtoms(2);
-                SETSYMBOL(&onnxAtoms[0], gensym(ONNXDesc.first.c_str()));
-                SETFLOAT(&onnxAtoms[1], ONNXDesc.second);
+                atom_setsym(&onnxAtoms[0], gensym(ONNXDesc.first.c_str()));
+                atom_setfloat(&onnxAtoms[1], ONNXDesc.second);
                 outlet_anything(x->DescOut, gensym("onnx"), 2, onnxAtoms.data());
             }
             break;
