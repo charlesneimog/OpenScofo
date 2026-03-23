@@ -42,6 +42,7 @@ extra_javascript = [
   { path = "javascript/vexflow.mjs" },
   { path = "javascripts/mathjax.js" },
   { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
+  { path = "javascript/download-links.js" },
 
 
 ]
