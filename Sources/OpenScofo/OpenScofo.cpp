@@ -531,7 +531,7 @@ double OpenScofo::GetBlockDuration() {
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
-bool OpenScofo::ParseScore(std::string ScorePath) {
+bool OpenScofo::ParseScore(fs::path ScorePath) {
     ClearErrors();
 
     m_CurrentScorePosition = 0;

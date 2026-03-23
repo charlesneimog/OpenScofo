@@ -40,7 +40,7 @@ class OpenScofo {
   public:
     OpenScofo(float Sr, float WindowSize, float HopSize);
     // Main Functions
-    bool ParseScore(std::string ScorePath);
+    bool ParseScore(fs::path ScorePath);
     bool ProcessBlock(const std::vector<double> &AudioBuffer);
     bool ScoreIsLoaded();
 
