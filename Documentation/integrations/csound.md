@@ -1,5 +1,8 @@
 # CSound
 
+<release interface="CSound">Loading Releases</release>
+
+
 `OpenScofo` is a Csound opcode for real-time score following and audio descriptor extraction.
 
 !!! danger "This is a pre-alpha version!"

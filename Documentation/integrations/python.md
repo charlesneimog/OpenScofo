@@ -1,5 +1,8 @@
 # Python
 
+<release interface="Python">Loading Releases</release>
+
+
 `OpenScofo` provides Python bindings (via `pybind11`) for development, validation, and research workflows.
 
 ## Import and create an object
