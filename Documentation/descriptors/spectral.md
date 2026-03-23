@@ -5,6 +5,7 @@ Spectral descriptors are used after a `FFT`. For `FFT` we use a Hann window.
 ---
 
 ## `Harmonicity` 
+**ID**: `harmonicity` 
 
 !!! bug "Not implemented yet"
 
@@ -26,8 +27,7 @@ Harmonicity measures how well a sound’s spectrum aligns with a harmonic series
 ---
 
 ## `Spectral Flatness` 
-
-:custom-librosa:[^2]
+**ID**: `flatness` | :custom-librosa:[^2]
 
 Spectral flatness indicates how noisy versus tonal a sound is. A high flatness means the spectrum is uniform like white noise, while a low flatness shows clear peaks, like a sustained musical note.
 
@@ -46,8 +46,7 @@ Spectral flatness indicates how noisy versus tonal a sound is. A high flatness m
 ---
 
 ## `Spectral Flux`
-
-:custom-essentia:[^6]
+**ID**: `flux` |  :custom-essentia:[^6]
 
 Spectral flux measures how quickly the spectrum of a sound changes over time. High flux indicates sudden changes or transients, like drum hits, while low flux corresponds to steady, continuous sounds.
 
@@ -66,6 +65,8 @@ Spectral flux measures how quickly the spectrum of a sound changes over time. Hi
 ---
 
 ## `Spectral Irregularity`
+**ID**: `irregularity`
+
 
 Spectral irregularity quantifies how uneven or jagged a spectrum is between adjacent frequency bins. High irregularity indicates complex, inharmonic, or noisy timbres, while low values suggest smooth, harmonic sounds.
 
@@ -84,7 +85,7 @@ Spectral irregularity quantifies how uneven or jagged a spectrum is between adja
 ---
 
 ## `Spectral Crest`
-:custom-essentia:[^6]
+**ID**: `crest` | :custom-essentia:[^6]
 
 Spectral crest measures the ratio of the highest spectral peak to the average spectral amplitude. A high crest indicates a tone dominated by strong harmonics or transients, while a low crest corresponds to more even, noise-like spectra.
 
@@ -99,22 +100,19 @@ Spectral crest measures the ratio of the highest spectral peak to the average sp
 </div>
 
 ## `Spectral Skewness`
-
-:custom-essentia:[^6]
+**ID**: `skewness` | :custom-essentia:[^6]
 
 Spectral kurtosis measures the _peakedness_ or _tailedness_ of the spectral distribution around its centroid. It quantifies how concentrated the spectral energy is in a few frequency bins versus being evenly spread.
 
 ## `Spectral Kurtois`
-
-:custom-essentia:[^6]
+**ID**: `kurtosis` | :custom-essentia:[^6]
     
 Spectral skewness measures the asymmetry of the spectral distribution around its centroid. It indicates whether the energy is biased toward low or high frequencies.
 
 ---
 
 ## `Spectral Centroid` 
-
-:custom-librosa:[^3]
+**ID**: `centroid` | :custom-librosa:[^3]
 
 Spectral centroid indicates the “center of mass” of a sound’s spectrum. Higher values make the sound perceptually brighter, while lower values make it darker or warmer.
 
@@ -132,6 +130,7 @@ Spectral centroid indicates the “center of mass” of a sound’s spectrum. Hi
 ---
 
 ## `Centroid Velocity`
+**ID**: `velocity` | :custom-essentia:[^6]
 
 Centroid velocity measures how quickly the spectral centroid changes over time, reflecting dynamic shifts in brightness or timbre.
 
@@ -149,7 +148,7 @@ Centroid velocity measures how quickly the spectral centroid changes over time, 
 ---
 
 ## `Spectral Spread` 
-:custom-librosa:[^3]
+**ID**: `spread` | :custom-librosa:[^3]
 
 Spectral spread quantifies how dispersed the energy is around the spectral centroid, indicating whether the sound is focused (narrow) or diffuse (wide) in frequency.
 
@@ -167,6 +166,8 @@ Spectral spread quantifies how dispersed the energy is around the spectral centr
 ---
 
 ## `High Frequency Ratio`
+**ID**: `hfr`
+
 
 High Frequency Ratio measures the proportion of energy in the upper part of the spectrum, reflecting the brightness or presence of high-pitched content in a sound.
 
@@ -185,7 +186,7 @@ High Frequency Ratio measures the proportion of energy in the upper part of the 
 ---
 
 ## `Zero Crossing Rate`
-:custom-librosa:[^5]
+**ID**: `zcr` | :custom-librosa:[^5]
 
 Zero Crossing Rate counts how often the waveform crosses the zero amplitude line, indicating the noisiness or percussiveness of a sound.
 
@@ -203,6 +204,7 @@ Zero Crossing Rate counts how often the waveform crosses the zero amplitude line
 ---
 
 ## `Standard Deviation`
+**ID**: `std`
 
 Standard deviation of the normalized spectral power compared to the mean ($\mu = \frac{1}{K}$):
 
@@ -220,6 +222,8 @@ Standard deviation of the normalized spectral power compared to the mean ($\mu =
 ---
 
 ## `Pitch` & `PitchConfidence`
+**ID**: `pitch`
+
 
 Estimated fundamental frequency and confidence, calculated using the YIN algorithm's cumulative mean normalized difference function (CMNDF):
 
@@ -255,8 +259,7 @@ Vector of magnitude values normalized by the FFT size $N$:
 ---
 
 ## `Log-Mel Spectrogram`
-
-:custom-librosa:[^5]
+**ID**: `logmel` | :custom-librosa:[^5]
 
 The log-mel spectrum represents how the **energy of a sound is distributed across perceptual frequency bands**, using the mel scale and a logarithmic (dB) compression to approximate human loudness perception.
 
@@ -288,7 +291,7 @@ The log-mel spectrum represents how the **energy of a sound is distributed acros
 ---
 
 ## `MFCC` 
-:custom-librosa:[^3]
+**ID**: `mfcc` | :custom-librosa:[^3]
 
 MFCCs summarize the shape of a sound’s spectrum on a perceptual, mel-based scale, giving a compact representation of timbre and tone color as humans hear it.
 
@@ -306,7 +309,7 @@ MFCCs summarize the shape of a sound’s spectrum on a perceptual, mel-based sca
 ---
 
 ## `Chroma`
-:custom-librosa:[^4]
+**ID**: `chroma` | :custom-librosa:[^4]
 
 Chroma features capture the intensity of the twelve pitch classes (C, C♯, …, B) in a sound, representing its harmonic and melodic content independently of octave.
 

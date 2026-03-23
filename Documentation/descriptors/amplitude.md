@@ -2,8 +2,7 @@
 
 
 ## `Root Mean Square (RMS)` 
-
-:custom-librosa:[^1] :custom-essentia:
+**ID**: `rms` | :custom-librosa:[^1] :custom-essentia:
 
 A measure of the amplitude (energy) of the current audio frame. It represents how loud the sound is within a short time window. Higher RMS values indicate louder sounds, while lower values indicate quieter sounds or silence.
 
@@ -21,6 +20,7 @@ A measure of the amplitude (energy) of the current audio frame. It represents ho
 ---
 
 ## `dB`
+**ID**: `db` 
 
 A logarithmic measure of sound level derived from the signal amplitude. Unlike RMS, which measures the raw energy of the signal, dB expresses this energy on a logarithmic scale that better reflects how humans perceive changes in loudness.
 
@@ -39,6 +39,7 @@ A logarithmic measure of sound level derived from the signal amplitude. Unlike R
 ---
 
 ## `Max Amplitude `
+**ID**: `maxamp` 
 
 Maximum normalized spectral amplitude detected in the current frame of audio.
 
@@ -53,6 +54,7 @@ Maximum normalized spectral amplitude detected in the current frame of audio.
 
 
 ## `Loudness`
+**ID**: `loudness` 
 
 An estimate of perceived sound intensity based on psychoacoustic models of human hearing. Unlike dB, it applies perceptual models and filters derived from psychoacoustic studies to approximate how humans actually perceive loudness.
 
@@ -78,6 +80,7 @@ An estimate of perceived sound intensity based on psychoacoustic models of human
 ---
 
 ## `Silence Probability`
+**ID**: `silence` 
 
 Probability that the current frame corresponds to silence, derived from Loudness ($L$) via a logistic function where $\alpha = 0.25$ and $L_0 = -60.0$:
 
