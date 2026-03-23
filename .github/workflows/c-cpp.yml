@@ -1,9 +1,16 @@
 ---
-name: Compile PureData Object
+name: Compile Binaries
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish Release"
+        required: false
+        default: false
+        type: boolean
+
 env:
   LIBNAME: OpenScofo
   LIBVERSION: 0.1.5
@@ -26,7 +33,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-
       - name: Setup Emscripten
         if: runner.os == 'Linux'
         uses: mymindstorm/setup-emsdk@v14
@@ -104,7 +110,6 @@ jobs:
             "-Ccmake.args=-G Ninja"
           )
           python -m build --wheel @buildArgs
-
       - name: Build Emscripten
         if: runner.os == 'Linux'
         run: |
@@ -113,7 +118,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DOSCOFO_BUILD_TESTS=OFF \
             -DBUILD_ALL=ON
-
           cmake --build build-wasm
 
       # -----------------------
@@ -144,7 +148,6 @@ jobs:
             build/Sources/Wrappers/Vamp/*.so
             build/Sources/Wrappers/Vamp/*.dylib
             build/Sources/Wrappers/Vamp/*.dll
-
       - name: Prepare SuperCollider Final Folder
         shell: bash
         run: |
@@ -166,7 +169,6 @@ jobs:
           # assets
           mkdir -p SuperCollider/assets
           cp Tests/assets/* SuperCollider/assets/
-
       - name: Upload Emscripten Build
         if: runner.os == 'Linux'
         run: |
@@ -175,24 +177,47 @@ jobs:
           cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
           cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
           cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
-
       - name: Upload SuperCollider Plugin
         uses: actions/upload-artifact@v6
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
-
-      - name: Upload EMScripten Site
-        uses: actions/upload-artifact@v6
-        with:
-          name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}
-          path: Emscripten
-
       - name: Upload CSound Plugin
         uses: actions/upload-artifact@v6
         with:
           name: CSound-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |
+          path: |-
             build/Sources/Wrappers/CSound/*.so
             build/Sources/Wrappers/CSound/*.dylib
             build/Sources/Wrappers/CSound/*.dll
+
+  publish-release:
+    if: ${{ github.event.inputs.publish_release == 'true' }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create per-artifact zip archives
+        run: |
+          set -euo pipefail
+          mkdir -p release_assets
+          for artifact_dir in artifacts/*; do
+            [ -d "$artifact_dir" ] || continue
+            name="$(basename "$artifact_dir")"
+            (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
+          done
+          ls -1 release_assets
+      - name: Create / Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.LIBVERSION }}-alpha
+          name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            release_assets/*.zip
+          draft: true
+          prerelease: false
+
