@@ -865,11 +865,10 @@ bool ScoreIsText(const std::string &path) {
 }
 
 // ─────────────────────────────────────
-States Score::Parse(std::string ScoreFile) {
+States Score::Parse(fs::path ScoreFilePath) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
 
-    fs::path ScoreFilePath = fs::path(ScoreFile);
     if (fs::exists(ScoreFilePath) == false) {
         spdlog::error("Score File not found");
         return {};
@@ -877,7 +876,7 @@ States Score::Parse(std::string ScoreFile) {
     m_ScoreRootPath = ScoreFilePath.parent_path();
 
     // Open the score file for reading
-    std::ifstream File(ScoreFile, std::ios::binary);
+    std::ifstream File(ScoreFilePath, std::ios::binary);
     if (File.is_open() == false) {
         spdlog::error("Not possible to open score file");
         return {};
