@@ -38,6 +38,9 @@ function renderReleaseTable(data, assetName) {
     const container = document.querySelector(`release[interface="${assetName}"]`);
     if (!container) return;
 
+    if (assetName == "JavaScript") {
+        assetName = "Emscripten";
+    }
     const filteredAssets = data.assets.filter((a) => a.name.includes(assetName));
     if (filteredAssets.length === 0) return;
 
@@ -60,13 +63,16 @@ function renderReleaseTable(data, assetName) {
     const tbody = document.createElement("tbody");
     filteredAssets.forEach((a) => {
         const parts = a.name.replace(".zip", "").split("-");
-        const version = parts[2] || data.tag;
-        const os = parts[parts.length - 1] || "unknown";
+        const version = data.tag;
+        var os = parts[parts.length - 1] || "unknown";
+        if (assetName == "Emscripten") {
+            os = "WASM";
+        }
 
         const tr = document.createElement("tr");
 
         const tdVersion = document.createElement("td");
-        tdVersion.innerHTML = `<code>` + version + "-alpha" + `</code>`;
+        tdVersion.innerHTML = `<code>` + version + `</code>`;
 
         const tdOS = document.createElement("td");
         tdOS.textContent = os;

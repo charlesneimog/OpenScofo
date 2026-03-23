@@ -2,6 +2,7 @@
 
 <release interface="JavaScript">Loading Releases</release>
 
+Check the JavaScript module using the [OpenScofo descriptors](../descriptors/testing){target="_blank"}.
 
 
 This module exposes `OpenScofo` to JavaScript via Emscripten bindings. It enables browser-based score following, real-time processing, and offline analysis.
