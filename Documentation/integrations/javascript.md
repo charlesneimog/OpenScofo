@@ -1,5 +1,9 @@
 # JavaScript
 
+<release interface="JavaScript">Loading Releases</release>
+
+
+
 This module exposes `OpenScofo` to JavaScript via Emscripten bindings. It enables browser-based score following, real-time processing, and offline analysis.
 
 ## Overview
