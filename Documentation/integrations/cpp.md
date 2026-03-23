@@ -1,5 +1,9 @@
 # C++
 
+```
+git clone https://github.com/charlesneimog/OpenScofo.git
+```
+
 The C++ API provides direct access to the `OpenScofo` engine with minimal abstraction. It is intended for real-time systems, high-performance applications, and integration into custom audio pipelines.
 
 ## Overview
