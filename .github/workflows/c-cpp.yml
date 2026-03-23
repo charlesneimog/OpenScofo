@@ -171,6 +171,9 @@ jobs:
           cp Tests/assets/* SuperCollider/assets/
       - name: Upload Emscripten Build
         if: runner.os == 'Linux'
+        with:
+          name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+          path: SuperCollider
         run: |
           mkdir -p Emscripten
           mkdir -p Emscripten
@@ -182,6 +185,11 @@ jobs:
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
+      - name: Upload EMScripten Site
+        uses: actions/upload-artifact@v6
+        with:
+          name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
+          path: Emscripten
       - name: Upload CSound Plugin
         uses: actions/upload-artifact@v6
         with:
