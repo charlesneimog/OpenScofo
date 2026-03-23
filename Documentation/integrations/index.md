@@ -16,3 +16,7 @@ The following integrations are available:
 
 Each section provides setup instructions and usage details specific to the target environment.
 
+# Download Links
+
+<release interface="All"><i>Loading Releases</i></release>
+

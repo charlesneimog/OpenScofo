@@ -1,8 +1,9 @@
 # Python
 
-``` 
-pip install OpenScofo
-```
+<release interface="Python"><i>Loading Releases</i></release>
+
+!!! tip "`pip install OpenScofo`"
+
 
 `OpenScofo` provides Python bindings (via `pybind11`) for development, validation, and research workflows.
 
