@@ -23,7 +23,17 @@ nav = [
     "descriptors/onset.md",
     "descriptors/spectral.md",
   ] },
-  { "Python" = "python.md" },
+  { "Integrations" = [
+    "integrations/index.md",
+    "integrations/puredata.md",
+    "integrations/max.md",
+    "integrations/vamp.md",
+    "integrations/supercollider.md",
+    "integrations/csound.md",
+    "integrations/python.md",
+    "integrations/javascript.md",
+    "integrations/cpp.md",
+  ] },
   { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
   { "Downloads" = "https://github.com/charlesneimog/OpenScofo/releases/latest" },
 ]
