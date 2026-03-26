@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.25)
-project(OpenScofo VERSION 0.1.5)
+cmake_minimum_required(VERSION 3.30)
+project(OpenScofo VERSION 0.1.6 LANGUAGES C CXX
+        HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/" 
+        DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,6 +12,8 @@ set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
+
+add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-alpha")
 
 if(EMSCRIPTEN)
     message(STATUS "Emscripten compilation")
@@ -132,7 +136,7 @@ if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OSCOFO_LANGUAGE})
 
     # Download archive if missing
     if(NOT EXISTS "${TS_ARCHIVE}")
-        file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" SHOW_PROGRESS STATUS download_status)
+        file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" STATUS download_status)
         list(GET download_status 0 status_code)
         if(NOT status_code EQUAL 0)
             message(FATAL_ERROR "Failed to download web-tree-sitter archive")
@@ -220,7 +224,6 @@ list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
-target_compile_definitions(OpenScofo PUBLIC OPENSCOFO_VERSION="${PROJECT_VERSION}")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
 

@@ -2,8 +2,8 @@
 s.waitForBoot {
     var repoRoot = PathName(thisProcess.nowExecutingPath).pathOnly;
 
-    ~audioPath = (repoRoot +/+ "../assets/bwv-1013.wav").standardizePath;
-    ~scorePath = (repoRoot +/+ "../assets/bwv-1013.txt").standardizePath;
+	~audioPath = "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.wav";
+    ~scorePath = "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.txt";
     ~lastEvent = -1;
 
     ~sndBuf = Buffer.read(s, ~audioPath);

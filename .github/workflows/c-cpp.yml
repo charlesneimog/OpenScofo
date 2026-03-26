@@ -1,4 +1,3 @@
----
 name: Compile Binaries
 on:
   # push:
@@ -13,7 +12,7 @@ on:
 
 env:
   LIBNAME: OpenScofo
-  LIBVERSION: 0.1.5
+  LIBVERSION: 0.1.6
 permissions:
   contents: write
 jobs:
@@ -169,11 +168,9 @@ jobs:
           # assets
           mkdir -p SuperCollider/assets
           cp Tests/assets/* SuperCollider/assets/
+
       - name: Upload Emscripten Build
         if: runner.os == 'Linux'
-        with:
-          name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: SuperCollider
         run: |
           mkdir -p Emscripten
           mkdir -p Emscripten
@@ -222,7 +219,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.LIBVERSION }}-alpha
-          name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}
+          name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}-alpha
           target_commitish: ${{ github.sha }}
           files: |
             release_assets/*.zip
