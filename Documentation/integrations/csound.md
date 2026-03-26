@@ -7,6 +7,19 @@
 
 !!! danger "This is a pre-alpha version!"
 
+
+## Loading `OpenScofo`
+
+To load the `OpenScofo` opcode, you use the following code:
+
+``` csound
+<CsOptions>
+--opcode-lib=/path/to/OScofoCSound.so
+</CsOptions>
+```
+
+!!! warning "For MacOS extension is `OScofoCSound.dylib`, for Windows extension is `OScofoCSound.dll`."
+
 ## Syntax
 
 ```csound
@@ -20,17 +33,6 @@ The `OpenScofo` opcode operates in two distinct modes depending on the `SMode` a
 1. **Score Mode:** Tracks an audio signal against a text-based score, outputting the current event index and live BPM estimation.
 2. **Descriptor Mode:** Analyzes the audio signal and outputs a specific scalar audio descriptor (e.g., `RMS`, `crest`, and others).
 
-## Loading `OpenScofo`
-
-To load the `OpenScofo` opcode, you use the following code:
-
-``` csound
-<CsOptions>
---opcode-lib=/path/to/OScofoCSound.so
-</CsOptions>
-```
-
-For MacOS extension is `dylib`, for Windows extension is `dll`.
 
 ## Initialization (Inputs)
 
