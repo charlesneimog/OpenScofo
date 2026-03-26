@@ -316,6 +316,64 @@ def run_test_flux(prev_window, window, label):
     )
 
 
+# ---------------- ROLLOFF TEST ----------------
+def run_test_rolloff(window, label):
+    global MAX_DIFF
+
+    scofo_desc = scofo.get_audio_description(window)
+    o_rolloff = scofo_desc.rolloff
+
+    # Essentia rolloff (uses magnitude spectrum)
+    rolloff_algo = es.RollOff(cutoff=0.85)  # match typical definition
+
+    spectrum = np.ascontiguousarray(scofo_desc.magnitude, dtype=np.float32)
+    e_rolloff = rolloff_algo(spectrum)
+
+    diff = abs(e_rolloff - o_rolloff)
+    MAX_DIFF = max(diff, MAX_DIFF)
+
+    print_with_threshold(
+        diff,
+        "Essentia "
+        f"{label} | "
+        f"ROLL | "
+        f"E: {e_rolloff:+012.5f} | "
+        f"S: {o_rolloff:+012.5f} | "
+        f"D: {diff:+012.5f}",
+    )
+
+# ---------------- ENTROPY TEST ----------------
+def run_test_entropy(window, label):
+    global MAX_DIFF
+
+    scofo_desc = scofo.get_audio_description(window)
+    o_entropy = scofo_desc.entropy
+
+    # Essentia spectral entropy
+    entropy_algo = es.Entropy()
+
+    spectrum = np.ascontiguousarray(scofo_desc.magnitude, dtype=np.float32)
+
+    # Normalize to probability distribution (required for entropy)
+    s = spectrum.sum()
+    if s > 0:
+        spectrum = spectrum / s
+
+    e_entropy = entropy_algo(spectrum)
+
+    diff = abs(e_entropy - o_entropy)
+    MAX_DIFF = max(diff, MAX_DIFF)
+
+    print_with_threshold(
+        diff,
+        "Essentia "
+        f"{label} | "
+        f"ENTR | "
+        f"E: {e_entropy:+012.5f} | "
+        f"S: {o_entropy:+012.5f} | "
+        f"D: {diff:+012.5f}",
+    )
+
 # ---------------- FLUX TEST ----------------
 def run_test_spread_skew_kurt(prev_window, window, label):
     global MAX_DIFF
@@ -499,9 +557,11 @@ for _ in range(n_tests):
     run_test_spread(window, f"Start {start:08d}")
     run_test_centroid(window, f"Start {start:08d}")
     run_test_chroma(window, f"start {start:08d}")
+   
 
     # Essentia
-    print()
+    # run_test_rolloff(window, f"Start {start:08d}")
+    # run_test_entropy(window, f"Start {start:08d}")
     run_test_crest(window, f"start {start:08d}")
     run_test_flux(prev_window, window, f"Start {start:08d}")
     run_test_spread_skew_kurt(prev_window, window, f"Start {start:08d}")
