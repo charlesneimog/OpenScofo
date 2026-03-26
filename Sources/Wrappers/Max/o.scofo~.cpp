@@ -679,8 +679,7 @@ void ext_main(void) {
     t_class *c =
         class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
 
-    object_post(nullptr, "[o.scofo~] version %d.%d.%d (%s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR,
-                OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH, OSCOFO_BUILD_TIME);
+    object_post(nullptr, "[o.scofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 
     class_addmethod(c, (method)oscofo_score, "score", A_SYM, 0);
     class_addmethod(c, (method)oscofo_start, "start", A_NOTHING, 0);

@@ -89,6 +89,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
         return;
     }
     x->OpenScofo->SetCurrentEvent(0);
+    x->JustDescription = false;
 
     x->Event = 0;
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
@@ -560,6 +561,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     if (x->RequestMIR.size() > 0) {
         x->DescOut = outlet_new(&x->PdObject, &s_list);
         x->MirOutput = true;
+        x->JustDescription = true;
     }
 
     // Schedule
@@ -600,8 +602,7 @@ extern "C" void setup_o0x2escofo_tilde(void) {
     OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
                              CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[o.scofo~] version %d.%d.%d (%s), by Charles K. Neimog", OSCOFO_VERSION_MAJOR, OSCOFO_VERSION_MINOR,
-         OSCOFO_VERSION_PATCH, OSCOFO_BUILD_TIME);
+    post("[o.scofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);
