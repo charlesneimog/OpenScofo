@@ -675,7 +675,7 @@ static void oscofo_free(MaxOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-void ext_main(void) {
+int C74_EXPORT main() {
     t_class *c =
         class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
 
@@ -695,4 +695,5 @@ void ext_main(void) {
     class_dspinit(c);
     class_register(CLASS_BOX, c);
     oscofo_class = c;
+    return 0;
 }
