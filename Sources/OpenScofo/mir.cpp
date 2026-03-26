@@ -242,6 +242,12 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         case FLATNESS:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlatness; });
             break;
+        case ENTROPY:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralEntropy; });
+            break;
+        case ROLLOFF:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralRolloff; });
+            break;
         case FLUX:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlux; });
             break;
@@ -626,6 +632,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     double irregularityDenominator = 0.0;
     double logSumPower = 0.0;
     double linSumPower = 0.0;
+    double spectralEnergySum = 0.0;
     double harmonicityPeak = 0.0;
     double harmonicitySum = 0.0;
     double highFreqEnergy = 0.0;
@@ -683,6 +690,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         const double v = std::max(amin, p);
         logSumPower += std::log(v);
         linSumPower += v;
+        spectralEnergySum += p;
 
         const double diff = mag - m_PreviousSpectralPower[i];
         Desc.SpectralFlux += diff * diff;
@@ -760,8 +768,32 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     }
 
     Desc.SpectralFlatness = std::exp(logSumPower / NHalf) / (linSumPower / NHalf);
+    Desc.SpectralEntropy = 0.0;
+    if (spectralEnergySum > 0.0) {
+        const double invSpectralEnergy = 1.0 / spectralEnergySum;
+        for (size_t i = 0; i < NHalf; ++i) {
+            const double probability = Desc.Power[i] * invSpectralEnergy;
+            if (probability > 0.0) {
+                Desc.SpectralEntropy -= probability * std::log2(probability);
+            }
+        }
+    }
     Desc.Harmonicity = harmonicityPeak / (harmonicitySum + 1e-12);
     Desc.HighFreqRatio = highFreqEnergy / SumPowerEps;
+
+    const double rolloffCutoffEnergy = std::clamp(m_SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
+    double cumulativeEnergy = 0.0;
+    size_t rolloffBin = 0;
+    for (size_t i = 0; i < NHalf; ++i) {
+        cumulativeEnergy += Desc.Power[i];
+        if (cumulativeEnergy >= rolloffCutoffEnergy) {
+            rolloffBin = i;
+            break;
+        }
+        rolloffBin = i;
+    }
+    const double binToHz = (static_cast<double>(m_Sr) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
+    Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
 
     const double K = static_cast<double>(NHalf);
     const double denom = (K * sumFreqSq - sumFreq * sumFreq) + 1e-12;
@@ -774,8 +806,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     for (size_t i = 0; i < NHalf; ++i) {
         m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.Power[i];
     }
-
-    
 
     OnsetExec(Desc);
     MFCCExec(Desc);

@@ -13,12 +13,13 @@
 
 #include <fftw3.h>
 #include <onnx.h>
-#include <onsetsds.h>
 
 #define CURRENT_ONNX_OPSET 24
 #include "log.hpp"
 #include "states.hpp"
 namespace OpenScofo {
+
+#include <onsetsds.h>
 
 namespace fs = std::filesystem;
 
@@ -165,6 +166,7 @@ class MIR {
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;
     double m_PrevCentroid = 0.0;
+    double m_SpectralRolloffCutoff = 0.85;
     double m_YINThreshold = 0.15;
     double m_YINMinFrequency = 50.0;
     double m_YINMaxFrequency = 2000.0;

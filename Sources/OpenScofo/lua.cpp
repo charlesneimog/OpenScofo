@@ -62,6 +62,10 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "harmonicity");
     lua_pushnumber(L, desc.SpectralFlatness);
     lua_setfield(L, -2, "spectral_flatness");
+    lua_pushnumber(L, desc.SpectralEntropy);
+    lua_setfield(L, -2, "spectral_entropy");
+    lua_pushnumber(L, desc.SpectralRolloff);
+    lua_setfield(L, -2, "spectral_rolloff");
     lua_pushnumber(L, desc.SpectralFlux);
     lua_setfield(L, -2, "spectral_flux");
     lua_pushnumber(L, desc.SpectralIrregularity);
