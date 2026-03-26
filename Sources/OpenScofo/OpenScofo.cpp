@@ -330,6 +330,10 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
         return "spread";
     case Descriptors::FLATNESS:
         return "flatness";
+    case Descriptors::ENTROPY:
+        return "entropy";
+    case Descriptors::ROLLOFF:
+        return "rolloff";
     case Descriptors::FLUX:
         return "flux";
     case Descriptors::SKEWNESS:
@@ -367,6 +371,8 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::CHROMA;
     } else if (strcmp(s, "silence") == 0) {
         return Descriptors::SILENCEPROB;
+    } else if (strcmp(s, "harmonicity") == 0) {
+        return Descriptors::HARMONICITY;
     } else if (strcmp(s, "centroid") == 0) {
         return Descriptors::CENTROID;
     } else if (strcmp(s, "zcr") == 0) {
@@ -377,6 +383,10 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::SPREADHZ;
     } else if (strcmp(s, "flatness") == 0) {
         return Descriptors::FLATNESS;
+    } else if (strcmp(s, "entropy") == 0) {
+        return Descriptors::ENTROPY;
+    } else if (strcmp(s, "rolloff") == 0) {
+        return Descriptors::ROLLOFF;
     } else if (strcmp(s, "flux") == 0) {
         return Descriptors::FLUX;
     } else if (strcmp(s, "skewness") == 0) {
@@ -421,6 +431,10 @@ double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
         return Desc.Harmonicity;
     case Descriptors::FLATNESS:
         return Desc.SpectralFlatness;
+    case Descriptors::ENTROPY:
+        return Desc.SpectralEntropy;
+    case Descriptors::ROLLOFF:
+        return Desc.SpectralRolloff;
     case Descriptors::FLUX:
         return Desc.SpectralFlux;
     case Descriptors::IRREGULARITY:
@@ -456,7 +470,7 @@ double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
     case Descriptors::MFCC:
     case Descriptors::MELOGRAM:
     case Descriptors::MAGNITUDE:
-    case Descriptors::POWER:
+    case Descriptors::POWERARRAY:
     case Descriptors::CHROMA:
     case Descriptors::ONNX:
         spdlog::error("Descriptor '{}' is vector-valued; cannot return a single double", GetDescriptionId(d));
@@ -477,7 +491,7 @@ std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descripto
         return Desc.Chroma;
     case Descriptors::MELOGRAM:
         return Desc.LogMelSpectrum;
-    case Descriptors::POWER:
+    case Descriptors::POWERARRAY:
         return Desc.Power;
     case Descriptors::MAGNITUDE:
         return Desc.Magnitude;

@@ -27,7 +27,7 @@ enum Descriptors {
     RMS,
     STDDEV,
     MAGNITUDE,
-    POWER,
+    POWERARRAY,
     SILENCEPROB,
 
     // Spectral Arrays
@@ -43,6 +43,8 @@ enum Descriptors {
     SPREADVARIANCE,
     CREST,
     FLATNESS,
+    ENTROPY,
+    ROLLOFF,
     CENTROIDVEL,
     FLUX,
     SKEWNESS,
@@ -162,6 +164,8 @@ class Description {
     // Spectral
     double Harmonicity;
     double SpectralFlatness;
+    double SpectralEntropy = 0.0;
+    double SpectralRolloff = 0.0;
     double SpectralFlux;
     double SpectralIrregularity = 0.0;
     double SpectralCrest = 0.0;
