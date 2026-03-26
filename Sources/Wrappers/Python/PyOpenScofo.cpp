@@ -73,8 +73,9 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def_readwrite("skewness", &OpenScofo::Description::SpectralSkewness)
         .def_readwrite("slope", &OpenScofo::Description::SpectralSlope)
         .def_readwrite("kurtosis", &OpenScofo::Description::SpectralKurtosis)
-
         .def_readwrite("centroid_velocity", &OpenScofo::Description::CentroidVelocity)
+        .def_readwrite("rolloff", &OpenScofo::Description::SpectralRolloff)
+        .def_readwrite("entropy", &OpenScofo::Description::SpectralEntropy)
 
         .def_readwrite("hfr", &OpenScofo::Description::HighFreqRatio)
         .def_readwrite("harmonicity", &OpenScofo::Description::Harmonicity)
