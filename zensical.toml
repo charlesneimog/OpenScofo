@@ -23,7 +23,7 @@ nav = [
     "descriptors/onset.md",
     "descriptors/spectral.md",
   ] },
-  { "Integrations" = [
+  { "Integrations / Download" = [
     "integrations/index.md",
     "integrations/puredata.md",
     "integrations/max.md",
@@ -35,7 +35,6 @@ nav = [
     "integrations/cpp.md",
   ] },
   { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
-  { "Downloads" = "https://github.com/charlesneimog/OpenScofo/releases/latest" },
 ]
 
 extra_javascript = [
