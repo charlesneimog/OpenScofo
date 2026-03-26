@@ -92,7 +92,6 @@
                 height: 100%;
             }
 
-            /* NEW: Overlay for centered analysis text */
             #analysisOverlay {
                 position: absolute;
                 top: 50%;
@@ -183,34 +182,47 @@
             let wavesurfer = null;
             let analyzedData = [];
             let currentAudioTime = null;
-            let isAnalyzing = false; // State flag to control zooming and rendering
+            let isAnalyzing = false;
 
-            const descriptorList = [
-                "onset",
-                "silence",
-                "ext",
-                "max_amp",
-                "loudness",
-                "flux",
-                "irregularity",
-                "crest",
-                "centroid",
-                "spreadhz",
-                "spread_variance",
-                "flatness",
-                "skewness",
-                "slope",
-                "kurtosis",
-                "centroid_velocity",
-                "hfr",
-                "harmonicity",
-                "zcr",
-                "stddev",
-                "pitch",
-                "pitch_confidence",
-                "db",
-                "rms",
-            ];
+            const descriptorRanges = {
+                onset: { min: 0, max: 1 },
+                silence: { min: 0, max: 1 },
+                ext: { min: 0, max: 1 },
+                max_amp: { min: 0, max: 1 },
+                loudness: { min: -100, max: 0 },
+                flux: { min: 0, max: 50 },
+                irregularity: { min: 0, max: 1 },
+                crest: { min: 1, max: 100 },
+                centroid: { min: 0, max: 22050 }, // Up to Nyquist
+                spreadhz: { min: 0, max: 11025 }, // Typically half Nyquist
+                spread_variance: { min: 0, max: 1 },
+                flatness: { min: 0, max: 1 }, // Geometric/Arithmetic mean is [0, 1]
+                skewness: { min: -20, max: 20 },
+                slope: { min: -0.1, max: 0.1 },
+                kurtosis: { min: -3, max: 100 }, // Fisher kurtosis (-3 offset)
+                centroid_velocity: { min: 0, max: 22050 }, // Absolute value applied in C++
+                hfr: { min: 0, max: 1 },
+                harmonicity: { min: 0, max: 1 },
+                zcr: { min: 0, max: 1 },
+                stddev: { min: 0, max: 1 },
+                pitch: { min: 0, max: 5000 },
+                pitch_confidence: { min: 0, max: 1 },
+                db: { min: -100, max: 0 },
+                rms: { min: 0, max: 1 },
+            };
+
+            function normalize(value, key) {
+                const range = descriptorRanges[key];
+                if (!range) return 0;
+
+                const { min, max } = range;
+                if (max === min) return 0;
+
+                const v = (value - min) / (max - min);
+                return Math.max(0, Math.min(1, v)); // clamp
+            }
+
+            const descriptorList = Object.keys(descriptorRanges);
 
             const colors = [
                 "#E6194B",
@@ -277,7 +289,6 @@
                 let targetRange = [0, totalDuration];
                 let nearestIdx = 0;
 
-                // Only follow playhead or preserve zoom if NOT currently analyzing
                 if (!isAnalyzing) {
                     let viewWidth = totalDuration;
                     if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
@@ -298,7 +309,7 @@
                         }
                         targetRange = [start, end];
                     } else if (chartDiv.layout && chartDiv.layout.xaxis && chartDiv.layout.xaxis.range) {
-                        targetRange = chartDiv.layout.xaxis.range; // Preserve zoom while stationary
+                        targetRange = chartDiv.layout.xaxis.range;
                     }
 
                     if (currentAudioTime !== null) {
@@ -309,13 +320,12 @@
                         );
                     }
                 } else {
-                    // While analyzing, force view to see everything processed so far
                     targetRange = [0, totalDuration];
                 }
 
                 const traces = selected.map((cb) => ({
                     x: analyzedData.map((d) => d.time),
-                    y: analyzedData.map((d) => d[cb.value]),
+                    y: analyzedData.map((d) => normalize(d[cb.value], cb.value)),
                     mode: "lines",
                     type: "scattergl",
                     name: cb.value,
@@ -329,7 +339,7 @@
                               const val = analyzedData[nearestIdx][cb.value];
                               return {
                                   x: currentAudioTime,
-                                  y: val,
+                                  y: normalize(val, cb.value),
                                   xref: "x",
                                   yref: "y",
                                   text: `${cb.value.toUpperCase()}: ${val.toFixed(2)}`,
@@ -348,10 +358,10 @@
                     showlegend: false,
                     xaxis: {
                         visible: false,
-                        fixedrange: isAnalyzing, // Disabled during analysis
+                        fixedrange: isAnalyzing,
                         range: targetRange,
-                        minallowed: 0, // Prevent panning past the start
-                        maxallowed: Math.max(totalDuration, 0.01), // Prevent zooming out wider than the total duration
+                        minallowed: 0,
+                        maxallowed: Math.max(totalDuration, 0.01),
                         spikemode: "across",
                         spikethickness: 1,
                         spikedash: "solid",
@@ -359,7 +369,7 @@
                     },
                     yaxis: {
                         visible: false,
-                        fixedrange: true, // Always lock Y axis height
+                        fixedrange: true,
                     },
                     annotations: annotations,
                     shapes:
@@ -381,7 +391,7 @@
                 const config = {
                     responsive: true,
                     displayModeBar: false,
-                    scrollZoom: !isAnalyzing, // Mouse wheel zoom disabled during analysis
+                    scrollZoom: !isAnalyzing,
                     doubleClick: "reset",
                 };
 
@@ -428,7 +438,6 @@
                     analyzedData.push(frame);
                     vec.delete();
 
-                    // Update live chart every 50 frames
                     if (analyzedData.length % 50 === 0) {
                         overlay.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
                         updatePlot();
@@ -436,11 +445,11 @@
                     }
                 }
 
-                // Finish
                 isAnalyzing = false;
                 overlay.style.display = "none";
                 status.innerText = "Ready.";
                 document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = false));
+
                 updatePlot();
             }
 
@@ -462,13 +471,11 @@
             function togglePlay() {
                 wavesurfer.playPause();
             }
-            // Global Spacebar listener for Play/Pause
+
             document.addEventListener("keydown", function (event) {
                 if (event.code === "Space") {
-                    // Prevent default page scrolling
                     event.preventDefault();
 
-                    // Only toggle if audio is loaded (play button is active)
                     const playBtn = document.getElementById("playBtn");
                     if (playBtn && !playBtn.disabled) {
                         togglePlay();

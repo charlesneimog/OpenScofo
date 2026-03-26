@@ -23,7 +23,7 @@ The `OpenScofo` UGen runs entirely on the server (scsynth) and accepts commands 
 * **`fftSize`** *(Float, Default: 2048.0)*: The size of the FFT window.
 * **`hopSize`** *(Float, Default: 512.0)*: The hop size for analysis blocks.
 
-! warning "Warning"
+!!! warning "Warning"
     The UGen currently outputs a silent audio signal (`0.0`) and is used purely for its side-effects (analysis and OSC replies).
 
 ---
@@ -34,14 +34,17 @@ You communicate with the `OpenScofo` UGen using `Node.set` or `Synth.cmd`.
 
 ### `parseScore`
 Loads a text-based score file for the follower.
+
 * **Args:** `path` (String)
 
 ### `setFollowScore`
 Enables or disables the score following engine.
+
 * **Args:** `follow` (Integer: 1 for true, 0 for false)
 
 ### `setEventNotifications`
 Enables or disables automatic OSC replies whenever the current score event changes.
+
 * **Args:** `enabled` (Integer: 1 for true, 0 for false)
 
 ### `getCurrentEvent`
@@ -49,12 +52,17 @@ Requests the current event index from the score follower. The server will reply 
 
 ### `getDescriptor`
 Requests the value(s) of a specific audio descriptor for the current audio block.
+
 * **Args:** `descriptorId` (String, e.g., `"rms"`, `"mfcc"`, `"pitch"`),  check complet list [Descriptors](../descriptors/index.md). 
+
 * **Reply:** The server sends an OSC message to `/oscofo/descriptor/<descriptorId>` containing the float value(s). (Scalar descriptors return 1 float; array descriptors like MFCC return multiple floats).
 
 ### `loadOnnxModel`
+
 Loads a custom ONNX machine learning model for advanced descriptor with trained AI model.
-* **Args:** 1. `modelPath` (String)
+
+* **Args:** 
+    1. `modelPath` (String)
     2. `descriptorIdsCsv` (String: A comma-separated list of descriptor IDs expected by the model).
 
 ---
@@ -64,9 +72,12 @@ Loads a custom ONNX machine learning model for advanced descriptor with trained 
 You must set up `OSCFunc` or `OSCdef` listeners in sclang to receive data from the UGen.
 
 * **`/oscofo/currentEvent`**: 
+
     * Triggered automatically if `setEventNotifications` is 1, OR manually requested via `getCurrentEvent`.
     * **Arguments:** `[ nodeID, replyID, eventIndex ]`
+
 * **`/oscofo/descriptor/<descriptorId>`**: 
+
     * Triggered by requesting `getDescriptor`.
     * **Arguments:** `[ nodeID, replyID, val1, val2, ... ]`
 

@@ -4,27 +4,6 @@ Spectral descriptors are used after a `FFT`. For `FFT` we use a Hann window.
 
 ---
 
-## `Harmonicity` 
-**ID**: `harmonicity` 
-
-!!! bug "Not implemented yet"
-
-Harmonicity measures how well a sound’s spectrum aligns with a harmonic series (integer multiples of a fundamental frequency). High harmonicity indicates a clear pitched sound with harmonically related partials, while low harmonicity indicates inharmonic or noise-like spectra.
-
-
-<div class="grid cards" style="font-weigth:bold" markdown>
-
--   ??? equation "Equation"
-
-        $$Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$$
-
--   ??? note "Notes"
-
-        Probably will be Based on [Yu](https://doi.org/10.1121/1.2356838) (2006);
-
-</div>
-
----
 
 ## `Spectral Flatness` 
 **ID**: `flatness` | :custom-librosa:[^2]
@@ -79,7 +58,6 @@ Spectral irregularity quantifies how uneven or jagged a spectrum is between adja
 
 -   ??? note "Notes"
 
-
 </div>
 
 ---
@@ -104,12 +82,70 @@ Spectral crest measures the ratio of the highest spectral peak to the average sp
 
 Spectral kurtosis measures the _peakedness_ or _tailedness_ of the spectral distribution around its centroid. It quantifies how concentrated the spectral energy is in a few frequency bins versus being evenly spread.
 
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Irregularity = \frac{\sum_{k=1}^{K-1} (|X[k]| - |X[k-1]|)^2}{\sum_{k=0}^{K-1} |X[k]|^2}$
+
+-   ??? note "Notes"
+
+</div>
+
 ## `Spectral Kurtois`
 **ID**: `kurtosis` | :custom-essentia:[^6]
     
 Spectral skewness measures the asymmetry of the spectral distribution around its centroid. It indicates whether the energy is biased toward low or high frequencies.
 
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $Irregularity = \frac{\sum_{k=1}^{K-1} (|X[k]| - |X[k-1]|)^2}{\sum_{k=0}^{K-1} |X[k]|^2}$
+
+-   ??? note "Notes"
+
+</div>
+
 ---
+
+## `Spectral RollOff` 
+**ID**: `rolloff` | :custom-essentia:[^6]
+
+Spectral rolloff indicates the frequency below which a fixed percentage of a sound’s spectral energy is contained. Higher values make the sound perceptually brighter or sharper, while lower values make it darker or warmer.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        TODO
+
+-   ??? note "Notes"
+
+        TODO
+
+</div>
+
+---
+
+## `Spectral Entropy` 
+**ID**: `entropy` | :custom-essentia:[^6]
+
+Spectral entropy indicates how uniformly a sound’s spectral energy is distributed across frequencies. Higher values make the sound perceptually more noisy or disordered, while lower values make it more tonal or structured.
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        TODO
+
+-   ??? note "Notes"
+
+        TODO
+
+</div>
 
 ## `Spectral Centroid` 
 **ID**: `centroid` | :custom-librosa:[^3]
@@ -253,6 +289,27 @@ Vector of magnitude values normalized by the FFT size $N$:
 
 -   ??? note "Notes"
 
+
+</div>
+
+
+## `Harmonicity` 
+**ID**: `harmonicity` 
+
+!!! warning "Very simple version implemented for now."
+
+Harmonicity measures how well a sound’s spectrum aligns with a harmonic series (integer multiples of a fundamental frequency). High harmonicity indicates a clear pitched sound with harmonically related partials, while low harmonicity indicates inharmonic or noise-like spectra.
+
+
+<div class="grid cards" style="font-weigth:bold" markdown>
+
+-   ??? equation "Equation"
+
+        $$Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$$
+
+-   ??? note "Notes"
+
+        Probably will be Based on [Yu](https://doi.org/10.1121/1.2356838) (2006);
 
 </div>
 

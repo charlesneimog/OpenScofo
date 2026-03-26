@@ -27,11 +27,12 @@ function getIcons(os_name) {
 }
 // ─────────────────────────────────────
 async function getLatestTagWithDetails() {
+    console.log("Requesting Github Data");
     if (latestData) return latestData; // return cached data if available
 
     const repo = "charlesneimog/OpenScofo";
 
-    const tagRes = await fetch(`https://api.github.com/repos/${repo}/tags?per_page=1`);
+    const tagRes = await fetch(`https://api.github.com/repos/${repo}/tags`);
     if (!tagRes.ok) throw new Error("Failed to fetch tags");
 
     const tags = await tagRes.json();
@@ -72,7 +73,11 @@ function renderReleaseTable(data, assetName) {
     if (filteredAssets.length === 0) return;
 
     const table = document.createElement("table");
-    table.style.width = "80%";
+    if (assetName === "All") {
+        table.style.width = "80%";
+    } else {
+        table.style.width = "50%";
+    }
     table.style.borderCollapse = "collapse";
     table.style.textAlign = "center";
     table.style.tableLayout = "fixed";
@@ -83,16 +88,16 @@ function renderReleaseTable(data, assetName) {
         thead.innerHTML = `
         <tr>
             <th style="width: 20%;">Enviroment</th>
-            <th style="width: 5%;">Version</th>
             <th style="width: 25%;">OS</th>
+            <th style="width: 5%;">Version</th>
             <th style="width: 20%;">Download</th>
         </tr>
       `;
     } else {
         thead.innerHTML = `
         <tr>
-            <th style="width: 30%;">Version</th>
             <th style="width: 30%;">OS</th>
+            <th style="width: 30%;">Version</th>
             <th style="width: 40%;">Download</th>
         </tr>
       `;
@@ -130,8 +135,8 @@ function renderReleaseTable(data, assetName) {
             tr.appendChild(tdSystem);
         }
 
-        tr.appendChild(tdVersion);
         tr.appendChild(tdOS);
+        tr.appendChild(tdVersion);
         tr.appendChild(tdDownload);
         tbody.appendChild(tr);
     });
@@ -143,7 +148,7 @@ function renderReleaseTable(data, assetName) {
     });
 
     table.querySelectorAll("th").forEach((th) => {
-        th.style.width = "50%";
+        th.style.width = "40%";
     });
 
     const wrapper = document.createElement("div");
