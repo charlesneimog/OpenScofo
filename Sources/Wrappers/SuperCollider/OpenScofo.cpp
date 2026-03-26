@@ -70,12 +70,11 @@ struct ScOpenScofo : public SCUnit {
                 continue;
             }
 
-            const auto begin = std::find_if_not(item.begin(), item.end(), [](unsigned char c) {
-                return std::isspace(c) != 0;
-            });
+            const auto begin =
+                std::find_if_not(item.begin(), item.end(), [](unsigned char c) { return std::isspace(c) != 0; });
             const auto end = std::find_if_not(item.rbegin(), item.rend(), [](unsigned char c) {
-                return std::isspace(c) != 0;
-            }).base();
+                                 return std::isspace(c) != 0;
+                             }).base();
 
             if (begin < end) {
                 std::string descriptorId(begin, end);
@@ -113,8 +112,8 @@ struct ScOpenScofo : public SCUnit {
             m_LastDescValid = true;
         }
 
-        OpenScofo::Description desc = (m_FollowScore && m_OScofo->ScoreIsLoaded()) ? m_OScofo->GetDescription()
-                                                                                      : m_LastDesc;
+        OpenScofo::Description desc =
+            (m_FollowScore && m_OScofo->ScoreIsLoaded()) ? m_OScofo->GetDescription() : m_LastDesc;
 
         const auto descriptor = m_OScofo->GetDescriptorsEnum(descriptorId);
         if (descriptor == OpenScofo::Descriptors::INVALID || descriptor == OpenScofo::Descriptors::ONNX) {
@@ -126,7 +125,7 @@ struct ScOpenScofo : public SCUnit {
         case OpenScofo::Descriptors::CHROMA:
         case OpenScofo::Descriptors::MELOGRAM:
         case OpenScofo::Descriptors::MAGNITUDE:
-        case OpenScofo::Descriptors::POWER: {
+        case OpenScofo::Descriptors::POWERARRAY: {
             auto &arrayValues = m_OScofo->GetDescriptionArray(desc, descriptor);
             values.assign(arrayValues.begin(), arrayValues.end());
             return true;
@@ -274,6 +273,5 @@ PluginLoad(OpenScofoUGens) {
     DefineUnitCmd("OpenScofo", "getDescriptor", (UnitCmdFunc)&cmdGetDescriptor);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
 
-    Print("\nOpenScofo version %d.%d.%d (build on %s), by Charles K. Neimog\n\n", OSCOFO_VERSION_MAJOR,
-          OSCOFO_VERSION_MINOR, OSCOFO_VERSION_PATCH, OSCOFO_BUILD_TIME);
+    printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 }
