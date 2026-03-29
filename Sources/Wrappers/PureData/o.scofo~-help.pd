@@ -1,4 +1,4 @@
-#N canvas 0 0 1112 1132 10;
+#N canvas 198 58 530 401 10;
 #X declare -path ../build/Sources/PureData -path tests;
 #X declare -path ../build/Sources/PureData -path Audios;
 #X declare -lib xlab;
