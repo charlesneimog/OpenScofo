@@ -209,6 +209,12 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
                     *out++ = desc.Chroma[i];
             });
             break;
+        case POWERARRAY:
+            m_Writers.push_back([](const Description &desc, float *&out) {
+                for (int i = 0; i < (int)desc.Power.size(); ++i)
+                    *out++ = desc.Power[i];
+            });
+            break;
         case MELOGRAM:
             m_Writers.push_back([this](const Description &desc, float *&out) {
                 for (int i = 0; i < m_MFCCMels; ++i)
@@ -278,10 +284,31 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         case SLOPE:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSlope; });
             break;
+        case DB:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.dB; });
+            break;
+        case MAXAMP:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.MaxAmp; });
+            break;
+        case SPREADVARIANCE:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSpreadVariance; });
+            break;
+        case CREST:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralCrest; });
+            break;
         case KURTOSIS:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralKurtosis; });
             break;
+        case CENTROIDVEL:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.CentroidVelocity; });
+            break;
+        case YINCONFIDENCE:
+            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.PitchConfidence; });
+            break;
         case ONNX:
+            break;
+        case INVALID:
+            spdlog::error("Invalid descriptor");
             break;
         }
     }
