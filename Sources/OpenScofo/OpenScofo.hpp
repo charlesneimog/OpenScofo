@@ -112,6 +112,9 @@ class OpenScofo {
     int m_BlockIndex = 0;
     std::vector<double> m_InputBuffer;
 
+    // AI
+    bool m_LoadingONNX = false;
+
     // Errors
     spdlog::level::level_enum m_HasErrors;
     std::vector<std::string> m_Errors;

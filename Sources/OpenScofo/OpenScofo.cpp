@@ -118,7 +118,14 @@ void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descripto
         return;
     }
 
-    m_MIR.ONNXInit(Model, Descriptors);
+    // m_MIR.ONNXInit(Model, Descriptors);
+    std::thread([ModelCopy = std::move(Model), DescriptorsCopy = Descriptors, this]() mutable {
+        m_LoadingONNX = true;
+        spdlog::warn("Loading ONNX model, wait...");
+        m_MIR.ONNXInit(ModelCopy, DescriptorsCopy);
+        m_LoadingONNX = false;
+        spdlog::warn("ONNX Model ready");
+    }).detach();
 }
 
 // ╭─────────────────────────────────────╮
@@ -556,7 +563,13 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
 
     // Timbre detection
     if (m_Score.HasTimbreModel()) {
-        m_MIR.ONNXInit(m_Score.GetTimbreModel(), m_Score.GetTimbreModelDescriptors());
+        auto model = m_Score.GetTimbreModel();
+        auto descriptors = m_Score.GetTimbreModelDescriptors();
+        std::thread([model = std::move(model), descriptors = std::move(descriptors), this]() mutable {
+            spdlog::warn("Loading ONNX model, wait...");
+            m_MIR.ONNXInit(model, descriptors);
+            spdlog::warn("ONNX Model ready");
+        }).detach();
     }
 
     m_FFTSize = m_Score.GetFFTSize();
@@ -582,7 +595,7 @@ Description OpenScofo::GetDescription() {
 
 // ─────────────────────────────────────
 Description OpenScofo::GetAudioDescription(const std::vector<double> &AudioBuffer) {
-    if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
+    if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical || m_LoadingONNX) {
         return {};
     }
     if (m_FFTSize != static_cast<int>(AudioBuffer.size())) {
@@ -597,7 +610,8 @@ Description OpenScofo::GetAudioDescription(const std::vector<double> &AudioBuffe
 // ─────────────────────────────────────
 bool OpenScofo::ProcessBlock(const std::vector<double> &AudioBuffer) {
     spdlog::stopwatch sw;
-    if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical) {
+    if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical ||
+        m_LoadingONNX) {
         spdlog::error("Score not loaded");
         return false;
     }
