@@ -439,12 +439,12 @@ static void oscofo_ticknewevent(void *xv) {
 
     int prevEvent = x->Event;
     x->Event = x->OpenScofo->GetEventIndex();
-    if (prevEvent == x->Event || x->Event == 0) {
+    if (prevEvent == x->Event) {
         return;
     }
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
-    outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
+    outlet_int(x->EventOut, static_cast<int>(x->Event));
     OpenScofo::EventActions actions = x->OpenScofo->GetEventActions(x->Event);
 
     for (OpenScofo::ScoreAction &act : actions) {
@@ -608,17 +608,16 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
 
     dsp_setup((t_pxobject *)x, 1);
 
-    x->EventOut = outlet_new(x, "int");
-    x->TempoOut = outlet_new(x, "float");
-
     x->RequestMIR = oscofo_get_descriptors(x, 0, argc, argv);
     if (x->RequestMIR.size() > 0) {
         x->DescOut = outlet_new(x, nullptr);
         x->MirOutput = true;
     } else {
-        x->DescOut = outlet_new(x, nullptr);
         x->MirOutput = false;
     }
+
+    x->TempoOut = outlet_new(x, "float");
+    x->EventOut = outlet_new(x, "float");
 
     x->ClockEvent = clock_new(x, (method)oscofo_ticknewevent);
     x->ClockActions = clock_new(x, (method)oscofo_tickactions);
