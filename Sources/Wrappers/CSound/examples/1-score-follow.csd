@@ -90,6 +90,42 @@ i1 0 60
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <bsbPanel>
  <label>Widgets</label>
  <objectName/>
