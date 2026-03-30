@@ -28,11 +28,8 @@ endif()
 # ╭──────────────────────────────────────╮
 # │         Installation/Data            │
 # ╰──────────────────────────────────────╯
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/examples/1-score-follow.scd
+               ${CMAKE_CURRENT_BINARY_DIR}/examples/1-score-follow.scd COPYONLY)
 
-# This will install the UGen, SC class file, help file, and assets into a folder which you can then
-# drop into your SuperCollider Extensions directory.
-install(TARGETS SCOpenScofo DESTINATION SCOpenScofo)
-install(FILES "${CMAKE_SOURCE_DIR}/README.md" DESTINATION OpenScofo)
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo.sc" DESTINATION OpenScofo)
-install(FILES "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.mp3"
-              "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt" DESTINATION OpenScofo/assets)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo.sc ${CMAKE_CURRENT_BINARY_DIR}/OpenScofo.sc
+               COPYONLY)

@@ -2,7 +2,6 @@
 #include <SC_PlugIn.hpp>
 #include <algorithm>
 #include <cctype>
-#include <exception>
 #include <string>
 #include <vector>
 
@@ -10,8 +9,33 @@
 #error "Supernova is not supported by OpenScofo"
 #endif
 
-static InterfaceTable *ft;
+// Callback de erro adaptado para SC
+static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
+    // ignorar logs abaixo de warn
+    if (log.level < spdlog::level::warn)
+        return;
 
+    std::string text(log.payload.data(), log.payload.size());
+
+    switch (log.level) {
+    case spdlog::level::critical:
+    case spdlog::level::err:
+        printf("\n[OpenScofo][ERR] %s\n", text.c_str());
+        break;
+    case spdlog::level::warn:
+        printf("\n[OpenScofo][WARN] %s\n", text.c_str());
+        break;
+    case spdlog::level::info:
+    case spdlog::level::debug:
+    case spdlog::level::trace:
+        printf("\n[OpenScofo][INFO] %s\n", text.c_str());
+        break;
+    default:
+        break;
+    }
+}
+
+static InterfaceTable *ft;
 struct ScOpenScofo : public SCUnit {
   public:
     ScOpenScofo() {
@@ -23,13 +47,11 @@ struct ScOpenScofo : public SCUnit {
         m_HopSize = std::max(1, static_cast<int>(hopSize));
         m_InBuffer.assign(m_FFTSize, 0.0);
         m_OScofo = new OpenScofo::OpenScofo(sampleRate, fftSize, hopSize);
+        m_OScofo->SetErrorCallback(oscofo_error_callback, nullptr);
 
         if (isAudioRateIn(0)) {
             set_calc_function<ScOpenScofo, &ScOpenScofo::next_a>();
             next_a(1);
-        } else {
-            set_calc_function<ScOpenScofo, &ScOpenScofo::next_k>();
-            next_k(1);
         }
     }
 
@@ -39,13 +61,12 @@ struct ScOpenScofo : public SCUnit {
 
     void ParseScore(const char *path) {
         if (m_OScofo) {
-            m_OScofo->ParseScore(path);
+            bool ok = m_OScofo->ParseScore(path);
+            if (!ok) {
+                return;
+            }
             m_LastEventIndex = -1;
         }
-    }
-
-    void SetFollowScore(bool follow) {
-        m_FollowScore = follow;
     }
 
     void SetEventNotifications(bool enabled) {
@@ -139,11 +160,8 @@ struct ScOpenScofo : public SCUnit {
             // set fail
         }
 
-        out(0)[0] = 0.0f;
-    }
+        EmitCurrentEventIfChanged();
 
-    void next_k(int inNumSamples) {
-        (void)inNumSamples;
         out(0)[0] = 0.0f;
     }
 };
@@ -152,7 +170,7 @@ struct ScOpenScofo : public SCUnit {
 void cmdGetCurrentEvent(ScOpenScofo *unit, sc_msg_iter *args) {
     (void)args;
     float currentEvent = static_cast<float>(unit->GetEventIndex());
-    SendNodeReply(&unit->mParent->mNode, 0, "/oscofo/currentEvent", 1, &currentEvent);
+    SendNodeReply(&unit->mParent->mNode, 0, "/OpenScofo/currentEvent", 1, &currentEvent);
 }
 
 // ─────────────────────────────────────
@@ -161,12 +179,6 @@ void cmdParseScore(ScOpenScofo *unit, sc_msg_iter *args) {
     if (path) {
         unit->ParseScore(path);
     }
-}
-
-// ─────────────────────────────────────
-void cmdSetFollowScore(ScOpenScofo *unit, sc_msg_iter *args) {
-    const int follow = args->geti();
-    unit->SetFollowScore(follow != 0);
 }
 
 // ─────────────────────────────────────
@@ -189,9 +201,7 @@ PluginLoad(OpenScofoUGens) {
     registerUnit<ScOpenScofo>(ft, "OpenScofo");
     DefineUnitCmd("OpenScofo", "parseScore", (UnitCmdFunc)&cmdParseScore);
     DefineUnitCmd("OpenScofo", "getCurrentEvent", (UnitCmdFunc)&cmdGetCurrentEvent);
-    DefineUnitCmd("OpenScofo", "setFollowScore", (UnitCmdFunc)&cmdSetFollowScore);
     DefineUnitCmd("OpenScofo", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
-
     printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 }
