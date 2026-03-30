@@ -24,6 +24,7 @@ extern "C" {
 #include <chrono>
 #include <iostream>
 
+#include <concepts>
 #include <cmath>
 #include <numbers>
 #include <numeric>
@@ -32,13 +33,17 @@ extern "C" {
 
 namespace OpenScofo {
 
+template <typename T>
+concept OpenScofoPrecision = std::same_as<T, float> || std::same_as<T, double>;
+
 class OpenScofo {
   public:
     OpenScofo(float Sr, float WindowSize, float HopSize);
     // Main Functions
     bool ParseScore(fs::path ScorePath);
-    bool ProcessBlock(const std::vector<double> &AudioBuffer);
     bool ScoreIsLoaded();
+
+    template <OpenScofoPrecision T> bool ProcessBlock(const T *AudioBuffer, size_t n);
 
     // ONNX
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
@@ -68,7 +73,6 @@ class OpenScofo {
     double GetFFTSize();
     double GetHopSize();
     double GetBlockDuration();
-    Description GetAudioDescription(const std::vector<double> &AudioBuffer);
     Description GetDescription();
 
     Descriptors GetDescriptorsEnum(const char *s);
@@ -102,6 +106,7 @@ class OpenScofo {
     lua_State *m_LuaState;
 #endif
 
+    Mode m_Mode = DESCRIPTORS;
     States m_States;
     Description m_Desc;
     int m_CurrentScorePosition = -1;

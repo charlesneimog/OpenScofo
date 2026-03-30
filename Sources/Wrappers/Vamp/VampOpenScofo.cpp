@@ -242,22 +242,19 @@ bool VampOpenScofo::LoadScoreAtIndex(int index) {
 
 // ─────────────────────────────────────
 Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers, Vamp::RealTime) {
-
     FeatureSet fs;
 
-    std::vector<double> input(m_blockSize);
-    for (size_t i = 0; i < m_blockSize; i++) {
-        input[i] = inputBuffers[0][i];
+    bool ok = m_OScofo->ProcessBlock(inputBuffers[0], m_blockSize);
+    if (!ok) {
     }
+    OpenScofo::Description Desc = m_OScofo->GetDescription();
 
-    OpenScofo::Description Desc = m_OScofo->GetAudioDescription(input);
-
+    // lambda
     auto pushScalar = [&](int idx, double value) {
         Feature f;
         f.values.push_back((float)value);
         fs[idx].push_back(f);
     };
-
     auto pushVector = [&](int idx, const std::vector<double> &vec) {
         Feature f;
         f.values.reserve(vec.size());

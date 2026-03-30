@@ -491,21 +491,8 @@ static void oscofo_perform_descriptors(MaxOpenScofo *x, double **ins, long sampl
 
 // ─────────────────────────────────────
 static void oscofo_perform_score(MaxOpenScofo *x, double **ins, long sampleframes) {
-    x->BlockIndex += sampleframes;
-    std::copy(x->inBuffer.begin() + sampleframes, x->inBuffer.end(), x->inBuffer.begin());
-    std::copy(ins[0], ins[0] + sampleframes, x->inBuffer.end() - sampleframes);
-
-    if (x->BlockIndex != x->HopSize) {
-        clock_delay(x->ClockActions, 0);
-        return;
-    }
-
-    if (!x->OpenScofo->ScoreIsLoaded() || !x->Following) {
-        return;
-    }
-
     x->BlockIndex = 0;
-    bool ok = x->OpenScofo->ProcessBlock(x->inBuffer);
+    bool ok = x->OpenScofo->ProcessBlock(ins[0], sampleframes);
     if (!ok) {
         return;
     }
@@ -527,7 +514,7 @@ static void oscofo_perform64(t_object *obj, t_object *dsp64, double **ins, long 
     (void)userparam;
 
     if (x->JustDescription) {
-        oscofo_perform_descriptors(x, ins, sampleframes);
+        // oscofo_perform_descriptors(x, ins, sampleframes);
     } else {
         oscofo_perform_score(x, ins, sampleframes);
     }

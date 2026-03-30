@@ -65,6 +65,9 @@ enum Descriptors {
 };
 
 // ─────────────────────────────────────
+enum Mode { SCOREFOLLOWER, DESCRIPTORS };
+
+// ─────────────────────────────────────
 enum EventType {
     // Tradicional
     REST,
