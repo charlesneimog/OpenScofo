@@ -145,17 +145,14 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
         .def("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
 
-        // Help & Test Functions
-        .def("get_audio_description", &OpenScofo::OpenScofo::GetAudioDescription)
-
         // Process
         .def("process_block", [](OpenScofo::OpenScofo &self, py::array_t<double> audio) {
             py::buffer_info bufInfo = audio.request();
             if (bufInfo.ndim != 1) {
                 throw std::runtime_error("Input array must be 1-dimensional");
             }
-            std::vector<double> cpp_audio(static_cast<double *>(bufInfo.ptr),
-                                          static_cast<double *>(bufInfo.ptr) + bufInfo.shape[0]);
-            return self.ProcessBlock(cpp_audio);
+            double *data = static_cast<double *>(bufInfo.ptr);
+            size_t size = static_cast<size_t>(bufInfo.shape[0]);
+            return self.ProcessBlock(data, size);
         });
 }

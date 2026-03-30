@@ -581,6 +581,8 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
 
     // Add States
     m_MDP.SetScoreStates(m_States);
+    m_Mode = SCOREFOLLOWER;
+
     if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
         return true;
     } else {
@@ -594,34 +596,36 @@ Description OpenScofo::GetDescription() {
 }
 
 // ─────────────────────────────────────
-Description OpenScofo::GetAudioDescription(const std::vector<double> &AudioBuffer) {
-    if (m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical || m_LoadingONNX) {
-        return {};
-    }
-    if (m_FFTSize != static_cast<int>(AudioBuffer.size())) {
-        spdlog::error("AudioBuffer size ({}) differs from FFT size ({})", AudioBuffer.size(), m_FFTSize);
-        return {};
+template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffer, size_t n) {
+    m_BlockIndex += n;
+
+    std::copy(m_InBuffer.begin() + n, m_InBuffer.end(), m_InBuffer.begin());
+
+    std::transform(AudioBuffer, AudioBuffer + n, m_InBuffer.end() - n, [](T x) { return static_cast<double>(x); });
+
+    if (m_BlockIndex != m_HopSize) {
+        return true;
     }
 
-    m_MIR.GetDescription(AudioBuffer, m_Desc);
-    return m_Desc;
+    m_BlockIndex = 0;
+
+    switch (m_Mode) {
+    case SCOREFOLLOWER:
+        m_MIR.GetDescription(m_InBuffer, m_Desc);
+        m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
+        m_MIR.AddReverb(m_Desc, 0.01);
+        break;
+
+    case DESCRIPTORS:
+        m_MIR.GetDescription(m_InBuffer, m_Desc);
+        break;
+    }
+
+    return true;
 }
 
 // ─────────────────────────────────────
-bool OpenScofo::ProcessBlock(const std::vector<double> &AudioBuffer) {
-    spdlog::stopwatch sw;
-    if (!m_Score.ScoreIsLoaded() || m_HasErrors == spdlog::level::err || m_HasErrors == spdlog::level::critical ||
-        m_LoadingONNX) {
-        spdlog::error("Score not loaded");
-        return false;
-    }
-
-    m_MIR.GetDescription(AudioBuffer, m_Desc);
-
-    m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
-    m_MIR.AddReverb(m_Desc, 0.01);
-    spdlog::debug("Time to Process Inference: {:.0f} µs\n", sw.elapsed().count() * 1'000'000.0);
-    return true;
-}
+template bool OpenScofo::ProcessBlock<float>(const float *, size_t);
+template bool OpenScofo::ProcessBlock<double>(const double *, size_t);
 
 } // namespace OpenScofo

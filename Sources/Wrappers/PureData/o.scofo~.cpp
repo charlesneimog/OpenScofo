@@ -53,7 +53,6 @@ class PdOpenScofo {
     bool Following;
 
     // Audio
-    std::vector<double> inBuffer;
     int FFTSize;
     int HopSize;
     int BlockSize;
@@ -98,7 +97,6 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     // Update Audio
     x->FFTSize = x->OpenScofo->GetFFTSize();
     x->HopSize = x->OpenScofo->GetHopSize();
-    x->inBuffer.resize(x->FFTSize, 0.0f);
 
     // Get Lua Code
 
@@ -244,7 +242,9 @@ static void oscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
                 }
                 AudioBuffer[i] = static_cast<double>(vec[src].w_float);
             }
-            OpenScofo::Description Desc = x->OpenScofo->GetAudioDescription(AudioBuffer);
+
+            x->OpenScofo->ProcessBlock(AudioBuffer.data(), AudioBuffer.size());
+            OpenScofo::Description Desc = x->OpenScofo->GetDescription();
             oscofo_output_descriptors(x, Desc);
         }
     }
@@ -444,52 +444,14 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-static t_int *oscofo_perform_descriptors(t_int *w) {
-    PdOpenScofo *x = (PdOpenScofo *)(w[1]);
-    t_sample *in = (t_sample *)(w[2]);
-    int n = static_cast<int>(w[3]);
-
-    x->BlockIndex += n;
-    std::copy(x->inBuffer.begin() + n, x->inBuffer.end(), x->inBuffer.begin());
-    std::copy(in, in + n, x->inBuffer.end() - n);
-
-    if (x->BlockIndex != x->HopSize) {
-        clock_delay(x->ClockActions, 0);
-        return (w + 4);
-    }
-
-    x->BlockIndex = 0;
-    x->Desc = std::make_unique<OpenScofo::Description>(x->OpenScofo->GetAudioDescription(x->inBuffer));
-    clock_delay(x->ClockInfo, 0);
-
-    return (w + 4);
-}
-
-// ─────────────────────────────────────
 static t_int *oscofo_perform_score(t_int *w) {
     PdOpenScofo *x = (PdOpenScofo *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
     int n = static_cast<int>(w[3]);
-
-    x->BlockIndex += n;
-    std::copy(x->inBuffer.begin() + n, x->inBuffer.end(), x->inBuffer.begin());
-    std::copy(in, in + n, x->inBuffer.end() - n);
-
-    if (x->BlockIndex != x->HopSize) {
-        clock_delay(x->ClockActions, 0);
-        return (w + 4);
-    }
-
-    if (!x->OpenScofo->ScoreIsLoaded() || !x->Following) {
-        return (w + 4);
-    }
-
-    x->BlockIndex = 0;
-    bool ok = x->OpenScofo->ProcessBlock(x->inBuffer);
+    bool ok = x->OpenScofo->ProcessBlock(in, n);
     if (!ok) {
         return (w + 4);
     }
-
     clock_delay(x->ClockActions, 0);
     clock_delay(x->ClockEvent, 0);
     clock_delay(x->ClockInfo, 0);
@@ -500,12 +462,7 @@ static t_int *oscofo_perform_score(t_int *w) {
 static void oscofo_adddsp(PdOpenScofo *x, t_signal **sp) {
     x->BlockSize = sp[0]->s_n;
     x->BlockIndex = 0;
-    x->inBuffer.resize((size_t)x->FFTSize, (double)0.0f);
-    if (x->JustDescription) {
-        dsp_add(oscofo_perform_descriptors, 3, x, sp[0]->s_vec, sp[0]->s_n);
-    } else {
-        dsp_add(oscofo_perform_score, 3, x, sp[0]->s_vec, sp[0]->s_n);
-    }
+    dsp_add(oscofo_perform_score, 3, x, sp[0]->s_vec, sp[0]->s_n);
 }
 
 // ─────────────────────────────────────

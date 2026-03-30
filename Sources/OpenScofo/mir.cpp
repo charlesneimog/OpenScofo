@@ -513,6 +513,7 @@ void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
 
     // Loudness (based on sum of squares)
     double meanSquare = z_loudness / In.size();
+    printf("\n\n\nDesc.dB %f | size %ld | mean %f | loud %f\n\n\n", Desc.dB, In.size(), meanSquare, z_loudness);
     if (meanSquare <= 0.0) {
         Desc.Loudness = -100.0; // substitui -inf
     } else {
