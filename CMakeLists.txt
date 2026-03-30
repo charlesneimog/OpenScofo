@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 project(OpenScofo VERSION 0.1.6 LANGUAGES C CXX
-        HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/" 
+        HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -22,6 +22,9 @@ if(EMSCRIPTEN)
     )
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128")
 endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
 
 option(OSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
