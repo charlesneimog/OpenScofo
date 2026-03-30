@@ -1,6 +1,6 @@
 <CsoundSynthesizer>
 <CsOptions>
---opcode-lib=/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/CSound/OScofoCSound.so
+--opcode-lib=/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/CSound/OpenScofo.so -b512
 </CsOptions>
 
 <CsInstruments>
@@ -16,15 +16,18 @@ instr 1
     ; kEvent is the event index of the score, first note, second note, third note, etc (rest do not count as event).
     ; kBPM is the current kBPM that the player is play a given score.
     ; kTrig is 1 when new event index is detected, 0 otherwise.
-    kEvent, kBPM, kTrig, OpenScofoScore a1, "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.txt"
+    kEvent, kBPM, kTrig OpenScofoScore a1, "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.txt"
+
+
+		; imprime apenas quando kTrig for 1
+	if kTrig == 1 then
+		printk2 kEvent
+	endif
+    
 
     ; first input parameters is the audio channel
     ; third parameter is the score path for "score" mode or descriptor name for "description" mode.
 
-    if (kTrig == 1) then
-        ; here you can do something
-        printk2 kEvent
-    endif
 
     out a1
 endin
@@ -35,6 +38,58 @@ endin
 i1 0 60
 </CsScore>
 </CsoundSynthesizer>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <bsbPanel>
  <label>Widgets</label>
  <objectName/>

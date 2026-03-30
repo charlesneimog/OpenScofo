@@ -275,7 +275,7 @@ void OpenScofo::SetCurrentEvent(int Event) {
 // │            Get Functions            │
 // ╰─────────────────────────────────────╯
 int OpenScofo::GetEventIndex() {
-    return m_CurrentScorePosition; // TODO: Implement yet
+    return m_CurrentScorePosition;
 }
 
 // ─────────────────────────────────────
@@ -617,6 +617,7 @@ bool OpenScofo::ProcessBlock(const std::vector<double> &AudioBuffer) {
     }
 
     m_MIR.GetDescription(AudioBuffer, m_Desc);
+
     m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
     m_MIR.AddReverb(m_Desc, 0.01);
     spdlog::debug("Time to Process Inference: {:.0f} µs\n", sw.elapsed().count() * 1'000'000.0);

@@ -1,4 +1,5 @@
 #include <OpenScofo.hpp>
+#undef TWOPI
 
 // TODO: Check how to define this without extra define
 #define opaddr opadr
@@ -9,18 +10,51 @@
 
 namespace csnd {
 
-struct CSoundOpenScofo : Plugin<4, 3> {
+// ─────────────────────────────────────
+static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
+    Csound *csound = static_cast<Csound *>(data);
+    spdlog::level::level_enum pdlevel = spdlog::level::warn;
+    if (log.level < pdlevel) {
+        return;
+    }
+
+    std::string text(log.payload.data(), log.payload.size());
+    switch (log.level) {
+    case spdlog::level::critical:
+    case spdlog::level::err:
+        csound->warning(std::format("[OpenScofo] {}", text));
+        break;
+    case spdlog::level::info:
+    case spdlog::level::warn:
+        csound->warning(std::format("[OpenScofo] {}", text));
+        break;
+    case spdlog::level::debug:
+    case spdlog::level::trace:
+        csound->message(std::format("[OpenScofo] {}", text));
+        break;
+    default:
+        break;
+    }
+}
+
+// ─────────────────────────────────────
+struct CSoundOpenScofo : Plugin<3, 2> {
     OpenScofo::OpenScofo *oscofo;
     uint32_t m_FFT;
     uint32_t m_HOP;
-    int m_BlockIndex = 0;
-    int m_ScoreEventIndex;
+    uint32_t m_BlockIndex = 0;
+    uint32_t m_ScoreEventIndex;
     std::vector<double> m_InBuffer;
+    MYFLT m_CurrentEvent = FL(0.0);
+    MYFLT m_CurrentBPM = FL(0.0);
+    bool m_Following = false; // Add a flag to prevent the -nan silence issue
 
     int init() {
         double sr = csound->sr();
         m_FFT = 2048;
         m_HOP = 512;
+        m_BlockIndex = 0;
+        m_ScoreEventIndex = 0;
         if (m_FFT < m_HOP) {
             csound->warning(std::format("ksmps (defined as {}) must be less then {}", m_HOP, m_FFT));
             return NOTOK;
@@ -28,6 +62,7 @@ struct CSoundOpenScofo : Plugin<4, 3> {
 
         m_ScoreEventIndex = -1;
         oscofo = new OpenScofo::OpenScofo(sr, m_FFT, m_HOP);
+        oscofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(csound));
 
         STRINGDAT ScorePath = inargs.str_data(1);
         const char *score = reinterpret_cast<const char *>(ScorePath.data);
@@ -37,6 +72,9 @@ struct CSoundOpenScofo : Plugin<4, 3> {
             return NOTOK;
         }
 
+        OpenScofo::States states = oscofo->GetStates();
+        csound->message(std::format("There is {} states", states.size()));
+
         outargs[0] = FL(0.0);
         outargs[1] = FL(0.0);
         outargs[2] = FL(0.0);
@@ -45,40 +83,44 @@ struct CSoundOpenScofo : Plugin<4, 3> {
         return OK;
     }
 
+    // ─────────────────────────────────────
     int aperf() {
-        csnd::AudioSig in(this, inargs(0));
-        outargs[0] = FL(0.0);
-        outargs[1] = FL(0.0);
+        csnd::AudioSig in(this, &inargs[0]);
+        int n = in.GetNsmps();
+
+        // 1. Only reset the trigger output, not the state
         outargs[2] = FL(0.0);
 
-        if (nsmps != m_HOP) {
-            csound->warning(std::format("ksmps must be {} for now, received {}", m_HOP, nsmps));
-            return NOTOK;
+        // [ Keep your existing buffer copy logic here ]
+
+        if (m_BlockIndex >= m_HOP) {
+            // Optional: Only process if you've received a trigger/start command
+            // if (m_Following) {
+            bool ok = oscofo->ProcessBlock(m_InBuffer);
+            // ... error handling ...
+
+            int event = oscofo->GetEventIndex();
+            m_CurrentEvent = static_cast<MYFLT>(event);
+            m_CurrentBPM = static_cast<MYFLT>(oscofo->GetLiveBPM());
+
+            if (event >= 0 && m_ScoreEventIndex != static_cast<uint32_t>(event)) {
+                m_ScoreEventIndex = event;
+                outargs[2] = FL(1.0); // Trigger high for exactly one k-cycle
+            }
+            // }
+
+            // 2. Subtract instead of forcing to 0 to preserve remainder samples
+            m_BlockIndex -= m_HOP;
         }
 
-        m_BlockIndex += m_HOP;
-        std::memmove(m_InBuffer.data(), m_InBuffer.data() + m_HOP, (m_InBuffer.size() - m_HOP) * sizeof(double));
-        for (uint32_t i = 0; i < m_HOP; ++i) {
-            m_InBuffer[m_InBuffer.size() - m_HOP + i] = in[i];
-        }
+        // 3. Constantly output the held state
+        outargs[0] = m_CurrentEvent;
+        outargs[1] = m_CurrentBPM;
 
-        bool ok = oscofo->ProcessBlock(m_InBuffer);
-        if (!ok) {
-            csound->message("Failed to process block");
-            return NOTOK;
-        }
-        int event = oscofo->GetEventIndex();
-        outargs[0] = static_cast<MYFLT>(event);
-        outargs[1] = static_cast<MYFLT>(oscofo->GetLiveBPM());
-        if (event >= 0 && m_ScoreEventIndex != event) {
-            m_ScoreEventIndex = event;
-            outargs[2] = FL(1.0);
-        } else {
-            outargs[2] = FL(0.0);
-        }
         return OK;
     }
 
+    // ─────────────────────────────────────
     int deinit() {
         if (oscofo) {
             delete oscofo;
@@ -90,5 +132,7 @@ struct CSoundOpenScofo : Plugin<4, 3> {
 } // namespace csnd
 
 void csnd::on_load(Csound *csound) {
+    csound->message(
+        std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME));
     csnd::plugin<CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aS", csnd::thread::ia);
 }
