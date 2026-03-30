@@ -3,10 +3,12 @@ OpenScofo : UGen {
         ^this.multiNew('audio', in, sampleRate, fftSize, hopSize)
     }
 
+    // ─────────────────────────────────────
     *kr { arg sampleRate = 48000.0, fftSize = 2048.0, hopSize = 512.0, in = 0.0;
         ^this.multiNew('control', in, sampleRate, fftSize, hopSize)
     }
 
+    // ─────────────────────────────────────
     *findUnitIndex { arg synth;
         var desc, children, openScofoUGen;
 
@@ -26,6 +28,7 @@ OpenScofo : UGen {
         ^openScofoUGen.synthIndex ? 0;
     }
 
+    // ─────────────────────────────────────
     *cmd { arg synth, command ...args;
         var unitIndex;
         if(synth.isNil) {
@@ -35,28 +38,35 @@ OpenScofo : UGen {
         synth.server.sendMsg("/u_cmd", synth.nodeID, unitIndex, command.asString, *args);
     }
 
+    // ─────────────────────────────────────
     *parseScore { arg synth, path;
         ^this.cmd(synth, "parseScore", path.asString);
     }
 
+    // ─────────────────────────────────────
     *getCurrentEvent { arg synth;
         ^this.cmd(synth, "getCurrentEvent");
     }
 
+    // ─────────────────────────────────────
     *setFollowScore { arg synth, enabled = true;
         var value = if(enabled, 1, 0);
         ^this.cmd(synth, "setFollowScore", value);
     }
 
+    // ─────────────────────────────────────
     *setEventNotifications { arg synth, enabled = true;
         var value = if(enabled, 1, 0);
         ^this.cmd(synth, "setEventNotifications", value);
     }
+
+    // ─────────────────────────────────────
 zr
     *getDescriptor { arg synth, descriptorId;
         ^this.cmd(synth, "getDescriptor", descriptorId.asString);
     }
 
+    // ─────────────────────────────────────
     *loadOnnxModel { arg synth, modelPath, descriptorIds;
         var csv = descriptorIds.asArray.collect(_.asString).join(",");
         ^this.cmd(synth, "loadOnnxModel", modelPath.asString, csv);

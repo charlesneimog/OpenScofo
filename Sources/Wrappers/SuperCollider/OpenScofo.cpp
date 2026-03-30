@@ -22,7 +22,6 @@ struct ScOpenScofo : public SCUnit {
         m_FFTSize = std::max(1, static_cast<int>(fftSize));
         m_HopSize = std::max(1, static_cast<int>(hopSize));
         m_InBuffer.assign(m_FFTSize, 0.0);
-
         m_OScofo = new OpenScofo::OpenScofo(sampleRate, fftSize, hopSize);
 
         if (isAudioRateIn(0)) {
@@ -102,50 +101,12 @@ struct ScOpenScofo : public SCUnit {
         return -1;
     }
 
-    bool GetDescriptorValues(const char *descriptorId, std::vector<float> &values) {
-        if (!m_OScofo || !descriptorId) {
-            return false;
-        }
-
-        if (!m_LastDescValid) {
-            m_LastDesc = m_OScofo->GetAudioDescription(m_InBuffer);
-            m_LastDescValid = true;
-        }
-
-        OpenScofo::Description desc =
-            (m_FollowScore && m_OScofo->ScoreIsLoaded()) ? m_OScofo->GetDescription() : m_LastDesc;
-
-        const auto descriptor = m_OScofo->GetDescriptorsEnum(descriptorId);
-        if (descriptor == OpenScofo::Descriptors::INVALID || descriptor == OpenScofo::Descriptors::ONNX) {
-            return false;
-        }
-
-        switch (descriptor) {
-        case OpenScofo::Descriptors::MFCC:
-        case OpenScofo::Descriptors::CHROMA:
-        case OpenScofo::Descriptors::MELOGRAM:
-        case OpenScofo::Descriptors::MAGNITUDE:
-        case OpenScofo::Descriptors::POWERARRAY: {
-            auto &arrayValues = m_OScofo->GetDescriptionArray(desc, descriptor);
-            values.assign(arrayValues.begin(), arrayValues.end());
-            return true;
-        }
-        default: {
-            const double value = m_OScofo->GetDescriptionFloat(desc, descriptor);
-            values.assign(1, static_cast<float>(value));
-            return true;
-        }
-        }
-    }
-
   private:
     OpenScofo::OpenScofo *m_OScofo = nullptr;
-    int m_BlockIndex = 0;
     int m_FFTSize = 2048;
     int m_HopSize = 512;
     bool m_FollowScore = true;
     bool m_EmitEventNotifications = false;
-    bool m_LastDescValid = false;
     std::vector<double> m_InBuffer;
     OpenScofo::Description m_LastDesc;
     int m_LastEventIndex = -1;
@@ -171,35 +132,11 @@ struct ScOpenScofo : public SCUnit {
 
     void next_a(int inNumSamples) {
         (void)inNumSamples;
-        int audioSamples = mWorld->mFullRate.mBufLength;
+        int n = mWorld->mFullRate.mBufLength;
         const float *inBuf = in(0);
-        const int size = (int)m_InBuffer.size();
-
-        // 2. Shift your internal FFT buffer left to make room
-        if (audioSamples < size) {
-            std::copy(m_InBuffer.begin() + audioSamples, m_InBuffer.end(), m_InBuffer.begin());
-            // 3. Insert the new audio block at the end
-            for (int i = 0; i < audioSamples; ++i) {
-                m_InBuffer[size - audioSamples + i] = inBuf[i];
-            }
-        }
-
-        m_BlockIndex += audioSamples;
-
-        // 4. If we hit the 512 hop size, process it
-        if (m_BlockIndex >= m_HopSize) {
-            m_BlockIndex -= m_HopSize; // Reset for next hop
-
-            if (m_OScofo) {
-                if (m_FollowScore && m_OScofo->ScoreIsLoaded()) {
-                    m_OScofo->ProcessBlock(m_InBuffer);
-                    m_LastDesc = m_OScofo->GetDescription();
-                } else {
-                    m_LastDesc = m_OScofo->GetAudioDescription(m_InBuffer);
-                }
-                m_LastDescValid = true;
-                EmitCurrentEventIfChanged();
-            }
+        bool ok = m_OScofo->ProcessBlock(inBuf, n);
+        if (!ok) {
+            // set fail
         }
 
         out(0)[0] = 0.0f;
@@ -239,22 +176,6 @@ void cmdSetEventNotifications(ScOpenScofo *unit, sc_msg_iter *args) {
 }
 
 // ─────────────────────────────────────
-void cmdGetDescriptor(ScOpenScofo *unit, sc_msg_iter *args) {
-    const char *descriptorId = args->gets();
-    if (!descriptorId) {
-        return;
-    }
-
-    std::vector<float> values;
-    if (!unit->GetDescriptorValues(descriptorId, values) || values.empty()) {
-        return;
-    }
-
-    std::string address = std::string("/oscofo/descriptor/") + descriptorId;
-    SendNodeReply(&unit->mParent->mNode, 0, address.c_str(), static_cast<int>(values.size()), values.data());
-}
-
-// ─────────────────────────────────────
 void cmdLoadOnnxModel(ScOpenScofo *unit, sc_msg_iter *args) {
     const char *modelPath = args->gets();
     const char *descriptorIdsCsv = args->gets();
@@ -270,7 +191,6 @@ PluginLoad(OpenScofoUGens) {
     DefineUnitCmd("OpenScofo", "getCurrentEvent", (UnitCmdFunc)&cmdGetCurrentEvent);
     DefineUnitCmd("OpenScofo", "setFollowScore", (UnitCmdFunc)&cmdSetFollowScore);
     DefineUnitCmd("OpenScofo", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
-    DefineUnitCmd("OpenScofo", "getDescriptor", (UnitCmdFunc)&cmdGetDescriptor);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
 
     printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);

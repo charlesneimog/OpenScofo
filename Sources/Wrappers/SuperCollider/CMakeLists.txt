@@ -18,9 +18,9 @@ target_link_libraries(SCOpenScofo PRIVATE OpenScofo)
 # │         SuperCollider Target         │
 # ╰──────────────────────────────────────╯
 if(APPLE OR WIN32)
-    set_target_properties(SCOpenScofo PROPERTIES PREFIX "" SUFFIX ".scx")
+    set_target_properties(SCOpenScofo PROPERTIES PREFIX "" SUFFIX ".scx" OUTPUT_NAME "OpenScofo")
 else()
-    set_target_properties(SCOpenScofo PROPERTIES PREFIX "" SUFFIX ".so")
+    set_target_properties(SCOpenScofo PROPERTIES PREFIX "" SUFFIX ".so" OUTPUT_NAME "OpenScofo")
     target_link_options(SCOpenScofo PRIVATE -Wl,-allow-multiple-definition -flto=auto)
     target_compile_options(SCOpenScofo PRIVATE -flto=auto)
 endif()
