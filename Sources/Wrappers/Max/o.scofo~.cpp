@@ -255,7 +255,8 @@ static void oscofo_get(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         buffer_unlocksamples(bufferObj);
         object_free(bufferRef);
 
-        OpenScofo::Description Desc = x->OpenScofo->GetAudioDescription(audioBuffer);
+        bool ok = x->OpenScofo->ProcessBlock(audioBuffer, fftsize);
+        OpenScofo::Description Desc = x->OpenScofo->GetDescription();
         oscofo_output_descriptors(x, Desc);
     }
 }
@@ -474,22 +475,6 @@ static void oscofo_ticknewevent(void *xv) {
 }
 
 // ─────────────────────────────────────
-static void oscofo_perform_descriptors(MaxOpenScofo *x, double **ins, long sampleframes) {
-    x->BlockIndex += sampleframes;
-    std::copy(x->inBuffer.begin() + sampleframes, x->inBuffer.end(), x->inBuffer.begin());
-    std::copy(ins[0], ins[0] + sampleframes, x->inBuffer.end() - sampleframes);
-
-    if (x->BlockIndex != x->HopSize) {
-        clock_delay(x->ClockActions, 0);
-        return;
-    }
-
-    x->BlockIndex = 0;
-    x->Desc = std::make_unique<OpenScofo::Description>(x->OpenScofo->GetAudioDescription(x->inBuffer));
-    clock_delay(x->ClockInfo, 0);
-}
-
-// ─────────────────────────────────────
 static void oscofo_perform_score(MaxOpenScofo *x, double **ins, long sampleframes) {
     x->BlockIndex = 0;
     bool ok = x->OpenScofo->ProcessBlock(ins[0], sampleframes);
@@ -512,12 +497,7 @@ static void oscofo_perform64(t_object *obj, t_object *dsp64, double **ins, long 
     (void)numouts;
     (void)flags;
     (void)userparam;
-
-    if (x->JustDescription) {
-        // oscofo_perform_descriptors(x, ins, sampleframes);
-    } else {
-        oscofo_perform_score(x, ins, sampleframes);
-    }
+    oscofo_perform_score(x, ins, sampleframes);
 }
 
 // ─────────────────────────────────────

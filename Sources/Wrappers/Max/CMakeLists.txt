@@ -14,5 +14,6 @@ add_library(${PROJECT_NAME} MODULE o.scofo~.cpp maxlua.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenScofo)
 target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_INCLUDES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_MSP_INCLUDES})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-posttarget.cmake")
