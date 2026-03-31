@@ -194,6 +194,7 @@ jobs:
           path: SuperCollider
 
       - name: Upload Emscripten
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v6
         with:
           name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
