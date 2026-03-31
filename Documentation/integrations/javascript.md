@@ -28,7 +28,7 @@ Errors from the internal logger are forwarded to JavaScript:
 After compiling with Emscripten, the module can be used as:
 
 ```javascript
-const scofo = new Module.OpenScofo(sampleRate, blockSize, hopSize);
+const scofo = new OpenScofo.OpenScofo(sampleRate, blockSize, hopSize);
 ```
 
 ---
@@ -38,7 +38,7 @@ const scofo = new Module.OpenScofo(sampleRate, blockSize, hopSize);
 ### VectorDouble
 
 ```js
-let v = new Module.VectorDouble();
+let v = new OpenScofo.VectorDouble();
 ```
 
 Used for arrays of numeric data exchanged with the engine.
@@ -168,11 +168,11 @@ scofo.get_audio_description()
 ## Minimal Example
 
 ```js
-const scofo = new Module.OpenScofo(44100, 1024, 512);
+const scofo = new OpenScofo.OpenScofo(44100, 1024, 512);
 
 scofo.parse_score(scoreText);
 
-let buffer = new Module.VectorDouble();
+let buffer = new OpenScofo.VectorDouble();
 // fill buffer with audio samples
 
 scofo.process_block(buffer);

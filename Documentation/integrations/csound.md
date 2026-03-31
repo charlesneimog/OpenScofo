@@ -2,97 +2,78 @@
 
 <release interface="CSound">Loading Releases</release>
 
-
-`OpenScofo` is a Csound opcode for real-time score following and audio descriptor extraction.
+`OpenScofo` features a Csound opcode dedicated to real-time score following.
 
 !!! danger "This is a pre-alpha version!"
 
-
 ## Loading `OpenScofo`
 
-To load the `OpenScofo` opcode, you use the following code:
+To load the opcode, reference the compiled library in your `<CsOptions>` block:
 
-``` csound
+```csound
 <CsOptions>
---opcode-lib=/path/to/OScofoCSound.so
+--opcode-lib=/path/to/OpenScofo.so
 </CsOptions>
 ```
 
-!!! warning "For MacOS extension is `OScofoCSound.dylib`, for Windows extension is `OScofoCSound.dll`."
+!!! warning "Use `.dylib` for macOS and `.dll` for Windows."
+
+-----
 
 ## Syntax
 
 ```csound
-kEvent, kBPM, kTrig, kDesc OpenScofo ain, SMode, SArg
+kEvent, kBPM, kTrig OpenScofoScore aIn, SScorePath, iFFTSize, iHopSize 
 ```
 
-## Description
+### Inputs
 
-The `OpenScofo` opcode operates in two distinct modes depending on the `SMode` argument:
+  * **`aIn`** *(a-rate)*: The input audio signal (from a file or real-time microphone input).
+  * **`SScorePath`** *(String)*: The absolute file path to your OpenScofo text score.
+  * **`iFFTSize`** *(i-rate)*: The FFT size. Recommended value is `2048`.
+  * **`iHopSize`** *(i-rate)*: The Hop size. Recommended value is `512`.
 
-1. **Score Mode:** Tracks an audio signal against a text-based score, outputting the current event index and live BPM estimation.
-2. **Descriptor Mode:** Analyzes the audio signal and outputs a specific scalar audio descriptor (e.g., `RMS`, `crest`, and others).
+### Outputs
 
+  * **`kEvent`** *(k-rate)*: The current event index in the score. Rests do not count as events.
+  * **`kBPM`** *(k-rate)*: The estimated live BPM based on the player's execution of the score.
+  * **`kTrig`** *(k-rate)*: A trigger signal that outputs `1` when a new event index is detected, and `0` otherwise.
 
-## Initialization (Inputs)
+-----
 
-* **`ain`** *(a-rate)*: The input audio signal to be analyzed.
-* **`SMode`** *(String)*: The operational mode. Use `"score"` for score following, or `"desc"` (or `"descriptor"`) for audio feature extraction.
-* **`SArg`** *(String)*: 
-    * If `SMode` is `"score"`, this must be the **file path** to your OpenScofo text score.
-    * If `SMode` is `"desc"`, this must be the **name ID of the descriptor** (e.g., `"rms"`, `"pitch"`, etc.), check complet list [Descriptors](../descriptors/index.md). 
+## Example Usage
 
-
-!!! warning "Just scalar descriptors for now"
-
-    If a non-scalar descriptor (like MFCC or Chroma) is requested, it safely falls back to `rms`.
-
-## Performance (Outputs)
-
-* **`kEvent`** *(k-rate)*: The current event index in the score (Active in Score Mode).
-* **`kBPM`** *(k-rate)*: The estimated live BPM (Active in Score Mode).
-* **`kTrig`** *(k-rate)*: A trigger signal that outputs `1` when a processing block finishes/updates, and `0` otherwise. Useful for triggering sub-instruments.
-* **`kDesc`** *(k-rate)*: The float value of the requested audio descriptor (Active in Descriptor Mode).
-
----
-
-## Examples
-
-### 1. Score Following Mode
-
-Loads a score file and tracks the audio, printing the event and BPM whenever it updates.
+This example loads a score file and tracks the incoming audio, printing the current event and BPM whenever a new event is detected.
 
 ```csound
+<CsoundSynthesizer>
+<CsOptions>
+--opcode-lib=/path/to/OpenScofo.so
+</CsOptions>
+
+<CsInstruments>
+sr = 48000
+ksmps = 64
+nchnls = 1
+0dbfs = 1
+
 instr 1
+    ; Audio input from file (or real-time MIC)
     a1 diskin2 "/path/to/audio.wav", 1, 0, 0
+
+    ; Run OpenScofoScore
+    kEvent, kBPM, kTrig OpenScofoScore a1, "/path/to/score.txt", 2048, 512
     
-    ; Run OpenScofo in "score" mode
-    kEvent, kBPM, kTrig, kDesc OpenScofo a1, "score", "/path/to/score.txt"
-    
-    ; Print updates only when the trigger is 1
-    if (kTrig == 1) then
-        printf "Event: %d | BPM: %.2f\n", changed(kEvent), kEvent, kBPM
-    endif
+    ; Print updates only when kTrig is 1
+    printf "Event: %03d | BPM: %.2f\n", kTrig, kEvent, kBPM
     
     out a1
 endin
-```
 
-### 2. Audio Descriptor Mode
-Extracts the RMS value from the incoming audio signal.
+</CsInstruments>
 
-```csound
-instr 2
-    a1 diskin2 "/path/to/audio.wav", 1, 0, 1
-    
-    ; Run OpenScofo in "desc" mode, requesting Spectral Crest descriptor
-    kEvent, kBPM, kTrig, kDesc OpenScofo a1, "desc", "crest"
-    
-    ; Print the descriptor value when the trigger is 1
-    if (kTrig == 1) then
-        printf "RMS Value: %f\n", changed(kDesc), kDesc
-    endif
-    
-    out a1
-endin
+<CsScore>
+i1 0 120
+</CsScore>
+</CsoundSynthesizer>
 ```
