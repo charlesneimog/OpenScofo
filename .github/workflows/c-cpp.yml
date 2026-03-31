@@ -12,7 +12,7 @@ on:
 
 env:
   LIBNAME: OpenScofo
-  LIBVERSION: 0.1.6
+  LIBVERSION: 0.1.7
 permissions:
   contents: write
 jobs:

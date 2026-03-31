@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(OpenScofo VERSION 0.1.6 LANGUAGES C CXX
+project(OpenScofo VERSION 0.1.7 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
