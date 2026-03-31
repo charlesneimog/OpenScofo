@@ -255,7 +255,7 @@ static void oscofo_get(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         buffer_unlocksamples(bufferObj);
         object_free(bufferRef);
 
-        bool ok = x->OpenScofo->ProcessBlock(audioBuffer, fftsize);
+        bool ok = x->OpenScofo->ProcessBlock(audioBuffer.data(), audioBuffer.size());
         OpenScofo::Description Desc = x->OpenScofo->GetDescription();
         oscofo_output_descriptors(x, Desc);
     }
