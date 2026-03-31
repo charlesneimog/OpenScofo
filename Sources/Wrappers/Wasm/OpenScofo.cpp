@@ -112,5 +112,10 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
         .function("get_states", &OpenScofo::OpenScofo::GetStates)
         .function("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
         .function("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
-        .function("process_block", &OpenScofo::OpenScofo::ProcessBlock);
+        // Note the '+' right before the '['
+        .function(
+            "process_block", +[](OpenScofo::OpenScofo &self, emscripten::val input) {
+                std::vector<double> vec = emscripten::vecFromJSArray<double>(input);
+                self.ProcessBlock(vec.data(), vec.size());
+            });
 }
