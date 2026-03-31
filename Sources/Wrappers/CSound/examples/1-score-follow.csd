@@ -1,101 +1,41 @@
 <CsoundSynthesizer>
 <CsOptions>
---opcode-lib=/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/CSound/OpenScofo.so -b512
+--opcode-lib=/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/CSound/OpenScofo.so
 </CsOptions>
 
 <CsInstruments>
 sr = 48000
-ksmps = 512
+ksmps = 64
 nchnls = 1
 0dbfs = 1
 
 instr 1
     ; audio input from file or real time audio input
-    a1 diskin2 "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.wav", 1, 0, 0
+    a1 diskin2 "/home/neimog/Documents/Git/OpenScofo/Tests/assets/canticos.wav", 1, 0, 0
 
     ; kEvent is the event index of the score, first note, second note, third note, etc (rest do not count as event).
     ; kBPM is the current kBPM that the player is play a given score.
     ; kTrig is 1 when new event index is detected, 0 otherwise.
-    kEvent, kBPM, kTrig OpenScofoScore a1, "/home/neimog/Documents/Git/OpenScofo/Tests/assets/bwv-1013.txt"
+    kEvent, kBPM, kTrig OpenScofoScore a1, "/home/neimog/Documents/Git/OpenScofo/Tests/assets/canticos.txt", 2048, 512
+    
+    ; first input is the audio signal (recording or realtime audio from the MIC)
+    ; second is the Score Text (check https://charlesneimog.github.io/OpenScofo/)
+    ; FFT Size (recommended is 2048)
+    ; Hop Size (recommended is 512)
 
 
 		; imprime apenas quando kTrig for 1
-	if kTrig == 1 then
-		printk2 kEvent
-	endif
-    
-
-    ; first input parameters is the audio channel
-    ; third parameter is the score path for "score" mode or descriptor name for "description" mode.
-
-
-    out a1
+		printf "Event: %03d | BPM: %.2f\n", kTrig, kEvent, kBPM
+		
+   out a1
 endin
 
 </CsInstruments>
 
 <CsScore>
-i1 0 60
+i1 0 120
 </CsScore>
 </CsoundSynthesizer>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

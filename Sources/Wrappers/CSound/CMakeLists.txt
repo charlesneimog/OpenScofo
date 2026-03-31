@@ -16,6 +16,7 @@ endif()
 file(GLOB_RECURSE OPENSCOFO_CSOUND_SOURCES "*.cpp" "*.h" "*.hpp")
 add_library(OScofoCSound MODULE ${OPENSCOFO_CSOUND_SOURCES})
 target_link_libraries(OScofoCSound PRIVATE OpenScofo)
+target_compile_definitions(OScofoCSound PUBLIC USE_DOUBLE)
 
 if(APPLE)
     set_target_properties(OScofoCSound PROPERTIES PREFIX "" SUFFIX ".dylib" OUTPUT_NAME "OpenScofo")
