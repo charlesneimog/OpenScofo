@@ -127,13 +127,20 @@ jobs:
         with:
           name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
             runner.os }}
-          path: ${{env.LIBNAME}}
+          path: | 
+            ${{env.LIBNAME}}
+            Tests/assets/canticos.wav
+            Tests/assets/canticos.txt
+
       - name: Upload Max Object
         uses: actions/upload-artifact@v6
         if: runner.os != 'Linux'
         with:
           name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: max
+          path: |
+            max
+            Tests/assets/canticos.wav
+            Tests/assets/canticos.txt
       - name: Upload Python Object
         uses: actions/upload-artifact@v6
         with:
@@ -147,6 +154,9 @@ jobs:
             build/Sources/Wrappers/Vamp/*.so
             build/Sources/Wrappers/Vamp/*.dylib
             build/Sources/Wrappers/Vamp/*.dll
+            Tests/assets/canticos.wav
+            Tests/assets/canticos.txt
+
       - name: Prepare SuperCollider Final Folder
         shell: bash
         run: |
@@ -177,17 +187,19 @@ jobs:
           cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
           cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
           cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
-      - name: Upload SuperCollider Plugin
+      - name: Upload SuperCollider
         uses: actions/upload-artifact@v6
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
-      - name: Upload EMScripten Site
+
+      - name: Upload Emscripten
         uses: actions/upload-artifact@v6
         with:
           name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
           path: Emscripten
-      - name: Upload CSound Plugin
+
+      - name: Upload CSound
         uses: actions/upload-artifact@v6
         with:
           name: CSound-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
@@ -195,6 +207,8 @@ jobs:
             build/Sources/Wrappers/CSound/*.so
             build/Sources/Wrappers/CSound/*.dylib
             build/Sources/Wrappers/CSound/*.dll
+            Tests/assets/canticos.wav
+            Tests/assets/canticos.txt
 
   publish-release:
     if: ${{ github.event.inputs.publish_release == 'true' }}
