@@ -39,7 +39,7 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
 // ╭─────────────────────────────────────╮
 // │               Opcode                │
 // ╰─────────────────────────────────────╯
-struct CSoundOpenScofo : Plugin<3, 2> {
+struct CSoundOpenScofo : Plugin<3, 4> {
     OpenScofo::OpenScofo *oscofo = nullptr;
     float m_SR;
     float m_FFT;
@@ -49,10 +49,18 @@ struct CSoundOpenScofo : Plugin<3, 2> {
 
     // ─────────────────────────────────────
     int init() {
-        m_SR = sr();
-        m_FFT = 2048;
-        m_HOP = 512;
-        oscofo = new OpenScofo::OpenScofo(48000, 2048, 512);
+        m_SR = static_cast<MYFLT>(csound->sr());
+        m_FFT = static_cast<MYFLT>(inargs[2]);
+        m_HOP = static_cast<MYFLT>(inargs[3]);
+
+        if (m_SR <= 0 || m_FFT <= 0 || m_HOP <= 0) {
+            csound->warning("FFT or HOP not defined, defined fft = 2048, hop == 512");
+            m_SR = 48000;
+            m_FFT = 2048;
+            m_HOP = 512;
+        }
+
+        oscofo = new OpenScofo::OpenScofo(m_SR, m_FFT, m_HOP);
         oscofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(csound));
 
         STRINGDAT &scorePath = inargs.str_data(1);
@@ -62,8 +70,11 @@ struct CSoundOpenScofo : Plugin<3, 2> {
             return NOTOK;
         }
 
+        OpenScofo::States states = oscofo->GetStates();
+        csound->message(std::format("\nScore has {} states\n", states.size()));
+
         outargs[0] = FL(0.0);
-        outargs[1] = oscofo->GetLiveBPM();
+        outargs[1] = FL(oscofo->GetLiveBPM());
         outargs[2] = FL(0.0);
         m_LastEvent = -1;
 
@@ -91,7 +102,6 @@ struct CSoundOpenScofo : Plugin<3, 2> {
 
         if (event != m_LastEvent) {
             outargs[2] = FL(1.0);
-            csound->message(std::format("Event is {}", event));
         } else {
             outargs[2] = FL(0.0);
         }
@@ -102,7 +112,6 @@ struct CSoundOpenScofo : Plugin<3, 2> {
     }
 
     // ─────────────────────────────────────
-    // FIX 1: now actually called because plugin_deinit was registered above
     int deinit() {
         if (oscofo) {
             delete oscofo;
@@ -118,5 +127,5 @@ struct CSoundOpenScofo : Plugin<3, 2> {
 void csnd::on_load(Csound *csound) {
     csound->message(
         std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME));
-    csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aS", csnd::thread::ik);
+    csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aSii", csnd::thread::ik);
 }
