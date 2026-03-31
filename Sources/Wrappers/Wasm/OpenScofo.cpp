@@ -112,6 +112,5 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
         .function("get_states", &OpenScofo::OpenScofo::GetStates)
         .function("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
         .function("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
-        .function("get_audio_description", &OpenScofo::OpenScofo::GetAudioDescription)
         .function("process_block", &OpenScofo::OpenScofo::ProcessBlock);
 }
