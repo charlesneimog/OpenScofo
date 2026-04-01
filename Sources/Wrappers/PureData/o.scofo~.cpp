@@ -572,3 +572,8 @@ extern "C" void setup_o0x2escofo_tilde(void) {
     CLASS_MAINSIGNALIN(OpenScofoObj, PdOpenScofo, Sample);
     class_addmethod(OpenScofoObj, (t_method)oscofo_adddsp, gensym("dsp"), A_CANT, 0);
 }
+
+
+#ifdef __WIN64
+__declspec(dllexport) void setup_o0x2escofo_tilde(void);
+#endif
