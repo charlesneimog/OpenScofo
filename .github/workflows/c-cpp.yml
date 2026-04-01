@@ -32,6 +32,16 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Setup MSYS2 (Windows)
+        id: msys2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-ninja
       - name: Setup Emscripten
         if: runner.os == 'Linux'
         uses: mymindstorm/setup-emsdk@v14
@@ -66,8 +76,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $msys2Bin = "${{ steps.msys2.outputs.msys2-location }}\\mingw64\\bin"
+          if (!(Test-Path "$msys2Bin\\gcc.exe")) {
+            throw "MinGW gcc not found at $msys2Bin"
+          }
+          $msys2Bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
           npm install -g tree-sitter-cli
-          winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
           winget install -e --id MillerPuckette.PureData --accept-source-agreements
           python -m pip install --upgrade pip
           python -m pip install build scikit-build-core cibuildwheel twine pybind11
@@ -101,8 +116,8 @@ jobs:
             "-Ccmake.define.CMAKE_BUILD_TYPE=Debug "
             "-Ccmake.define.pybind11_DIR=$pybind11Dir"
             "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
-            "-Ccmake.define.CMAKE_C_COMPILER=clang"
-            "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
+            "-Ccmake.define.CMAKE_C_COMPILER=gcc"
+            "-Ccmake.define.CMAKE_CXX_COMPILER=g++"
             "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
             "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
             "-Ccmake.define.BUILD_ALL=ON"
