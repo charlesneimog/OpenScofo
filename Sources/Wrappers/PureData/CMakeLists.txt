@@ -13,9 +13,12 @@ if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     target_link_options(o.scofo_tilde PRIVATE -Wl,-allow-multiple-definition)
     target_compile_options(o.scofo_tilde PRIVATE -flto=auto)
     target_link_options(o.scofo_tilde PRIVATE -flto=auto)
+elseif(WIN32)
+    set_target_properties(o.scofo_tilde PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/README.md")
 pd_add_datafile(o.scofo_tilde "${CMAKE_CURRENT_SOURCE_DIR}/o.scofo~-help.pd")
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.wav")
 pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt")
+

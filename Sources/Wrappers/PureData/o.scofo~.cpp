@@ -574,6 +574,6 @@ extern "C" void setup_o0x2escofo_tilde(void) {
 }
 
 
-#ifdef __WIN64
+#ifdef __WIN32
 __declspec(dllexport) void setup_o0x2escofo_tilde(void);
 #endif
