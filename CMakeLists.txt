@@ -15,6 +15,10 @@ set(TREE_SITTER_VERSION "v0.26.6")
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-alpha")
 
+if(WIN32 AND MINGW)
+    add_compile_definitions(_POSIX_SEM_VALUE_MAX=32767)
+endif()
+
 if(EMSCRIPTEN)
     message(STATUS "Emscripten compilation")
     set(CMAKE_CXX_FLAGS
