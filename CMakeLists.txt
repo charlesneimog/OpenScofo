@@ -12,16 +12,8 @@ set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
-
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-endif()
-
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-alpha")
 
-if(WIN32 AND MINGW)
-    add_compile_definitions(_POSIX_SEM_VALUE_MAX=32767)
-endif()
 
 if(EMSCRIPTEN)
     message(STATUS "Emscripten compilation")
