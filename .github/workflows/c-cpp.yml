@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Publish Debug"
+        description: "Publish Release"
         required: false
         default: false
         type: boolean
@@ -29,9 +29,27 @@ jobs:
           submodules: recursive
           fetch-depth: 1
       - name: Setup Python
+        id: setup_python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup MSYS2 (MinGW64)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-tree-sitter
+            mingw-w64-x86_64-nodejs
       - name: Setup Emscripten
         if: runner.os == 'Linux'
         uses: mymindstorm/setup-emsdk@v14
@@ -49,7 +67,7 @@ jobs:
           sudo apt install puredata -y
           sudo apt install libboost-all-dev libgtest-dev python3-pybind11 -y
           npm install -g tree-sitter-cli
-          pip install build scikit-build-core cibuildwheel twine
+          pip install build scikit-build-core cibuildwheel twine pybind11-stubgen
       # -----------------------
       # macOS dependencies
       # -----------------------
@@ -58,19 +76,30 @@ jobs:
         run: |
           brew install pd pybind11 googletest tree-sitter boost
           npm install -g tree-sitter-cli
-          pip install build scikit-build-core cibuildwheel twine
+          pip install build scikit-build-core cibuildwheel twine pybind11-stubgen
+
+      # -----------------------
+      # Windows dependencies
+      # -----------------------
+      - name: Install PureData (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          winget install -e --id MillerPuckette.PureData --accept-source-agreements --accept-package-agreements
+
       # -----------------------
       # Windows dependencies
       # -----------------------
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: msys2 {0}
         run: |
-          npm install -g tree-sitter-cli
-          winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
-          winget install -e --id MillerPuckette.PureData --accept-source-agreements
-          python -m pip install --upgrade pip
-          python -m pip install build scikit-build-core cibuildwheel twine pybind11
+          python_exe="$(cygpath -u "${{ steps.setup_python.outputs.python-path }}")"
+
+          pacman -S --noconfirm --needed mingw-w64-x86_64-ninja mingw-w64-x86_64-tree-sitter mingw-w64-x86_64-nodejs
+          node --version
+          "$python_exe" -m pip install --upgrade pip
+          "$python_exe" -m pip install build scikit-build-core cibuildwheel twine pybind11 pybind11-stubgen
       # -----------------------
       # Configure (Unix)
       # -----------------------
@@ -80,7 +109,7 @@ jobs:
           python -m build --wheel \
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
-            -Ccmake.define.CMAKE_BUILD_TYPE=Debug \
+            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
             -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
@@ -91,30 +120,30 @@ jobs:
       # -----------------------
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: msys2 {0}
         run: |
-          $pybind11Dir = python -m pybind11 --cmakedir
-          $treeSitterBin = (Get-Command tree-sitter.cmd).Source
-          $buildArgs = @(
-            "-Cbuild-dir=build"
-            "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
-            "-Ccmake.define.CMAKE_BUILD_TYPE=Debug"
-            "-Ccmake.define.pybind11_DIR=$pybind11Dir"
-            "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
-            "-Ccmake.define.CMAKE_C_COMPILER=clang"
-            "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
-            "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
-            "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
-            "-Ccmake.define.BUILD_ALL=ON"
-            "-Ccmake.args=-G Ninja"
-          )
-          python -m build --wheel @buildArgs
+          set -euo pipefail
+
+          python_exe="$(cygpath -u "${{ steps.setup_python.outputs.python-path }}")"
+          pybind11_dir="$("$python_exe" -m pybind11 --cmakedir)"
+          tree_sitter_bin="$(command -v tree-sitter || command -v tree-sitter.cmd)"
+
+          "$python_exe" -m build --wheel \
+            -Cbuild-dir=build \
+            -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
+            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+            -Ccmake.define.pybind11_DIR="$pybind11_dir" \
+            -Ccmake.define.TREE_SITTER_EXECUTABLE="$tree_sitter_bin" \
+            -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+            -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+            -Ccmake.define.BUILD_ALL=ON \
+            -Ccmake.args="-G Ninja"
       - name: Build Emscripten
         if: runner.os == 'Linux'
         run: |
           source $EMSDK/emsdk_env.sh
           emcmake cmake . -B build-wasm \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=Release \
             -DOSCOFO_BUILD_TESTS=OFF \
             -DBUILD_ALL=ON
           cmake --build build-wasm
@@ -230,7 +259,7 @@ jobs:
             (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
           done
           ls -1 release_assets
-      - name: Create / Update GitHub Debug
+      - name: Create / Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.LIBVERSION }}-alpha
