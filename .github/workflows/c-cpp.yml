@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Publish Release"
+        description: "Publish Debug"
         required: false
         default: false
         type: boolean
@@ -80,7 +80,7 @@ jobs:
           python -m build --wheel \
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
-            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+            -Ccmake.define.CMAKE_BUILD_TYPE=Debug \
             -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
@@ -98,7 +98,7 @@ jobs:
           $buildArgs = @(
             "-Cbuild-dir=build"
             "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
-            "-Ccmake.define.CMAKE_BUILD_TYPE=Release"
+            "-Ccmake.define.CMAKE_BUILD_TYPE=Debug"
             "-Ccmake.define.pybind11_DIR=$pybind11Dir"
             "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
             "-Ccmake.define.CMAKE_C_COMPILER=clang"
@@ -114,7 +114,7 @@ jobs:
         run: |
           source $EMSDK/emsdk_env.sh
           emcmake cmake . -B build-wasm \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DOSCOFO_BUILD_TESTS=OFF \
             -DBUILD_ALL=ON
           cmake --build build-wasm
@@ -230,7 +230,7 @@ jobs:
             (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
           done
           ls -1 release_assets
-      - name: Create / Update GitHub Release
+      - name: Create / Update GitHub Debug
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.LIBVERSION }}-alpha
