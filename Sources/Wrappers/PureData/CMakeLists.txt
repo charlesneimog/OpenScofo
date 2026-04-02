@@ -3,6 +3,15 @@ project(o.scofo~ C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
+set(PDCMAKE_VERSION "v0.2.12")
+if(NOT EXISTS "${PDCMAKE_FILE}")
+    file(DOWNLOAD
+         https://raw.githubusercontent.com/charlesneimog/pd.cmake/refs/heads/flags-test/pd.cmake
+         ${PDCMAKE_FILE})
+endif()
+include(${PDCMAKE_FILE})
+
 file(GLOB_RECURSE OPENSCOFO_PDOBJ_SOURCES "*.cpp" "*.h")
 pd_add_external(o.scofo~ "${OPENSCOFO_PDOBJ_SOURCES}" LINK_LIBRARIES OpenScofo)
 
@@ -27,18 +36,9 @@ if(WIN32 AND MINGW)
 
     target_compile_definitions(o.scofo_tilde PRIVATE _POSIX_SEM_VALUE_MAX=32767)
     target_compile_options(o.scofo_tilde PRIVATE -pthread)
-    target_link_options(o.scofo_tilde PRIVATE
-        -static-libgcc
-        -static-libstdc++
-        -pthread
-        -Wl,--enable-auto-import
-        -Wl,--enable-runtime-pseudo-reloc
-        -Wl,--no-undefined
-    )
-    target_link_libraries(o.scofo_tilde PRIVATE
-        Threads::Threads
-        -Wl,--push-state,-Bstatic
-        -lwinpthread
-        -Wl,--pop-state
-    )
+    target_link_options(
+        o.scofo_tilde PRIVATE -static-libgcc -static-libstdc++ -pthread -Wl,--enable-auto-import
+        -Wl,--enable-runtime-pseudo-reloc -Wl,--no-undefined)
+    target_link_libraries(o.scofo_tilde PRIVATE Threads::Threads -Wl,--push-state,-Bstatic
+                                                -lwinpthread -Wl,--pop-state)
 endif()

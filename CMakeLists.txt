@@ -45,15 +45,6 @@ if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_CSOUND_PLUGIN ON)
 endif()
 
-if(OSCOFO_BUILD_PD_OBJECT)
-    set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
-    set(PDCMAKE_VERSION "v0.2.12")
-    if(NOT EXISTS "${PDCMAKE_FILE}")
-        file(DOWNLOAD https://raw.githubusercontent.com/pure-data/pd.cmake/refs/heads/main/pd.cmake
-             ${PDCMAKE_FILE})
-    endif()
-    include(${PDCMAKE_FILE})
-endif()
 
 # ╭──────────────────────────────────────╮
 # │             CPM Package              │
