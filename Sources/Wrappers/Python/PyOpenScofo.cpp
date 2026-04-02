@@ -144,6 +144,7 @@ PYBIND11_MODULE(_OpenScofo, m) {
         .def("get_states", &OpenScofo::OpenScofo::GetStates)
         .def("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
         .def("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
+        .def("get_description", &OpenScofo::OpenScofo::GetDescription)
 
         // Process
         .def("process_block", [](OpenScofo::OpenScofo &self, py::array_t<double> audio) {

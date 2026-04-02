@@ -14,6 +14,14 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-alpha")
 
+if (WIN32)
+  add_compile_definitions(_WIN32_WINNT=0x0601)
+  add_link_options(
+    -static-libgcc
+    -static-libstdc++
+    -Wl,--enable-auto-import
+  )
+endif()
 
 if(EMSCRIPTEN)
     message(STATUS "Emscripten compilation")

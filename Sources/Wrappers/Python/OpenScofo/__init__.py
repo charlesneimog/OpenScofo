@@ -1,11 +1,21 @@
-from _OpenScofo import (
-    OpenScofo,
-    EventType,
-    HMMType,
-    AudioState,
-    MarkovState,
-    Description,
-)
+try: 
+    from ._OpenScofo import (
+        OpenScofo,
+        EventType,
+        HMMType,
+        AudioState,
+        MarkovState,
+        Description,
+    )
+except: 
+    from _OpenScofo import (
+        OpenScofo,
+        EventType,
+        HMMType,
+        AudioState,
+        MarkovState,
+        Description,
+    )
 
 __all__ = [
     "OpenScofo",
