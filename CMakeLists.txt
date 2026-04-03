@@ -14,13 +14,9 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.6")
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-alpha")
 
-if (WIN32)
-  add_compile_definitions(_WIN32_WINNT=0x0601)
-  add_link_options(
-    -static-libgcc
-    -static-libstdc++
-    -Wl,--enable-auto-import
-  )
+if(WIN32)
+    add_compile_definitions(_WIN32_WINNT=0x0601)
+    add_link_options(-static-libgcc -static-libstdc++ -Wl,--enable-auto-import)
 endif()
 
 if(EMSCRIPTEN)
@@ -53,6 +49,17 @@ if(OSCOFO_BUILD_ALL)
     set(OSCOFO_BUILD_CSOUND_PLUGIN ON)
 endif()
 
+# ╭──────────────────────────────────────╮
+# │               PD CMAKE               │
+# ╰──────────────────────────────────────╯
+set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
+set(PDCMAKE_VERSION "v0.2.12")
+if(NOT EXISTS "${PDCMAKE_FILE}")
+    file(DOWNLOAD
+         https://raw.githubusercontent.com/charlesneimog/pd.cmake/refs/heads/flags-test/pd.cmake
+         ${PDCMAKE_FILE})
+endif()
+include(${PDCMAKE_FILE})
 
 # ╭──────────────────────────────────────╮
 # │             CPM Package              │

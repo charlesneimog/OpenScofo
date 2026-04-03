@@ -3,14 +3,6 @@ project(o.scofo~ C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
-set(PDCMAKE_VERSION "v0.2.12")
-if(NOT EXISTS "${PDCMAKE_FILE}")
-    file(DOWNLOAD
-         https://raw.githubusercontent.com/charlesneimog/pd.cmake/refs/heads/flags-test/pd.cmake
-         ${PDCMAKE_FILE})
-endif()
-include(${PDCMAKE_FILE})
 
 # Keep Pd installs prefix-relative so scikit-build wheel installs do not try to write to /usr/local.
 set(PD_LIB_DIR "lib/pd-externals" CACHE PATH "Path where lib will be installed" FORCE)
