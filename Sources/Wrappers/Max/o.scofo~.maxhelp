@@ -202,7 +202,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 10.0, 15.0, 144.0, 22.0 ],
-                                    "text": "open bwv-1013.mp3"
+                                    "text": "open bwv-1013.wav"
                                 }
                             },
                             {
@@ -492,7 +492,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 10.0, 15.0, 144.0, 22.0 ],
-                                    "text": "open bwv-1013.mp3"
+                                    "text": "open bwv-1013.wav"
                                 }
                             },
                             {
@@ -1303,7 +1303,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 10.0, 15.0, 144.0, 22.0 ],
-                                    "text": "open bwv-1013.mp3"
+                                    "text": "open bwv-1013.wav"
                                 }
                             },
                             {
