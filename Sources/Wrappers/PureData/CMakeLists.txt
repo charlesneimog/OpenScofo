@@ -1,18 +1,11 @@
-project(o.scofo~ C CXX)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-
-# Keep Pd installs prefix-relative so scikit-build wheel installs do not try to write to /usr/local.
-set(PD_LIB_DIR "lib/pd-externals" CACHE PATH "Path where lib will be installed" FORCE)
+project(openscofo~ C CXX)
 
 file(GLOB_RECURSE OPENSCOFO_PDOBJ_SOURCES "*.cpp" "*.h")
-pd_add_external(o.scofo~ "${OPENSCOFO_PDOBJ_SOURCES}" LINK_LIBRARIES OpenScofo)
+pd_add_external(openscofo~ "${OPENSCOFO_PDOBJ_SOURCES}" LINK_LIBRARIES OpenScofo)
 
-pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/README.md")
-pd_add_datafile(o.scofo_tilde "${CMAKE_CURRENT_SOURCE_DIR}/o.scofo~-help.pd")
-pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.wav")
-pd_add_datafile(o.scofo_tilde "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt")
+pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/README.md")
+pd_add_datafile(openscofo~ "${CMAKE_CURRENT_SOURCE_DIR}/openscofo~-help.pd")
+pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.wav")
+pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt")
 
-target_compile_definitions(o.scofo_tilde PRIVATE _POSIX_SEM_VALUE_MAX=32767)
+set_target_properties(openscofo_tilde PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
