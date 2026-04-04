@@ -251,7 +251,7 @@ if(WIN32)
     set(CPACK_GENERATOR "NSIS")
     set(CPACK_NSIS_DISPLAY_NAME "OpenScofo")
 elseif(APPLE)
-    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_GENERATOR "productbuild")
 endif()
 
 include(CPack)
