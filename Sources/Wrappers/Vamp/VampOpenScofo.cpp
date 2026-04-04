@@ -363,10 +363,16 @@ Vamp::Plugin::OutputList VampOpenScofo::getOutputDescriptors() const {
 
 static Vamp::PluginAdapter<VampOpenScofo> adapter;
 
-extern "C" {
+// Windows hosts often fail to discover descriptors unless the entry point is
+// explicitly exported from the DLL.
+#if defined(_WIN32)
+#define VAMP_PLUGIN_EXPORT extern "C" __declspec(dllexport)
+#else
+#define VAMP_PLUGIN_EXPORT extern "C"
+#endif
 
-__attribute__((visibility("default"))) const VampPluginDescriptor *vampGetPluginDescriptor(unsigned int version,
-                                                                                           unsigned int index) {
+VAMP_PLUGIN_EXPORT const VampPluginDescriptor *vampGetPluginDescriptor(unsigned int version,
+                                                                        unsigned int index) {
     if (version < 1)
         return nullptr;
 
@@ -374,5 +380,4 @@ __attribute__((visibility("default"))) const VampPluginDescriptor *vampGetPlugin
         return nullptr;
 
     return adapter.getDescriptor();
-}
 }
