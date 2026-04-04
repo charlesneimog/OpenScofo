@@ -1,7 +1,4 @@
 <CsoundSynthesizer>
-<CsOptions>
---opcode-lib=/home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/CSound/OpenScofo.so
-</CsOptions>
 
 <CsInstruments>
 sr = 48000
