@@ -121,6 +121,13 @@ def build_destination(spec: IntegrationSpec, arch: str) -> tuple[str, list[str]]
 
 
 def component_specs() -> list[IntegrationSpec]:
+
+    # check files ending with dll inside build/Sources/Wrappers/PureData/
+    pd_candidates = list((Path("build") / "Sources" / "Wrappers" / "PureData").glob("*.dll"))
+    if not pd_candidates:
+        print("Warning: no Pure Data wrapper binary found in build directory. The Pure Data component will be skipped.")
+
+
     return [
         IntegrationSpec(
             key="max",
@@ -157,11 +164,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
             ],
-            optional=[
-                Path("build/Sources/Wrappers/PureData/o.scofo~.dll"),
-                Path("build/Sources/Wrappers/PureData/o.scofo~.m_amd64"),
-                Path("build/Sources/Wrappers/PureData/o.scofo~.m_i386"),
-            ],
+            optional=pd_candidates,
         ),
         IntegrationSpec(
             key="csound",
@@ -264,16 +267,21 @@ def generate_wix_source(
     arch: str,
     built_components: list[tuple[IntegrationSpec, Path, tuple[str, list[str]]]],
 ) -> None:
+    user_profile_roots = {"PersonalFolder", "AppDataFolder", "LocalAppDataFolder"}
     root_paths: dict[str, set[tuple[str, ...]]] = {}
     directory_ids: dict[tuple[str, tuple[str, ...]], str] = {}
     file_groups: dict[tuple[str, str, tuple[str, ...]], list[Path]] = {}
     destination_leaf_ids: dict[str, str] = {}
     integration_by_key: dict[str, IntegrationSpec] = {spec.key: spec for spec, _, _ in built_components}
+    integration_dir_paths: dict[str, set[tuple[str, tuple[str, ...]]]] = {}
 
     for spec, payload_root, (root, destination_parts) in built_components:
+        integration_dir_paths.setdefault(spec.key, set())
         paths = root_paths.setdefault(root, set())
         for depth in range(1, len(destination_parts) + 1):
-            paths.add(tuple(destination_parts[:depth]))
+            path_parts = tuple(destination_parts[:depth])
+            paths.add(path_parts)
+            integration_dir_paths[spec.key].add((root, path_parts))
 
         dest_tuple = tuple(destination_parts)
         destination_leaf_ids[spec.key] = (
@@ -288,7 +296,9 @@ def generate_wix_source(
             full_parts = tuple(destination_parts) + rel_parts
 
             for depth in range(1, len(full_parts) + 1):
-                paths.add(full_parts[:depth])
+                path_parts = full_parts[:depth]
+                paths.add(path_parts)
+                integration_dir_paths[spec.key].add((root, path_parts))
 
             group_key = (spec.key, root, full_parts)
             file_groups.setdefault(group_key, []).append(file_path)
@@ -373,6 +383,7 @@ def generate_wix_source(
             f'Win64="{"yes" if arch == "x64" else "no"}">'
         )
 
+        per_user_component = root in user_profile_roots
         first_file = True
         for file_path in sorted(files):
             rel_for_id = file_path.name
@@ -380,17 +391,71 @@ def generate_wix_source(
                 f"FIL_{spec.key}_{short_hash(str(file_path.parent) + ':' + rel_for_id)}"
             )
             source_path = to_wix_path(file_path.resolve())
-            keypath_attr = ' KeyPath="yes"' if first_file else ""
+            keypath_attr = ' KeyPath="yes"' if first_file and not per_user_component else ""
             lines.append(
                 f'        <File Id="{escape_attr(file_id)}" Source="{escape_attr(source_path)}"{keypath_attr}/>'
             )
             first_file = False
+
+        if per_user_component:
+            reg_id = sanitize_id(f"REG_{spec.key}_{short_hash(component_key)}")
+            reg_name = sanitize_id(f"K_{short_hash(component_key)}")
+            lines.append(
+                '        <RegistryValue Root="HKCU" '
+                'Key="Software\\OpenScofo\\Installer\\Components" '
+                f'Name="{escape_attr(reg_name)}" Type="integer" Value="1" '
+                f'Id="{escape_attr(reg_id)}" KeyPath="yes"/>'
+            )
 
         lines.append("      </Component>")
         lines.append("    </DirectoryRef>")
 
         all_component_ids.append(component_id)
         integration_components[spec_key].append(component_id)
+
+    for spec, _, _ in built_components:
+        for root, parts in sorted(integration_dir_paths.get(spec.key, set()), key=lambda x: (x[0], len(x[1]), x[1])):
+            if root not in user_profile_roots:
+                continue
+            if not parts:
+                continue
+
+            dir_id = directory_ids[(root, parts)]
+            cleanup_key = f"{spec.key}:{root}:{'/'.join(parts)}:cleanup"
+            cleanup_id = sanitize_id(f"CLN_{spec.key}_{short_hash(cleanup_key)}")
+            cleanup_guid = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    f"openscofo/{spec.identifier}/{root}/{'/'.join(parts)}/cleanup",
+                )
+            )
+            remove_file_id = sanitize_id(f"RMF_{short_hash(cleanup_key)}")
+            remove_folder_id = sanitize_id(f"RMD_{short_hash(cleanup_key)}")
+            reg_id = sanitize_id(f"RGC_{short_hash(cleanup_key)}")
+            reg_name = sanitize_id(f"C_{short_hash(cleanup_key)}")
+
+            lines.append(f'    <DirectoryRef Id="{escape_attr(dir_id)}">')
+            lines.append(
+                f'      <Component Id="{escape_attr(cleanup_id)}" Guid="{escape_attr(cleanup_guid)}" '
+                f'Win64="{"yes" if arch == "x64" else "no"}">'
+            )
+            lines.append(
+                f'        <RemoveFile Id="{escape_attr(remove_file_id)}" Name="*" On="uninstall"/>'
+            )
+            lines.append(
+                f'        <RemoveFolder Id="{escape_attr(remove_folder_id)}" On="uninstall"/>'
+            )
+            lines.append(
+                '        <RegistryValue Root="HKCU" '
+                'Key="Software\\OpenScofo\\Installer\\Cleanup" '
+                f'Name="{escape_attr(reg_name)}" Type="integer" Value="1" '
+                f'Id="{escape_attr(reg_id)}" KeyPath="yes"/>'
+            )
+            lines.append("      </Component>")
+            lines.append("    </DirectoryRef>")
+
+            all_component_ids.append(cleanup_id)
+            integration_components[spec.key].append(cleanup_id)
 
     lines.append('    <Feature Id="MainFeature" Title="OpenScofo" Level="1" Display="expand">')
     for spec, _, _ in built_components:
