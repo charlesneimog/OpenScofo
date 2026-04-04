@@ -70,6 +70,11 @@ jobs:
           npm install -g tree-sitter-cli
           winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
           winget install -e --id MillerPuckette.PureData --accept-source-agreements
+          choco install wixtoolset --no-progress -y
+          $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+          if (Test-Path $wixBin) {
+            "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
           python -m pip install --upgrade pip
           python -m pip install build scikit-build-core cibuildwheel twine pybind11
       # -----------------------
@@ -121,10 +126,35 @@ jobs:
             -DBUILD_ALL=ON
           cmake --build build-wasm
 
-      - name: Generate Installer (macOS)
-        if: runner.os == 'macOS' || runner.os == 'Windows'
+      - name: Generate macOS Component Installer
+        if: runner.os == 'macOS'
         run: |
-          cpack --config build/CPackConfig.cmake
+          python Resources/Packages/macos.py \
+            --version ${{ env.LIBVERSION }} \
+            --output OpenScofo-${{ env.LIBVERSION }}-macOS.pkg
+
+      - name: Generate Windows Component Installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
+          $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
+
+          if (-not $candle -or -not $light) {
+            $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+            $candlePath = Join-Path $wixBin 'candle.exe'
+            $lightPath = Join-Path $wixBin 'light.exe'
+          } else {
+            $candlePath = $candle.Source
+            $lightPath = $light.Source
+          }
+
+          python Resources/Packages/windows.py `
+            --version ${{ env.LIBVERSION }} `
+            --arch x64 `
+            --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
+            --candle "$candlePath" `
+            --light "$lightPath"
 
       # -----------------------
       # Upload artifacts
@@ -154,7 +184,7 @@ jobs:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
 
-      - name: Upload CPack Installer
+      - name: Upload Installer
         if: runner.os == 'Windows' || runner.os == 'macOS'
         uses: actions/upload-artifact@v6
         with:
@@ -162,8 +192,12 @@ jobs:
           path: |
             *.exe
             *.dmg
+            *.msi
+            *.pkg
             build/*.exe
             build/*.dmg
+            build/*.msi
+            build/*.pkg
       - name: Upload Vamp Plugin
         uses: actions/upload-artifact@v6
         with:
