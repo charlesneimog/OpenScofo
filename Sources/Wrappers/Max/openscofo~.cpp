@@ -133,7 +133,7 @@ static void oscofo_output_descriptors(MaxOpenScofo *x, OpenScofo::Description &D
         OpenScofo::Descriptors d = *it;
         switch (d) {
         case OpenScofo::Descriptors::INVALID:
-            object_error((t_object *)x, "[o.scofo~] Invalid descriptors");
+            object_error((t_object *)x, "[openscofo~] Invalid descriptors");
             break;
         case OpenScofo::Descriptors::MFCC:
         case OpenScofo::Descriptors::CHROMA:
@@ -643,9 +643,9 @@ static void oscofo_free(MaxOpenScofo *x) {
 // ─────────────────────────────────────
 int C74_EXPORT main() {
     t_class *c =
-        class_new("o.scofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
+        class_new("openscofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
 
-    object_post(nullptr, "[o.scofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
+    object_post(nullptr, "[openscofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 
     class_addmethod(c, (method)oscofo_score, "score", A_SYM, 0);
     class_addmethod(c, (method)oscofo_start, "start", A_NOTHING, 0);

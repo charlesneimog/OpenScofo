@@ -70,7 +70,7 @@ class PdOpenScofo {
 static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     // check if file exists
     if (!s) {
-        pd_error(x, "[o.scofo~] No score file provided");
+        pd_error(x, "[openscofo~] No score file provided");
         return;
     }
 
@@ -82,9 +82,9 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     ok = x->OpenScofo->ParseScore(scorePath);
     if (ok) {
-        logpost(x, 2, "[o.scofo~] Score loaded");
+        logpost(x, 2, "[openscofo~] Score loaded");
     } else {
-        logpost(x, 1, "[o.scofo~] Score has errors");
+        logpost(x, 1, "[openscofo~] Score has errors");
         return;
     }
     x->OpenScofo->SetCurrentEvent(0);
@@ -106,8 +106,8 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     if (!result) {
         std::string error = x->OpenScofo->LuaGetError();
-        pd_error(x, "[o.scofo~] Lua error");
-        pd_error(x, "[o.scofo~] %s", error.c_str());
+        pd_error(x, "[openscofo~] Lua error");
+        pd_error(x, "[openscofo~] %s", error.c_str());
     }
 #endif
 }
@@ -115,7 +115,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
 // ─────────────────────────────────────
 static void oscofo_start(PdOpenScofo *x) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
-        pd_error(x, "[o.scofo~] Score not loaded");
+        pd_error(x, "[openscofo~] Score not loaded");
         return;
     }
     x->Actions.clear();
@@ -126,7 +126,7 @@ static void oscofo_start(PdOpenScofo *x) {
     outlet_float(x->EventOut, x->Event);
 
     x->Following = true;
-    logpost(x, 2, "[o.scofo~] Start following");
+    logpost(x, 2, "[openscofo~] Start following");
 }
 
 // ─────────────────────────────────────
@@ -135,7 +135,7 @@ static void oscofo_output_descriptors(PdOpenScofo *x, OpenScofo::Description &De
         OpenScofo::Descriptors d = *it;
         switch (d) {
         case OpenScofo::Descriptors::INVALID:
-            pd_error(x, "[o.scofo~] Invalid descriptors");
+            pd_error(x, "[openscofo~] Invalid descriptors");
             break;
         case OpenScofo::Descriptors::MFCC:
         case OpenScofo::Descriptors::CHROMA:
@@ -183,19 +183,19 @@ static std::vector<OpenScofo::Descriptors> oscofo_get_descriptors(PdOpenScofo *x
 static void oscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     (void)s;
     if (argc < 1) {
-        pd_error(x, "[o.scofo~] Wrong number of arguments");
+        pd_error(x, "[openscofo~] Wrong number of arguments");
         return;
     }
 
     if (argv[0].a_type != A_SYMBOL) {
-        pd_error(x, "[o.scofo~] First argument of set method must be a symbol");
+        pd_error(x, "[openscofo~] First argument of set method must be a symbol");
         return;
     }
 
     std::string method = atom_getsymbol(argv)->s_name;
     if (method == "descriptors") {
         if (argc < 2) {
-            pd_error(x, "[o.scofo~] descriptors method require <arrayname>");
+            pd_error(x, "[openscofo~] descriptors method require <arrayname>");
             return;
         }
 
@@ -203,19 +203,19 @@ static void oscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         const char *arrayname = atom_getsymbol(argv + 1)->s_name;
         t_symbol *pd_symbol = gensym(arrayname);
         if (!(pdarray = (t_garray *)pd_findbyclass(pd_symbol, garray_class))) {
-            pd_error(x, "[o.scofo~] array %s not found", arrayname);
+            pd_error(x, "[openscofo~] array %s not found", arrayname);
             return;
         } else {
             int vecsize;
             t_word *vec;
             if (!garray_getfloatwords(pdarray, &vecsize, &vec) || vec == nullptr) {
-                pd_error(x, "[o.scofo~] failed to read array %s", arrayname);
+                pd_error(x, "[openscofo~] failed to read array %s", arrayname);
                 return;
             }
 
             int fftsize = x->OpenScofo->GetFFTSize();
             if (vecsize <= 0) {
-                pd_error(x, "[o.scofo~] array %s is empty", arrayname);
+                pd_error(x, "[openscofo~] array %s is empty", arrayname);
                 return;
             }
 
@@ -225,12 +225,12 @@ static void oscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
             } else if (argc == 3) {
                 start = atom_getint(argv + 2);
                 if (start < 0 || start >= vecsize) {
-                    pd_error(x, "[o.scofo~] invalid start index %d for array size %d and fftsize %d", start, vecsize,
+                    pd_error(x, "[openscofo~] invalid start index %d for array size %d and fftsize %d", start, vecsize,
                              fftsize);
                     return;
                 }
             } else {
-                pd_error(x, "[o.scofo~] Wrong arguments");
+                pd_error(x, "[openscofo~] Wrong arguments");
                 return;
             }
 
@@ -255,14 +255,14 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     (void)s;
 
     if (argv[0].a_type != A_SYMBOL) {
-        pd_error(x, "[o.scofo~] First argument of set method must be a symbol");
+        pd_error(x, "[openscofo~] First argument of set method must be a symbol");
         return;
     }
 
     std::string method = atom_getsymbol(argv)->s_name;
     if (method == "event") {
         if (argc > 0) {
-            pd_error(x, "[o.scofo~] Wrong number of arguments");
+            pd_error(x, "[openscofo~] Wrong number of arguments");
             return;
         }
 
@@ -273,7 +273,7 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         std::vector<OpenScofo::Descriptors> Desc = oscofo_get_descriptors(x, 2, argc, argv);
 
         if (Desc.size() == 0) {
-            pd_error(x, "[o.scofo~] ONNX models required the Descriptors order used on train");
+            pd_error(x, "[openscofo~] ONNX models required the Descriptors order used on train");
             return;
         }
 
@@ -303,20 +303,20 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
 
     } else if (method == "mfcc") {
     } else if (method == "section") {
-        pd_error(x, "[o.scofo~] Section method not implemented");
+        pd_error(x, "[openscofo~] Section method not implemented");
     } else if (method == "justdescription") {
         int f = atom_getint(argv + 1);
         x->JustDescription = f != 0;
         canvas_update_dsp();
     } else {
-        pd_error(x, "[o.scofo~] Unknown method");
+        pd_error(x, "[openscofo~] Unknown method");
     }
 }
 
 // ─────────────────────────────────────
 static void oscofo_following(PdOpenScofo *x, t_float f) {
     if (!x->OpenScofo->ScoreIsLoaded()) {
-        pd_error(x, "[o.scofo~] Score not loaded");
+        pd_error(x, "[openscofo~] Score not loaded");
         return;
     }
     if (f == 1) {
@@ -330,8 +330,8 @@ static void oscofo_luaexecute(PdOpenScofo *x, std::string code) {
 #if OSCOFO_LUA
     if (!x->OpenScofo->LuaExecute(code)) {
         std::string error = x->OpenScofo->LuaGetError();
-        pd_error(x, "[o.scofo~] Lua error");
-        pd_error(x, "[o.scofo~] %s", error.c_str());
+        pd_error(x, "[openscofo~] Lua error");
+        pd_error(x, "[openscofo~] %s", error.c_str());
     }
 #endif
 }
@@ -340,7 +340,7 @@ static void oscofo_luaexecute(PdOpenScofo *x, std::string code) {
 static void oscofo_pdsend(PdOpenScofo *x, std::string r, int argc, t_atom *argv) {
     t_pd *receiver = gensym(r.c_str())->s_thing;
     if (!receiver) {
-        pd_error(x, "[o.scofo~] Receiver %s not found", r.c_str());
+        pd_error(x, "[openscofo~] Receiver %s not found", r.c_str());
         return;
     }
 
@@ -477,15 +477,15 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
     switch (log.level) {
     case spdlog::level::critical:
     case spdlog::level::err:
-        logpost(x, 1, "[o.scofo~] %s", text.c_str());
+        logpost(x, 1, "[openscofo~] %s", text.c_str());
         break;
     case spdlog::level::info:
     case spdlog::level::warn:
-        logpost(x, 2, "[o.scofo~] %s", text.c_str());
+        logpost(x, 2, "[openscofo~] %s", text.c_str());
         break;
     case spdlog::level::debug:
     case spdlog::level::trace:
-        logpost(x, 3, "[o.scofo~] %s", text.c_str());
+        logpost(x, 3, "[openscofo~] %s", text.c_str());
         break;
     default:
         break;
@@ -498,7 +498,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     (void)s;
 
     if (!x) {
-        pd_error(x, "[o.scofo~] Error creating object");
+        pd_error(x, "[openscofo~] Error creating object");
         return nullptr;
     }
 
@@ -555,11 +555,14 @@ static void oscofo_free(PdOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-extern "C" void setup_o0x2escofo_tilde(void) {
-    OpenScofoObj = class_new(gensym("o.scofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
-                             CLASS_DEFAULT, A_GIMME, A_NULL);
+extern "C" void setup_openscofo_tilde(void) {
+    OpenScofoObj = class_new(
+        gensym("openscofo~"), 
+        (t_newmethod)oscofo_new, 
+        (t_method)oscofo_free, 
+        sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[o.scofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
+    post("[openscofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);
@@ -572,8 +575,3 @@ extern "C" void setup_o0x2escofo_tilde(void) {
     CLASS_MAINSIGNALIN(OpenScofoObj, PdOpenScofo, Sample);
     class_addmethod(OpenScofoObj, (t_method)oscofo_adddsp, gensym("dsp"), A_CANT, 0);
 }
-
-
-#ifdef __WIN32
-__declspec(dllexport) void setup_o0x2escofo_tilde(void);
-#endif
