@@ -2,7 +2,7 @@
 name = "OpenScofo"
 dynamic = ["version"]
 authors = [{ name = "Charles K. Neimog", email = "charlesneimog@outlook.com" }]
-description = "OpenScofo is an OpenSource Score Follower."
+description = "OpenScofo is an open-source score-following system specifically designed for contemporary music." 
 readme = "README.md"
 requires-python = ">=3.10, <3.15"
 

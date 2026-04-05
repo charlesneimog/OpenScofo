@@ -141,6 +141,15 @@ jobs:
             -DBUILD_ALL=ON
           cmake --build build-wasm
 
+      - name: Repair Linux wheels
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          python -m pip install auditwheel
+          auditwheel repair dist/*.whl -w dist/
+          rm dist/*-linux_*.whl
+
+
       - name: Generate macOS Component Installer
         if: runner.os == 'macOS'
         run: |
@@ -284,6 +293,14 @@ jobs:
           name: Build-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: |-
             build/Sources/Wrappers/
+
+      - name: Publish Pip
+        if: ${{ github.event.inputs.publish_release == 'true' }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m twine upload --skip-existing dist/*.whl
 
   publish-release:
     if: ${{ github.event.inputs.publish_release == 'true' }}
