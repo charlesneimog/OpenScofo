@@ -21,6 +21,8 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_CACHE_SIZE: 2G
+      SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}
+      SCCACHE_CACHE_MULTIARCH: "1"
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -127,10 +129,14 @@ jobs:
           python -m build --wheel @buildArgs
       - name: Build Emscripten
         if: runner.os == 'Linux'
+        env:
+          SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-wasm
         run: |
           source $EMSDK/emsdk_env.sh
           emcmake cmake . -B build-wasm \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DOSCOFO_BUILD_TESTS=OFF \
             -DBUILD_ALL=ON
           cmake --build build-wasm
