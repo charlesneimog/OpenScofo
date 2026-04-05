@@ -18,10 +18,13 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_CACHE_SIZE: 2G
     strategy:
       matrix:
-        # os: [ubuntu-latest, macos-latest, windows-latest]
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        #os: [macos-latest, windows-latest]
         precision: [32]
     steps:
       - name: Checkout
@@ -33,6 +36,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: Setup Emscripten
         if: runner.os == 'Linux'
         uses: mymindstorm/setup-emsdk@v14
@@ -87,6 +92,8 @@ jobs:
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
             -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+            -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
+            -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
@@ -110,6 +117,8 @@ jobs:
             "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
             "-Ccmake.define.CMAKE_C_COMPILER=clang"
             "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
+            "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
+            "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
             "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
             "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
             "-Ccmake.define.BUILD_ALL=ON"
