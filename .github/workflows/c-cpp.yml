@@ -92,8 +92,8 @@ jobs:
         env:
           SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
           ARCHFLAGS: "-arch x86_64 -arch arm64"
+          MACOSX_DEPLOYMENT_TARGET: 11.0
         run: |
-          export MACOSX_DEPLOYMENT_TARGET=11.0
           python -m build --wheel \
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
@@ -170,35 +170,33 @@ jobs:
           auditwheel repair dist/*.whl -w dist/
           rm dist/*-linux_*.whl
 
-      # - name: Generate macOS Component Installer
-      #   if: runner.os == 'macOS'
-      #   run: |
-      #     python Resources/Packages/macos.py \
-      #       --version ${{ env.LIBVERSION }} \
-      #       --output OpenScofo-${{ env.LIBVERSION }}-macOS.pkg
+      - name: Generate macOS Component Installer
+        if: runner.os == 'macOS'
+        run: |
+          python Resources/Packages/macos.py --version ${{ env.LIBVERSION }}
 
-      # - name: Generate Windows Component Installer
-      #   if: runner.os == 'Windows'
-      #   shell: pwsh
-      #   run: |
-      #     $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
-      #     $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
-      #
-      #     if (-not $candle -or -not $light) {
-      #       $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
-      #       $candlePath = Join-Path $wixBin 'candle.exe'
-      #       $lightPath = Join-Path $wixBin 'light.exe'
-      #     } else {
-      #       $candlePath = $candle.Source
-      #       $lightPath = $light.Source
-      #     }
-      #
-      #     python Resources/Packages/windows.py `
-      #       --version ${{ env.LIBVERSION }} `
-      #       --arch x64 `
-      #       --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
-      #       --candle "$candlePath" `
-      #       --light "$lightPath"
+      - name: Generate Windows Component Installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
+          $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
+
+          if (-not $candle -or -not $light) {
+            $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+            $candlePath = Join-Path $wixBin 'candle.exe'
+            $lightPath = Join-Path $wixBin 'light.exe'
+          } else {
+            $candlePath = $candle.Source
+            $lightPath = $light.Source
+          }
+
+          python Resources/Packages/windows.py `
+            --version ${{ env.LIBVERSION }} `
+            --arch x64 `
+            --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
+            --candle "$candlePath" `
+            --light "$lightPath"
 
       # -----------------------
       # Upload artifacts
@@ -212,6 +210,7 @@ jobs:
             ${{env.LIBNAME}}
             Tests/assets/canticos.wav
             Tests/assets/canticos.txt
+
       - name: Upload Max Object
         uses: actions/upload-artifact@v6
         if: runner.os != 'Linux'
@@ -221,6 +220,7 @@ jobs:
             max
             Tests/assets/canticos.wav
             Tests/assets/canticos.txt
+
       - name: Upload Python Object
         uses: actions/upload-artifact@v6
         with:
@@ -232,14 +232,8 @@ jobs:
         with:
           name: Installer-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: |
-            *.exe
-            *.dmg
-            *.msi
             *.pkg
-            build/*.exe
-            build/*.dmg
-            build/*.msi
-            build/*.pkg
+            *.msi
       - name: Upload Vamp Plugin
         uses: actions/upload-artifact@v6
         with:
