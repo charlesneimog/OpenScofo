@@ -149,35 +149,35 @@ jobs:
           rm dist/*-linux_*.whl
 
 
-      - name: Generate macOS Component Installer
-        if: runner.os == 'macOS'
-        run: |
-          python Resources/Packages/macos.py \
-            --version ${{ env.LIBVERSION }} \
-            --output OpenScofo-${{ env.LIBVERSION }}-macOS.pkg
+      # - name: Generate macOS Component Installer
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     python Resources/Packages/macos.py \
+      #       --version ${{ env.LIBVERSION }} \
+      #       --output OpenScofo-${{ env.LIBVERSION }}-macOS.pkg
 
-      - name: Generate Windows Component Installer
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
-          $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
-
-          if (-not $candle -or -not $light) {
-            $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
-            $candlePath = Join-Path $wixBin 'candle.exe'
-            $lightPath = Join-Path $wixBin 'light.exe'
-          } else {
-            $candlePath = $candle.Source
-            $lightPath = $light.Source
-          }
-
-          python Resources/Packages/windows.py `
-            --version ${{ env.LIBVERSION }} `
-            --arch x64 `
-            --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
-            --candle "$candlePath" `
-            --light "$lightPath"
+      # - name: Generate Windows Component Installer
+      #   if: runner.os == 'Windows'
+      #   shell: pwsh
+      #   run: |
+      #     $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
+      #     $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
+      #
+      #     if (-not $candle -or -not $light) {
+      #       $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+      #       $candlePath = Join-Path $wixBin 'candle.exe'
+      #       $lightPath = Join-Path $wixBin 'light.exe'
+      #     } else {
+      #       $candlePath = $candle.Source
+      #       $lightPath = $light.Source
+      #     }
+      #
+      #     python Resources/Packages/windows.py `
+      #       --version ${{ env.LIBVERSION }} `
+      #       --arch x64 `
+      #       --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
+      #       --candle "$candlePath" `
+      #       --light "$lightPath"
 
       # -----------------------
       # Upload artifacts

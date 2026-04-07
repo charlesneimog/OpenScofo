@@ -1,6 +1,6 @@
-# Use Python stable ABI (abi3) for the extension module. nanobind's package check requires
-# Development, and abi3 requires Development.SABIModule.
-find_package(Python REQUIRED COMPONENTS Interpreter Development Development.SABIModule)
+# Use Python stable ABI (abi3) for the extension module.
+# Development.Module is enough for extension builds and avoids requiring embed libs.
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 
 # Prefer a pip-installed nanobind when nanobind_DIR isn't set explicitly.
 if(NOT nanobind_DIR)
