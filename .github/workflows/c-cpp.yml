@@ -92,6 +92,7 @@ jobs:
         env:
           SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
           ARCHFLAGS: "-arch x86_64 -arch arm64"
+          MACOSX_DEPLOYMENT_TARGET: 11.0
         run: |
           export MACOSX_DEPLOYMENT_TARGET=11.0
           python -m build --wheel \
