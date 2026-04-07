@@ -38,29 +38,30 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 * On Windows, you need `mingw64`.
 
 #### Optional
+
 * treesitter (`npm install tree-sitter`) (If you want to change/update score syntax).
-* pybind11 (optional): To build Python package.
+* nanobind: To build Python package.
 * PureData (optional): To build the Pd Object.
 
-#### Building Options
+#### Build Options
 
-* `BUILD_ALL`: Build all OpenScofo modules (Python, Pd, Max).
-* `BUILD_ALL_OBJECTS`: Build Pd and Max Objects.
-* `BUILD_PY_MODULE`: Build or not the OpenScofo python module.
-* `BUILD_PD_OBJECT`: Build or not the Pd Object.
-* `BUILD_MAX_OBJECT`: Build or not the Max Object.
+* `OSCOFO_BUILD_ALL` (ON/OFF): Build all OpenScofo modules, including Python, Pd, and Max. Default: ON.
+* `OSCOFO_BUILD_PD_OBJECT` (ON/OFF): Build the Pure Data (Pd) object. Default: OFF.
+* `OSCOFO_BUILD_PY_MODULE` (ON/OFF): Build the Python module. Default: OFF.
+* `OSCOFO_BUILD_MAX_OBJECT` (ON/OFF): Build the Max object. Default: OFF.
+* `OSCOFO_BUILD_CSOUND_PLUGIN` (ON/OFF): Build the Csound plugin. Default: OFF.
+* `OSCOFO_BUILD_TESTS` (ON/OFF): Build test suite. Default: OFF.
+* `OSCOFO_BUILD_WITH_LUA` (ON/OFF): Build Lua module embedded in OpenScofo. Default: ON.
+* `UPDATE_OSCOFO_LANGUAGE` (ON/OFF): Update OpenScofo language grammar (`grammar.js`). Default: ON.
 
-* `PDLIBDIR`: Where the Pd object will be installed.
 
 #### Building Steps
 
 ``` bash
-git clone https://github.com/charlesneimog/OpenScofo --recursive
-cmake . -B build -DBUILD_ALL_OBJECTS=ON -G Ninja 
+git clone https://github.com/charlesneimog/OpenScofo
+cmake . -B build
 cmake --build build
 ```
-
-To install use `cmake --install build`.
 
 ## GPLv3 Licensing Notice
 
@@ -71,4 +72,3 @@ The GPLv3 is a free and open source license. Any software that incorporates, lin
 Non-compliance automatically terminates the license rights granted under the GPLv3 and may constitute copyright infringement.
 
 Full license text: [https://www.gnu.org/licenses/gpl-3.0.html](https://www.gnu.org/licenses/gpl-3.0.html)
-
