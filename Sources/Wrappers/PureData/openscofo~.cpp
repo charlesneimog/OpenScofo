@@ -555,7 +555,7 @@ static void oscofo_free(PdOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-extern "C" void setup_openscofo_tilde(void) {
+extern "C" void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(
         gensym("openscofo~"), 
         (t_newmethod)oscofo_new, 
