@@ -1,3 +1,4 @@
+---
 name: Compile Binaries
 on:
   # push:
@@ -5,11 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Publish Release"
+        description: Publish Release
         required: false
         default: false
         type: boolean
-
 env:
   LIBNAME: OpenScofo
   LIBVERSION: 0.1.7
@@ -19,14 +19,14 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     env:
-      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_ENABLED: 'true'
       SCCACHE_CACHE_SIZE: 2G
       SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}
-      SCCACHE_CACHE_MULTIARCH: "1"
+      SCCACHE_CACHE_MULTIARCH: '1'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        #os: [macos-latest, windows-latest]
+        # os: [macos-latest, windows-latest]
         precision: [32]
     steps:
       - name: Checkout
@@ -91,6 +91,10 @@ jobs:
       - name: Configure (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
+          EXTRA_ARGS=""
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            EXTRA_ARGS="-Cwheel.plat-name=macosx_11_0_universal2"
+          fi
           python -m build --wheel \
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
@@ -99,10 +103,12 @@ jobs:
             -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+            -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
             -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -Ccmake.define.BUILD_ALL=ON \
-            -Ccmake.args="-G Ninja"
+            -Ccmake.args="-G Ninja" \
+            $EXTRA_ARGS
       # -----------------------
       # Configure (Windows)
       # -----------------------
@@ -139,7 +145,6 @@ jobs:
             -DOSCOFO_BUILD_TESTS=OFF \
             -DBUILD_ALL=ON
           cmake --build build-wasm
-
       - name: Repair Linux wheels
         if: runner.os == 'Linux'
         continue-on-error: true
@@ -147,7 +152,6 @@ jobs:
           python -m pip install auditwheel
           auditwheel repair dist/*.whl -w dist/
           rm dist/*-linux_*.whl
-
 
       # - name: Generate macOS Component Installer
       #   if: runner.os == 'macOS'
@@ -187,11 +191,10 @@ jobs:
         with:
           name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
             runner.os }}
-          path: | 
+          path: |
             ${{env.LIBNAME}}
             Tests/assets/canticos.wav
             Tests/assets/canticos.txt
-
       - name: Upload Max Object
         uses: actions/upload-artifact@v6
         if: runner.os != 'Linux'
@@ -206,7 +209,6 @@ jobs:
         with:
           name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: dist/*.whl
-
       - name: Upload Installer
         if: runner.os == 'Windows' || runner.os == 'macOS'
         uses: actions/upload-artifact@v6
@@ -231,7 +233,6 @@ jobs:
             build/Sources/Wrappers/Vamp/*.dll
             Tests/assets/canticos.wav
             Tests/assets/canticos.txt
-
       - name: Prepare SuperCollider Final Folder
         shell: bash
         run: |
@@ -253,7 +254,6 @@ jobs:
           # assets
           mkdir -p SuperCollider/assets
           cp Tests/assets/* SuperCollider/assets/
-
       - name: Upload Emscripten Build
         if: runner.os == 'Linux'
         run: |
@@ -267,14 +267,12 @@ jobs:
         with:
           name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: SuperCollider
-
       - name: Upload Emscripten
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v6
         with:
           name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
           path: Emscripten
-
       - name: Upload CSound
         uses: actions/upload-artifact@v6
         with:
@@ -285,14 +283,12 @@ jobs:
             build/Sources/Wrappers/CSound/*.dll
             Tests/assets/canticos.wav
             Tests/assets/canticos.txt
-
       - name: Build Source
         uses: actions/upload-artifact@v6
         with:
           name: Build-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
           path: |-
             build/Sources/Wrappers/
-
       - name: Publish Pip
         if: ${{ github.event.inputs.publish_release == 'true' }}
         env:
@@ -300,7 +296,6 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m twine upload --skip-existing dist/*.whl
-
   publish-release:
     if: ${{ github.event.inputs.publish_release == 'true' }}
     needs: [build]
