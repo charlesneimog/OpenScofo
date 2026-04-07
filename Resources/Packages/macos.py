@@ -46,6 +46,8 @@ def ensure_max_bundle(repo_root: Path) -> Path | None:
 	for candidate in [
 		repo_root / "max" / "o.scofo~.mxo",
 		repo_root / "max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
 	]:
 		if candidate.exists():
 			return candidate if candidate.is_dir() else candidate.parent.parent
@@ -56,6 +58,8 @@ def ensure_max_bundle(repo_root: Path) -> Path | None:
 		for candidate in [
 			repo_root / "max" / "o.scofo~.mxo",
 			repo_root / "max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
+			repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo",
+			repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
 		]:
 			if candidate.exists():
 				return candidate if candidate.is_dir() else candidate.parent.parent
