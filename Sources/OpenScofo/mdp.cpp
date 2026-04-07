@@ -272,11 +272,6 @@ void MDP::SetHarmonics(int Harmonics) {
 }
 
 // ─────────────────────────────────────
-void MDP::SetMinEntropy(double EntropyValue) {
-    m_MinEntropy = EntropyValue;
-}
-
-// ─────────────────────────────────────
 void MDP::SetAmplitudeDecay(double decay) {
     m_PitchTemplateAmplitudeDecay = decay;
 }

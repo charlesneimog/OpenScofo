@@ -26,7 +26,6 @@ class MDP {
     void SetPitchTemplateSigma(double f);
     void SetHarmonics(int i);
     void SetBPM(double Bpm);
-    void SetMinEntropy(double EntropyValue);
     void SetAmplitudeDecay(double decay);
     void SetTunning(double Tunning);
     void SetCurrentEvent(int Event);

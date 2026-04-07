@@ -24,7 +24,7 @@ hop = 512
 scofo = OpenScofo.OpenScofo(sr, n_fft, hop)
 
 y, sr = librosa.load(
-    "./assets/bwv-1013.mp3",
+    "./assets/bwv-1013.wav",
     sr=sr,
 )
 
@@ -53,7 +53,8 @@ def print_with_threshold(diff, message):
 def run_test_logmel(window, label):
     global MAX_DIFF
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     # Librosa log-mel
     mel = librosa.feature.melspectrogram(
@@ -71,14 +72,27 @@ def run_test_logmel(window, label):
     librosa_logmel = librosa.power_to_db(mel, ref=1.0)[:, 0]
     scofo_logmel = scofo_desc.logmelspectrum
 
-    max_diff = 0.0
-    max_idx = -1
+    n = min(len(librosa_logmel), len(scofo_logmel))
+    if n == 0:
+        print_with_threshold(
+            MAX_DIFF_ALLOWED + 1.0,
+            "Librosa  "
+            f"{label} | "
+            f"LOGM | Empty feature vector (librosa={len(librosa_logmel)}, scofo={len(scofo_logmel)})",
+        )
+        MAX_DIFF = max(MAX_DIFF, MAX_DIFF_ALLOWED + 1.0)
+        return
 
-    for i, (l, s) in enumerate(zip(librosa_logmel, scofo_logmel)):
+    max_diff = 0.0
+    max_idx = 0
+
+    for i, (l, s) in enumerate(zip(librosa_logmel[:n], scofo_logmel[:n])):
         diff = abs(l - s)
         if diff > max_diff:
             max_diff = diff
             max_idx = i
+
+    MAX_DIFF = max(MAX_DIFF, max_diff)
 
     print_with_threshold(
         max_diff,
@@ -87,7 +101,8 @@ def run_test_logmel(window, label):
         f"LOGM | "
         f"L: {librosa_logmel[max_idx]:+012.5f} | "
         f"S: {scofo_logmel[max_idx]:+012.5f} | "
-        f"D: {max_diff:+012.5f}",
+        f"D: {max_diff:+012.5f} | "
+        f"N: {n:03d}",
     )
 
 
@@ -95,7 +110,8 @@ def run_test_logmel(window, label):
 def run_test_mfcc(window, label):
     global MAX_DIFF
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     mfcc = librosa.feature.mfcc(
         y=window,
@@ -141,7 +157,9 @@ def run_test_kurtosis(window, label):
     S = np.abs(librosa.stft(window))
     k = kurtosis(S, fisher=True, bias=True)
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
+
     s_kurtosis = scofo_desc.kurtosis
     diff = abs(k - s_kurtosis)
     MAX_DIFF = max(abs(diff), MAX_DIFF)
@@ -161,7 +179,8 @@ def run_test_kurtosis(window, label):
 def run_test_centroid(window, label):
     global MAX_DIFF
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     # Librosa spectral centroid
     l_centroid = librosa.feature.spectral_centroid(
@@ -195,7 +214,8 @@ def run_test_centroid(window, label):
 # ---------------- Spread TEST ----------------
 def run_test_spread(window, label):
     global MAX_DIFF
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     # Librosa spectral spread
     l_spread = librosa.feature.spectral_bandwidth(
@@ -230,7 +250,9 @@ def run_test_spread(window, label):
 # ---------------- FLATNESS TEST ----------------
 def run_test_flatness(window, label):
     global MAX_DIFF
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
+
     l_flatness = librosa.feature.spectral_flatness(
         y=window,
         n_fft=n_fft,
@@ -261,7 +283,9 @@ def run_test_crest(window, label):
     global MAX_DIFF
 
     # Scofo
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
+
     o_crest = scofo_desc.crest
 
     crest = es.Crest()
@@ -287,8 +311,13 @@ def run_test_crest(window, label):
 # ---------------- FLUX TEST ----------------
 def run_test_flux(prev_window, window, label):
     global MAX_DIFF
-    oscofo_prev_window = scofo.get_audio_description(prev_window)
-    oscofo_curr_window = scofo.get_audio_description(window)
+
+    scofo.process_block(prev_window)
+    oscofo_prev_window = scofo.get_description()
+
+    scofo.process_block(window)
+    oscofo_curr_window = scofo.get_description()
+
     o_flux = oscofo_curr_window.flux
 
     # Essentia (Flux memory behavior: first call seeds memory, second call computes prev->curr)
@@ -320,7 +349,8 @@ def run_test_flux(prev_window, window, label):
 def run_test_rolloff(window, label):
     global MAX_DIFF
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
     o_rolloff = scofo_desc.rolloff
 
     # Essentia rolloff (uses magnitude spectrum)
@@ -342,11 +372,13 @@ def run_test_rolloff(window, label):
         f"D: {diff:+012.5f}",
     )
 
+
 # ---------------- ENTROPY TEST ----------------
 def run_test_entropy(window, label):
     global MAX_DIFF
 
-    scofo_desc = scofo.get_audio_description(window)
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
     o_entropy = scofo_desc.entropy
 
     # Essentia spectral entropy
@@ -374,12 +406,16 @@ def run_test_entropy(window, label):
         f"D: {diff:+012.5f}",
     )
 
+
 # ---------------- FLUX TEST ----------------
 def run_test_spread_skew_kurt(prev_window, window, label):
     global MAX_DIFF
 
-    oscofo_prev_window = scofo.get_audio_description(prev_window)
-    oscofo_curr_window = scofo.get_audio_description(window)
+    scofo.process_block(prev_window)
+    _ = scofo.get_description()
+
+    scofo.process_block(window)
+    oscofo_curr_window = scofo.get_description()
 
     # OpenScofo targets
     o_spread = oscofo_curr_window.spread_variance
@@ -443,7 +479,10 @@ def run_test_spread_skew_kurt(prev_window, window, label):
 # ---------------- CHROMA TEST ----------------
 def run_test_chroma(window, label):
     global MAX_DIFF
-    scofo_desc = scofo.get_audio_description(window)
+
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
+
     librosa_chroma = librosa.feature.chroma_stft(
         y=window,
         sr=sr,
@@ -484,7 +523,9 @@ def run_test_chroma(window, label):
 # ---------------- RMS TEST ----------------
 def run_test_rms(window, label):
     global MAX_DIFF
-    scofo_desc = scofo.get_audio_description(window)
+
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     # RMS-based loudness (power=2.0 equivalent)
     l_loudness = librosa.feature.rms(
@@ -512,7 +553,9 @@ def run_test_rms(window, label):
 # ---------------- ZEROCROSS-RATING TEST --------
 def run_test_zcr(window, label):
     global MAX_DIFF
-    scofo_desc = scofo.get_audio_description(window)
+
+    scofo.process_block(window)
+    scofo_desc = scofo.get_description()
 
     l_zcr = librosa.feature.zero_crossing_rate(
         y=window,
@@ -557,7 +600,6 @@ for _ in range(n_tests):
     run_test_spread(window, f"Start {start:08d}")
     run_test_centroid(window, f"Start {start:08d}")
     run_test_chroma(window, f"start {start:08d}")
-   
 
     # Essentia
     # run_test_rolloff(window, f"Start {start:08d}")
