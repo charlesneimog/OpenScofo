@@ -65,6 +65,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install pd nanobind googletest tree-sitter boost
+          brew install python@3.13
           npm install -g tree-sitter-cli
           pip install build scikit-build-core cibuildwheel twine
       # -----------------------
@@ -109,7 +110,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $nanobindDir = python -m nanobind --cmakedir
           $treeSitterBin = (Get-Command tree-sitter.cmd).Source
           $buildArgs = @(
             "-Cbuild-dir=build"
