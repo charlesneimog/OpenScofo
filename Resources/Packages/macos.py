@@ -42,27 +42,36 @@ def first_existing(paths: Iterable[Path]) -> Path | None:
 	return None
 
 
+def max_bundle_candidates(repo_root: Path) -> list[Path]:
+	return [
+		repo_root / "max" / "openscofo~.mxo",
+		repo_root / "max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
+		repo_root / "max" / "openscofo~.mxo",
+		repo_root / "max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
+		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
+	]
+
+
 def ensure_max_bundle(repo_root: Path) -> Path | None:
-	for candidate in [
-		repo_root / "max" / "o.scofo~.mxo",
-		repo_root / "max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
-		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo",
-		repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
-	]:
+	for candidate in max_bundle_candidates(repo_root):
 		if candidate.exists():
 			return candidate if candidate.is_dir() else candidate.parent.parent
 
 	build_dir = repo_root / "build"
 	if build_dir.exists():
-		run(["cmake", "--build", str(build_dir), "--target", "Max"])
-		for candidate in [
-			repo_root / "max" / "o.scofo~.mxo",
-			repo_root / "max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
-			repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo",
-			repo_root / "build" / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo" / "Contents" / "MacOS" / "o.scofo~",
-		]:
-			if candidate.exists():
-				return candidate if candidate.is_dir() else candidate.parent.parent
+		for target in ["max_openscofo", "Max", "openscofo~", "openscofo~"]:
+			cmd = ["cmake", "--build", str(build_dir), "--target", target]
+			print("+", " ".join(cmd))
+			result = subprocess.run(cmd, check=False)
+			if result.returncode != 0:
+				continue
+
+			for candidate in max_bundle_candidates(repo_root):
+				if candidate.exists():
+					return candidate if candidate.is_dir() else candidate.parent.parent
 
 	return None
 
@@ -196,35 +205,35 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
 			identifier="org.openscofo.pkg.max",
 			user_destination="Documents/Max 9/Packages/OpenScofo",
 			required=[
-				Path("Sources/Wrappers/Max/o.scofo~.maxhelp"),
+				Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
 				Path("Tests/assets/bwv-1013.wav"),
 				Path("Tests/assets/bwv-1013.txt"),
 				Path("Tests/assets/canticos.wav"),
 				Path("Tests/assets/canticos.txt"),
 			],
 			optional=[
-				Path("max/o.scofo~.mxo"),
-				Path("max/o.scofo~.mxo/Contents/MacOS/o.scofo~"),
-				Path("build/Sources/Wrappers/Max/o.scofo~.mxo"),
-				Path("build/Sources/Wrappers/Max/o.scofo~.mxo/Contents/MacOS/o.scofo~"),
+				Path("max/openscofo~.mxo"),
+				Path("max/openscofo~.mxo/Contents/MacOS/openscofo~"),
+				Path("build/Sources/Wrappers/Max/openscofo~.mxo"),
+				Path("build/Sources/Wrappers/Max/openscofo~.mxo/Contents/MacOS/openscofo~"),
 			],
 		),
 		IntegrationSpec(
 			key="puredata",
 			title="Pure Data",
 			identifier="org.openscofo.pkg.puredata",
-			user_destination="Documents/Pd/externals/o.scofo~",
+			user_destination="Documents/Pd/externals/openscofo~",
 			required=[
-				Path("Sources/Wrappers/PureData/o.scofo~-help.pd"),
+				Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
 				Path("Tests/assets/bwv-1013.wav"),
 				Path("Tests/assets/bwv-1013.txt"),
 				Path("Tests/assets/canticos.wav"),
 				Path("Tests/assets/canticos.txt"),
 			],
 			optional=[
-				Path("build/Sources/Wrappers/PureData/o.scofo~.pd_darwin"),
-				Path("build/Sources/Wrappers/PureData/o.scofo~.darwin-fat-32.so"),
-				Path("build/Sources/Wrappers/PureData/o.scofo~.so"),
+				Path("build/Sources/Wrappers/PureData/openscofo~.pd_darwin"),
+				Path("build/Sources/Wrappers/PureData/openscofo~.darwin-fat-32.so"),
+				Path("build/Sources/Wrappers/PureData/openscofo~.so"),
 			],
 		),
 		IntegrationSpec(
