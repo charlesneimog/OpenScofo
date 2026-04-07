@@ -85,16 +85,14 @@ jobs:
           }
           python -m pip install --upgrade pip
           python -m pip install build scikit-build-core cibuildwheel twine nanobind
+
       # -----------------------
-      # Configure (Unix)
-      # -----------------------
-      - name: Configure (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Build (MacOS)
+        if: runner.os == 'macOS'
+        env:
+          SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
+          ARCHFLAGS: "-arch x86_64 -arch arm64"
         run: |
-          EXTRA_ARGS=""
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            EXTRA_ARGS="-Cwheel.plat-name=macosx_11_0_universal2"
-          fi
           python -m build --wheel \
             -Cbuild-dir=build \
             -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
@@ -107,12 +105,30 @@ jobs:
             -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
             -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -Ccmake.define.BUILD_ALL=ON \
-            -Ccmake.args="-G Ninja" \
-            $EXTRA_ARGS
+            -Ccmake.args="-G Ninja"
+
+      # -----------------------
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python -m build --wheel \
+            -Cbuild-dir=build \
+            -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
+            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+            -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
+            -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+            -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+            -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+            -Ccmake.define.BUILD_ALL=ON \
+            -Ccmake.args="-G Ninja"
+
       # -----------------------
       # Configure (Windows)
       # -----------------------
-      - name: Configure (Windows)
+      - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
