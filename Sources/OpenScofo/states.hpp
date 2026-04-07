@@ -16,7 +16,7 @@ enum AudioDescType {
 
 // ─────────────────────────────────────
 enum Descriptors {
-    INVALID,
+    INVALID = -1,
 
     ONSET,
 

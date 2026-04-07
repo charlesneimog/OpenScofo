@@ -228,11 +228,6 @@ void OpenScofo::SetAmplitudeDecay(double decay) {
 }
 
 // ─────────────────────────────────────
-void OpenScofo::SetMinEntropy(double EntropyValue) {
-    m_MDP.SetMinEntropy(EntropyValue);
-}
-
-// ─────────────────────────────────────
 void OpenScofo::SetHarmonics(int Harmonics) {
     m_MDP.SetHarmonics(Harmonics);
     m_MDP.UpdateAudioTemplate();
