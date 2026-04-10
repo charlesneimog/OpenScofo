@@ -15,8 +15,8 @@ instr 1
     ; kTrig is 1 when new event index is detected, 0 otherwise.
     kEvent, kBPM, kTrig OpenScofoScore a1, "/home/neimog/Documents/Git/OpenScofo/Tests/assets/canticos.txt", 2048, 512
     
-    ; first input is the audio signal (recording or realtime audio from the MIC)
-    ; second is the Score Text (check https://charlesneimog.github.io/OpenScofo/)
+    ; first input (a1) is the audio signal (recording or realtime audio from the MIC)
+    ; second is the Score Text (check https://charlesneimog.github.io/OpenScofo/score/intro/ for Documentation)
     ; FFT Size (recommended is 2048)
     ; Hop Size (recommended is 512)
 
@@ -33,3 +33,20 @@ endin
 i1 0 120
 </CsScore>
 </CsoundSynthesizer>
+<bsbPanel>
+ <label>Widgets</label>
+ <objectName/>
+ <x>100</x>
+ <y>100</y>
+ <width>320</width>
+ <height>240</height>
+ <visible>true</visible>
+ <uuid/>
+ <bgcolor mode="background">
+  <r>240</r>
+  <g>240</g>
+  <b>240</b>
+ </bgcolor>
+</bsbPanel>
+<bsbPresets>
+</bsbPresets>

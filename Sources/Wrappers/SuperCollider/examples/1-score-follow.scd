@@ -61,7 +61,7 @@ s.waitForBoot {
     s.sync;
 
     // Send score to OpenScofo
-    OpenScofo.parseScore(~oscofoSynth, ~scorePath);
+    scofo.parseScore(~oscofoSynth, ~scorePath);
 
     // Enable event notifications
     if(OpenScofo.respondsTo(\setEventNotifications)) {

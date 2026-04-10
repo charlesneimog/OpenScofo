@@ -185,7 +185,7 @@ bool VampOpenScofo::initialise(size_t channels, size_t stepSize, size_t blockSiz
     m_stepSize = stepSize;
 
     delete m_OScofo;
-    m_OScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_stepSize);
+    m_OScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_blockSize);
 
     if (!m_scorePaths.empty()) {
         LoadScoreAtIndex(m_selectedScoreIndex);
