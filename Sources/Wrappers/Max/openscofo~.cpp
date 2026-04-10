@@ -161,7 +161,7 @@ static void oscofo_output_descriptors(MaxOpenScofo *x, OpenScofo::Description &D
             double DescValue = x->OpenScofo->GetDescriptionFloat(Desc, d);
             std::vector<t_atom> DescAtoms(1);
             atom_setfloat(&DescAtoms[0], (t_float)DescValue);
-            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), DescValue, DescAtoms.data());
+            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), 1, DescAtoms.data());
         }
     }
 }
@@ -424,12 +424,7 @@ static void oscofo_tickactions(void *xv) {
 static void oscofo_tickinfo(MaxOpenScofo *xv) {
     MaxOpenScofo *x = (MaxOpenScofo *)xv;
     if (x->MirOutput) {
-        OpenScofo::Description Desc;
-        if (x->JustDescription && x->Desc) {
-            Desc = *x->Desc;
-        } else {
-            Desc = x->OpenScofo->GetDescription();
-        }
+        OpenScofo::Description Desc = x->OpenScofo->GetDescription();
         oscofo_output_descriptors(x, Desc);
     }
 }

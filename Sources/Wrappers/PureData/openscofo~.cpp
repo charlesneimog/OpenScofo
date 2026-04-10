@@ -162,8 +162,8 @@ static void oscofo_output_descriptors(PdOpenScofo *x, OpenScofo::Description &De
         default:
             double DescValue = x->OpenScofo->GetDescriptionFloat(Desc, d);
             std::vector<t_atom> DescAtoms(1);
-            SETFLOAT(&DescAtoms[0], (t_float)DescValue);
-            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), DescValue, DescAtoms.data());
+            SETFLOAT(&DescAtoms[0], static_cast<t_float>(DescValue));
+            outlet_anything(x->DescOut, gensym(x->OpenScofo->GetDescriptionId(d)), 1, DescAtoms.data());
         }
     }
 }
@@ -395,12 +395,7 @@ static void oscofo_tickactions(PdOpenScofo *x) {
 // ─────────────────────────────────────
 static void oscofo_tickinfo(PdOpenScofo *x) {
     if (x->MirOutput) {
-        OpenScofo::Description Desc;
-        if (x->JustDescription) {
-            Desc = *x->Desc;
-        } else {
-            Desc = x->OpenScofo->GetDescription();
-        }
+        OpenScofo::Description Desc = x->OpenScofo->GetDescription();
         oscofo_output_descriptors(x, Desc);
     }
 }
@@ -556,11 +551,8 @@ static void oscofo_free(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 extern "C" void openscofo_tilde_setup(void) {
-    OpenScofoObj = class_new(
-        gensym("openscofo~"), 
-        (t_newmethod)oscofo_new, 
-        (t_method)oscofo_free, 
-        sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
+    OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
+                             CLASS_DEFAULT, A_GIMME, A_NULL);
 
     post("[openscofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 

@@ -10,7 +10,7 @@
 #endif
 
 // Callback de erro adaptado para SC
-static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
+static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     // ignorar logs abaixo de warn
     if (log.level < spdlog::level::warn)
         return;
@@ -47,7 +47,7 @@ struct ScOpenScofo : public SCUnit {
         m_HopSize = std::max(1, static_cast<int>(hopSize));
         m_InBuffer.assign(m_FFTSize, 0.0);
         m_OScofo = new OpenScofo::OpenScofo(sampleRate, fftSize, hopSize);
-        m_OScofo->SetErrorCallback(oscofo_error_callback, nullptr);
+        m_OScofo->SetErrorCallback(OpenScofo_error_callback, nullptr);
 
         if (isAudioRateIn(0)) {
             set_calc_function<ScOpenScofo, &ScOpenScofo::next_a>();
@@ -148,7 +148,7 @@ struct ScOpenScofo : public SCUnit {
 
         m_LastEventIndex = currentEvent;
         float currentEventAsFloat = static_cast<float>(currentEvent);
-        SendNodeReply(&mParent->mNode, 0, "/oscofo/currentEvent", 1, &currentEventAsFloat);
+        SendNodeReply(&mParent->mNode, 0, "/OpenScofo/currentEvent", 1, &currentEventAsFloat);
     }
 
     void next_a(int inNumSamples) {
@@ -203,5 +203,6 @@ PluginLoad(OpenScofoUGens) {
     DefineUnitCmd("OpenScofo", "getCurrentEvent", (UnitCmdFunc)&cmdGetCurrentEvent);
     DefineUnitCmd("OpenScofo", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
+
     printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
 }

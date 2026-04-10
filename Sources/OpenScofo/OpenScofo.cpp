@@ -476,11 +476,11 @@ double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
     case Descriptors::CHROMA:
     case Descriptors::ONNX:
         spdlog::error("Descriptor '{}' is vector-valued; cannot return a single double", GetDescriptionId(d));
-        return 0.0;
+        return -1.0;
 
     default:
         spdlog::error("Invalid descriptor '{}'", static_cast<int>(d));
-        return 0.0;
+        return -1.0;
     }
 }
 
@@ -595,7 +595,6 @@ template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffe
     m_BlockIndex += n;
 
     std::copy(m_InBuffer.begin() + n, m_InBuffer.end(), m_InBuffer.begin());
-
     std::transform(AudioBuffer, AudioBuffer + n, m_InBuffer.end() - n, [](T x) { return static_cast<double>(x); });
 
     if (m_BlockIndex != m_HopSize) {
