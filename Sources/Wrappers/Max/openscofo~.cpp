@@ -9,7 +9,7 @@
 #include <OpenScofo.hpp>
 
 static t_class *oscofo_class = nullptr;
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
 int luaopen_max(lua_State *L);
 #endif
 
@@ -98,7 +98,7 @@ static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
     x->HopSize = x->OpenScofo->GetHopSize();
     x->inBuffer.resize(x->FFTSize, 0.0f);
 
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
     std::string LuaCode = x->OpenScofo->GetLuaCode();
     bool result = x->OpenScofo->LuaExecute(LuaCode.c_str());
 
@@ -354,7 +354,7 @@ static void oscofo_following(MaxOpenScofo *x, long f) {
 
 // ─────────────────────────────────────
 static void oscofo_luaexecute(MaxOpenScofo *x, std::string code) {
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
     if (!x->OpenScofo->LuaExecute(code)) {
         std::string error = x->OpenScofo->LuaGetError();
         object_error((t_object *)x, "Lua error");
@@ -603,7 +603,7 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
     x->OpenScofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(x));
     x->OpenScofo->SetLogLevel(x->log);
 
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
     x->OpenScofo->LuaAddModule("max", luaopen_max);
     x->OpenScofo->LuaAddPath(x->PatchDir);
     x->OpenScofo->LuaAddPointer(x, "_maxobj");
@@ -640,7 +640,7 @@ int C74_EXPORT main() {
     t_class *c =
         class_new("openscofo~", (method)oscofo_new, (method)oscofo_free, (long)sizeof(MaxOpenScofo), 0L, A_GIMME, 0);
 
-    object_post(nullptr, "[openscofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
+    object_post(nullptr, "[openscofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
 
     class_addmethod(c, (method)oscofo_score, "score", A_SYM, 0);
     class_addmethod(c, (method)oscofo_start, "start", A_NOTHING, 0);

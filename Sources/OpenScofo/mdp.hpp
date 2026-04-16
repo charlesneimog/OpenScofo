@@ -39,9 +39,10 @@ class MDP {
     double GetBlockDuration();
 
     // Get Functions
+    int GetCurrentBufferIndex();
     int GetTunning();
     EventActions GetEventActions(int Index);
-    std::vector<MarkovState> GetStates();
+    std::vector<MarkovState> &GetStates();
     MarkovState GetState(int Index);
     double GetKappa();
     void AddState(MarkovState state);

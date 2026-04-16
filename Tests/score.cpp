@@ -135,7 +135,7 @@ void PrintTreeSitterNode(TSNode node, const std::string &source, const std::stri
 // ─────────────────────────────────────
 int main() {
     std::string m_ScoreRootPath = //"/home/neimog/Documents/Git/OpenScofo/Tests/assets/all-tokens.txt";
-        "/home/neimog/Documents/Git/OpenScofo/Tests/assets/canticos.txt";
+        "/home/neimog/Documents/Git/OpenScofo/Resources/Extended-Techniques-Random-Tests/score.txt";
     std::ifstream File(m_ScoreRootPath, std::ios::binary);
 
     if (File.is_open() == false) {

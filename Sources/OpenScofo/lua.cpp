@@ -1,6 +1,6 @@
 #include <OpenScofo.hpp>
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
 
 namespace OpenScofo {
 

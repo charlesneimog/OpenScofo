@@ -1,4 +1,4 @@
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
 
 #include <OpenScofo.hpp>
 #include <m_pd.h>
