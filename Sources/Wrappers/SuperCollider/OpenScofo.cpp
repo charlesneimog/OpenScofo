@@ -204,5 +204,5 @@ PluginLoad(OpenScofoUGens) {
     DefineUnitCmd("OpenScofo", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
 
-    printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
+    printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
 }

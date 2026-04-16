@@ -277,6 +277,11 @@ void MDP::SetAmplitudeDecay(double decay) {
 }
 
 // ─────────────────────────────────────
+int MDP::GetCurrentBufferIndex() {
+    return m_Tau % m_BufferSize;
+}
+
+// ─────────────────────────────────────
 int MDP::GetTunning() {
     return m_Tunning;
 }
@@ -311,6 +316,11 @@ void MDP::AddState(MarkovState State) {
 // ─────────────────────────────────────
 MarkovState MDP::GetState(int Index) {
     return m_States[Index];
+}
+
+// ─────────────────────────────────────
+std::vector<MarkovState> &MDP::GetStates() {
+    return m_States;
 }
 
 // ─────────────────────────────────────

@@ -2,13 +2,13 @@
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
+#include <nanobind/stl/filesystem.h>
 
 #include <OpenScofo.hpp>
 
 namespace nb = nanobind;
 
-template <typename T>
-static bool process_python_block(OpenScofo::OpenScofo &self, const T *data, size_t size) {
+template <typename T> static bool process_python_block(OpenScofo::OpenScofo &self, const T *data, size_t size) {
     if (size == 0) {
         return true;
     }
@@ -225,6 +225,7 @@ NB_MODULE(_OpenScofo, m) {
         .def("get_hop_size", &OpenScofo::OpenScofo::GetHopSize)
         .def("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
         .def("get_description", &OpenScofo::OpenScofo::GetDescription)
+        .def("get_current_buffer_index", &OpenScofo::OpenScofo::GetCurrentBufferIndex)
 
         // Process (template wrapper)
         .def("process_block",

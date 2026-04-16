@@ -22,6 +22,6 @@ target_link_libraries(_OpenScofo PRIVATE OpenScofo)
 target_include_directories(_OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
 
 # collect python sources
-file(GLOB OSCOFO_PY_MODULE ${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo/*.py)
+file(GLOB OPENSCOFO_PY_MODULE ${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo/*.py)
 install(TARGETS _OpenScofo LIBRARY DESTINATION OpenScofo)
-install(FILES ${OSCOFO_PY_MODULE} DESTINATION OpenScofo)
+install(FILES ${OPENSCOFO_PY_MODULE} DESTINATION OpenScofo)

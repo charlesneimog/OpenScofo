@@ -48,7 +48,7 @@ class Score {
         return m_TimbreONNXModel;
     }
 
-    std::vector<Descriptors> GetTimbreModelDescriptors() {
+    std::vector<std::string> GetTimbreModelDescriptors() {
         return m_ONNXDescriptors;
     }
 
@@ -109,7 +109,7 @@ class Score {
     // Paths
     fs::path m_ScoreRootPath;
     fs::path m_TimbreONNXModel;
-    std::vector<Descriptors> m_ONNXDescriptors;
+    std::vector<std::string> m_ONNXDescriptors;
 
     // Variables
     int m_ScorePosition = 1;

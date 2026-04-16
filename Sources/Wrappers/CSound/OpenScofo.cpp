@@ -126,6 +126,6 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 // Registration
 void csnd::on_load(Csound *csound) {
     csound->message(
-        std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME));
+        std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME));
     csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aSii", csnd::thread::ik);
 }

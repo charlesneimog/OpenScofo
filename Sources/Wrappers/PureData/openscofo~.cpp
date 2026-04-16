@@ -9,7 +9,7 @@
 
 static t_class *OpenScofoObj;
 
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
 int luaopen_pd(lua_State *L);
 #endif
 
@@ -100,7 +100,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     // Get Lua Code
 
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
     std::string LuaCode = x->OpenScofo->GetLuaCode();
     bool result = x->OpenScofo->LuaExecute(LuaCode.c_str());
 
@@ -327,7 +327,7 @@ static void oscofo_following(PdOpenScofo *x, t_float f) {
 }
 // ─────────────────────────────────────
 static void oscofo_luaexecute(PdOpenScofo *x, std::string code) {
-#if OSCOFO_LUA
+#if OPENSCOFO_LUA
     if (!x->OpenScofo->LuaExecute(code)) {
         std::string error = x->OpenScofo->LuaGetError();
         pd_error(x, "[openscofo~] Lua error");
@@ -536,7 +536,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     // x->OpenScofo->SetLogLevel(spdlog::level::info);
 #endif
 
-#ifdef OSCOFO_LUA
+#ifdef OPENSCOFO_LUA
     x->OpenScofo->LuaAddModule("pd", luaopen_pd);
     x->OpenScofo->LuaAddPath(x->PatchDir);
     x->OpenScofo->LuaAddPointer(x, "_pdobj");
@@ -554,7 +554,7 @@ extern "C" void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
                              CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[openscofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OSCOFO_BUILD_TIME);
+    post("[openscofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);

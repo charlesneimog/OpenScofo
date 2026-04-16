@@ -8,4 +8,11 @@ pd_add_datafile(openscofo~ "${CMAKE_CURRENT_SOURCE_DIR}/openscofo~-help.pd")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.wav")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/assets/bwv-1013.txt")
 
-set_target_properties(openscofo_tilde PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+if(LINUX)
+    target_link_options(openscofo_tilde PRIVATE -Wl,--exclude-libs,ALL)
+elseif(APPLE)
+    target_compile_options(openscofo_tilde PRIVATE -fvisibility=hidden)
+elseif(WIN32)
+    # non needed?
+
+endif()

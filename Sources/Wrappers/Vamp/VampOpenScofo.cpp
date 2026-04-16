@@ -104,7 +104,7 @@ Vamp::Plugin::ParameterList VampOpenScofo::getParameterDescriptors() const {
     ParameterDescriptor scorePath;
     scorePath.identifier = "score_path";
     scorePath.name = "Score Path";
-    scorePath.description = "Select score index from Programs, or set OSCOFO_VAMP_SCORE_PATH to a full path.";
+    scorePath.description = "Select score index from Programs, or set OPENSCOFO_VAMP_SCORE_PATH to a full path.";
     scorePath.unit = "index";
     scorePath.minValue = 0;
     scorePath.maxValue = m_scorePaths.empty() ? 0 : float(m_scorePaths.size() - 1);
@@ -202,7 +202,7 @@ void VampOpenScofo::reset() {
 void VampOpenScofo::RefreshScorePathsFromEnv() {
     m_scorePaths.clear();
 
-    const char *singlePath = std::getenv("OSCOFO_VAMP_SCORE_PATH");
+    const char *singlePath = std::getenv("OPENSCOFO_VAMP_SCORE_PATH");
     if (singlePath && *singlePath) {
         std::string path = trim(std::string(singlePath));
         if (!path.empty()) {
@@ -212,7 +212,7 @@ void VampOpenScofo::RefreshScorePathsFromEnv() {
         }
     }
 
-    const char *env = std::getenv("OSCOFO_VAMP_SCORE_PATHS");
+    const char *env = std::getenv("OPENSCOFO_VAMP_SCORE_PATHS");
     if (!env || !*env) {
         m_selectedScoreIndex = 0;
         return;

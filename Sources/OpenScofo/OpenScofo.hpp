@@ -6,7 +6,7 @@
 #include "states.hpp"
 #include "log.hpp"
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
 extern "C" {
 #include <lua.h>
 #include <lualib.h>
@@ -14,7 +14,7 @@ extern "C" {
 }
 #endif
 
-#define OSCOFO_BUILD_TIME (__DATE__ " " __TIME__)
+#define OPENSCOFO_BUILD_TIME (__DATE__ " " __TIME__)
 
 // vector
 #include <vector>
@@ -65,7 +65,7 @@ class OpenScofo {
     EventActions GetEventActions(int Index);
     std::string GetLuaCode();
     double GetPitchProb(double f);
-    States GetStates();
+    States &GetStates();
     PitchTemplateArray GetPitchTemplate(double Freq);
     std::vector<double> GetSpectrumPower() const;
     double GetSr();
@@ -73,6 +73,7 @@ class OpenScofo {
     double GetHopSize();
     double GetBlockDuration();
     Description GetDescription();
+    int GetCurrentBufferIndex();
 
     Descriptors GetDescriptorsEnum(const char *s);
     const char *GetDescriptionId(Descriptors d);
@@ -82,7 +83,7 @@ class OpenScofo {
     // Config
     void ClearErrors();
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
     void InitLuaModule();
     bool LuaExecute(std::string code);
     std::string LuaGetError();
@@ -101,7 +102,7 @@ class OpenScofo {
     Score m_Score;
     std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
     lua_State *m_LuaState;
 #endif
 

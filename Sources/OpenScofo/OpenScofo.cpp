@@ -5,7 +5,7 @@
 // ╰─────────────────────────────────────╯
 namespace OpenScofo {
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
 int luaopen_OpenScofo(lua_State *L);
 #endif
 
@@ -21,7 +21,7 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     m_InBuffer.reserve(FftSize);
     m_BlockIndex = 0;
 
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
     InitLuaModule();
 #endif
 
@@ -131,7 +131,7 @@ void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descripto
 // ╭─────────────────────────────────────╮
 // │                 Lua                 │
 // ╰─────────────────────────────────────╯
-#if defined(OSCOFO_LUA)
+#if defined(OPENSCOFO_LUA)
 void OpenScofo::InitLuaModule() {
     m_LuaState = luaL_newstate();
     luaL_openlibs(m_LuaState); // NOTE: Rethink if I load all functions
@@ -311,7 +311,7 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
     case Descriptors::MFCC:
         return "mfcc";
     case Descriptors::MELOGRAM:
-        return "logmelspectrum";
+        return "logmel";
     case Descriptors::RMS:
         return "rms";
     case Descriptors::LOUDNESS:
@@ -361,7 +361,7 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
 Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
     if (strcmp(s, "mfcc") == 0) {
         return Descriptors::MFCC;
-    } else if (strcmp(s, "logmelspectrum") == 0) {
+    } else if (strcmp(s, "logmel") == 0) {
         return Descriptors::MELOGRAM;
     } else if (strcmp(s, "rms") == 0) {
         return Descriptors::RMS;
@@ -506,12 +506,8 @@ std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descripto
 // ╭─────────────────────────────────────╮
 // │ Python Research and Test Functions  │
 // ╰─────────────────────────────────────╯
-States OpenScofo::GetStates() {
-    if (m_States.size() != 0) {
-        return m_States;
-    }
-    spdlog::error("No states found, please use the ScoreParse first");
-    return m_States;
+States &OpenScofo::GetStates() {
+    return m_MDP.GetStates();
 }
 
 // ─────────────────────────────────────
@@ -559,12 +555,14 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
     // Timbre detection
     if (m_Score.HasTimbreModel()) {
         auto model = m_Score.GetTimbreModel();
-        auto descriptors = m_Score.GetTimbreModelDescriptors();
-        std::thread([model = std::move(model), descriptors = std::move(descriptors), this]() mutable {
-            spdlog::warn("Loading ONNX model, wait...");
-            m_MIR.ONNXInit(model, descriptors);
-            spdlog::warn("ONNX Model ready");
-        }).detach();
+        std::vector<std::string> descriptors = m_Score.GetTimbreModelDescriptors();
+        spdlog::warn("Loading ONNX model, wait...");
+        std::vector<Descriptors> DescEnum;
+        for (auto d : descriptors) {
+            DescEnum.push_back(GetDescriptorsEnum(d.c_str()));
+        }
+        m_MIR.ONNXInit(model, DescEnum);
+        spdlog::warn("ONNX Model ready");
     }
 
     m_FFTSize = m_Score.GetFFTSize();
@@ -588,6 +586,11 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
 // ─────────────────────────────────────
 Description OpenScofo::GetDescription() {
     return m_Desc;
+}
+
+// ─────────────────────────────────────
+int OpenScofo::GetCurrentBufferIndex() {
+    return m_MDP.GetCurrentBufferIndex();
 }
 
 // ─────────────────────────────────────

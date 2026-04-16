@@ -1,5 +1,5 @@
 /**
- * @file The OScofo language is a specialized scripting language for OpenScofo, an open-source score follower tailored for contemporary live-electronic music. Inspired by the research behind IRCAM's Antescofo, it leverages Lua for flexible scripting and Tree-sitter to parse EVENTs and musical actions. It is built to lower the barrier to entry and setup complexity of live-electronics by enabling interactive scores that integrate seamlessly across PureData (including web deployment via pd4web), Max, Python, and C/C++.
+ * @file The OpenScofo language is a specialized scripting language for OpenScofo, an open-source score follower tailored for contemporary live-electronic music. Inspired by the research behind IRCAM's Antescofo, it leverages Lua for flexible scripting and Tree-sitter to parse EVENTs and musical actions. It is built to lower the barrier to entry and setup complexity of live-electronics by enabling interactive scores that integrate seamlessly across PureData (including web deployment via pd4web), Max, Python, and C/C++.
  * @author Charles K. Neimog <charlesneimog@outlook.com>
  * @license GPL3
  */
@@ -26,10 +26,11 @@ module.exports = grammar({
         lua_call: ($) => repeat1(choice(/[^()`]+/, seq("(", optional($.lua_call), ")"))),
         lua_comment: (_) => /--[^\n]*/,
 
-        descriptor_list: ($) => seq("[", repeat1(field("descriptor", $.descriptor)), "]"),
+        descriptor_list: ($) => repeat1(field("descriptor", $.descriptor)),
         descriptor: (_) =>
             choice(
                 "mfcc",
+                "logmel",
                 "loudness",
                 "rms",
                 "power",
@@ -53,7 +54,17 @@ module.exports = grammar({
         CONFIG: ($) =>
             seq(
                 field("key", $.config_key),
-                field("value", choice($.number, $.identifier, $.path, $.descriptor_list, $.onset_function)),
+                field(
+                    "value",
+                    choice(
+                        prec(2, $.descriptor_list),
+                        $.number,
+                        $.identifier,
+                        $.path,
+                        $.descriptor_list,
+                        $.onset_function,
+                    ),
+                ),
             ),
 
         config_key: (_) =>

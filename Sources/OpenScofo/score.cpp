@@ -695,6 +695,16 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
         }
         return;
     }
+
+    if (id == "ONNXDESCRIPTORS") {
+        m_ONNXDescriptors.clear();
+        uint32_t count = ts_node_named_child_count(valueNode);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(valueNode, i);
+            std::string d = GetCodeStr(ScoreStr, child);
+            m_ONNXDescriptors.push_back(d);
+        }
+    }
 }
 
 // ─────────────────────────────────────
