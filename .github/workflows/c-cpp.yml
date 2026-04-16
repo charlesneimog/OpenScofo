@@ -175,6 +175,11 @@ jobs:
         run: |
           python Resources/Packages/macos.py --version ${{ env.LIBVERSION }}
 
+      - name: Generate Linux Component Installer
+        if: runner.os == 'Linux'
+        run: |
+          python Resources/Packages/Linux.py --version ${{ env.LIBVERSION }}
+
       - name: Generate Windows Component Installer
         if: runner.os == 'Windows'
         shell: pwsh
@@ -201,31 +206,6 @@ jobs:
       # -----------------------
       # Upload artifacts
       # -----------------------
-      - name: Upload PureData Object
-        uses: actions/upload-artifact@v6
-        with:
-          name: PureData-${{env.LIBNAME}}-${{env.LIBVERSION}}-pd${{matrix.precision}}-${{
-            runner.os }}
-          path: |
-            ${{env.LIBNAME}}
-            Tests/assets/canticos.wav
-            Tests/assets/canticos.txt
-
-      - name: Upload Max Object
-        uses: actions/upload-artifact@v6
-        if: runner.os != 'Linux'
-        with:
-          name: Max-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |
-            max
-            Tests/assets/canticos.wav
-            Tests/assets/canticos.txt
-
-      - name: Upload Python Object
-        uses: actions/upload-artifact@v6
-        with:
-          name: Python-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: dist/*.whl
       - name: Upload Installer
         if: runner.os == 'Windows' || runner.os == 'macOS'
         uses: actions/upload-artifact@v6
@@ -234,37 +214,7 @@ jobs:
           path: |
             *.pkg
             *.msi
-      - name: Upload Vamp Plugin
-        uses: actions/upload-artifact@v6
-        with:
-          name: Vamp-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |
-            build/Sources/Wrappers/Vamp/*.so
-            build/Sources/Wrappers/Vamp/*.dylib
-            build/Sources/Wrappers/Vamp/*.dll
-            Tests/assets/canticos.wav
-            Tests/assets/canticos.txt
-      - name: Prepare SuperCollider Final Folder
-        shell: bash
-        run: |
-          mkdir -p SuperCollider
-
-          # binaries
-          cp build/Sources/Wrappers/SuperCollider/*.so SuperCollider/ 2>/dev/null || true
-          cp build/Sources/Wrappers/SuperCollider/*.dylib SuperCollider/ 2>/dev/null || true
-          cp build/Sources/Wrappers/SuperCollider/*.dll SuperCollider/ 2>/dev/null || true
-          cp build/Sources/Wrappers/SuperCollider/*.scx SuperCollider/ 2>/dev/null || true
-
-          # sc files
-          cp Sources/Wrappers/SuperCollider/*.sc SuperCollider/ 2>/dev/null || true
-
-          # examples
-          mkdir -p SuperCollider/examples
-          cp Sources/Wrappers/SuperCollider/examples/*.scd SuperCollider/examples/ 2>/dev/null || true
-
-          # assets
-          mkdir -p SuperCollider/assets
-          cp Tests/assets/* SuperCollider/assets/
+            *.sh
       - name: Upload Emscripten Build
         if: runner.os == 'Linux'
         run: |
@@ -284,22 +234,6 @@ jobs:
         with:
           name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
           path: Emscripten
-      - name: Upload CSound
-        uses: actions/upload-artifact@v6
-        with:
-          name: CSound-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |-
-            build/Sources/Wrappers/CSound/*.so
-            build/Sources/Wrappers/CSound/*.dylib
-            build/Sources/Wrappers/CSound/*.dll
-            Tests/assets/canticos.wav
-            Tests/assets/canticos.txt
-      - name: Build Source
-        uses: actions/upload-artifact@v6
-        with:
-          name: Build-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |-
-            build/Sources/Wrappers/
       - name: Publish Pip
         if: ${{ github.event.inputs.publish_release == 'true' }}
         env:
