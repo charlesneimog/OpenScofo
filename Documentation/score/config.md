@@ -90,12 +90,12 @@ PITCHTEMPLATESIGMA 0.8
 ```
 
 ---
-### `TIMBREMODEL`
+### `ONNXMODEL`
 
-Defines a path to a `.onnx` model trained with `py.train-onnx` for identification of extended techniques. These paths are relative to the score file, so `TIMBREMODEL "flute.onnx"` expected a file `flute.onnx` side by side of the score file loaded.
+Defines a path to a `.onnx` model trained with `py.train-onnx` for identification of extended techniques. These paths are relative to the score file, so `ONNXMODEL "flute.onnx"` expected a file `flute.onnx` side by side of the score file loaded.
 
 ```
-TIMBREMODEL "flute.onnx"
+ONNXMODEL "flute.onnx"
 ```
 
 !!! tip "Train models the object `py.train-onnx`."
@@ -113,6 +113,8 @@ ONNXDESCRIPTORS mfcc zcr centroid spread
 
 !!! warning "Order matters!"
     Use descriptors in the same order as your training. For example, using `zcr mfcc` when the model was trained with `mfcc zcr` will **change the result**.
+
+To detect Flute extended techniques, like tongue-ram, pizz, key-click, jet-whistle, etc... A good list would be `mfcc logmel zcr centroid flatness hfr`.
 
 
 Check the `OpenScofo` [descriptors](../listening.md).
