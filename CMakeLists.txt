@@ -30,23 +30,23 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
 
-option(OSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
-option(OSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
-option(OSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
-option(OSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
-option(OSCOFO_BUILD_TESTS "Build Tests" OFF)
-option(OSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
+option(OPENSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
+option(OPENSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
+option(OPENSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
+option(OPENSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
+option(OPENSCOFO_BUILD_TESTS "Build Tests" OFF)
+option(OPENSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
 
-option(OSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
-option(UPDATE_OSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
+option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
+option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 
-if(OSCOFO_BUILD_ALL)
-    set(OSCOFO_BUILD_PY_MODULE ON)
-    set(OSCOFO_BUILD_PD_OBJECT ON)
-    set(OSCOFO_BUILD_MAX_OBJECT ON)
-    set(OSCOFO_BUILD_VAMP_PLUGIN ON)
-    set(OSCOFO_BUILD_SC_PLUGIN ON)
-    set(OSCOFO_BUILD_CSOUND_PLUGIN ON)
+if(OPENSCOFO_BUILD_ALL)
+    set(OPENSCOFO_BUILD_PY_MODULE ON)
+    set(OPENSCOFO_BUILD_PD_OBJECT ON)
+    set(OPENSCOFO_BUILD_MAX_OBJECT ON)
+    set(OPENSCOFO_BUILD_VAMP_PLUGIN ON)
+    set(OPENSCOFO_BUILD_SC_PLUGIN ON)
+    set(OPENSCOFO_BUILD_CSOUND_PLUGIN ON)
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -94,7 +94,7 @@ set(GRAMMAR_JSON_BUILD "${GRAMMAR_BUILD_DIR}/tree-sitter.json")
 set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 
-set(OSCOFO_ONLINE_EDITOR_WASM
+set(OPENSCOFO_ONLINE_EDITOR_WASM
     "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
 
 add_custom_command(
@@ -120,10 +120,9 @@ set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(score_parser generate_tree_sitter_parser)
 
 # Custom command to generate the WASM file if it doesn't exist
-if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OSCOFO_LANGUAGE})
-
+if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OPENSCOFO_LANGUAGE})
     add_custom_command(
-        OUTPUT "${OSCOFO_ONLINE_EDITOR_WASM}"
+        OUTPUT "${OPENSCOFO_ONLINE_EDITOR_WASM}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
                 --wasm
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
@@ -166,15 +165,15 @@ if(NOT EXISTS "${OSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OSCOFO_LANGUAGE})
     file(COPY "${TS_TEMP_DIR}/web-tree-sitter.js" "${TS_TEMP_DIR}/web-tree-sitter.wasm"
          DESTINATION "${TS_DEST}")
 
-    add_custom_target(build_online_editor_wasm ALL DEPENDS "${OSCOFO_ONLINE_EDITOR_WASM}")
+    add_custom_target(build_online_editor_wasm ALL DEPENDS "${OPENSCOFO_ONLINE_EDITOR_WASM}")
 
 endif()
 
 # ╭──────────────────────────────────────╮
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_WITH_LUA)
-    cpmaddpackage("gh:lua/lua@5.4.0")
+if(OPENSCOFO_BUILD_WITH_LUA)
+    cpmaddpackage("gh:lua/lua@5.5.0")
     if(lua_ADDED)
         file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
         add_library(lua STATIC "${lua_SOURCE_DIR}/onelua.c")
@@ -183,14 +182,16 @@ if(OSCOFO_BUILD_WITH_LUA)
         target_include_directories(lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
         set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-        if(LINUX)
-            target_compile_definitions(lua PUBLIC LUA_USE_LINUX)
-        elseif(APPLE)
-            target_compile_definitions(lua PUBLIC LUA_USE_MACOSX)
+        if(APPLE)
+            target_compile_definitions(lua PRIVATE LUA_USE_MACOSX)
+        elseif(WIN32)
+            target_compile_definitions(lua PRIVATE LUA_USE_WINDOWS)
+        elseif(UNIX)
+            target_compile_definitions(lua PRIVATE LUA_USE_LINUX)
         endif()
 
     endif()
-    add_definitions(-DOSCOFO_LUA)
+    add_definitions(-DOPENSCOFO_LUA)
 else()
     message(STATUS "Lua not included")
 endif()
@@ -236,7 +237,7 @@ target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
 
-if(OSCOFO_BUILD_WITH_LUA)
+if(OPENSCOFO_BUILD_WITH_LUA)
     target_link_libraries(OpenScofo PUBLIC lua)
 endif()
 
@@ -357,42 +358,42 @@ endif()
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_PY_MODULE AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_PY_MODULE AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Python")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │           PureData Object            │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_PD_OBJECT)
+if(OPENSCOFO_BUILD_PD_OBJECT)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/PureData")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_MAX_OBJECT AND NOT LINUX AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_MAX_OBJECT AND NOT LINUX AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Super Collider            │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_SC_PLUGIN AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_SC_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │              CSound                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_CSOUND_PLUGIN AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_CSOUND_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/CSound")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Vamp Obj                  │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_VAMP_PLUGIN AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_VAMP_PLUGIN AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Vamp")
 endif()
 
@@ -406,6 +407,14 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
-if(OSCOFO_BUILD_TESTS AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_TESTS AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
+endif()
+
+if(LINUX)
+    include(InstallRequiredSystemLibraries)
+    set(CPACK_GENERATOR "STGZ")
+    set(CPACK_PACKAGE_NAME "OpenScofo")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}-a6")
+    include(CPack)
 endif()
