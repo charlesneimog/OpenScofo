@@ -90,3 +90,6 @@ OpenScofo.pkg
 max/
 Resources/Packages/out
 Resources/Packages/OpenScofo-macOS.pkg
+Resources/Packages/OpenScofo-macOS.pkg
+Resources/Extended-Techniques-Random-Tests/*.wav
+Resources/Extended-Techniques-Random-Tests/*.txt
