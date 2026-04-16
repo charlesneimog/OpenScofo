@@ -240,7 +240,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
 			key="csound",
 			title="CSound",
 			identifier="org.openscofo.pkg.csound",
-			user_destination="/Library/Frameworks/CsoundLib64.framework/Versions/6.0/Resources/Opcodes64",
+			user_destination="Library/csound/6.0/plugins64",
 			required=[
 				Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
 				Path("Tests/assets/bwv-1013.wav"),

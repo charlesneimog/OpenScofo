@@ -170,9 +170,9 @@ def component_specs() -> list[IntegrationSpec]:
             key="csound",
             title="CSound",
             identifier="org.openscofo.pkg.csound",
-            destination_root="ProgramFilesFolder",
-            destination_subdir="Csound6/plugins",
-            destination_subdir_x64="Csound6_x64/plugins64",
+            destination_root="LocalAppDataFolder",
+            destination_subdir="csound/6.0/plugins64",
+            destination_subdir_x64=None,
             required=[
                 Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
                 Path("Tests/assets/bwv-1013.wav"),
