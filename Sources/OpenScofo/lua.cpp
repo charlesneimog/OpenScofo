@@ -198,7 +198,7 @@ static int OpenScofoGetEventIndex(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
         return luaL_error(L, "OpenScofo pointer is null");
-    lua_pushinteger(L, self->GetEventIndex());
+    lua_pushinteger(L, self->GetCurrentScorePosition());
     return 1;
 }
 

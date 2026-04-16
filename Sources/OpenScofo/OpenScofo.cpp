@@ -269,7 +269,7 @@ void OpenScofo::SetCurrentEvent(int Event) {
 // ╭─────────────────────────────────────╮
 // │            Get Functions            │
 // ╰─────────────────────────────────────╯
-int OpenScofo::GetEventIndex() {
+int OpenScofo::GetCurrentScorePosition() {
     return m_CurrentScorePosition;
 }
 
@@ -290,7 +290,7 @@ double OpenScofo::GetKappa() {
 
 // ─────────────────────────────────────
 double OpenScofo::GetPitchProb(double f) {
-    return m_MDP.GetPitchSimilarity(f);
+    return m_MDP.GetPitchProbability(f);
 }
 
 // ─────────────────────────────────────

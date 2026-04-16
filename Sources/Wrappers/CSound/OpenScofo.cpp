@@ -96,7 +96,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
             return NOTOK;
         }
 
-        int event = oscofo->GetEventIndex();
+        int event = oscofo->GetCurrentScorePosition();
         outargs[0] = static_cast<MYFLT>(event);
         outargs[1] = static_cast<MYFLT>(oscofo->GetLiveBPM());
 
@@ -125,7 +125,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
 // Registration
 void csnd::on_load(Csound *csound) {
-    csound->message(
-        std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME));
+    csound->message(std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION,
+                                OPENSCOFO_BUILD_TIME));
     csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aSii", csnd::thread::ik);
 }

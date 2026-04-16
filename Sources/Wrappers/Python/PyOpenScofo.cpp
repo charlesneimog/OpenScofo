@@ -211,7 +211,7 @@ NB_MODULE(_OpenScofo, m) {
 
         // Getters
         .def("get_live_bpm", &OpenScofo::OpenScofo::GetLiveBPM)
-        .def("get_event_index", &OpenScofo::OpenScofo::GetEventIndex)
+        .def("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
         .def("get_kappa", &OpenScofo::OpenScofo::GetKappa)
         .def("get_db_value", &OpenScofo::OpenScofo::GetdBValue)
         .def("get_event_actions", &OpenScofo::OpenScofo::GetEventActions)

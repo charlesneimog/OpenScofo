@@ -403,13 +403,13 @@ static void oscofo_tickinfo(PdOpenScofo *x) {
 // ─────────────────────────────────────
 static void oscofo_ticknewevent(PdOpenScofo *x) {
     int PrevEvent = x->Event;
-    x->Event = x->OpenScofo->GetEventIndex();
+    x->Event = x->OpenScofo->GetCurrentScorePosition();
     if (PrevEvent == x->Event || x->Event == 0) {
         return;
     }
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
-    outlet_float(x->EventOut, x->OpenScofo->GetEventIndex());
+    outlet_float(x->EventOut, x->OpenScofo->GetCurrentScorePosition());
     OpenScofo::EventActions Actions = x->OpenScofo->GetEventActions(x->Event);
 
     for (OpenScofo::ScoreAction &Act : Actions) {
