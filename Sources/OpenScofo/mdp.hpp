@@ -49,7 +49,7 @@ class MDP {
 
     int GetStatesSize();
     int GetEvent(Description &Desc);
-    double GetPitchSimilarity(double Freq);
+    double GetPitchProbability(double Freq);
     States GetStatesForProcessing();
 
     // Python For Research

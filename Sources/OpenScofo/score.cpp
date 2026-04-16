@@ -404,9 +404,19 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
 
     // Pitch
     AudioState SubState;
-    PitchNode2Freq(ScoreStr, PitchNode, SubState);
     SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+    SubState.Type = LABEL;
     Event.AudioStates.push_back(SubState);
+
+    // Pitch
+    AudioState Pitch;
+    PitchNode2Freq(ScoreStr, PitchNode, Pitch);
+    Event.AudioStates.push_back(Pitch);
+
+    // Silence
+    AudioState Silence;
+    Silence.Type = SILENCE;
+    Event.AudioStates.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -440,7 +450,13 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     Event.Type = UTECH;
     AudioState SubState;
     SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+    SubState.Type = LABEL;
     Event.AudioStates.push_back(SubState);
+
+    // Silence
+    AudioState Silence;
+    Silence.Type = SILENCE;
+    Event.AudioStates.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);

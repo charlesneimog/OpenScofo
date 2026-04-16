@@ -117,7 +117,7 @@ struct ScOpenScofo : public SCUnit {
 
     int GetEventIndex() {
         if (m_OScofo) {
-            return m_OScofo->GetEventIndex();
+            return m_OScofo->GetCurrentScorePosition();
         }
         return -1;
     }
@@ -141,7 +141,7 @@ struct ScOpenScofo : public SCUnit {
             return;
         }
 
-        const int currentEvent = m_OScofo->GetEventIndex();
+        const int currentEvent = m_OScofo->GetCurrentScorePosition();
         if (currentEvent == m_LastEventIndex) {
             return;
         }

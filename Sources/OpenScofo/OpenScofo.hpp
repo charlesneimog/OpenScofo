@@ -59,7 +59,7 @@ class OpenScofo {
 
     // Get Functions
     double GetLiveBPM();
-    int GetEventIndex();
+    int GetCurrentScorePosition();
     double GetKappa();
     double GetdBValue();
     EventActions GetEventActions(int Index);

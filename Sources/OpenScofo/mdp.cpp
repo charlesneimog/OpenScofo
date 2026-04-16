@@ -591,103 +591,118 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╰─────────────────────────────────────╯
 // Section (CONT 2010) section 3.1 and also CUVILLIER (2016) section 2.2.2
 void MDP::GetAudioObservations(int T) {
-    std::unordered_map<double, double> PitchObs;
-    PitchObs.reserve(m_WinEnd - m_WinStart);
-
     int bufferIndex = T % m_BufferSize;
-    double ObsNoSound = 0;
-    double ObsSilence = m_Desc.SilenceProb;
-    double nonSilenceWeight = 1.0 - m_Desc.SilenceProb;
-    double nonPercussiveWeight = 1.0 - m_Desc.ExtendedTechProb;
+    double soundEvidence = 0.0;
+
+    // Peso dinâmico baseado na confiança de técnica estendida
+    // Quando ExtendedTechProb é alto (próximo de 1) -> pitch não é confiável, técnica domina
+    // Quando ExtendedTechProb é baixo (próximo de 0) -> pitch é confiável
+    double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
+    double techWeight = m_Desc.ExtendedTechProb;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
             continue;
 
-        MarkovState &StateJ = m_States[j];
-        double BestObs = 1e-300;
+        MarkovState &state = m_States[j];
+        double stateLikelihood = 1e-300;
 
-        switch (StateJ.Type) {
+        switch (state.Type) {
         case NOTE:
         case TRILL: {
-            for (AudioState &AS : StateJ.AudioStates) {
-                if (AS.Type == PITCH) {
-                    auto it = PitchObs.find(AS.Freq);
-                    if (it != PitchObs.end()) {
-                        BestObs = std::max(BestObs, it->second);
-                    } else {
-                        double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
-                        PitchObs.emplace(AS.Freq, kl);
-                        BestObs = std::max(BestObs, kl);
-                    }
-                } else if (AS.Type == SILENCE) {
-                    // with @percussive
-                    BestObs = std::max(BestObs, m_Desc.SilenceProb);
+            double bestForState = 1e-300;
+            for (AudioState &as : state.AudioStates) {
+                if (as.Type == PITCH) {
+                    double pitchProb = GetPitchProbability(as.Freq);
+                    double silenceProb = 1.0 - m_Desc.SilenceProb;
+
+                    // MoE com peso dinâmico: pitch domina quando é confiável
+                    // Se ExtendedTechProb é alto, pitchWeight é baixo -> nota menos provável
+                    double combined = pitchProb * pitchWeight * silenceProb;
+                    bestForState = std::max(bestForState, combined);
+                } else if (as.Type == SILENCE) {
+                    bestForState = std::max(bestForState, m_Desc.SilenceProb);
                 }
             }
-            ObsNoSound = std::max(ObsNoSound, BestObs);
+            stateLikelihood = bestForState;
+            soundEvidence = std::max(soundEvidence, bestForState);
             break;
         }
-        case CHORD: {
-            double ChordKLObs = 1e-300;
-            for (AudioState &AS : StateJ.AudioStates) {
-                if (AS.Type != PITCH) {
-                    spdlog::error("Memory error on creation of Audio States, please report");
-                }
-                auto it = PitchObs.find(AS.Freq);
-                if (it != PitchObs.end()) {
-                    ChordKLObs += it->second;
-                } else {
-                    double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
-                    PitchObs.emplace(AS.Freq, kl);
-                    ChordKLObs += kl;
-                }
-            }
-            BestObs = ChordKLObs / StateJ.AudioStates.size();
-            ObsNoSound = std::max(ObsNoSound, BestObs);
-            break;
-        }
+
         case PTECH: {
-            for (AudioState &AS : StateJ.AudioStates) {
-                double kl = GetPitchSimilarity(AS.Freq) * nonSilenceWeight * nonPercussiveWeight;
-                double tech = m_Desc.ONNX[AS.Label] * m_Desc.ExtendedTechProb * nonSilenceWeight;
-                PitchObs.emplace(AS.Freq, kl);
-                BestObs = std::max(kl * tech, BestObs);
+            double bestForState = 1e-300;
+            for (AudioState &as : state.AudioStates) {
+                if (as.Type == LABEL) {
+                    double techProb = m_Desc.ONNX[as.Label];
+                    double silenceProb = 1.0 - m_Desc.SilenceProb;
+
+                    // MoE com peso dinâmico: técnica domina quando ExtendedTechProb é alto
+                    double combined = techProb * techWeight * silenceProb;
+                    bestForState = std::max(bestForState, combined);
+                } else if (as.Type == PITCH) {
+                    // Pitch como evidência secundária para PTECH
+                    double pitchProb = GetPitchProbability(as.Freq);
+                    double silenceProb = 1.0 - m_Desc.SilenceProb;
+                    // Peso reduzido porque pitch é menos relevante para técnica
+                    double combined = pitchProb * (1.0 - techWeight * 0.5) * silenceProb;
+                    bestForState = std::max(bestForState, combined);
+                } else if (as.Type == SILENCE) {
+                    bestForState = std::max(bestForState, m_Desc.SilenceProb);
+                }
             }
+            stateLikelihood = bestForState;
+            soundEvidence = std::max(soundEvidence, bestForState);
             break;
         }
+
         case UTECH: {
-            for (AudioState &AS : StateJ.AudioStates) {
-                double tech = m_Desc.ONNX[AS.Label] * m_Desc.ExtendedTechProb * nonSilenceWeight;
-                BestObs = std::max(tech, BestObs);
+            double bestForState = 1e-300;
+            for (AudioState &as : state.AudioStates) {
+                double techProb = m_Desc.ONNX[as.Label];
+                double silenceProb = 1.0 - m_Desc.SilenceProb;
+                // UTECH: técnica domina completamente
+                double combined = techProb * techWeight * silenceProb;
+                bestForState = std::max(bestForState, combined);
             }
+            stateLikelihood = bestForState;
+            soundEvidence = std::max(soundEvidence, bestForState);
             break;
         }
+
+        case CHORD: {
+            double sumProbs = 0.0;
+            for (AudioState &as : state.AudioStates) {
+                double pitchProb = GetPitchProbability(as.Freq);
+                sumProbs += pitchProb;
+            }
+            stateLikelihood = sumProbs / state.AudioStates.size();
+            soundEvidence = std::max(soundEvidence, stateLikelihood);
+            break;
+        }
+
         case REST: {
-            BestObs = std::max(BestObs, m_Desc.SilenceProb);
+            stateLikelihood = m_Desc.SilenceProb;
+            soundEvidence = std::max(soundEvidence, stateLikelihood);
             break;
         }
+
         default:
-            spdlog::error("Observation not implemented yet");
+            spdlog::error("Event type not implemented yet, please remove it");
+            break;
         }
 
-        StateJ.BestObs[bufferIndex] = BestObs;
+        state.BestObs[bufferIndex] = stateLikelihood;
     }
 
-    if (ObsNoSound > ObsSilence) {
-        spdlog::debug("SOUND   | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
-        m_IsSilence = false;
-    } else {
-        spdlog::debug("SILENCE | Sound {:.4f} | Silence {:.4f}", ObsNoSound, ObsSilence);
-        m_IsSilence = true;
-    }
+    // Silence detection: compara silêncio com a melhor evidência de som
+    m_IsSilence = (m_Desc.SilenceProb > soundEvidence);
 }
 
 // ─────────────────────────────────────
 // CONT (2010) section 3.1;
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
-double MDP::GetPitchSimilarity(double Freq) {
+double MDP::GetPitchProbability(double Freq) {
     double KLDiv = 0.0;
     double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
     auto it = m_PitchTemplates.find(RootBinFreq);
