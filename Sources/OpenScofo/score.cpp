@@ -951,7 +951,7 @@ States Score::Parse(fs::path ScoreFilePath) {
             NewConfig(ScoreStr, child);
         } else if (type == "LUA") {
             std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
-            lua_body += "\n\n";
+            // lua_body += "\n\n";
             m_LuaCode += lua_body;
         } else if (type == "comment") {
         } else {

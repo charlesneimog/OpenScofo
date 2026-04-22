@@ -289,8 +289,9 @@ double OpenScofo::GetKappa() {
 }
 
 // ─────────────────────────────────────
-double OpenScofo::GetPitchProb(double f) {
-    return m_MDP.GetPitchProbability(f);
+double OpenScofo::GetPitchProb(double Freq) {
+    m_MDP.SetDescription(m_Desc);
+    return m_MDP.GetPitchProbability(Freq);
 }
 
 // ─────────────────────────────────────
@@ -615,6 +616,7 @@ template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffe
 
     case DESCRIPTORS:
         m_MIR.GetDescription(m_InBuffer, m_Desc);
+        m_MDP.SetDescription(m_Desc);
         break;
     }
 

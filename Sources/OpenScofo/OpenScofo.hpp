@@ -64,7 +64,7 @@ class OpenScofo {
     double GetdBValue();
     EventActions GetEventActions(int Index);
     std::string GetLuaCode();
-    double GetPitchProb(double f);
+    double GetPitchProb(double Freq);
     States &GetStates();
     PitchTemplateArray GetPitchTemplate(double Freq);
     std::vector<double> GetSpectrumPower() const;
