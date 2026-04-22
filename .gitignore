@@ -95,7 +95,8 @@ Resources/Extended-Techniques-Random-Tests/*.wav
 Resources/Extended-Techniques-Random-Tests/*.txt
 Resources/Extended-Techniques-Random-Tests/*.svg
 
-OpenScofo
+OpenScofo/
+!/Sources/OpenScofo/
 site
 dist
 
