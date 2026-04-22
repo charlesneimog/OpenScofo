@@ -1,360 +1,800 @@
 #!/usr/bin/env python3
 """
-Extended Techniques Benchmark for OpenScofo
-Validação de implementações com persistência e comparação automática
+Extended Techniques Benchmark for OpenScofo.
+
+Evaluation follows the protocol described in Cont (Section 8.2) and MIREX
+score-following campaigns:
+
+- Missed note:
+  - reference event not detected, or
+  - detected but |offset| > tolerance.
+- False positive:
+  - misaligned event (|offset| > tolerance), and counted as part of misses.
+- Offset statistics:
+  - mean absolute offset, mean signed offset, standard deviation.
+- Precision metrics:
+  - piecewise precision = mean_i((N_ref_i - N_miss_i) / N_ref_i)
+  - overall precision = (sum_i N_ref_i - sum_i N_miss_i) / sum_i N_ref_i
+
+Latency is fixed to zero because this benchmark runs in strict online mode.
 """
 
-import os
-import json
+import argparse
 import hashlib
+import json
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Dict
-import numpy as np
-from scipy import stats
+from typing import Dict, List, Optional, Tuple
+
 import librosa
+import numpy as np
 import OpenScofo
 
 os.chdir(os.path.dirname(__file__))
 
 # ============================================================================
-# CONFIGURAÇÃO GLOBAL
+# GLOBAL CONFIGURATION
 # ============================================================================
 SR = 48000
 FFT = 2048
-HOP = 512
+HOP = 256
 
-# Caminhos dos arquivos de teste
 TEST_FILES = [
     {"audio": "./score-1.wav", "score": "./score-1.txt"},
     {"audio": "./score-2.wav", "score": "./score-2.txt"},
     {"audio": "./score-3.wav", "score": "./score-3.txt"},
+    {"audio": "./score-4.wav", "score": "./score-4.txt"},
+    {"audio": "./score-5.wav", "score": "./score-5.txt"},
+    {"audio": "./score-6.wav", "score": "./score-6.txt"},
+    {"audio": "./score-7.wav", "score": "./score-7.txt"},
+    {"audio": "./score-8.wav", "score": "./score-8.txt"},
+    {"audio": "./score-9.wav", "score": "./score-9.txt"},
+    {"audio": "./score-10.wav", "score": "./score-10.txt"},
+    {"audio": "./score-11.wav", "score": "./score-11.txt"},
+    {"audio": "./score-12.wav", "score": "./score-12.txt"},
+    {"audio": "./score-13.wav", "score": "./score-13.txt"},
+    {"audio": "./score-14.wav", "score": "./score-14.txt"},
+    {"audio": "./score-15.wav", "score": "./score-15.txt"},
+    {"audio": "./score-16.wav", "score": "./score-16.txt"},
+    {"audio": "./score-17.wav", "score": "./score-17.txt"},
+    {"audio": "./score-18.wav", "score": "./score-18.txt"},
+    {"audio": "./score-19.wav", "score": "./score-19.txt"},
+    {"audio": "./score-20.wav", "score": "./score-20.txt"},
 ]
 
 RESULTS_PATH = "follower_validation.json"
-EPSILON = 1e-6  # Tolerância para considerar scores iguais
+RESULT_FILES_DIR = "mirex_results"
+
+PROTOCOL_TOLERANCE_MS = {
+    "cont-8.2": 250.0,
+    "mirex-2006": 2000.0,
+}
+DEFAULT_PROTOCOL = "cont-8.2"
+ONLINE_LATENCY_MS = 0.0
 
 
-# ============================================================================
-# CLASSE VALIDADORA
-# ============================================================================
 class ScoreFollowerValidator:
-    def __init__(self, results_path: str = RESULTS_PATH):
+    """Compute and persist protocol-based evaluation metrics."""
+
+    def __init__(
+        self,
+        results_path: str,
+        protocol_name: str,
+        tolerance_ms: float,
+    ):
         self.results_path = Path(results_path)
-        self.current_results = None
-        self.previous_results = None
+        self.protocol_name = protocol_name
+        self.tolerance_ms = float(tolerance_ms)
 
-    def compute_metrics(self, events: List[Tuple]) -> Dict:
-        """Compute comprehensive metrics beyond simple mean/std"""
-        if not events:
-            return {"error": "no_events", "composite_score": float("inf")}
+    def resolve_implementation_name(self, implementation_name: Optional[str]) -> str:
+        """Normalize implementation name used for summary and persistence."""
+        if implementation_name:
+            return implementation_name
+        return f"impl_{self.hash_implementation()}"
 
-        errors = np.array([e[3] for e in events])  # em segundos
-        abs_errors = np.abs(errors)
-
-        # Métricas básicas
-        metrics = {
-            "n_events": len(events),
-            "mean_error_ms": float(np.mean(errors) * 1000),
-            "std_error_ms": float(np.std(errors) * 1000),
-            "mae_ms": float(np.mean(abs_errors) * 1000),
-            "median_error_ms": float(np.median(errors) * 1000),
-            "median_absolute_error_ms": float(np.median(abs_errors) * 1000),
-            "rmse_ms": float(np.sqrt(np.mean(errors**2)) * 1000),
-            "percentile_95_abs_ms": float(np.percentile(abs_errors, 95) * 1000),
-            "percentile_99_abs_ms": float(np.percentile(abs_errors, 99) * 1000),
-        }
-
-        # Assimetria do erro
-        negative_errors = errors[errors < 0]
-        positive_errors = errors[errors > 0]
-
-        metrics["bias_ms"] = float(np.mean(errors) * 1000)
-        metrics["negative_bias_ms"] = (
-            float(np.mean(negative_errors) * 1000) if len(negative_errors) > 0 else 0
-        )
-        metrics["positive_bias_ms"] = (
-            float(np.mean(positive_errors) * 1000) if len(positive_errors) > 0 else 0
-        )
-        metrics["ratio_negative"] = float(len(negative_errors) / len(errors))
-
-        # Detecção de outliers catastróficos
-        if len(errors) > 3:
-            q75, q25 = np.percentile(abs_errors, 75), np.percentile(abs_errors, 25)
-            iqr = q75 - q25
-            if iqr > 0:
-                outliers = abs_errors > (q75 + 1.5 * iqr)
-                metrics["outlier_ratio"] = float(np.sum(outliers) / len(errors))
-            else:
-                metrics["outlier_ratio"] = 0.0
-        else:
-            metrics["outlier_ratio"] = 0.0
-
-        # Score composto (menor = melhor)
-        normalized_mae = min(metrics["mae_ms"] / 100.0, 2.0)
-        normalized_outliers = min(metrics["outlier_ratio"] * 10, 2.0)
-        normalized_bias = min(abs(metrics["bias_ms"]) / 50.0, 1.0)
-
-        metrics["composite_score"] = (
-            0.5 * normalized_mae + 0.3 * normalized_outliers + 0.2 * normalized_bias
-        )
-
-        return metrics
-
-    def hash_implementation(self) -> str:
-        """Create hash of the compiled OpenScofo module"""
+    @staticmethod
+    def hash_implementation() -> str:
+        """Create a short hash for the currently loaded OpenScofo module."""
         try:
-            import OpenScofo
-
             module_path = Path(OpenScofo.__file__)
             if module_path.exists():
-                with open(module_path, "rb") as f:
-                    content = f.read()
-                    return hashlib.sha256(content).hexdigest()[:8]
-        except:
+                with open(module_path, "rb") as handle:
+                    return hashlib.sha256(handle.read()).hexdigest()[:8]
+        except Exception:
             pass
 
-        # Fallback: timestamp da última execução
-        return hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:8]
+        return hashlib.sha256(str(datetime.now()).encode("utf-8")).hexdigest()[:8]
 
-    def save_results(
+    def compute_piece_metrics(
         self,
-        events: List[Tuple],
-        audio_file: str,
-        score_file: str,
-        implementation_name: str = None,
-    ):
-        """Save results with comparison logic"""
-        metrics = self.compute_metrics(events)
+        detected_events: List[Tuple[int, float]],
+        expected_times: Dict[int, float],
+    ) -> Dict:
+        """
+        Compute per-piece metrics according to the protocol.
 
-        if implementation_name is None:
-            impl_hash = self.hash_implementation()
-            implementation_name = f"impl_{impl_hash}"
+        detected_events: list of tuples (score_pos, detected_time_seconds)
+        expected_times: map score_pos -> reference_time_seconds
+        """
+        detected_by_pos: Dict[int, List[float]] = {}
+        for pos, detected_time in detected_events:
+            detected_by_pos.setdefault(pos, []).append(float(detected_time))
 
-        result_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "implementation": implementation_name,
-            "audio_file": audio_file,
-            "score_file": score_file,
-            "metrics": metrics,
-            "n_events": len(events),
+        expected_positions = set(expected_times.keys())
+
+        missed_positions: List[int] = []
+        misaligned_positions: List[int] = []
+        matched_offsets_ms: List[float] = []
+
+        for pos in sorted(expected_positions):
+            reference_time = expected_times[pos]
+            candidate_detections = detected_by_pos.get(pos, [])
+
+            if not candidate_detections:
+                missed_positions.append(pos)
+                continue
+
+            best_detection = min(
+                candidate_detections,
+                key=lambda value: abs(value - reference_time),
+            )
+            offset_ms = float((best_detection - reference_time) * 1000.0)
+
+            if abs(offset_ms) > self.tolerance_ms:
+                missed_positions.append(pos)
+                misaligned_positions.append(pos)
+            else:
+                matched_offsets_ms.append(offset_ms)
+
+        unexpected_positions = sorted(set(detected_by_pos.keys()) - expected_positions)
+
+        n_reference = len(expected_positions)
+        n_missed = len(missed_positions)
+        n_false_positives = len(misaligned_positions)
+        n_matched = n_reference - n_missed
+
+        precision = (n_matched / n_reference) if n_reference > 0 else 0.0
+
+        if matched_offsets_ms:
+            offsets = np.array(matched_offsets_ms, dtype=float)
+            mean_abs_offset_ms = float(np.mean(np.abs(offsets)))
+            mean_offset_ms = float(np.mean(offsets))
+            std_offset_ms = float(np.std(offsets))
+        else:
+            mean_abs_offset_ms = 0.0
+            mean_offset_ms = 0.0
+            std_offset_ms = 0.0
+
+        return {
+            "reference_events": n_reference,
+            "detected_transitions": len(detected_events),
+            "detected_event_tags": len(detected_by_pos),
+            "matched_events": n_matched,
+            "missed_notes": n_missed,
+            "missed_notes_pct": (
+                float((n_missed / n_reference) * 100.0) if n_reference > 0 else 0.0
+            ),
+            "false_positives": n_false_positives,
+            "unexpected_event_tags": len(unexpected_positions),
+            "precision": float(precision),
+            "precision_pct": float(precision * 100.0),
+            "mean_abs_offset_ms": mean_abs_offset_ms,
+            "mean_offset_ms": mean_offset_ms,
+            "std_offset_ms": std_offset_ms,
+            "latency_ms_mean": ONLINE_LATENCY_MS,
+            "protocol": self.protocol_name,
+            "tolerance_ms": self.tolerance_ms,
+            "missing_positions": missed_positions,
+            "misaligned_positions": misaligned_positions,
+            "unexpected_positions": unexpected_positions,
+            "matched_offsets_ms": matched_offsets_ms,
         }
 
-        # Carregar resultados anteriores
+    def save_run(
+        self,
+        piece_results: List[Dict],
+        global_metrics: Dict,
+        implementation_name: Optional[str] = None,
+    ) -> None:
+        """Persist per-piece history entries and run-level global summary."""
+        if implementation_name is None:
+            implementation_name = f"impl_{self.hash_implementation()}"
+
+        timestamp = datetime.now().isoformat()
+
         if self.results_path.exists():
-            with open(self.results_path, "r") as f:
-                previous_data = json.load(f)
+            with open(self.results_path, "r", encoding="utf-8") as handle:
+                storage = json.load(handle)
         else:
-            previous_data = {"history": [], "best_implementations": {}}
+            storage = {}
 
-        # Adicionar resultado atual
-        previous_data["history"].append(result_entry)
+        history = storage.setdefault("history", [])
+        run_history = storage.setdefault("run_history", [])
 
-        # Rastrear melhor implementação para este arquivo específico
-        if audio_file not in previous_data["best_implementations"]:
-            previous_data["best_implementations"][audio_file] = implementation_name
-            is_better = True
-            is_equal = False
-            comparison_msg = f"📊 Primeira execução para {audio_file} (baseline)"
-        else:
-            best_impl = previous_data["best_implementations"][audio_file]
-            best_metrics = None
+        for piece in piece_results:
+            history.append(
+                {
+                    "timestamp": timestamp,
+                    "implementation": implementation_name,
+                    "protocol": self.protocol_name,
+                    "tolerance_ms": self.tolerance_ms,
+                    "audio_file": piece["audio_file"],
+                    "score_file": piece["score_file"],
+                    "metrics": piece["metrics"],
+                }
+            )
 
-            for entry in previous_data["history"]:
-                if (
-                    entry["implementation"] == best_impl
-                    and entry["audio_file"] == audio_file
-                ):
-                    best_metrics = entry["metrics"]
-                    break
+        run_history.append(
+            {
+                "timestamp": timestamp,
+                "implementation": implementation_name,
+                "protocol": self.protocol_name,
+                "tolerance_ms": self.tolerance_ms,
+                "files_processed": len(piece_results),
+                "global_metrics": global_metrics,
+                "pieces": [
+                    {
+                        "audio_file": piece["audio_file"],
+                        "score_file": piece["score_file"],
+                    }
+                    for piece in piece_results
+                ],
+            }
+        )
 
-            if best_metrics:
-                score_diff = (
-                    metrics["composite_score"] - best_metrics["composite_score"]
-                )
+        storage["schema_version"] = "mirex_cont_v1"
+        storage["last_updated"] = timestamp
 
-                if abs(score_diff) < EPSILON:
-                    # Praticamente igual
-                    is_better = False
-                    is_equal = True
-                    comparison_msg = f"≈ IGUAL (score: {metrics['composite_score']:.3f} vs {best_metrics['composite_score']:.3f})"
-                elif metrics["composite_score"] < best_metrics["composite_score"]:
-                    is_better = True
-                    is_equal = False
-                    previous_data["best_implementations"][
-                        audio_file
-                    ] = implementation_name
-                    comparison_msg = f"✓ MELHOR (score: {metrics['composite_score']:.3f} vs {best_metrics['composite_score']:.3f} [-{score_diff:.3f}])"
-                else:
-                    is_better = False
-                    is_equal = False
-                    comparison_msg = f"✗ PIOR (score: {metrics['composite_score']:.3f} vs {best_metrics['composite_score']:.3f} [+{abs(score_diff):.3f}])"
-            else:
-                is_better = True
-                is_equal = False
-                comparison_msg = f"📊 Primeira referência para {audio_file}"
+        with open(self.results_path, "w", encoding="utf-8") as handle:
+            json.dump(storage, handle, indent=2)
 
-            print(f"\n--- COMPARAÇÃO para {Path(audio_file).name} ---")
-            print(comparison_msg)
-            if best_metrics:
-                print(
-                    f"  MAE: {metrics['mae_ms']:.2f}ms vs {best_metrics['mae_ms']:.2f}ms"
-                )
-                print(
-                    f"  Outliers: {metrics['outlier_ratio']:.2%} vs {best_metrics['outlier_ratio']:.2%}"
-                )
-                print(
-                    f"  Bias: {metrics['bias_ms']:+.2f}ms vs {best_metrics['bias_ms']:+.2f}ms"
-                )
-
-        # Salvar
-        with open(self.results_path, "w") as f:
-            json.dump(previous_data, f, indent=2)
-
-        print(f"\nResultados salvos em {self.results_path}")
-        return is_better
+        print(f"\nResults saved to {self.results_path}")
 
 
-# ============================================================================
-# FUNÇÃO PRINCIPAL DE PROCESSAMENTO
-# ============================================================================
-def process_audio_file(audio_path: str, score_path: str) -> List[Tuple]:
+def write_result_file(
+    output_path: Path,
+    detected_events: List[Tuple[int, float]],
+    expected_times: Dict[int, float],
+) -> None:
     """
-    Processa um arquivo de áudio com o OpenScofo e retorna eventos detectados
-    Returns: List of (score_pos, detected_time, expected_time, error)
+    Write MIREX-style ASCII output with four columns:
+    1) estimated onset time in performance [ms]
+    2) detection time [ms]
+    3) score start time [ms] (used as event identifier)
+    4) score position integer
     """
-    print(f"\n--- Processando {audio_path} ---")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load audio
-    x, sr = librosa.load(audio_path, sr=SR)
+    lines: List[str] = []
+    for pos, detected_time in detected_events:
+        onset_ms = detected_time * 1000.0
+        detection_ms = detected_time * 1000.0
+        score_ms = expected_times.get(pos, -1.0) * 1000.0
+        lines.append(f"{onset_ms:.3f} {detection_ms:.3f} {score_ms:.3f} {pos}")
 
-    # Init Scofo
+    output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+
+def process_audio_file(
+    audio_path: str,
+    score_path: str,
+) -> Tuple[List[Tuple[int, float]], Dict[int, float]]:
+    """
+    Process one audio file with OpenScofo.
+
+    Returns:
+        detected_events: list[(score_pos, detected_time_seconds)]
+        expected_times: dict[score_pos] = reference_time_seconds
+    """
+    print(f"\n--- Processing {audio_path} ---")
+
+    # Load audio at benchmark sample rate.
+    audio, _ = librosa.load(audio_path, sr=SR)
+
+    #audio = audio * 2
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     scofo.parse_score(Path(score_path))
 
-    states = scofo.get_states()
-
-    # Map score_pos -> expected onset time
-    score_pos_to_expected = {}
-    for s in states:
-        if hasattr(s, "score_pos") and hasattr(s, "onset_expected"):
-            score_pos_to_expected[s.score_pos] = s.onset_expected
-
-    # Process
-    n = len(x)
-    prev_pos = None
-    events = []
-
-    for frame_idx, start in enumerate(range(0, n, HOP)):
-        end = start + HOP
-
-        if end <= n:
-            frame = x[start:end]
-        else:
-            frame = np.zeros(FFT, dtype=x.dtype)
-            valid = n - start
-            if valid > 0:
-                frame[:valid] = x[start:n]
-
-        scofo.process_block(frame)
-        pos = scofo.get_current_score_position()
-
-        if pos < 0:
+    # Build reference tag -> time map from parser states.
+    expected_times: Dict[int, float] = {}
+    for state in scofo.get_states():
+        if not hasattr(state, "score_pos") or not hasattr(state, "onset_expected"):
+            continue
+        try:
+            pos = int(state.score_pos)
+            expected_times[pos] = float(state.onset_expected)
+        except (TypeError, ValueError):
             continue
 
-        if pos != prev_pos:
-            t_det = start / SR
-            t_exp = score_pos_to_expected.get(pos, None)
+    n_samples = len(audio)
+    prev_pos: Optional[int] = None
+    detected_events: List[Tuple[int, float]] = []
 
-            if t_exp is not None:
-                err = t_det - t_exp
-                events.append((pos, t_det, t_exp, err))
+    for start in range(0, n_samples, 64):
+        end = min(start + 64, n_samples)
+        frame = np.zeros(64, dtype=audio.dtype)
+        valid = end - start
+        if valid > 0:
+            frame[:valid] = audio[start:end]
 
-                print(
-                    f"pos={pos:03d}  det={t_det:8.3f}s  exp={t_exp:8.3f}s  err={err*1000:+8.2f} ms"
-                )
+        scofo.process_block(frame)
+        pos = int(scofo.get_current_score_position())
 
-            prev_pos = pos
+        if pos < 0 or pos == prev_pos:
+            continue
 
-    print(f"Total eventos detectados: {len(events)}")
-    return events
+        detected_time = start / SR
+        detected_events.append((pos, detected_time))
 
-
-# ============================================================================
-# MAIN
-# ============================================================================
-def main():
-    print("=" * 60)
-    print("EXTENDED TECHNIQUES BENCHMARK - OpenScofo")
-    print("=" * 60)
-
-    # Mostrar versão do módulo compilado
-    try:
-        if hasattr(OpenScofo, "__file__"):
-            module_time = Path(OpenScofo.__file__).stat().st_mtime
-            print(f"Módulo OpenScofo: {Path(OpenScofo.__file__).name}")
+        reference_time = expected_times.get(pos)
+        if reference_time is None:
             print(
-                f"Última modificação: {datetime.fromtimestamp(module_time).strftime('%Y-%m-%d %H:%M:%S')}"
+                f"pos={pos:03d}  det={detected_time:8.3f}s  ref=   N/A   offset=   N/A"
             )
-    except:
+        else:
+            offset_ms = (detected_time - reference_time) * 1000.0
+            print(
+                f"pos={pos:03d}  det={detected_time:8.3f}s  "
+                f"ref={reference_time:8.3f}s  offset={offset_ms:+8.2f} ms"
+            )
+
+        prev_pos = pos
+
+    detected_positions = {position for position, _ in detected_events}
+    expected_positions = set(expected_times.keys())
+    not_reported = expected_positions - detected_positions
+    unexpected = detected_positions - expected_positions
+
+    print(f"Detected transitions: {len(detected_events)}")
+    print(f"Reference events: {len(expected_positions)}")
+    print(
+        f"Reference tags with no detection: {len(not_reported)}"
+        if not_reported
+        else "Reference tags with no detection: 0"
+    )
+    print(
+        f"Unexpected detected tags: {len(unexpected)}"
+        if unexpected
+        else "Unexpected detected tags: 0"
+    )
+
+    return detected_events, expected_times
+
+
+def compute_global_metrics(piece_results: List[Dict]) -> Dict:
+    """Compute global metrics over all processed files."""
+    if not piece_results:
+        return {
+            "files_processed": 0,
+            "total_reference_events": 0,
+            "total_missed_notes": 0,
+            "total_false_positives": 0,
+            "overall_precision": 0.0,
+            "overall_precision_pct": 0.0,
+            "piecewise_precision": 0.0,
+            "piecewise_precision_pct": 0.0,
+            "global_mean_abs_offset_ms": 0.0,
+            "piecewise_mean_abs_offset_ms": 0.0,
+            "global_mean_offset_ms": 0.0,
+            "global_std_offset_ms": 0.0,
+            "average_latency_ms": ONLINE_LATENCY_MS,
+        }
+
+    total_reference_events = sum(
+        piece["metrics"]["reference_events"] for piece in piece_results
+    )
+    total_missed_notes = sum(
+        piece["metrics"]["missed_notes"] for piece in piece_results
+    )
+    total_false_positives = sum(
+        piece["metrics"]["false_positives"] for piece in piece_results
+    )
+
+    overall_precision = (
+        (total_reference_events - total_missed_notes) / total_reference_events
+        if total_reference_events > 0
+        else 0.0
+    )
+
+    piecewise_precision_values = [
+        piece["metrics"]["precision"] for piece in piece_results
+    ]
+    piecewise_precision = (
+        float(np.mean(piecewise_precision_values))
+        if piecewise_precision_values
+        else 0.0
+    )
+
+    all_offsets: List[float] = []
+    piecewise_abs_offsets: List[float] = []
+
+    for piece in piece_results:
+        metrics = piece["metrics"]
+        all_offsets.extend(metrics.get("matched_offsets_ms", []))
+        if metrics.get("matched_events", 0) > 0:
+            piecewise_abs_offsets.append(metrics["mean_abs_offset_ms"])
+
+    if all_offsets:
+        offsets = np.array(all_offsets, dtype=float)
+        global_mean_abs_offset_ms = float(np.mean(np.abs(offsets)))
+        global_mean_offset_ms = float(np.mean(offsets))
+        global_std_offset_ms = float(np.std(offsets))
+    else:
+        global_mean_abs_offset_ms = 0.0
+        global_mean_offset_ms = 0.0
+        global_std_offset_ms = 0.0
+
+    piecewise_mean_abs_offset_ms = (
+        float(np.mean(piecewise_abs_offsets)) if piecewise_abs_offsets else 0.0
+    )
+
+    return {
+        "files_processed": len(piece_results),
+        "total_reference_events": int(total_reference_events),
+        "total_missed_notes": int(total_missed_notes),
+        "total_false_positives": int(total_false_positives),
+        "overall_precision": float(overall_precision),
+        "overall_precision_pct": float(overall_precision * 100.0),
+        "piecewise_precision": float(piecewise_precision),
+        "piecewise_precision_pct": float(piecewise_precision * 100.0),
+        "global_mean_abs_offset_ms": global_mean_abs_offset_ms,
+        "piecewise_mean_abs_offset_ms": piecewise_mean_abs_offset_ms,
+        "global_mean_offset_ms": global_mean_offset_ms,
+        "global_std_offset_ms": global_std_offset_ms,
+        "average_latency_ms": ONLINE_LATENCY_MS,
+    }
+
+
+def load_run_history(results_path: Path) -> List[Dict]:
+    """Load previously stored run history entries from results JSON."""
+    if not results_path.exists():
+        return []
+
+    try:
+        with open(results_path, "r", encoding="utf-8") as handle:
+            storage = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    run_history = storage.get("run_history", [])
+    if not isinstance(run_history, list):
+        return []
+
+    return [entry for entry in run_history if isinstance(entry, dict)]
+
+
+def _as_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def select_best_run(
+    run_history: List[Dict],
+    protocol_name: str,
+    tolerance_ms: float,
+    files_processed: int,
+) -> Tuple[Optional[Dict], str]:
+    """Select best run, preferring same protocol/tolerance and file coverage."""
+    runs_with_metrics = [
+        run for run in run_history if isinstance(run.get("global_metrics"), dict)
+    ]
+    if not runs_with_metrics:
+        return None, "no-history"
+
+    def same_tolerance(run: Dict) -> bool:
+        return abs(_as_float(run.get("tolerance_ms"), tolerance_ms) - tolerance_ms) < 1e-9
+
+    exact_scope = [
+        run
+        for run in runs_with_metrics
+        if run.get("protocol") == protocol_name
+        and same_tolerance(run)
+        and _as_int(run.get("files_processed"), -1) == files_processed
+    ]
+
+    protocol_scope = [
+        run
+        for run in runs_with_metrics
+        if run.get("protocol") == protocol_name and same_tolerance(run)
+    ]
+
+    if exact_scope:
+        candidates = exact_scope
+        scope_label = "same protocol, same tolerance, same files processed"
+    elif protocol_scope:
+        candidates = protocol_scope
+        scope_label = "same protocol and tolerance"
+    else:
+        candidates = runs_with_metrics
+        scope_label = "all recorded runs"
+
+    def run_rank_key(run: Dict) -> Tuple[float, float, float, int, str]:
+        metrics = run.get("global_metrics", {})
+        overall_precision = _as_float(metrics.get("overall_precision"), 0.0)
+        mean_abs_offset = _as_float(metrics.get("global_mean_abs_offset_ms"), float("inf"))
+        missed_notes = _as_float(metrics.get("total_missed_notes"), float("inf"))
+        processed = _as_int(run.get("files_processed"), 0)
+        timestamp = str(run.get("timestamp", ""))
+
+        # Higher precision is better; lower offset/missed are better.
+        return (
+            overall_precision,
+            -mean_abs_offset,
+            -missed_notes,
+            processed,
+            timestamp,
+        )
+
+    return max(candidates, key=run_rank_key), scope_label
+
+
+def compare_runs(current_metrics: Dict, best_metrics: Dict) -> Dict:
+    """Build numeric deltas for current run against best run."""
+    return {
+        "delta_mean_abs_offset_ms": _as_float(
+            current_metrics.get("global_mean_abs_offset_ms"), 0.0
+        )
+        - _as_float(best_metrics.get("global_mean_abs_offset_ms"), 0.0),
+        "delta_mean_offset_ms": _as_float(current_metrics.get("global_mean_offset_ms"), 0.0)
+        - _as_float(best_metrics.get("global_mean_offset_ms"), 0.0),
+        "delta_std_offset_ms": _as_float(current_metrics.get("global_std_offset_ms"), 0.0)
+        - _as_float(best_metrics.get("global_std_offset_ms"), 0.0),
+        "delta_missed_notes": _as_int(current_metrics.get("total_missed_notes"), 0)
+        - _as_int(best_metrics.get("total_missed_notes"), 0),
+        "delta_false_positives": _as_int(current_metrics.get("total_false_positives"), 0)
+        - _as_int(best_metrics.get("total_false_positives"), 0),
+    }
+
+
+def format_percent_vs_best(current_pct: float, best_pct: float) -> str:
+    """Format precision comparison as relative percent better/worse."""
+    if abs(current_pct - best_pct) < 1e-12:
+        return (
+            f"matches best (current={current_pct:.2f}%, best={best_pct:.2f}%)"
+        )
+
+    if best_pct <= 0.0:
+        if current_pct > 0.0:
+            return (
+                "is above a zero best baseline "
+                f"(current={current_pct:.2f}%, best={best_pct:.2f}%)"
+            )
+        return (
+            "cannot be compared against zero best baseline "
+            f"(current={current_pct:.2f}%, best={best_pct:.2f}%)"
+        )
+
+    relative = abs((current_pct - best_pct) / best_pct * 100.0)
+    relation = "better" if current_pct > best_pct else "worse"
+    of_best = (current_pct / best_pct) * 100.0
+
+    return (
+        f"is {relative:.2f}% {relation} than best "
+        f"({of_best:.2f}% of best, current={current_pct:.2f}%, best={best_pct:.2f}%)"
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Evaluate OpenScofo alignment following Cont/MIREX metrics."
+    )
+    parser.add_argument(
+        "--protocol",
+        choices=sorted(PROTOCOL_TOLERANCE_MS.keys()),
+        default=DEFAULT_PROTOCOL,
+        help="Evaluation protocol. Defines default miss tolerance.",
+    )
+    parser.add_argument(
+        "--tolerance-ms",
+        type=float,
+        default=None,
+        help="Override tolerance (ms). If omitted, protocol default is used.",
+    )
+    parser.add_argument(
+        "--results-path",
+        default=RESULTS_PATH,
+        help="JSON file where piece history and run summaries are stored.",
+    )
+    parser.add_argument(
+        "--implementation-name",
+        default=None,
+        help="Optional implementation label. Defaults to OpenScofo hash.",
+    )
+    parser.add_argument(
+        "--write-result-files",
+        action="store_true",
+        help="Write MIREX-style ASCII output files for each processed piece.",
+    )
+    parser.add_argument(
+        "--result-files-dir",
+        default=RESULT_FILES_DIR,
+        help="Directory for per-piece MIREX-style ASCII result files.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    tolerance_ms = (
+        float(args.tolerance_ms)
+        if args.tolerance_ms is not None
+        else PROTOCOL_TOLERANCE_MS[args.protocol]
+    )
+
+    print("=" * 72)
+    print("EXTENDED TECHNIQUES BENCHMARK - MIREX/CONT PROTOCOL")
+    print("=" * 72)
+    print(f"Protocol: {args.protocol}")
+    print(f"Missing/misaligned tolerance: {tolerance_ms:.1f} ms")
+    print("Missed = no event or |offset| > tolerance")
+    print("False positive = misaligned event (subset of misses)")
+    print("Latency metric fixed to zero (strict online)")
+    print()
+
+    try:
+        module_time = Path(OpenScofo.__file__).stat().st_mtime
+        print(f"OpenScofo module: {Path(OpenScofo.__file__).name}")
+        print(
+            "Last modified: "
+            f"{datetime.fromtimestamp(module_time).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+    except Exception:
         pass
     print()
 
-    validator = ScoreFollowerValidator(RESULTS_PATH)
+    validator = ScoreFollowerValidator(
+        results_path=args.results_path,
+        protocol_name=args.protocol,
+        tolerance_ms=tolerance_ms,
+    )
 
-    # Processar cada arquivo de teste
-    all_results = []
+    piece_results: List[Dict] = []
 
     for test_file in TEST_FILES:
         audio_path = test_file["audio"]
         score_path = test_file["score"]
 
-        # Verificar se arquivos existem
         if not Path(audio_path).exists():
-            print(f"⚠️ Arquivo não encontrado: {audio_path}")
+            print(f"[WARN] Missing file: {audio_path}")
             continue
-
         if not Path(score_path).exists():
-            print(f"⚠️ Arquivo não encontrado: {score_path}")
+            print(f"[WARN] Missing file: {score_path}")
             continue
 
-        # Processar
-        events = process_audio_file(audio_path, score_path)
+        detected_events, expected_times = process_audio_file(audio_path, score_path)
+        metrics = validator.compute_piece_metrics(detected_events, expected_times)
 
-        if events:
-            is_better = validator.save_results(events, audio_path, score_path)
-            all_results.append(
-                {"file": audio_path, "is_better": is_better, "n_events": len(events)}
-            )
-        else:
-            print(f"❌ Nenhum evento detectado em {audio_path}")
+        piece_results.append(
+            {
+                "audio_file": audio_path,
+                "score_file": score_path,
+                "metrics": metrics,
+            }
+        )
 
-    # Sumário final
-    print("\n" + "=" * 60)
-    print("RESUMO DA VALIDAÇÃO")
-    print("=" * 60)
+        if args.write_result_files:
+            result_name = f"{Path(audio_path).stem}.result.txt"
+            output_path = Path(args.result_files_dir) / result_name
+            write_result_file(output_path, detected_events, expected_times)
+            print(f"Result file written: {output_path}")
 
-    if not all_results:
-        print("❌ Nenhum arquivo processado com sucesso")
+        print(
+            "Piece metrics: "
+            f"ref={metrics['reference_events']}  "
+            f"missed={metrics['missed_notes']}  "
+            f"fp={metrics['false_positives']}  "
+            f"precision={metrics['precision_pct']:.2f}%  "
+            f"mean|offset|={metrics['mean_abs_offset_ms']:.2f} ms  "
+            f"mean={metrics['mean_offset_ms']:.2f} ms  "
+            f"std={metrics['std_offset_ms']:.2f} ms"
+        )
+
+    print("\n" + "=" * 72)
+    print("GLOBAL SUMMARY")
+    print("=" * 72)
+
+    if not piece_results:
+        print("No file was processed successfully.")
         return
 
-    better_count = sum(1 for r in all_results if r["is_better"])
-    total = len(all_results)
+    global_metrics = compute_global_metrics(piece_results)
+    current_implementation = validator.resolve_implementation_name(
+        args.implementation_name
+    )
+    current_run = {
+        "timestamp": datetime.now().isoformat(),
+        "implementation": current_implementation,
+        "protocol": args.protocol,
+        "tolerance_ms": tolerance_ms,
+        "files_processed": len(piece_results),
+        "global_metrics": global_metrics,
+    }
+    historical_runs = load_run_history(Path(args.results_path))
+    best_run, best_scope = select_best_run(
+        run_history=historical_runs + [current_run],
+        protocol_name=args.protocol,
+        tolerance_ms=tolerance_ms,
+        files_processed=len(piece_results),
+    )
 
-    print(f"Arquivos testados: {total}")
-    print(f"Melhorias detectadas: {better_count}/{total}")
-    print(f"Piores ou iguais: {total - better_count}/{total}")
+    print(f"Files processed: {global_metrics['files_processed']}")
+    print(f"Total reference events: {global_metrics['total_reference_events']}")
+    print(f"Total missed notes: {global_metrics['total_missed_notes']}")
+    print(f"Total false positives: {global_metrics['total_false_positives']}")
+    print(f"Overall precision: {global_metrics['overall_precision_pct']:.2f}%")
+    print(f"Piecewise precision: {global_metrics['piecewise_precision_pct']:.2f}%")
+    print(
+        "Global mean absolute offset: "
+        f"{global_metrics['global_mean_abs_offset_ms']:.2f} ms"
+    )
+    print(
+        "Piecewise mean absolute offset: "
+        f"{global_metrics['piecewise_mean_abs_offset_ms']:.2f} ms"
+    )
+    print(f"Global mean offset: {global_metrics['global_mean_offset_ms']:.2f} ms")
+    print(f"Global offset std: {global_metrics['global_std_offset_ms']:.2f} ms")
+    print(f"Average latency: {global_metrics['average_latency_ms']:.2f} ms")
 
-    if better_count == total:
-        print("\n✅ IMPLEMENTAÇÃO APROVADA - Melhor em TODOS os testes")
-    elif better_count > total / 2:
-        print("\n✅ IMPLEMENTAÇÃO APROVADA - Melhor na maioria dos testes")
-    elif better_count == 0:
-        print("\n≈ IMPLEMENTAÇÃO EQUIVALENTE - Sem diferença significativa")
-        print("   As mudanças não afetaram a performance (positiva ou negativamente)")
-    else:
-        print("\n⚠️ RESULTADO INCONCLUSIVO - Mais testes necessários")
+    if best_run is not None:
+        best_metrics = best_run["global_metrics"]
+        comparison = compare_runs(global_metrics, best_metrics)
+        overall_precision_cmp = format_percent_vs_best(
+            _as_float(global_metrics.get("overall_precision_pct"), 0.0),
+            _as_float(best_metrics.get("overall_precision_pct"), 0.0),
+        )
+        piecewise_precision_cmp = format_percent_vs_best(
+            _as_float(global_metrics.get("piecewise_precision_pct"), 0.0),
+            _as_float(best_metrics.get("piecewise_precision_pct"), 0.0),
+        )
+        best_impl = str(best_run.get("implementation", "unknown"))
+        best_time = str(best_run.get("timestamp", "N/A"))
+
+        print("\n" + "-" * 72)
+        print("BEST IMPLEMENTATION")
+        print("-" * 72)
+        print(f"Comparison scope: {best_scope}")
+        print(f"Best implementation: {best_impl}")
+        print(f"Best run timestamp: {best_time}")
+        print(
+            "Best metrics: "
+            f"overall_precision={_as_float(best_metrics.get('overall_precision_pct')):.2f}%  "
+            f"piecewise_precision={_as_float(best_metrics.get('piecewise_precision_pct')):.2f}%  "
+            f"mean|offset|={_as_float(best_metrics.get('global_mean_abs_offset_ms')):.2f} ms  "
+            f"missed={_as_int(best_metrics.get('total_missed_notes'))}  "
+            f"fp={_as_int(best_metrics.get('total_false_positives'))}"
+        )
+
+        print("\nCurrent vs best:")
+        print(f"Current implementation: {current_implementation}")
+        print(f"Best implementation: {best_impl}")
+        print(f"Overall precision: current {overall_precision_cmp}")
+        print(f"Piecewise precision: current {piecewise_precision_cmp}")
+        print(
+            f"Delta mean absolute offset: {comparison['delta_mean_abs_offset_ms']:+.2f} ms"
+        )
+        print(f"Delta mean offset: {comparison['delta_mean_offset_ms']:+.2f} ms")
+        print(f"Delta offset std: {comparison['delta_std_offset_ms']:+.2f} ms")
+        print(f"Delta missed notes: {comparison['delta_missed_notes']:+d}")
+        print(f"Delta false positives: {comparison['delta_false_positives']:+d}")
+
+    validator.save_run(
+        piece_results=piece_results,
+        global_metrics=global_metrics,
+        implementation_name=current_implementation,
+    )
 
 
 if __name__ == "__main__":
     main()
+
