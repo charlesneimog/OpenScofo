@@ -292,7 +292,7 @@ def process_audio_file(
     # Load audio at benchmark sample rate.
     audio, _ = librosa.load(audio_path, sr=SR)
 
-    #audio = audio * 2
+    # audio = audio * 2
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     scofo.parse_score(Path(score_path))
 
@@ -492,7 +492,9 @@ def select_best_run(
         return None, "no-history"
 
     def same_tolerance(run: Dict) -> bool:
-        return abs(_as_float(run.get("tolerance_ms"), tolerance_ms) - tolerance_ms) < 1e-9
+        return (
+            abs(_as_float(run.get("tolerance_ms"), tolerance_ms) - tolerance_ms) < 1e-9
+        )
 
     exact_scope = [
         run
@@ -521,7 +523,9 @@ def select_best_run(
     def run_rank_key(run: Dict) -> Tuple[float, float, float, int, str]:
         metrics = run.get("global_metrics", {})
         overall_precision = _as_float(metrics.get("overall_precision"), 0.0)
-        mean_abs_offset = _as_float(metrics.get("global_mean_abs_offset_ms"), float("inf"))
+        mean_abs_offset = _as_float(
+            metrics.get("global_mean_abs_offset_ms"), float("inf")
+        )
         missed_notes = _as_float(metrics.get("total_missed_notes"), float("inf"))
         processed = _as_int(run.get("files_processed"), 0)
         timestamp = str(run.get("timestamp", ""))
@@ -545,13 +549,19 @@ def compare_runs(current_metrics: Dict, best_metrics: Dict) -> Dict:
             current_metrics.get("global_mean_abs_offset_ms"), 0.0
         )
         - _as_float(best_metrics.get("global_mean_abs_offset_ms"), 0.0),
-        "delta_mean_offset_ms": _as_float(current_metrics.get("global_mean_offset_ms"), 0.0)
+        "delta_mean_offset_ms": _as_float(
+            current_metrics.get("global_mean_offset_ms"), 0.0
+        )
         - _as_float(best_metrics.get("global_mean_offset_ms"), 0.0),
-        "delta_std_offset_ms": _as_float(current_metrics.get("global_std_offset_ms"), 0.0)
+        "delta_std_offset_ms": _as_float(
+            current_metrics.get("global_std_offset_ms"), 0.0
+        )
         - _as_float(best_metrics.get("global_std_offset_ms"), 0.0),
         "delta_missed_notes": _as_int(current_metrics.get("total_missed_notes"), 0)
         - _as_int(best_metrics.get("total_missed_notes"), 0),
-        "delta_false_positives": _as_int(current_metrics.get("total_false_positives"), 0)
+        "delta_false_positives": _as_int(
+            current_metrics.get("total_false_positives"), 0
+        )
         - _as_int(best_metrics.get("total_false_positives"), 0),
     }
 
@@ -559,9 +569,7 @@ def compare_runs(current_metrics: Dict, best_metrics: Dict) -> Dict:
 def format_percent_vs_best(current_pct: float, best_pct: float) -> str:
     """Format precision comparison as relative percent better/worse."""
     if abs(current_pct - best_pct) < 1e-12:
-        return (
-            f"matches best (current={current_pct:.2f}%, best={best_pct:.2f}%)"
-        )
+        return f"matches best (current={current_pct:.2f}%, best={best_pct:.2f}%)"
 
     if best_pct <= 0.0:
         if current_pct > 0.0:
@@ -797,4 +805,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
