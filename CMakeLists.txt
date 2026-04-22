@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(OpenScofo VERSION 0.1.7 LANGUAGES C CXX
+project(OpenScofo VERSION 0.2.0 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
@@ -11,8 +11,8 @@ set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
-set(TREE_SITTER_VERSION "v0.26.6")
-add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-a6")
+set(TREE_SITTER_VERSION "v0.26.8")
+add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-a1")
 
 if(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0601)
