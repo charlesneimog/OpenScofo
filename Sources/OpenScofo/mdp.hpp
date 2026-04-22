@@ -28,6 +28,7 @@ class MDP {
     void SetBPM(double Bpm);
     void SetAmplitudeDecay(double decay);
     void SetTunning(double Tunning);
+    void SetDescription(const Description &Desc);
     void SetCurrentEvent(int Event);
     void SetdBTreshold(double dB);
 
