@@ -44,7 +44,7 @@ void run_scofo(OpenScofo::OpenScofo &scofo, const std::vector<double> &samples) 
         if (blockIndex >= SCORE_HOP) {
             blockIndex = 0;
             bool ok = scofo.ProcessBlock(window.data(), 64);
-            int event = scofo.GetEventIndex();
+            int event = scofo.GetCurrentScorePosition();
             if (event != currentEvent) {
                 spdlog::info("Current Event is {}", event);
                 currentEvent = event;
