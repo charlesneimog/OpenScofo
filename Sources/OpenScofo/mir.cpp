@@ -171,7 +171,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 
     m_ONNXModelLoaded = true;
     m_ONNXDescriptors = Descriptors;
-    spdlog::info("ONNX Model Loaded");
+    spdlog::debug("ONNX Model Loaded");
     // Count
     m_ONNXDescriptorsSize = 0;
     for (size_t i = 0; i < m_ONNXDescriptors.size(); i++) {
@@ -189,7 +189,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             m_ONNXDescriptorsSize++;
         }
 
-        spdlog::info("Descriptors ID: {}, {}", (int)m_ONNXDescriptors[i], m_ONNXDescriptorsSize);
+        spdlog::debug("Descriptors ID: {}, {}", (int)m_ONNXDescriptors[i], m_ONNXDescriptorsSize);
     }
 
     spdlog::info("ONNX Model array is {}", m_ONNXDescriptorsSize);
