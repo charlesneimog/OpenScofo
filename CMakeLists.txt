@@ -199,20 +199,20 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
-set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz)
+set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.11.tar.gz)
 if(NOT EXISTS ${FFTW3_FILE})
     message(STATUS "Downloading FFTW3")
-    file(DOWNLOAD https://www.fftw.org/fftw-3.3.10.tar.gz ${FFTW3_FILE} STATUS DOWNLOAD_STATUS)
+    file(DOWNLOAD https://www.fftw.org/fftw-3.3.11.tar.gz ${FFTW3_FILE} STATUS DOWNLOAD_STATUS)
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
 set(ENABLE_FLOAT OFF CACHE BOOL "Enable single precision" FORCE)
 
-file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.10.tar.gz DESTINATION ${CMAKE_BINARY_DIR}/)
-add_subdirectory(${CMAKE_BINARY_DIR}/fftw-3.3.10 ${CMAKE_BINARY_DIR}/fftw3 EXCLUDE_FROM_ALL)
+file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.11.tar.gz DESTINATION ${CMAKE_BINARY_DIR}/)
+add_subdirectory(${CMAKE_BINARY_DIR}/fftw-3.3.11 ${CMAKE_BINARY_DIR}/fftw3 EXCLUDE_FROM_ALL)
 set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-include_directories("${CMAKE_BINARY_DIR}/fftw-3.3.10/api")
+include_directories("${CMAKE_BINARY_DIR}/fftw-3.3.11/api")
 
 # ╭──────────────────────────────────────╮
 # │               LibONNX                │
