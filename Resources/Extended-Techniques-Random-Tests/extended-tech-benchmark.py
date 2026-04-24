@@ -63,6 +63,11 @@ TEST_FILES = [
     {"audio": "./score-20.wav", "score": "./score-20.txt"},
 ]
 
+
+COLOR_RED = "\033[91m"
+COLOR_GREEN = "\033[92m"
+COLOR_RESET = "\033[0m"
+
 RESULTS_PATH = "follower_validation.json"
 RESULT_FILES_DIR = "mirex_results"
 
@@ -70,6 +75,7 @@ PROTOCOL_TOLERANCE_MS = {
     "cont-8.2": 250.0,
     "mirex-2006": 2000.0,
 }
+
 DEFAULT_PROTOCOL = "cont-8.2"
 ONLINE_LATENCY_MS = 0.0
 
@@ -135,11 +141,12 @@ class ScoreFollowerValidator:
                 missed_positions.append(pos)
                 continue
 
-            best_detection = min(
-                candidate_detections,
-                key=lambda value: abs(value - reference_time),
-            )
-            offset_ms = float((best_detection - reference_time) * 1000.0)
+            # Enforce causality: a real-time system reacts to the FIRST trigger.
+            # Sorting ensures chronological order if the list isn't already strictly sequential.
+            candidate_detections.sort()
+            first_detection = candidate_detections[0]
+
+            offset_ms = float((first_detection - reference_time) * 1000.0)
 
             if abs(offset_ms) > self.tolerance_ms:
                 missed_positions.append(pos)
@@ -279,6 +286,7 @@ def write_result_file(
 def process_audio_file(
     audio_path: str,
     score_path: str,
+    tolerance_ms: float,  # Added parameter for the threshold
 ) -> Tuple[List[Tuple[int, float]], Dict[int, float]]:
     """
     Process one audio file with OpenScofo.
@@ -292,7 +300,6 @@ def process_audio_file(
     # Load audio at benchmark sample rate.
     audio, _ = librosa.load(audio_path, sr=SR)
 
-    # audio = audio * 2
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     scofo.parse_score(Path(score_path))
 
@@ -334,9 +341,17 @@ def process_audio_file(
             )
         else:
             offset_ms = (detected_time - reference_time) * 1000.0
+
+            # Check absolute offset against the provided tolerance
+            if abs(offset_ms) > tolerance_ms:
+                color = COLOR_RED
+            else:
+                color = COLOR_GREEN
+
+            # Print with color and reset at the end of the line
             print(
-                f"pos={pos:03d}  det={detected_time:8.3f}s  "
-                f"ref={reference_time:8.3f}s  offset={offset_ms:+8.2f} ms"
+                f"{color}pos={pos:03d}  det={detected_time:8.3f}s  "
+                f"ref={reference_time:8.3f}s  offset={offset_ms:+8.2f} ms{COLOR_RESET}"
             )
 
         prev_pos = pos
@@ -680,7 +695,9 @@ def main() -> None:
             print(f"[WARN] Missing file: {score_path}")
             continue
 
-        detected_events, expected_times = process_audio_file(audio_path, score_path)
+        detected_events, expected_times = process_audio_file(
+            audio_path, score_path, tolerance_ms
+        )
         metrics = validator.compute_piece_metrics(detected_events, expected_times)
 
         piece_results.append(
