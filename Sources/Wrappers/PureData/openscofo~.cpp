@@ -554,7 +554,8 @@ extern "C" void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)oscofo_new, (t_method)oscofo_free, sizeof(PdOpenScofo),
                              CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[openscofo~] version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
+    post("[openscofo~] version %s (%s) (openscofo~ %s %s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION,
+         OPENSCOFO_BUILD_TIME, __DATE__, __TIME__);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)oscofo_score, gensym("score"), A_SYMBOL, 0);
