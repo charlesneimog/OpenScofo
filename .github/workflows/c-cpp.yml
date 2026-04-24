@@ -1,272 +1,272 @@
 ---
 name: Compile Binaries
 on:
-  # push:
-  #   branches: [main]
-  workflow_dispatch:
-    inputs:
-      publish_release:
-        description: Publish Release
-        required: false
-        default: false
-        type: boolean
+    # push:
+    #   branches: [main]
+    workflow_dispatch:
+        inputs:
+            publish_release:
+                description: Publish Release
+                required: false
+                default: false
+                type: boolean
 env:
-  LIBNAME: OpenScofo
-  LIBVERSION: 0.1.7
+    LIBNAME: OpenScofo
+    LIBVERSION: 0.1.7
 permissions:
-  contents: write
+    contents: write
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    env:
-      SCCACHE_GHA_ENABLED: 'true'
-      SCCACHE_CACHE_SIZE: 2G
-      SCCACHE_GHA_VERSION: ${{ matrix.os }}
-      SCCACHE_CACHE_MULTIARCH: '1'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        # os: [macos-latest, windows-latest]
-        precision: [32]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          submodules: recursive
-          fetch-depth: 1
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-      - name: Setup Emscripten
-        if: runner.os == 'Linux'
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: latest
-
-      # -----------------------
-      # Linux dependencies
-      # -----------------------
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo add-apt-repository ppa:pure-data/pure-data -y
-          sudo apt install puredata -y
-          sudo apt install libboost-all-dev libgtest-dev -y
-          npm install -g tree-sitter-cli
-          pip install build scikit-build-core cibuildwheel twine nanobind
-      # -----------------------
-      # macOS dependencies
-      # -----------------------
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install pd nanobind googletest tree-sitter boost
-          brew install python@3.13
-          npm install -g tree-sitter-cli
-          pip install build scikit-build-core cibuildwheel twine
-      # -----------------------
-      # Windows dependencies
-      # -----------------------
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          npm install -g tree-sitter-cli
-          winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
-          winget install -e --id MillerPuckette.PureData --accept-source-agreements
-          choco install wixtoolset --no-progress -y
-          $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
-          if (Test-Path $wixBin) {
-            "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          }
-          python -m pip install --upgrade pip
-          python -m pip install build scikit-build-core cibuildwheel twine nanobind
-
-      # -----------------------
-      - name: Build (MacOS)
-        if: runner.os == 'macOS'
+    build:
+        runs-on: ${{ matrix.os }}
         env:
-          SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
-          ARCHFLAGS: "-arch x86_64 -arch arm64"
-          MACOSX_DEPLOYMENT_TARGET: 11.0
-        run: |
-          python -m build --wheel \
-            -Cbuild-dir=build \
-            -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
-            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
-            -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
-            -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-            -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
-            -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
-            -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
-            -Ccmake.define.BUILD_ALL=ON \
-            -Ccmake.args="-G Ninja"
+            SCCACHE_GHA_ENABLED: "true"
+            SCCACHE_CACHE_SIZE: 2G
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}
+            SCCACHE_CACHE_MULTIARCH: "1"
+        strategy:
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                # os: [macos-latest, windows-latest]
+                precision: [32]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+              with:
+                  submodules: recursive
+                  fetch-depth: 1
+            - name: Setup Python
+              uses: actions/setup-python@v6
+              with:
+                  python-version: "3.13"
+            - name: Setup sccache
+              uses: mozilla-actions/sccache-action@v0.0.9
+            - name: Setup Emscripten
+              if: runner.os == 'Linux'
+              uses: mymindstorm/setup-emsdk@v14
+              with:
+                  version: latest
 
-      # -----------------------
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          python -m build --wheel \
-            -Cbuild-dir=build \
-            -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
-            -Ccmake.define.CMAKE_BUILD_TYPE=Release \
-            -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
-            -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-            -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
-            -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
-            -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
-            -Ccmake.define.BUILD_ALL=ON \
-            -Ccmake.args="-G Ninja"
+            # -----------------------
+            # Linux dependencies
+            # -----------------------
+            - name: Install dependencies (Linux)
+              if: runner.os == 'Linux'
+              run: |
+                  sudo apt update
+                  sudo add-apt-repository ppa:pure-data/pure-data -y
+                  sudo apt install puredata -y
+                  sudo apt install libboost-all-dev libgtest-dev -y
+                  npm install -g tree-sitter-cli
+                  pip install build scikit-build-core cibuildwheel twine nanobind
+            # -----------------------
+            # macOS dependencies
+            # -----------------------
+            - name: Install dependencies (macOS)
+              if: runner.os == 'macOS'
+              run: |
+                  brew install pd nanobind googletest tree-sitter boost
+                  brew install python@3.13
+                  npm install -g tree-sitter-cli
+                  pip install build scikit-build-core cibuildwheel twine
+            # -----------------------
+            # Windows dependencies
+            # -----------------------
+            - name: Install dependencies (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  npm install -g tree-sitter-cli
+                  winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
+                  winget install -e --id MillerPuckette.PureData --accept-source-agreements
+                  choco install wixtoolset --no-progress -y
+                  $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+                  if (Test-Path $wixBin) {
+                    "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  }
+                  python -m pip install --upgrade pip
+                  python -m pip install build scikit-build-core cibuildwheel twine nanobind
 
-      # -----------------------
-      # Configure (Windows)
-      # -----------------------
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $treeSitterBin = (Get-Command tree-sitter.cmd).Source
-          $buildArgs = @(
-            "-Cbuild-dir=build"
-            "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
-            "-Ccmake.define.CMAKE_BUILD_TYPE=Release "
-            "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
-            "-Ccmake.define.CMAKE_C_COMPILER=clang"
-            "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
-            "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
-            "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-            "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
-            "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
-            "-Ccmake.define.BUILD_ALL=ON"
-            "-Ccmake.args=-G Ninja"
-          )
-          python -m build --wheel @buildArgs
-      - name: Build Emscripten
-        if: runner.os == 'Linux'
-        env:
-          SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-wasm
-        run: |
-          source $EMSDK/emsdk_env.sh
-          emcmake cmake . -B build-wasm \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DOSCOFO_BUILD_TESTS=OFF \
-            -DBUILD_ALL=ON
-          cmake --build build-wasm
-      - name: Repair Linux wheels
-        if: runner.os == 'Linux'
-        continue-on-error: true
-        run: |
-          python -m pip install auditwheel
-          auditwheel repair dist/*.whl -w dist/
-          rm dist/*-linux_*.whl
+            # -----------------------
+            - name: Build (MacOS)
+              if: runner.os == 'macOS'
+              env:
+                  SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
+                  ARCHFLAGS: "-arch x86_64 -arch arm64"
+                  MACOSX_DEPLOYMENT_TARGET: 11.0
+              run: |
+                  python -m build --wheel \
+                    -Cbuild-dir=build \
+                    -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
+                    -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+                    -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
+                    -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+                    -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+                    -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+                    -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+                    -Ccmake.define.BUILD_ALL=ON \
+                    -Ccmake.args="-G Ninja"
 
-      - name: Generate macOS Component Installer
-        if: runner.os == 'macOS'
-        run: |
-          python Resources/Packages/macos.py --version ${{ env.LIBVERSION }}
+            # -----------------------
+            - name: Build (Linux)
+              if: runner.os == 'Linux'
+              run: |
+                  python -m build --wheel \
+                    -Cbuild-dir=build \
+                    -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
+                    -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+                    -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
+                    -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+                    -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+                    -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
+                    -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+                    -Ccmake.define.BUILD_ALL=ON \
+                    -Ccmake.args="-G Ninja"
 
-      - name: Generate Linux Component Installer
-        if: runner.os == 'Linux'
-        run: |
-          python Resources/Packages/Linux.py --version ${{ env.LIBVERSION }}
+            # -----------------------
+            # Configure (Windows)
+            # -----------------------
+            - name: Build (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $treeSitterBin = (Get-Command tree-sitter.cmd).Source
+                  $buildArgs = @(
+                    "-Cbuild-dir=build"
+                    "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
+                    "-Ccmake.define.CMAKE_BUILD_TYPE=Release "
+                    "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
+                    "-Ccmake.define.CMAKE_C_COMPILER=clang"
+                    "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
+                    "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
+                    "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+                    "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
+                    "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
+                    "-Ccmake.define.BUILD_ALL=ON"
+                    "-Ccmake.args=-G Ninja"
+                  )
+                  python -m build --wheel @buildArgs
+            - name: Build Emscripten
+              if: runner.os == 'Linux'
+              env:
+                  SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-wasm
+              run: |
+                  source $EMSDK/emsdk_env.sh
+                  emcmake cmake . -B build-wasm \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                    -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                    -DOSCOFO_BUILD_TESTS=OFF \
+                    -DBUILD_ALL=ON
+                  cmake --build build-wasm
+            - name: Repair Linux wheels
+              if: runner.os == 'Linux'
+              continue-on-error: true
+              run: |
+                  python -m pip install auditwheel
+                  auditwheel repair dist/*.whl -w dist/
+                  rm dist/*-linux_*.whl
 
-      - name: Generate Windows Component Installer
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
-          $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
+            - name: Generate macOS Component Installer
+              if: runner.os == 'macOS'
+              run: |
+                  python Resources/Packages/macos.py --version ${{ env.LIBVERSION }}
 
-          if (-not $candle -or -not $light) {
-            $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
-            $candlePath = Join-Path $wixBin 'candle.exe'
-            $lightPath = Join-Path $wixBin 'light.exe'
-          } else {
-            $candlePath = $candle.Source
-            $lightPath = $light.Source
-          }
+            - name: Generate Linux Component Installer
+              if: runner.os == 'Linux'
+              run: |
+                  python Resources/Packages/Linux.py --version ${{ env.LIBVERSION }}
 
-          python Resources/Packages/windows.py `
-            --version ${{ env.LIBVERSION }} `
-            --arch x64 `
-            --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
-            --candle "$candlePath" `
-            --light "$lightPath"
+            - name: Generate Windows Component Installer
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
+                  $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
 
-      # -----------------------
-      # Upload artifacts
-      # -----------------------
-      - name: Upload Installer
-        if: runner.os == 'Windows' || runner.os == 'macOS'
-        uses: actions/upload-artifact@v6
-        with:
-          name: Installer-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: |
-            *.pkg
-            *.msi
-            *.sh
-      - name: Upload Emscripten Build
-        if: runner.os == 'Linux'
-        run: |
-          mkdir -p Emscripten
-          mkdir -p Emscripten
-          cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
-          cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
-          cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
-      - name: Upload SuperCollider
-        uses: actions/upload-artifact@v6
-        with:
-          name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
-          path: SuperCollider
-      - name: Upload Emscripten
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v6
-        with:
-          name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
-          path: Emscripten
-      - name: Publish Pip
+                  if (-not $candle -or -not $light) {
+                    $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
+                    $candlePath = Join-Path $wixBin 'candle.exe'
+                    $lightPath = Join-Path $wixBin 'light.exe'
+                  } else {
+                    $candlePath = $candle.Source
+                    $lightPath = $light.Source
+                  }
+
+                  python Resources/Packages/windows.py `
+                    --version ${{ env.LIBVERSION }} `
+                    --arch x64 `
+                    --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
+                    --candle "$candlePath" `
+                    --light "$lightPath"
+
+            # -----------------------
+            # Upload artifacts
+            # -----------------------
+            - name: Upload Installer
+              if: runner.os == 'Windows' || runner.os == 'macOS'
+              uses: actions/upload-artifact@v6
+              with:
+                  name: Installer-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+                  path: |
+                      *.pkg
+                      *.msi
+                      *.sh
+            - name: Upload Emscripten Build
+              if: runner.os == 'Linux'
+              run: |
+                  mkdir -p Emscripten
+                  mkdir -p Emscripten
+                  cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
+                  cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
+                  cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
+            - name: Upload SuperCollider
+              uses: actions/upload-artifact@v6
+              with:
+                  name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+                  path: SuperCollider
+            - name: Upload Emscripten
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@v6
+              with:
+                  name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
+                  path: Emscripten
+            - name: Publish Pip
+              if: ${{ github.event.inputs.publish_release == 'true' }}
+              env:
+                  TWINE_USERNAME: __token__
+                  TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+              run: |
+                  python -m twine upload --skip-existing dist/*.whl
+    publish-release:
         if: ${{ github.event.inputs.publish_release == 'true' }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          python -m twine upload --skip-existing dist/*.whl
-  publish-release:
-    if: ${{ github.event.inputs.publish_release == 'true' }}
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Create per-artifact zip archives
-        run: |
-          set -euo pipefail
-          mkdir -p release_assets
-          for artifact_dir in artifacts/*; do
-            [ -d "$artifact_dir" ] || continue
-            name="$(basename "$artifact_dir")"
-            (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
-          done
-          ls -1 release_assets
-      - name: Create / Update GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.LIBVERSION }}-alpha
-          name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}-alpha
-          target_commitish: ${{ github.sha }}
-          files: |
-            release_assets/*.zip
-          draft: true
-          prerelease: false
+        needs: [build]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+            - name: Create per-artifact zip archives
+              run: |
+                  set -euo pipefail
+                  mkdir -p release_assets
+                  for artifact_dir in artifacts/*; do
+                    [ -d "$artifact_dir" ] || continue
+                    name="$(basename "$artifact_dir")"
+                    (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
+                  done
+                  ls -1 release_assets
+            - name: Create / Update GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ env.LIBVERSION }}-alpha
+                  name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}-alpha
+                  target_commitish: ${{ github.sha }}
+                  files: |
+                      release_assets/*.zip
+                  draft: true
+                  prerelease: false
