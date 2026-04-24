@@ -267,6 +267,11 @@ void MDP::SetTunning(double Tunning) {
 }
 
 // ─────────────────────────────────────
+void MDP::SetDescription(const Description &Desc) {
+    m_Desc = Desc;
+}
+
+// ─────────────────────────────────────
 void MDP::SetHarmonics(int Harmonics) {
     m_Harmonics = Harmonics;
 }
@@ -594,9 +599,9 @@ void MDP::GetAudioObservations(int T) {
     int bufferIndex = T % m_BufferSize;
     double soundEvidence = 0.0;
 
-    // Peso dinâmico baseado na confiança de técnica estendida
-    // Quando ExtendedTechProb é alto (próximo de 1) -> pitch não é confiável, técnica domina
-    // Quando ExtendedTechProb é baixo (próximo de 0) -> pitch é confiável
+    // Dynamic weight based on ExtendedTechProb
+    // When ExtendedTechProb approaches 1, we suppose that pitch estimation becomes unreliable and the signal is
+    // predominantly characterized by extended instrumental techniques.
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
     double techWeight = m_Desc.ExtendedTechProb;
 
@@ -629,40 +634,23 @@ void MDP::GetAudioObservations(int T) {
             break;
         }
 
+        case UTECH:
         case PTECH: {
             double bestForState = 1e-300;
             for (AudioState &as : state.AudioStates) {
                 if (as.Type == LABEL) {
                     double techProb = m_Desc.ONNX[as.Label];
                     double silenceProb = 1.0 - m_Desc.SilenceProb;
-
-                    // MoE com peso dinâmico: técnica domina quando ExtendedTechProb é alto
                     double combined = techProb * techWeight * silenceProb;
                     bestForState = std::max(bestForState, combined);
                 } else if (as.Type == PITCH) {
-                    // Pitch como evidência secundária para PTECH
                     double pitchProb = GetPitchProbability(as.Freq);
                     double silenceProb = 1.0 - m_Desc.SilenceProb;
-                    // Peso reduzido porque pitch é menos relevante para técnica
-                    double combined = pitchProb * (1.0 - techWeight * 0.5) * silenceProb;
+                    double combined = pitchProb * (1.0 - techWeight) * silenceProb;
                     bestForState = std::max(bestForState, combined);
                 } else if (as.Type == SILENCE) {
                     bestForState = std::max(bestForState, m_Desc.SilenceProb);
                 }
-            }
-            stateLikelihood = bestForState;
-            soundEvidence = std::max(soundEvidence, bestForState);
-            break;
-        }
-
-        case UTECH: {
-            double bestForState = 1e-300;
-            for (AudioState &as : state.AudioStates) {
-                double techProb = m_Desc.ONNX[as.Label];
-                double silenceProb = 1.0 - m_Desc.SilenceProb;
-                // UTECH: técnica domina completamente
-                double combined = techProb * techWeight * silenceProb;
-                bestForState = std::max(bestForState, combined);
             }
             stateLikelihood = bestForState;
             soundEvidence = std::max(soundEvidence, bestForState);
@@ -703,6 +691,10 @@ void MDP::GetAudioObservations(int T) {
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
 double MDP::GetPitchProbability(double Freq) {
+    if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
+        return 1e-300;
+    }
+
     double KLDiv = 0.0;
     double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
     auto it = m_PitchTemplates.find(RootBinFreq);
@@ -717,10 +709,20 @@ double MDP::GetPitchProbability(double Freq) {
     const PitchTemplateArray &PitchTemplate = it->second;
     const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
     const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
-    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
+    if (PitchTemplate.empty() || normSpectralPower.empty()) {
+        return 1e-300;
+    }
 
-    for (size_t i = 0; i < halfFft; i++) {
-        double P = PitchTemplate[i] + reverbSpectralPower[i];
+    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
+    size_t bins = std::min(halfFft, PitchTemplate.size());
+    bins = std::min(bins, normSpectralPower.size());
+    if (bins == 0) {
+        return 1e-300;
+    }
+
+    for (size_t i = 0; i < bins; i++) {
+        double reverb = (i < reverbSpectralPower.size()) ? reverbSpectralPower[i] : 0.0;
+        double P = PitchTemplate[i] + reverb;
         double Q = normSpectralPower[i];
         if (P > 0 && Q > 0) {
             KLDiv += P * log(P / Q);
