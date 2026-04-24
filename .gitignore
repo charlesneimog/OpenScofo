@@ -94,6 +94,7 @@ Resources/Packages/OpenScofo-macOS.pkg
 Resources/Extended-Techniques-Random-Tests/*.wav
 Resources/Extended-Techniques-Random-Tests/*.txt
 Resources/Extended-Techniques-Random-Tests/*.svg
+Resources/Extended-Techniques-Random-Tests/*.xml
 
 OpenScofo/
 !/Sources/OpenScofo/
@@ -101,3 +102,4 @@ site
 dist
 
 /Resources/Extended-Techniques-Random-Tests/flute.onnx
+/Resources/Extended-Techniques-Random-Tests/sonic_visualizer
