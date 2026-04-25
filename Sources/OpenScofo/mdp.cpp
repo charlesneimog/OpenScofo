@@ -600,7 +600,7 @@ void MDP::GetAudioObservations(int T) {
     // Precompute global frame probabilities
     double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
-    double pitchWeight = std::max(0.0, 1.0 - m_Desc.ExtendedTechProb);
+    double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
 
     double maxSoundEvidence = 0.0;
 

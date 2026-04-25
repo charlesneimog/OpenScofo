@@ -63,6 +63,8 @@ NB_MODULE(_OpenScofo, m) {
         .value("CHORD", OpenScofo::CHORD)
         .value("TRILL", OpenScofo::TRILL)
         .value("MULTI", OpenScofo::MULTI)
+        .value("PTECH", OpenScofo::PTECH)
+        .value("UTECH", OpenScofo::UTECH)
         .export_values();
 
     nb::enum_<OpenScofo::HMMType>(m, "HMMType")
