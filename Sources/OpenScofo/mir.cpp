@@ -358,14 +358,14 @@ void MIR::ONNXExec(Description &Desc) {
     case ONNX_TENSOR_TYPE_FLOAT32: {
         float *data = (float *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = data[i] * Desc.ExtendedTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = data[i];
         }
         break;
     }
     case ONNX_TENSOR_TYPE_FLOAT64: {
         double *data = (double *)m_OutputTensor->datas;
         for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i] * Desc.ExtendedTechProb;
+            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i];
         }
         break;
     }
