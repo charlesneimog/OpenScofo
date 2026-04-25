@@ -25,7 +25,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import librosa
 import numpy as np
@@ -63,7 +63,6 @@ TEST_FILES = [
     {"audio": "./score-20.wav", "score": "./score-20.txt"},
 ]
 
-
 COLOR_RED = "\033[91m"
 COLOR_GREEN = "\033[92m"
 COLOR_RESET = "\033[0m"
@@ -78,6 +77,38 @@ PROTOCOL_TOLERANCE_MS = {
 
 DEFAULT_PROTOCOL = "cont-8.2"
 ONLINE_LATENCY_MS = 0.0
+
+# Bulletproof fallback map assuming standard C++ enum 0-indexing.
+FALLBACK_EVENT_TYPES = {
+    0: "REST",
+    1: "NOTE",
+    2: "CHORD",
+    3: "TRILL",
+    4: "MULTI",
+    5: "PTECH",
+    6: "UTECH",
+}
+
+
+def _get_enum_name(enum_obj: Any) -> str:
+    """Extract clean string representation from pybind11/nanobind enums with integer fallback."""
+    # 1. Try native nanobind name resolution
+    if hasattr(enum_obj, "name") and enum_obj.name:
+        return enum_obj.name
+
+    # 2. Try raw integer memory cast (bypasses unexported enum bindings)
+    try:
+        val = int(enum_obj)
+        if val in FALLBACK_EVENT_TYPES:
+            return FALLBACK_EVENT_TYPES[val]
+    except (TypeError, ValueError):
+        pass
+
+    # 3. String parsing for mangled objects
+    s = str(enum_obj)
+    if "." in s:
+        return s.split(".")[-1].replace(">", "").strip()
+    return s
 
 
 class ScoreFollowerValidator:
@@ -116,12 +147,14 @@ class ScoreFollowerValidator:
         self,
         detected_events: List[Tuple[int, float]],
         expected_times: Dict[int, float],
+        score_context: Dict[int, Dict[str, str]],
     ) -> Dict:
         """
         Compute per-piece metrics according to the protocol.
 
         detected_events: list of tuples (score_pos, detected_time_seconds)
         expected_times: map score_pos -> reference_time_seconds
+        score_context: map score_pos -> {"type": current_type, "prev_type": preceding_type}
         """
         detected_by_pos: Dict[int, List[float]] = {}
         for pos, detected_time in detected_events:
@@ -142,7 +175,6 @@ class ScoreFollowerValidator:
                 continue
 
             # Enforce causality: a real-time system reacts to the FIRST trigger.
-            # Sorting ensures chronological order if the list isn't already strictly sequential.
             candidate_detections.sort()
             first_detection = candidate_detections[0]
 
@@ -173,6 +205,20 @@ class ScoreFollowerValidator:
             mean_offset_ms = 0.0
             std_offset_ms = 0.0
 
+        # Build Contextual Error Breakdown
+        miss_contexts: Dict[str, int] = {}
+        fp_contexts: Dict[str, int] = {}
+
+        for pos in missed_positions:
+            if pos in score_context:
+                ctx = f"After {score_context[pos]['prev_type']} -> Is {score_context[pos]['type']}"
+                miss_contexts[ctx] = miss_contexts.get(ctx, 0) + 1
+
+        for pos in misaligned_positions:
+            if pos in score_context:
+                ctx = f"After {score_context[pos]['prev_type']} -> Is {score_context[pos]['type']}"
+                fp_contexts[ctx] = fp_contexts.get(ctx, 0) + 1
+
         return {
             "reference_events": n_reference,
             "detected_transitions": len(detected_events),
@@ -196,6 +242,8 @@ class ScoreFollowerValidator:
             "misaligned_positions": misaligned_positions,
             "unexpected_positions": unexpected_positions,
             "matched_offsets_ms": matched_offsets_ms,
+            "miss_contexts": miss_contexts,
+            "fp_contexts": fp_contexts,
         }
 
     def save_run(
@@ -286,32 +334,48 @@ def write_result_file(
 def process_audio_file(
     audio_path: str,
     score_path: str,
-    tolerance_ms: float,  # Added parameter for the threshold
-) -> Tuple[List[Tuple[int, float]], Dict[int, float]]:
+    tolerance_ms: float,
+) -> Tuple[List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]]]:
     """
     Process one audio file with OpenScofo.
 
     Returns:
         detected_events: list[(score_pos, detected_time_seconds)]
         expected_times: dict[score_pos] = reference_time_seconds
+        score_context: dict[score_pos] = {"type": current, "prev_type": previous}
     """
     print(f"\n--- Processing {audio_path} ---")
 
     # Load audio at benchmark sample rate.
     audio, _ = librosa.load(audio_path, sr=SR)
-    audio = audio
 
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     scofo.parse_score(Path(score_path))
 
-    # Build reference tag -> time map from parser states.
     expected_times: Dict[int, float] = {}
+    score_context: Dict[int, Dict[str, str]] = {}
+    prev_type_str = "START_OF_SCORE"
+
     for state in scofo.get_states():
         if not hasattr(state, "score_pos") or not hasattr(state, "onset_expected"):
             continue
         try:
             pos = int(state.score_pos)
-            expected_times[pos] = float(state.onset_expected)
+
+            # Extract robust state type for precise context analysis
+            current_type_str = _get_enum_name(getattr(state, "type", "UNKNOWN"))
+
+            # Only register the expected onset of the FIRST state mapped to this score_pos
+            if pos not in expected_times:
+                expected_times[pos] = float(state.onset_expected)
+                score_context[pos] = {
+                    "type": current_type_str,
+                    "prev_type": prev_type_str,
+                }
+
+            # Advance the topological memory
+            prev_type_str = current_type_str
+
         except (TypeError, ValueError):
             continue
 
@@ -375,7 +439,7 @@ def process_audio_file(
         else "Unexpected detected tags: 0"
     )
 
-    return detected_events, expected_times
+    return detected_events, expected_times, score_context
 
 
 def compute_global_metrics(piece_results: List[Dict]) -> Dict:
@@ -395,6 +459,8 @@ def compute_global_metrics(piece_results: List[Dict]) -> Dict:
             "global_mean_offset_ms": 0.0,
             "global_std_offset_ms": 0.0,
             "average_latency_ms": ONLINE_LATENCY_MS,
+            "global_miss_contexts": {},
+            "global_fp_contexts": {},
         }
 
     total_reference_events = sum(
@@ -424,12 +490,20 @@ def compute_global_metrics(piece_results: List[Dict]) -> Dict:
 
     all_offsets: List[float] = []
     piecewise_abs_offsets: List[float] = []
+    global_miss_ctx: Dict[str, int] = {}
+    global_fp_ctx: Dict[str, int] = {}
 
     for piece in piece_results:
         metrics = piece["metrics"]
         all_offsets.extend(metrics.get("matched_offsets_ms", []))
         if metrics.get("matched_events", 0) > 0:
             piecewise_abs_offsets.append(metrics["mean_abs_offset_ms"])
+
+        # Aggregate Context metrics
+        for ctx, count in metrics.get("miss_contexts", {}).items():
+            global_miss_ctx[ctx] = global_miss_ctx.get(ctx, 0) + count
+        for ctx, count in metrics.get("fp_contexts", {}).items():
+            global_fp_ctx[ctx] = global_fp_ctx.get(ctx, 0) + count
 
     if all_offsets:
         offsets = np.array(all_offsets, dtype=float)
@@ -443,6 +517,14 @@ def compute_global_metrics(piece_results: List[Dict]) -> Dict:
 
     piecewise_mean_abs_offset_ms = (
         float(np.mean(piecewise_abs_offsets)) if piecewise_abs_offsets else 0.0
+    )
+
+    # Sort context maps descending by count for clearer reporting
+    global_miss_ctx = dict(
+        sorted(global_miss_ctx.items(), key=lambda item: item[1], reverse=True)
+    )
+    global_fp_ctx = dict(
+        sorted(global_fp_ctx.items(), key=lambda item: item[1], reverse=True)
     )
 
     return {
@@ -459,6 +541,8 @@ def compute_global_metrics(piece_results: List[Dict]) -> Dict:
         "global_mean_offset_ms": global_mean_offset_ms,
         "global_std_offset_ms": global_std_offset_ms,
         "average_latency_ms": ONLINE_LATENCY_MS,
+        "global_miss_contexts": global_miss_ctx,
+        "global_fp_contexts": global_fp_ctx,
     }
 
 
@@ -696,10 +780,12 @@ def main() -> None:
             print(f"[WARN] Missing file: {score_path}")
             continue
 
-        detected_events, expected_times = process_audio_file(
+        detected_events, expected_times, score_context = process_audio_file(
             audio_path, score_path, tolerance_ms
         )
-        metrics = validator.compute_piece_metrics(detected_events, expected_times)
+        metrics = validator.compute_piece_metrics(
+            detected_events, expected_times, score_context
+        )
 
         piece_results.append(
             {
@@ -771,6 +857,25 @@ def main() -> None:
     print(f"Global mean offset: {global_metrics['global_mean_offset_ms']:.2f} ms")
     print(f"Global offset std: {global_metrics['global_std_offset_ms']:.2f} ms")
     print(f"Average latency: {global_metrics['average_latency_ms']:.2f} ms")
+
+    print("\n" + "-" * 72)
+    print("ERROR CONTEXT ANALYSIS (Global)")
+    print("-" * 72)
+
+    if global_metrics.get("global_miss_contexts"):
+        print("Missed Events Context Breakdown (Preceding State -> Current State):")
+        for ctx, count in global_metrics["global_miss_contexts"].items():
+            print(f"  {ctx}: {count} misses")
+    else:
+        print("No missed events to analyze.")
+
+    print()
+    if global_metrics.get("global_fp_contexts"):
+        print("False Positive / Misaligned Context Breakdown:")
+        for ctx, count in global_metrics["global_fp_contexts"].items():
+            print(f"  {ctx}: {count} misalignments")
+    else:
+        print("No false positives to analyze.")
 
     if best_run is not None:
         best_metrics = best_run["global_metrics"]
