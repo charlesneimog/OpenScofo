@@ -594,101 +594,87 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╭─────────────────────────────────────╮
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
-// Section (CONT 2010) section 3.1 and also CUVILLIER (2016) section 2.2.2
-
 void MDP::GetAudioObservations(int T) {
     int bufferIndex = T % m_BufferSize;
-    double soundEvidence = 0.0;
 
-    // Peso dinâmico baseado na confiança de técnica estendida
-    // Quando ExtendedTechProb é alto (próximo de 1) -> pitch não é confiável, técnica domina
-    // Quando ExtendedTechProb é baixo (próximo de 0) -> pitch é confiável
-    double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
+    // Precompute global frame probabilities
+    double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
+    double pitchWeight = std::max(0.0, 1.0 - m_Desc.ExtendedTechProb);
+
+    double maxSoundEvidence = 0.0;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
             continue;
 
         MarkovState &state = m_States[j];
-        double stateLikelihood = 1e-300;
+        double stateLikelihood = 0.0;
 
         switch (state.Type) {
         case NOTE:
         case TRILL: {
-            double bestForState = 1e-300;
-            for (AudioState &as : state.AudioStates) {
+            double bestNoteProb = 0.0;
+            for (const AudioState &as : state.AudioStates) {
                 if (as.Type == PITCH) {
-                    double pitchProb = GetPitchProbability(as.Freq);
-                    double silenceProb = 1.0 - m_Desc.SilenceProb;
-
-                    // MoE com peso dinâmico: pitch domina quando é confiável
-                    // Se ExtendedTechProb é alto, pitchWeight é baixo -> nota menos provável
-                    double combined = pitchProb * pitchWeight * silenceProb;
-                    bestForState = std::max(bestForState, combined);
+                    double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
+                    bestNoteProb = std::max(bestNoteProb, p);
                 } else if (as.Type == SILENCE) {
-                    bestForState = std::max(bestForState, m_Desc.SilenceProb);
+                    bestNoteProb = std::max(bestNoteProb, m_Desc.SilenceProb);
                 }
             }
-            stateLikelihood = bestForState;
-            soundEvidence = std::max(soundEvidence, bestForState);
+            stateLikelihood = bestNoteProb;
             break;
         }
 
         case PTECH: {
-            double bestForState = 1e-300;
-            for (AudioState &as : state.AudioStates) {
+            double bestTechProb = 0.0;
+            for (const AudioState &as : state.AudioStates) {
                 if (as.Type == LABEL) {
-                    double techProb = m_Desc.ONNX[as.Label];
-                    double silenceProb = 1.0 - m_Desc.SilenceProb;
-
-                    // MoE com peso dinâmico: técnica domina quando ExtendedTechProb é alto
-                    double combined = techProb * techWeight * silenceProb;
-                    bestForState = std::max(bestForState, combined);
+                    // techWeight is applied here ONCE. Ensure mir.cpp is fixed.
+                    double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
+                    bestTechProb = std::max(bestTechProb, p);
                 } else if (as.Type == PITCH) {
-                    // Pitch como evidência secundária para PTECH
-                    double pitchProb = GetPitchProbability(as.Freq);
-                    double silenceProb = 1.0 - m_Desc.SilenceProb;
-                    // Peso reduzido porque pitch é menos relevante para técnica
-                    double combined = pitchProb * (1.0 - techWeight * 0.5) * silenceProb;
-                    bestForState = std::max(bestForState, combined);
+                    double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
+                    bestTechProb = std::max(bestTechProb, p);
                 } else if (as.Type == SILENCE) {
-                    bestForState = std::max(bestForState, m_Desc.SilenceProb);
+                    bestTechProb = std::max(bestTechProb, m_Desc.SilenceProb);
                 }
             }
-            stateLikelihood = bestForState;
-            soundEvidence = std::max(soundEvidence, bestForState);
+            stateLikelihood = bestTechProb;
             break;
         }
 
         case UTECH: {
-            double bestForState = 1e-300;
-            for (AudioState &as : state.AudioStates) {
-                double techProb = m_Desc.ONNX[as.Label];
-                double silenceProb = 1.0 - m_Desc.SilenceProb;
-                // UTECH: técnica domina completamente
-                double combined = techProb * techWeight * silenceProb;
-                bestForState = std::max(bestForState, combined);
+            double bestUTechProb = 0.0;
+            for (const AudioState &as : state.AudioStates) {
+                if (as.Type == LABEL) {
+                    double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
+                    bestUTechProb = std::max(bestUTechProb, p);
+                }
             }
-            stateLikelihood = bestForState;
-            soundEvidence = std::max(soundEvidence, bestForState);
+            stateLikelihood = bestUTechProb;
             break;
         }
 
         case CHORD: {
             double sumProbs = 0.0;
-            for (AudioState &as : state.AudioStates) {
-                double pitchProb = GetPitchProbability(as.Freq);
-                sumProbs += pitchProb;
+            int pitchCount = 0;
+            for (const AudioState &as : state.AudioStates) {
+                if (as.Type == PITCH) {
+                    sumProbs += GetPitchProbability(as.Freq);
+                    pitchCount++;
+                }
             }
-            stateLikelihood = sumProbs / state.AudioStates.size();
-            soundEvidence = std::max(soundEvidence, stateLikelihood);
+            if (pitchCount > 0) {
+                // Average the pitches, then apply the global pitch weight and sound probability
+                stateLikelihood = (sumProbs / pitchCount) * pitchWeight * soundProb;
+            }
             break;
         }
 
         case REST: {
             stateLikelihood = m_Desc.SilenceProb;
-            soundEvidence = std::max(soundEvidence, stateLikelihood);
             break;
         }
 
@@ -697,12 +683,17 @@ void MDP::GetAudioObservations(int T) {
             break;
         }
 
-        state.BestObs[bufferIndex] = stateLikelihood;
+        // Clamp to prevent absolute zero, which breaks Viterbi multiplications downstream
+        state.BestObs[bufferIndex] = std::max(stateLikelihood, 1e-300);
+
+        if (state.Type != REST) {
+            maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
+        }
     }
 
-    // Silence detection: compara silêncio com a melhor evidência de som
-    m_IsSilence = (m_Desc.SilenceProb > soundEvidence);
+    m_IsSilence = (m_Desc.SilenceProb > maxSoundEvidence);
 }
+
 // ─────────────────────────────────────
 // CONT (2010) section 3.1;
 // CUVILLIER (2016) section 2.2.2;
