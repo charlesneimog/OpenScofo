@@ -226,7 +226,7 @@ set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # ╭──────────────────────────────────────╮
 # │                OpenScofo             │
 # ╰──────────────────────────────────────╯
-list(APPEND ScofoSrc Sources/OpenScofo/mdp.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/forward.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/mir.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
