@@ -1,9 +1,9 @@
 #include "OpenScofo.hpp"
 #include <tree_sitter/api.h>
 
-extern "C" TSLanguage *tree_sitter_openscofo();
-
 namespace OpenScofo {
+
+extern "C" TSLanguage *tree_sitter_openscofo();
 
 // ─────────────────────────────────────
 void Score::PrintTreeSitterNode(TSNode node, int indent) {
@@ -247,7 +247,7 @@ MarkovState Score::AddDummySilence() {
 MarkovState Score::GetFirstEvent() {
     MarkovState Event;
     Event.HSMMType = MARKOV;
-    Event.Type = REST;
+    Event.Type = FIRSTEVENT;
     Event.ScorePos = 0;
     Event.Index = m_ScoreStates.size();
 

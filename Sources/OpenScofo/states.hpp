@@ -69,6 +69,8 @@ enum Mode { SCOREFOLLOWER, DESCRIPTORS };
 
 // ─────────────────────────────────────
 enum EventType {
+    FIRSTEVENT,
+
     // Tradicional
     REST,
     NOTE,
