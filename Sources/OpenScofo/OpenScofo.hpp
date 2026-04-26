@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mdp.hpp"
+#include "forward.hpp"
 #include "mir.hpp"
 #include "score.hpp"
 #include "states.hpp"
@@ -97,7 +97,7 @@ class OpenScofo {
     void SetLogLevel(spdlog::level::level_enum level);
 
   private:
-    MDP m_MDP;
+    OnlineForward m_Forward;
     MIR m_MIR;
     Score m_Score;
     std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;

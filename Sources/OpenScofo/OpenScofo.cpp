@@ -11,7 +11,7 @@ int luaopen_OpenScofo(lua_State *L);
 
 //  ─────────────────────────────────────
 OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
-    : m_MDP(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
+    : m_Forward(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
 
     m_States = States();
     m_Desc = Description();
@@ -58,7 +58,7 @@ void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
     m_Sr = Sr;
     m_FFTSize = FFTSize;
     m_HopSize = HopSize;
-    m_MDP.UpdateAudioParameters(Sr, FFTSize, HopSize);
+    m_Forward.UpdateAudioParameters(Sr, FFTSize, HopSize);
     m_MIR.UpdateAudioParameters(Sr, FFTSize, HopSize);
     m_Score.UpdateAudioParameters(FFTSize, HopSize);
     m_InBuffer.resize(FFTSize);
@@ -218,19 +218,19 @@ std::string OpenScofo::LuaGetError() {
 // │            Set Functions            │
 // ╰─────────────────────────────────────╯
 void OpenScofo::SetPitchTemplateSigma(double Sigma) {
-    m_MDP.SetPitchTemplateSigma(Sigma);
-    m_MDP.UpdateAudioTemplate();
+    m_Forward.SetPitchTemplateSigma(Sigma);
+    m_Forward.UpdateAudioTemplate();
 }
 
 // ─────────────────────────────────────
 void OpenScofo::SetAmplitudeDecay(double decay) {
-    m_MDP.SetAmplitudeDecay(decay);
+    m_Forward.SetAmplitudeDecay(decay);
 }
 
 // ─────────────────────────────────────
 void OpenScofo::SetHarmonics(int Harmonics) {
-    m_MDP.SetHarmonics(Harmonics);
-    m_MDP.UpdateAudioTemplate();
+    m_Forward.SetHarmonics(Harmonics);
+    m_Forward.UpdateAudioTemplate();
 }
 
 // ─────────────────────────────────────
@@ -240,7 +240,7 @@ double OpenScofo::GetdBValue() {
 
 // ─────────────────────────────────────
 void OpenScofo::SetdBTreshold(double dB) {
-    m_MDP.SetdBTreshold(dB);
+    m_Forward.SetdBTreshold(dB);
     m_MIR.SetdBTreshold(dB);
 }
 
@@ -251,7 +251,7 @@ void OpenScofo::SetTunning(double Tunning) {
 
 // ─────────────────────────────────────
 void OpenScofo::SetCurrentEvent(int Event) {
-    m_MDP.SetCurrentEvent(Event);
+    m_Forward.SetCurrentEvent(Event);
 
     if (Event == 0) {
         m_CurrentScorePosition = 0;
@@ -275,23 +275,23 @@ int OpenScofo::GetCurrentScorePosition() {
 
 // ─────────────────────────────────────
 double OpenScofo::GetLiveBPM() {
-    return m_MDP.GetLiveBPM();
+    return m_Forward.GetLiveBPM();
 }
 
 // ─────────────────────────────────────
 EventActions OpenScofo::GetEventActions(int Index) {
-    return m_MDP.GetEventActions(Index);
+    return m_Forward.GetEventActions(Index);
 }
 
 // ─────────────────────────────────────
 double OpenScofo::GetKappa() {
-    return m_MDP.GetKappa();
+    return m_Forward.GetKappa();
 }
 
 // ─────────────────────────────────────
 double OpenScofo::GetPitchProb(double Freq) {
-    m_MDP.SetDescription(m_Desc);
-    return m_MDP.GetPitchProbability(Freq);
+    m_Forward.SetDescription(m_Desc);
+    return m_Forward.GetPitchProbability(Freq);
 }
 
 // ─────────────────────────────────────
@@ -508,12 +508,12 @@ std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descripto
 // │ Python Research and Test Functions  │
 // ╰─────────────────────────────────────╯
 States &OpenScofo::GetStates() {
-    return m_MDP.GetStates();
+    return m_Forward.GetStates();
 }
 
 // ─────────────────────────────────────
 std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
-    return m_MDP.GetPitchTemplate(Freq);
+    return m_Forward.GetPitchTemplate(Freq);
 }
 
 // ─────────────────────────────────────
@@ -538,7 +538,7 @@ double OpenScofo::GetHopSize() {
 
 // ─────────────────────────────────────
 double OpenScofo::GetBlockDuration() {
-    return m_MDP.GetBlockDuration();
+    return m_Forward.GetBlockDuration();
 }
 
 // ╭─────────────────────────────────────╮
@@ -571,10 +571,10 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
     SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
 
     // Parse Config
-    m_MDP.SetPitchTemplateSigma(m_Score.GetPitchTemplateSigma());
+    m_Forward.SetPitchTemplateSigma(m_Score.GetPitchTemplateSigma());
 
     // Add States
-    m_MDP.SetScoreStates(m_States);
+    m_Forward.SetScoreStates(m_States);
     m_Mode = SCOREFOLLOWER;
 
     if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
@@ -591,7 +591,7 @@ Description OpenScofo::GetDescription() {
 
 // ─────────────────────────────────────
 int OpenScofo::GetCurrentBufferIndex() {
-    return m_MDP.GetCurrentBufferIndex();
+    return m_Forward.GetCurrentBufferIndex();
 }
 
 // ─────────────────────────────────────
@@ -610,13 +610,13 @@ template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffe
     switch (m_Mode) {
     case SCOREFOLLOWER:
         m_MIR.GetDescription(m_InBuffer, m_Desc);
-        m_CurrentScorePosition = m_MDP.GetEvent(m_Desc);
+        m_CurrentScorePosition = m_Forward.GetEvent(m_Desc);
         m_MIR.AddReverb(m_Desc, 0.01);
         break;
 
     case DESCRIPTORS:
         m_MIR.GetDescription(m_InBuffer, m_Desc);
-        m_MDP.SetDescription(m_Desc);
+        m_Forward.SetDescription(m_Desc);
         break;
     }
 

@@ -36,7 +36,7 @@ namespace OpenScofo {
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
-MDP::MDP(double Sr, double FFTSize, double HopSize) {
+OnlineForward::OnlineForward(double Sr, double FFTSize, double HopSize) {
     m_SyncStrength = 0.5;
     m_PhaseCoupling = 0.5;
     m_TimeInPrevEvent = 0;
@@ -54,7 +54,7 @@ MDP::MDP(double Sr, double FFTSize, double HopSize) {
 }
 
 // ─────────────────────────────────────
-void MDP::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
+void OnlineForward::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
     m_HopSize = HopSize;
     m_FFTSize = FFTSize;
     m_Sr = Sr;
@@ -79,7 +79,7 @@ void MDP::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
 }
 
 // ─────────────────────────────────────
-EventActions MDP::GetEventActions(int Index) {
+EventActions OnlineForward::GetEventActions(int Index) {
     if (Index < 0 || Index >= (int)m_States.size()) {
         return EventActions();
     }
@@ -89,7 +89,7 @@ EventActions MDP::GetEventActions(int Index) {
 }
 
 // ─────────────────────────────────────
-void MDP::SetScoreStates(States ScoreStates) {
+void OnlineForward::SetScoreStates(States ScoreStates) {
     if (ScoreStates.size() == 0) {
         return;
     }
@@ -126,7 +126,7 @@ void MDP::SetScoreStates(States ScoreStates) {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
-void MDP::BuildPitchTemplate(double Freq) {
+void OnlineForward::BuildPitchTemplate(double Freq) {
     const double m_MinHarmonicDecay = 0.2;
     const double m_MaxHarmonicDecay = 1.8;
     const double binWidth = m_Sr / m_FFTSize;
@@ -203,7 +203,7 @@ void MDP::BuildPitchTemplate(double Freq) {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
-void MDP::UpdateAudioTemplate() {
+void OnlineForward::UpdateAudioTemplate() {
     int StateSize = (int)m_States.size();
     m_PitchTemplates.clear();
 
@@ -220,79 +220,79 @@ void MDP::UpdateAudioTemplate() {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
-PitchTemplateArray MDP::GetPitchTemplate(double Freq) {
+PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
     BuildPitchTemplate(Freq);
     double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
     return m_PitchTemplates[rootBinFreq];
 }
 
 // ─────────────────────────────────────
-void MDP::UpdatePhaseValues() {
+void OnlineForward::UpdatePhaseValues() {
 }
 
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
-void MDP::ClearStates() {
+void OnlineForward::ClearStates() {
     m_States.clear();
 }
 // ─────────────────────────────────────
-double MDP::GetLiveBPM() {
+double OnlineForward::GetLiveBPM() {
     return m_BPM;
 }
 
 // ─────────────────────────────────────
-double MDP::GetKappa() {
+double OnlineForward::GetKappa() {
     return m_Kappa;
 }
 
 // ─────────────────────────────────────
-double MDP::GetBlockDuration() {
+double OnlineForward::GetBlockDuration() {
     return m_BlockDur;
 }
 
 // ─────────────────────────────────────
-void MDP::SetBPM(double BPM) {
+void OnlineForward::SetBPM(double BPM) {
     m_BPM = BPM;
 }
 
 // ─────────────────────────────────────
-void MDP::SetdBTreshold(double dB) {
+void OnlineForward::SetdBTreshold(double dB) {
     m_dBTreshold = dB;
 }
 
 // ─────────────────────────────────────
-void MDP::SetTunning(double Tunning) {
+void OnlineForward::SetTunning(double Tunning) {
     m_Tunning = Tunning;
 }
 
 // ─────────────────────────────────────
-void MDP::SetDescription(const Description &Desc) {
+void OnlineForward::SetDescription(const Description &Desc) {
     m_Desc = Desc;
 }
 
 // ─────────────────────────────────────
-void MDP::SetHarmonics(int Harmonics) {
+void OnlineForward::SetHarmonics(int Harmonics) {
     m_Harmonics = Harmonics;
 }
 
 // ─────────────────────────────────────
-void MDP::SetAmplitudeDecay(double decay) {
+void OnlineForward::SetAmplitudeDecay(double decay) {
     m_PitchTemplateAmplitudeDecay = decay;
 }
 
 // ─────────────────────────────────────
-int MDP::GetCurrentBufferIndex() {
+int OnlineForward::GetCurrentBufferIndex() {
     return m_Tau % m_BufferSize;
 }
 
 // ─────────────────────────────────────
-int MDP::GetTunning() {
+int OnlineForward::GetTunning() {
     return m_Tunning;
 }
 
 // ─────────────────────────────────────
-void MDP::SetCurrentEvent(int Event) {
+void OnlineForward::SetCurrentEvent(int Event) {
     spdlog::debug("Current event is {}", Event);
     if (m_States.size() == 0) {
         spdlog::error("There is not Events on Score or the Score was no loaded");
@@ -309,27 +309,27 @@ void MDP::SetCurrentEvent(int Event) {
 }
 
 // ─────────────────────────────────────
-int MDP::GetStatesSize() {
+int OnlineForward::GetStatesSize() {
     return m_States.size();
 }
 
 // ─────────────────────────────────────
-void MDP::AddState(MarkovState State) {
+void OnlineForward::AddState(MarkovState State) {
     m_States.push_back(State);
 }
 
 // ─────────────────────────────────────
-MarkovState MDP::GetState(int Index) {
+MarkovState OnlineForward::GetState(int Index) {
     return m_States[Index];
 }
 
 // ─────────────────────────────────────
-std::vector<MarkovState> &MDP::GetStates() {
+std::vector<MarkovState> &OnlineForward::GetStates() {
     return m_States;
 }
 
 // ─────────────────────────────────────
-void MDP::SetPitchTemplateSigma(double f) {
+void OnlineForward::SetPitchTemplateSigma(double f) {
     m_PitchTemplateSigma = f;
 }
 
@@ -337,7 +337,7 @@ void MDP::SetPitchTemplateSigma(double f) {
 // │            Time Decoding            │
 // ╰─────────────────────────────────────╯
 // CONT 2010
-void MDP::InitTimeDecoding(void) {
+void OnlineForward::InitTimeDecoding(void) {
     double PsiK = 60 / m_States[0].BPMExpected;
     m_LastPsiN = PsiK;
     m_PsiN = PsiK;
@@ -352,7 +352,7 @@ void MDP::InitTimeDecoding(void) {
 // ─────────────────────────────────────
 // https://stat.ethz.ch/R-manual//R-patched/library/stats/html/NegBinomial.html
 // CUVILLIER 2016 (Check chapter 3 and 4)
-void MDP::BuildDistributionCache(double ExpectedFrames) {
+void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     if (ExpectedFrames < 1.0)
         ExpectedFrames = 1.0;
 
@@ -396,7 +396,7 @@ void MDP::BuildDistributionCache(double ExpectedFrames) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
-double MDP::A2(double kappa) {
+double OnlineForward::A2(double kappa) {
     if (kappa <= 0.0) {
         return 0.0;
     }
@@ -415,7 +415,7 @@ double MDP::A2(double kappa) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
-double MDP::InverseA2(double SyncStrength) {
+double OnlineForward::InverseA2(double SyncStrength) {
     // SyncStrength must be between 0 and 1
     if (SyncStrength < 0) {
         return 0;
@@ -452,7 +452,7 @@ double MDP::InverseA2(double SyncStrength) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
-double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
+double OnlineForward::CouplingFunction(double phi, double phi_hat, double kappa) {
     static constexpr double invTwoPi = 1.0 / (2.0 * std::numbers::pi);
     double diff = 2.0 * std::numbers::pi * (phi - phi_hat);
     double cosDiff = std::cos(diff);
@@ -461,7 +461,7 @@ double MDP::CouplingFunction(double phi, double phi_hat, double kappa) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
-double MDP::ModPhases(double Phase) {
+double OnlineForward::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
     if (Phase < 0.0)
         Phase += 1.0;
@@ -470,7 +470,7 @@ double MDP::ModPhases(double Phase) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Last § of section 4)
-States MDP::GetStatesForProcessing() {
+States OnlineForward::GetStatesForProcessing() {
     double EventOnset = m_States[m_CurrentStateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
     size_t begin = m_CurrentStateIndex;
     size_t end = begin;
@@ -487,13 +487,13 @@ States MDP::GetStatesForProcessing() {
 
 // ─────────────────────────────────────
 // CONT 2010 (Last § of section 4)
-void MDP::GetDecodeWindow() {
+void OnlineForward::GetDecodeWindow() {
     int half = m_EventWindowSize / 2;
     m_WinStart = std::max(0, static_cast<int>(m_CurrentStateIndex) - half);
     m_WinEnd = std::min(static_cast<int>(m_States.size()) - 1, static_cast<int>(m_CurrentStateIndex) + half);
 
     if (m_WinStart < 0 || m_WinEnd >= static_cast<int>(m_States.size())) {
-        spdlog::critical("MDP::GetDecodeWindow invariant violated: "
+        spdlog::critical("Inference::GetDecodeWindow invariant violated: "
                          "window out of bounds "
                          "(winStart={}, winEnd={}, statesSize={}, currentIndex={}, eventWindowSize={})",
                          m_WinStart, m_WinEnd, m_States.size(), m_CurrentStateIndex, m_EventWindowSize);
@@ -502,7 +502,7 @@ void MDP::GetDecodeWindow() {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 5, algorithm 1)
-double MDP::UpdatePsiN(int StateIndex) {
+double OnlineForward::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
 
@@ -594,20 +594,20 @@ double MDP::UpdatePsiN(int StateIndex) {
 // ╭─────────────────────────────────────╮
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
-void MDP::GetAudioObservations(int T) {
-    int bufferIndex = T % m_BufferSize;
+void OnlineForward::GetAudioObservations() {
+    int bufferIndex = m_Tau % m_BufferSize;
 
     // Precompute global frame probabilities
     double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
 
+    EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
+
     double maxSoundEvidence = 0.0;
+    bool allowSilence = (CurrentEventType != FIRSTEVENT);
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
-        if (j < 0 || j >= (int)m_States.size())
-            continue;
-
         MarkovState &state = m_States[j];
         double stateLikelihood = 0.0;
 
@@ -619,7 +619,7 @@ void MDP::GetAudioObservations(int T) {
                 if (as.Type == PITCH) {
                     double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
                     bestNoteProb = std::max(bestNoteProb, p);
-                } else if (as.Type == SILENCE) {
+                } else if (as.Type == SILENCE && allowSilence) {
                     bestNoteProb = std::max(bestNoteProb, m_Desc.SilenceProb);
                 }
             }
@@ -631,13 +631,12 @@ void MDP::GetAudioObservations(int T) {
             double bestTechProb = 0.0;
             for (const AudioState &as : state.AudioStates) {
                 if (as.Type == LABEL) {
-                    // techWeight is applied here ONCE. Ensure mir.cpp is fixed.
                     double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
                     bestTechProb = std::max(bestTechProb, p);
                 } else if (as.Type == PITCH) {
                     double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
                     bestTechProb = std::max(bestTechProb, p);
-                } else if (as.Type == SILENCE) {
+                } else if (as.Type == SILENCE && allowSilence) {
                     bestTechProb = std::max(bestTechProb, m_Desc.SilenceProb);
                 }
             }
@@ -651,6 +650,8 @@ void MDP::GetAudioObservations(int T) {
                 if (as.Type == LABEL) {
                     double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
                     bestUTechProb = std::max(bestUTechProb, p);
+                } else if (as.Type == SILENCE && allowSilence) {
+                    bestUTechProb = std::max(bestUTechProb, m_Desc.SilenceProb);
                 }
             }
             stateLikelihood = bestUTechProb;
@@ -673,6 +674,7 @@ void MDP::GetAudioObservations(int T) {
             break;
         }
 
+        case FIRSTEVENT:
         case REST: {
             stateLikelihood = m_Desc.SilenceProb;
             break;
@@ -698,7 +700,7 @@ void MDP::GetAudioObservations(int T) {
 // CONT (2010) section 3.1;
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
-double MDP::GetPitchProbability(double Freq) {
+double OnlineForward::GetPitchProbability(double Freq) {
     if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
         return 1e-300;
     }
@@ -746,7 +748,7 @@ double MDP::GetPitchProbability(double Freq) {
 }
 
 // ─────────────────────────────────────
-void MDP::GetInitialDistribution() {
+void OnlineForward::GetInitialDistribution() {
     int Size = m_WinEnd - m_CurrentStateIndex + 1;
     std::vector<double> InitialProb(Size);
 
@@ -782,14 +784,14 @@ void MDP::GetInitialDistribution() {
 
 // ─────────────────────────────────────
 // CUVILLIER and CONT (2014) section 2.1.
-double MDP::GetTransProbability(int i, int j) {
+double OnlineForward::GetTransProbability(int i, int j) {
     return (i + 1 == j) ? 1.0 : 0.0;
 }
 
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // Needs review
-double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
+double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0)
         ExpectedFrames = 1.0;
@@ -807,7 +809,7 @@ double MDP::GetOccupancyDistribution(MarkovState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // Needs review
-double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
+double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
     double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
         expected_frames = 1.0;
@@ -824,7 +826,7 @@ double MDP::GetSurvivorDistribution(MarkovState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // Needs review
-int MDP::GetMaxUForJ(MarkovState &StateJ) {
+int OnlineForward::GetMaxUForJ(MarkovState &StateJ) {
     double expected_frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
     if (expected_frames < 1.0)
         expected_frames = 1.0;
@@ -838,11 +840,11 @@ int MDP::GetMaxUForJ(MarkovState &StateJ) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
+void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
     double fj;
 
-    if (T == 0) {
+    if (m_Tau == 0) {
         fj = bj * StateJ.InitProb;
     } else {
         int prevBuf = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
@@ -867,7 +869,7 @@ void MDP::Markov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
+void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
     double bj = StateJ.BestObs[bufferIndex];
 
     double f_tilde_j = 0.0;
@@ -876,18 +878,18 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 
     int maxU = GetMaxUForJ(StateJ);
 
-    for (int u = 1; u <= T + 1; u++) {
+    for (int u = 1; u <= m_Tau + 1; u++) {
         double D_bar_ju = GetSurvivorDistribution(StateJ, u);
         double d_ju = GetOccupancyDistribution(StateJ, u);
 
-        if (u == T + 1) {
+        if (u == m_Tau + 1) {
             f_tilde_j += D_bar_ju * ObsProd * StateJ.InitProb;
             f_tilde_jo += d_ju * ObsProd * StateJ.InitProb;
             break;
         }
 
         if (u <= maxU) {
-            int entryBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+            int entryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
             double transition_sum = 0.0;
 
             if (j > 0) {
@@ -899,7 +901,7 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
             f_tilde_jo += d_ju * ObsProd * transition_sum;
         }
 
-        int prevBuf = ((T - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+        int prevBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double prevObs = StateJ.BestObs[prevBuf];
         double prevNorm = std::max(m_Normalization[prevBuf], 1e-300);
         ObsProd *= prevObs / prevNorm;
@@ -914,8 +916,8 @@ void MDP::SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-int MDP::Inference(int T) {
-    int bIndex = T % m_BufferSize;
+int OnlineForward::GetAlphaT() {
+    int bIndex = m_Tau % m_BufferSize;
     spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
                   m_WinEnd, bIndex, m_Tau, m_Kappa);
 
@@ -923,9 +925,9 @@ int MDP::Inference(int T) {
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
         if (StateJ.HSMMType == SEMIMARKOV)
-            SemiMarkov(StateJ, j, T, bIndex);
+            SemiMarkov(StateJ, j, bIndex);
         else
-            Markov(StateJ, j, T, bIndex);
+            Markov(StateJ, j, bIndex);
     }
 
     // Calculate the Normalization Denominator
@@ -974,7 +976,7 @@ int MDP::Inference(int T) {
 }
 
 // ─────────────────────────────────────
-int MDP::GetEvent(Description &Desc) {
+int OnlineForward::GetEvent(Description &Desc) {
 
     spdlog::debug("Starting inference");
     m_Desc = Desc;
@@ -984,14 +986,14 @@ int MDP::GetEvent(Description &Desc) {
     }
 
     GetDecodeWindow();
-    GetAudioObservations(m_Tau);
+    GetAudioObservations();
 
     if (m_Tau == 0) {
         GetInitialDistribution();
     }
 
     // Run forward inference
-    int BestState = Inference(m_Tau);
+    int BestState = GetAlphaT();
     m_PsiN = UpdatePsiN(BestState);
 
     // Advance the score position if a new event was detected

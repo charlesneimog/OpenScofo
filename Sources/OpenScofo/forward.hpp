@@ -11,9 +11,9 @@ using PitchTemplateArray = std::vector<double>;
 // ╭─────────────────────────────────────╮
 // │     Markov Description Process      │
 // ╰─────────────────────────────────────╯
-class MDP {
+class OnlineForward {
   public:
-    MDP(double Sr, double WindowSize, double HopSize);
+    OnlineForward(double Sr, double WindowSize, double HopSize);
     void UpdateAudioParameters(double Sr, double WindowSize, double HopSize);
 
     // Init Functions
@@ -82,16 +82,16 @@ class MDP {
     double GetBestEvent();
     int GetMaxJIndex(int StateIndex);
 
-    void Markov(MarkovState &StateJ, int j, int T, int bufferIndex);
-    void SemiMarkov(MarkovState &StateJ, int j, int T, int bufferIndex);
+    void Markov(MarkovState &StateJ, int j, int bufferIndex);
+    void SemiMarkov(MarkovState &StateJ, int j, int bufferIndex);
 
-    int Inference(int CurrentState);
+    int GetAlphaT();
 
     // Pitch Template
     void BuildPitchTemplate(double Freq);
 
     // Get Audio Obs
-    void GetAudioObservations(int T);
+    void GetAudioObservations();
 
   private:
     // Test things
