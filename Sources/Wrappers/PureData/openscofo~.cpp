@@ -443,6 +443,10 @@ static t_int *oscofo_perform_score(t_int *w) {
     PdOpenScofo *x = (PdOpenScofo *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
     int n = static_cast<int>(w[3]);
+    if (!x->Following) {
+        return (w + 4);
+    }
+
     bool ok = x->OpenScofo->ProcessBlock(in, n);
     if (!ok) {
         return (w + 4);
