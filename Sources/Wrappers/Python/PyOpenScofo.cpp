@@ -36,11 +36,16 @@ static void python_error_callback(const spdlog::details::log_msg &log, void *dat
     (void)data;
     std::string text(log.payload.data(), log.payload.size());
     switch (log.level) {
-    case spdlog::level::critical:
-        throw nb::value_error(text.c_str());
-    case spdlog::level::err:
-        throw nb::value_error(text.c_str());
+    case spdlog::level::critical: {
+        nb::gil_scoped_acquire gil;
+        PyErr_SetString(PyExc_RuntimeError, text.c_str());
         break;
+    }
+    case spdlog::level::err: {
+        nb::gil_scoped_acquire gil;
+        PyErr_SetString(PyExc_RuntimeError, text.c_str());
+        break;
+    }
     case spdlog::level::info:
         nb::print(nb::str(text.c_str()));
         break;
