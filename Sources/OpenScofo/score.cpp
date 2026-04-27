@@ -312,6 +312,11 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
         AudioState PercussiveDesc;
         PercussiveDesc.Type = SILENCE;
         Event.AudioStates.push_back(PercussiveDesc);
+
+        // TODO: need tests
+        AudioState Onset;
+        PercussiveDesc.Type = ONSET;
+        Event.AudioStates.push_back(Onset);
     }
 
     // Duration

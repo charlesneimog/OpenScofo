@@ -25,12 +25,12 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
     InitLuaModule();
 #endif
 
-#if defined(NDEBUG)
-    spdlog::set_level(spdlog::level::info);
-#else
+    // #if defined(NDEBUG)
+    //     spdlog::set_level(spdlog::level::info);
+    // #else
     spdlog::set_level(spdlog::level::debug);
     spdlog::enable_backtrace(32);
-#endif
+    // #endif
 
     // --- Create OpenScofoLog sink ---
     m_Log = std::make_shared<OpenScofoLog<std::mutex>>();
@@ -118,14 +118,7 @@ void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descripto
         return;
     }
 
-    // m_MIR.ONNXInit(Model, Descriptors);
-    std::thread([ModelCopy = std::move(Model), DescriptorsCopy = Descriptors, this]() mutable {
-        m_LoadingONNX = true;
-        spdlog::warn("Loading ONNX model, wait...");
-        m_MIR.ONNXInit(ModelCopy, DescriptorsCopy);
-        m_LoadingONNX = false;
-        spdlog::warn("ONNX Model ready");
-    }).detach();
+    m_MIR.ONNXInit(Model, Descriptors);
 }
 
 // ╭─────────────────────────────────────╮
@@ -345,9 +338,9 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
         return "slope";
     case Descriptors::KURTOSIS:
         return "kurtosis";
-    case Descriptors::EXTENDEDPROB:
+    case Descriptors::EXTENDEDTECHNIQUE:
         return "ext";
-    case Descriptors::ONSET:
+    case Descriptors::ODSONSET:
         return "onset";
     case Descriptors::YIN:
         return "yin";
@@ -399,9 +392,9 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
     } else if (strcmp(s, "kurtosis") == 0) {
         return Descriptors::KURTOSIS;
     } else if (strcmp(s, "ext") == 0) {
-        return Descriptors::EXTENDEDPROB;
+        return Descriptors::EXTENDEDTECHNIQUE;
     } else if (strcmp(s, "onset") == 0) {
-        return Descriptors::ONSET;
+        return Descriptors::ODSONSET;
     } else if (strcmp(s, "yin") == 0) {
         return Descriptors::YIN;
     } else if (strcmp(s, "onnx") == 0) {
@@ -416,11 +409,11 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
 double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
     switch (d) {
     // Scalar descriptors
-    case Descriptors::ONSET:
+    case Descriptors::ODSONSET:
         return Desc.Onset;
     case Descriptors::SILENCEPROB:
         return Desc.SilenceProb;
-    case Descriptors::EXTENDEDPROB:
+    case Descriptors::EXTENDEDTECHNIQUE:
         return Desc.ExtendedTechProb;
     case Descriptors::DB:
         return Desc.dB;

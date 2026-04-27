@@ -443,7 +443,7 @@ static t_int *oscofo_perform_score(t_int *w) {
     PdOpenScofo *x = (PdOpenScofo *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
     int n = static_cast<int>(w[3]);
-    if (!x->Following) {
+    if (!x->Following && !x->JustDescription) {
         return (w + 4);
     }
 

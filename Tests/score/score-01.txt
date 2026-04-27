@@ -2,9 +2,12 @@
 
 BPM 80
 
+ONNXMODEL "flute.onnx"
+ONNXDESCRIPTORS mfcc logmel zcr centroid flatness hfr
+
 // Measure number 1
-PTECH key-click F4 1
-PTECH key-click G4 1
+PTECH key-click C4 1
+PTECH key-click D4 1
 REST 1
 UTECH jet-whistle 1
 

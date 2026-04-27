@@ -269,10 +269,10 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         case SILENCEPROB:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SilenceProb; });
             break;
-        case EXTENDEDPROB:
+        case EXTENDEDTECHNIQUE:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ExtendedTechProb; });
             break;
-        case ONSET:
+        case ODSONSET:
             m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Onset ? 1.0f : 0.0f; });
             break;
         case STDDEV:
@@ -651,9 +651,16 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     fftw_execute(m_FullFFTPlan);
 
+    // Initialize Essentia Flux buffer
+    if (m_PreviousSpectralPower.size() != NHalf) {
+        m_PreviousSpectralPower.assign(NHalf, 0.0);
+    }
+
+    // --- Pre-allocate/Reset Descriptor bounds ---
     Desc.MaxAmp = 0.0;
     Desc.SpectralFlux = 0.0;
 
+    // --- Accumulators for Pass 1 ---
     double SumPower = 0.0;
     double weightedSumFreqs = 0.0;
     double irregularityNumerator = 0.0;
@@ -665,51 +672,52 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     double harmonicitySum = 0.0;
     double highFreqEnergy = 0.0;
 
-    double sumFreq2 = 0.0;
-    double sumFreq3 = 0.0;
-    double sumFreq4 = 0.0;
-    double sumIndex = 0.0;
-    double sumIndex2 = 0.0;
+    double sumFreq2 = 0.0, sumFreq3 = 0.0, sumFreq4 = 0.0;
+    double sumIndex = 0.0, sumIndex2 = 0.0;
+    double sumFreq = 0.0, sumFreqSq = 0.0;
 
-    // Spectral Slope
-    double sumFreq = 0.0;
-    double sumFreqSq = 0.0;
-
-    // Crest
     double maxMag = 0.0;
     float sumMagCrest = 0.0f;
     float maxMagCrest = 0.0f;
 
-    // Essentia Flux keeps a previous spectrum with the same number of bins.
-    if (m_PreviousSpectralPower.size() != NHalf) {
-        m_PreviousSpectralPower.assign(NHalf, 0.0);
-    }
+    // State variable to avoid array lookup for (i - 1)
+    double prevNorm = 0.0;
 
+    // =========================================================================
+    // PASS 1: MAP & ACCUMULATE
+    // =========================================================================
     for (size_t i = 0; i < NHalf; ++i) {
+        // 1. Raw extraction
         const double re = m_FullFFTOut[i][0];
         const double im = m_FullFFTOut[i][1];
-
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;
 
+        // 2. State storage (Sequential writes)
         Desc.Power[i] = p;
         Desc.Magnitude[i] = mag;
         Desc.SpectralMagnitudeNorm[i] = norm;
         Desc.MaxAmp = std::max(Desc.MaxAmp, norm);
 
+        // 3. Peak tracking & Crest
         maxMag = std::max(maxMag, mag);
         const float magCrest = static_cast<float>(mag);
         sumMagCrest += magCrest;
         maxMagCrest = std::max(maxMagCrest, magCrest);
 
-        SumPower += norm;
+        // 4. Frequency/Index mappings
         const double freq = i * binWidth;
         const double freq2 = freq * freq;
         const double index = static_cast<double>(i);
+
+        // 5. Accumulations
+        SumPower += norm;
         sumFreq += freq;
         sumFreqSq += freq2;
-
+        sumFreq2 += freq2 * norm;
+        sumFreq3 += freq2 * freq * norm;
+        sumFreq4 += freq2 * freq2 * norm;
         weightedSumFreqs += freq * norm;
         sumIndex += index * norm;
         sumIndex2 += index * index * norm;
@@ -720,45 +728,33 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         linSumPower += v;
         spectralEnergySum += p;
 
+        // 6. Flux & Harmonicity
         const double diff = mag - m_PreviousSpectralPower[i];
         Desc.SpectralFlux += diff * diff;
-
-        sumFreq2 += freq2 * norm;
-        sumFreq3 += freq2 * freq * norm;
-        sumFreq4 += freq2 * freq2 * norm;
+        m_PreviousSpectralPower[i] = mag; // Simultaneous read/write to same cache line
 
         if (i >= hfStart) {
             highFreqEnergy += norm;
         }
+
         if (i > 0) {
-            const double d = Desc.SpectralMagnitudeNorm[i - 1] - norm;
+            const double d = prevNorm - norm;
             irregularityNumerator += d * d;
             harmonicitySum += norm;
             harmonicityPeak = std::max(harmonicityPeak, norm);
         }
-
-        m_PreviousSpectralPower[i] = mag;
+        prevNorm = norm; // Save state for next iteration
     }
 
+    // --- SCALAR CALCULATIONS (Inter-pass logic) ---
     Desc.SpectralFlux = std::sqrt(Desc.SpectralFlux);
 
     const double SumPowerEps = SumPower + 1e-12;
     const double invSum = 1.0 / SumPowerEps;
 
-    Desc.SpectralCentroid = weightedSumFreqs / SumPowerEps;
+    Desc.SpectralCentroid = weightedSumFreqs * invSum;
     Desc.CentroidVelocity = std::abs(Desc.SpectralCentroid - m_PrevCentroid);
     m_PrevCentroid = Desc.SpectralCentroid;
-
-    const double Mean = 1.0 / static_cast<double>(NHalf);
-    double Variance = 0.0;
-
-    for (size_t i = 0; i < NHalf; ++i) {
-        const double normSp = (Desc.SpectralMagnitudeNorm[i] + 1e-12) / SumPowerEps;
-        Desc.SpectralMagnitudeFrameNorm[i] = normSp;
-
-        const double diff = normSp - Mean;
-        Variance += diff * diff;
-    }
 
     const double E1 = Desc.SpectralCentroid;
     const double E2 = sumFreq2 * invSum;
@@ -768,26 +764,21 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     const double mu4 = E4 - 4.0 * E1 * E3 + 6.0 * E1 * E1 * E2 - 3.0 * E1 * E1 * E1 * E1;
 
     const double spectralSpreadHzVariance = std::max(0.0, E2 - E1 * E1);
-    Desc.SpectralSpreadHz = std::sqrt(spectralSpreadHzVariance);
+    Desc.SpectralSpreadHz = SumPower > 0.0 ? std::sqrt(spectralSpreadHzVariance) : 0.0;
 
     const double EIndex = sumIndex * invSum;
     const double EIndex2 = sumIndex2 * invSum;
     const double rawIndexVariance = std::max(0.0, EIndex2 - EIndex * EIndex);
     const double indexRange = static_cast<double>(std::max<size_t>(1, NHalf - 1));
     const double invIndexRange = 1.0 / indexRange;
-    Desc.SpectralSpreadVariance = rawIndexVariance * invIndexRange * invIndexRange;
-
-    if (SumPower <= 0.0) {
-        Desc.SpectralSpreadHz = 0.0;
-        Desc.SpectralSpreadVariance = 0.0;
-    }
+    Desc.SpectralSpreadVariance = SumPower > 0.0 ? (rawIndexVariance * invIndexRange * invIndexRange) : 0.0;
 
     const double spreadEps = Desc.SpectralSpreadHz + 1e-12;
     Desc.SpectralSkewness = mu3 / (spreadEps * spreadEps * spreadEps);
     Desc.SpectralKurtosis = mu4 / (spreadEps * spreadEps * spreadEps * spreadEps) - 3.0;
 
-    Desc.StdDev = std::sqrt(Variance / static_cast<double>(NHalf));
     Desc.SpectralIrregularity = irregularityDenominator > 0.0 ? (irregularityNumerator / irregularityDenominator) : 0.0;
+
     if (maxMagCrest == 0.0f) {
         Desc.SpectralCrest = 0.0;
     } else {
@@ -796,44 +787,63 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     }
 
     Desc.SpectralFlatness = std::exp(logSumPower / NHalf) / (linSumPower / NHalf);
-    Desc.SpectralEntropy = 0.0;
-    if (spectralEnergySum > 0.0) {
-        const double invSpectralEnergy = 1.0 / spectralEnergySum;
-        for (size_t i = 0; i < NHalf; ++i) {
-            const double probability = Desc.Power[i] * invSpectralEnergy;
-            if (probability > 0.0) {
-                Desc.SpectralEntropy -= probability * std::log2(probability);
-            }
-        }
-    }
     Desc.Harmonicity = harmonicityPeak / (harmonicitySum + 1e-12);
-    Desc.HighFreqRatio = highFreqEnergy / SumPowerEps;
-
-    const double rolloffCutoffEnergy = std::clamp(m_SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
-    double cumulativeEnergy = 0.0;
-    size_t rolloffBin = 0;
-    for (size_t i = 0; i < NHalf; ++i) {
-        cumulativeEnergy += Desc.Power[i];
-        if (cumulativeEnergy >= rolloffCutoffEnergy) {
-            rolloffBin = i;
-            break;
-        }
-        rolloffBin = i;
-    }
-    const double binToHz = (static_cast<double>(m_Sr) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
-    Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
+    Desc.HighFreqRatio = highFreqEnergy * invSum;
 
     const double K = static_cast<double>(NHalf);
     const double denom = (K * sumFreqSq - sumFreq * sumFreq) + 1e-12;
     const double slope = (K * weightedSumFreqs - sumFreq * SumPower) / denom;
-    Desc.SpectralSlope = slope / SumPowerEps;
+    Desc.SpectralSlope = slope * invSum;
 
+    // --- Setup for Pass 2 ---
+    const double Mean = 1.0 / static_cast<double>(NHalf);
+    const double invSpectralEnergy = spectralEnergySum > 0.0 ? (1.0 / spectralEnergySum) : 0.0;
+    const double rolloffCutoffEnergy = std::clamp(m_SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
+
+    double Variance = 0.0;
+    double cumulativeEnergy = 0.0;
+    size_t rolloffBin = NHalf - 1; // Default to max
+    bool rolloffFound = false;
+
+    Desc.SpectralEntropy = 0.0;
     m_SpectralPrefix.resize(NHalf + 1);
     m_SpectralPrefix[0] = 0.0;
 
+    // =========================================================================
+    // PASS 2: NORMALIZE, ENTROPY, ROLLOFF & PREFIX FUSION
+    // =========================================================================
     for (size_t i = 0; i < NHalf; ++i) {
-        m_SpectralPrefix[i + 1] = m_SpectralPrefix[i] + Desc.Power[i];
+        // Variance & Frame Norm
+        const double normSp = (Desc.SpectralMagnitudeNorm[i] + 1e-12) * invSum;
+        Desc.SpectralMagnitudeFrameNorm[i] = normSp;
+        const double diffMean = normSp - Mean;
+        Variance += diffMean * diffMean;
+
+        const double currentPower = Desc.Power[i];
+
+        // Entropy
+        if (invSpectralEnergy > 0.0) {
+            const double prob = currentPower * invSpectralEnergy;
+            if (prob > 0.0) { // Protect std::log2(0)
+                Desc.SpectralEntropy -= prob * std::log2(prob);
+            }
+        }
+
+        // Cumulative Prefix
+        cumulativeEnergy += currentPower;
+        m_SpectralPrefix[i + 1] = cumulativeEnergy;
+
+        // Rolloff Tracker (Branch predictor maps this efficiently)
+        if (!rolloffFound && cumulativeEnergy >= rolloffCutoffEnergy) {
+            rolloffBin = i;
+            rolloffFound = true;
+        }
     }
+
+    Desc.StdDev = std::sqrt(Variance * Mean);
+
+    const double binToHz = (static_cast<double>(m_Sr) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
+    Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
 
     OnsetExec(Desc);
     MFCCExec(Desc);
@@ -1200,77 +1210,6 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
     }
 
     Desc.ZeroCrossingRate = static_cast<double>(crossings) / static_cast<double>(frameLengthSz);
-}
-
-// ╭─────────────────────────────────────╮
-// │        Spectral Descriptions        │
-// ╰─────────────────────────────────────╯
-void MIR::SpectralFluxExec(Description &Desc) {
-
-    // Must be magnitude spectrum, not power
-    const auto &S = Desc.SpectralMagnitudeNorm;
-    const size_t N = S.size();
-
-    if (m_PreviousSpectralPower.size() != N) {
-        m_PreviousSpectralPower.assign(N, 0.0);
-    }
-
-    double flux = 0.0;
-
-    // Essentia uses all bins
-    for (size_t k = 0; k < N; ++k) {
-        double diff = S[k] - m_PreviousSpectralPower[k];
-        flux += diff * diff;
-    }
-
-    flux = std::sqrt(flux);
-
-    // store spectrum for next frame
-    m_PreviousSpectralPower = S;
-
-    Desc.SpectralFlux = flux;
-}
-
-// ─────────────────────────────────────
-void MIR::SpectralFlatnessExec(Description &Desc) {
-    const auto &S = Desc.Power; // usar potência
-    const size_t N = S.size();
-
-    constexpr double amin = 1e-10; // mesmo default do librosa
-
-    double logSum = 0.0;
-    double linSum = 0.0;
-
-    for (size_t k = 0; k < N; ++k) {
-        double v = std::max(amin, S[k]); // já está |X|^2
-        logSum += std::log(v);
-        linSum += v;
-    }
-
-    const double geoMean = std::exp(logSum / double(N));
-    const double arithMean = linSum / double(N);
-
-    Desc.SpectralFlatness = geoMean / arithMean;
-}
-
-// ─────────────────────────────────────
-void MIR::SpectralHarmonicityExec(Description &Desc) {
-    const auto &S = Desc.SpectralMagnitudeNorm;
-    const size_t N = S.size();
-
-    double sum = 0.0;
-    double peak = 0.0;
-
-    // skip DC
-    for (size_t k = 1; k < N; ++k) {
-        double v = S[k];
-        sum += v;
-        if (v > peak)
-            peak = v;
-    }
-
-    constexpr double eps = 1e-12;
-    Desc.Harmonicity = peak / (sum + eps);
 }
 
 // ─────────────────────────────────────

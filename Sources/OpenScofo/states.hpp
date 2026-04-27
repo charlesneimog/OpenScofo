@@ -12,13 +12,14 @@ enum AudioDescType {
     PITCH,
     SILENCE,
     LABEL,
+    ONSET,
 };
 
 // ─────────────────────────────────────
 enum Descriptors {
     INVALID = -1,
 
-    ONSET,
+    ODSONSET,
 
     // Amplitude
     LOUDNESS,
@@ -58,7 +59,7 @@ enum Descriptors {
     YINCONFIDENCE,
 
     // Percussive
-    EXTENDEDPROB,
+    EXTENDEDTECHNIQUE,
 
     // AI
     ONNX,

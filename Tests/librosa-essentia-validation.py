@@ -1,4 +1,5 @@
 import random
+import os
 
 import OpenScofo
 import librosa
@@ -13,6 +14,8 @@ from scipy.stats import kurtosis
 sr = 48000
 n_fft = 2048
 hop = 512
+
+os.chdir(os.path.dirname(__file__))
 
 scofo = OpenScofo.OpenScofo(sr, n_fft, hop)
 

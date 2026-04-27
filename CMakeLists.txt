@@ -65,7 +65,7 @@ include(${PDCMAKE_FILE})
 # │             CPM Package              │
 # ╰──────────────────────────────────────╯
 set(CPM_FILE ${CMAKE_BINARY_DIR}/CPM.cmake)
-set(CPM_VERSION "0.42.0")
+set(CPM_VERSION "0.42.1")
 if(NOT EXISTS "${CPM_FILE}")
     file(DOWNLOAD
          "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_VERSION}/CPM.cmake"

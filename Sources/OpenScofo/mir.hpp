@@ -57,18 +57,10 @@ class MIR {
     // Extended Technique
     void ExtendedTechExec(Description &Desc);
 
-    // Spectral Flux
-    void SpectralFluxInit();
-    void SpectralFluxExec(Description &Desc);
-    // Spectral Flatness
-    void SpectralFlatnessInit();
-    void SpectralFlatnessExec(Description &Desc);
-    // Harmonicity
-    void SpectralHarmonicityInit();
-    void SpectralHarmonicityExec(Description &Desc);
     // Chroma
     void SpectralChromaInit();
     void SpectralChromaExec(Description &Desc);
+
     // Zero Crossing Rate
     void ZeroCrossingRateInit();
     void ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc);
