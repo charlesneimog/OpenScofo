@@ -621,6 +621,9 @@ void OnlineForward::GetAudioObservations() {
                     bestNoteProb = std::max(bestNoteProb, p);
                 } else if (as.Type == SILENCE && allowSilence) {
                     bestNoteProb = std::max(bestNoteProb, m_Desc.SilenceProb);
+                    // TODO:
+                } else if (as.Type == ONSET) {
+                    bestNoteProb = std::max(bestNoteProb, m_Desc.Onset);
                 }
             }
             stateLikelihood = bestNoteProb;

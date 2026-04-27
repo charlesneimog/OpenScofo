@@ -189,7 +189,8 @@ class pytrain(pd.NewObject):
         idx = 0
         while idx <= len(y) - 2048:
             window = np.asarray(y[idx : idx + 2048], dtype=np.float32)
-            desc = self.oscofo.get_audio_description(window)
+            self.oscofo.process_block(window)
+            desc = self.oscofo.get_description()
             if desc.db >= self.min_db:
                 count += 1
             idx += 512
@@ -561,9 +562,11 @@ class pytrain(pd.NewObject):
 
     def in_0_descriptors(self, args):
         arr = np.zeros(2048)
-        random_des = self.oscofo.get_audio_description(arr)
+
+        self.oscofo.process_block(arr)
+        random_des = self.oscofo.get_description()
         for a in args:
-            value = getattr(random_des, a)
+            _ = getattr(random_des, a)
             if not (hasattr(random_des, a)):
                 self.error(f"The descriptor '{a}' does not exists on OpenScofo")
                 return
