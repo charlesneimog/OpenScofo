@@ -42,6 +42,7 @@ module.exports = grammar({
                 "flatness",
                 "flux",
                 "irregularity",
+                "kurtosis",
                 "harmonicity",
                 "yin",
             ),
