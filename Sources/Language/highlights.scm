@@ -57,40 +57,14 @@
 ; ================================
 ; ACTIONS (runtime layer)
 ; ================================
-(action) @function.call
+(exec receiver: (identifier) @variable.member)
+(exec args: (pdargs) @number)
 
-(exec
-  "sendto" @function)
+; actions keywords
+(exec "sendto" @keyword)
+(exec "luacall" @keyword)
+(delay "delay" @keyword)
 
-(exec
-  "luacall" @function)
-
-(delay) @keyword.operator
-(time_unit) @type
-
-; receiver (e.g. pitchshift, delay, freeze)
-(exec
-  receiver: (identifier) @variable)
-
-; ================================
-; PD ARGUMENTS (structured)
-; ================================
-(pdargs) @punctuation.bracket
-
-(pdarg) @number
-
-(pdarg
-  (identifier) @variable.parameter)
-
-; ================================
-; LUA EMBED
-; ================================
-(LUA) @keyword
-(lua_body) @none
-(lua_call) @function.call
-(lua_comment) @comment
-
-; ================================
-; MISC
-; ================================
-(time_unit) @type
+; delay 
+(delay amount: (number) @variable.parameter)
+(delay unit: (time_unit) @type)
