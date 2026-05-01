@@ -1,8 +1,0 @@
-#N canvas 0 0 925 1132 10;
-#X declare -lib xlab;
-#X declare -path ../build/Sources/PureData;
-#X obj 2 4 declare -lib xlab;
-#X obj 2 24 declare -path ../build/Sources/PureData;
-#X obj 16 196 o.scofo~;
-#X msg 66 116 score assets/extended.txt;
-#X connect 3 0 2 0;
