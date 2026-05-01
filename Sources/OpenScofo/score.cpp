@@ -247,10 +247,11 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 // ─────────────────────────────────────
 MarkovState Score::AddDummySilence() {
     MarkovState Event;
-    Event.HSMMType = MARKOV;
+    Event.HSMMType = SEMIMARKOV;
     Event.Type = REST;
     Event.ScorePos = m_ScorePosition;
     Event.Index = m_ScoreStates.size();
+    Event.Duration = 0;
 
     AudioState Silence;
     Silence.Type = SILENCE;
@@ -335,7 +336,7 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 
         // TODO: need tests
         AudioState Onset;
-        PercussiveDesc.Type = ONSET;
+        Onset.Type = ONSET;
         Event.AudioStates.push_back(Onset);
     }
 
@@ -778,6 +779,7 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
             } else if (unit == "tempo") {
                 BaseAction.AbsoluteTime = false;
             }
+            spdlog::warn("New Action after {} {}, Score Position {}", BaseAction.Time, unit, Event.ScorePos);
         }
     }
 
@@ -981,9 +983,9 @@ States Score::Parse(fs::path ScoreFilePath) {
             NewConfig(ScoreStr, child);
         } else if (type == "LUA") {
             std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
-            // lua_body += "\n\n";
             m_LuaCode += lua_body;
         } else if (type == "comment") {
+            // ignore
         } else {
             spdlog::error("Not recognized {}", type);
         }
