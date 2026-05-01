@@ -17,7 +17,7 @@ def run_scofo(audio_path, score_path):
     oscofo = OpenScofo.OpenScofo(SR, FFTSIZE, HOPSIZE)
 
     x, sr = librosa.load(audio_path, sr=SR)
-    oscofo.parse_score(score_path)
+    oscofo.load_score(score_path)
 
     event_marks = []
     CURRENT_EVENT = 0

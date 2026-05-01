@@ -12,7 +12,7 @@ HOPSIZE = 512
 
 oscofo = OpenScofo.OpenScofo(SR, FFTSIZE, HOPSIZE)
 x, sr = librosa.load("./assets/bwv-1013.mp3", sr=SR)
-oscofo.parse_score("./assets/bwv-1013.txt")
+oscofo.load_score("./assets/bwv-1013.txt")
 
 
 event_marks = []

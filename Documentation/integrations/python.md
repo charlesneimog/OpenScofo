@@ -28,13 +28,13 @@ Constructor arguments:
 
 ### Score
 
-#### `parse_score(path)`
+#### `load_score(path)`
 
 - Input: score file path.
 - Output: `bool`.
 
 ```py
-ok = scofo.parse_score("myscore.txt")
+ok = scofo.load_score("myscore.txt")
 ```
 
 ### Processing

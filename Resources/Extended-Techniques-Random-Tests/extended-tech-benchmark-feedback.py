@@ -155,7 +155,9 @@ class ScoreFollowerValidator:
     ) -> Dict:
         detected_by_pos: Dict[int, List[float]] = {}  # MIREX-COMPLIANT
         for pos, detected_time in detected_events:
-            detected_by_pos.setdefault(pos, []).append(float(detected_time))  # MIREX-COMPLIANT
+            detected_by_pos.setdefault(pos, []).append(
+                float(detected_time)
+            )  # MIREX-COMPLIANT
 
         expected_positions = set(expected_times.keys())  # MIREX-COMPLIANT
 
@@ -175,7 +177,9 @@ class ScoreFollowerValidator:
             candidate_detections.sort()  # MIREX-COMPLIANT
             first_detection = candidate_detections[0]  # MIREX-COMPLIANT
 
-            offset_ms = float((first_detection - reference_time) * 1000.0)  # MIREX-COMPLIANT
+            offset_ms = float(
+                (first_detection - reference_time) * 1000.0
+            )  # MIREX-COMPLIANT
 
             if abs(offset_ms) > float(tolerance_ms):  # MIREX-COMPLIANT
                 missed_positions.append(pos)  # MIREX-COMPLIANT
@@ -183,7 +187,9 @@ class ScoreFollowerValidator:
             else:
                 matched_offsets_ms.append(offset_ms)  # MIREX-COMPLIANT
 
-        unexpected_positions = sorted(set(detected_by_pos.keys()) - expected_positions)  # MIREX-COMPLIANT
+        unexpected_positions = sorted(
+            set(detected_by_pos.keys()) - expected_positions
+        )  # MIREX-COMPLIANT
         false_positive_positions.extend(unexpected_positions)  # MIREX-COMPLIANT
 
         n_reference = len(expected_positions)  # MIREX-COMPLIANT
@@ -191,7 +197,9 @@ class ScoreFollowerValidator:
         n_false_positives = len(false_positive_positions)  # MIREX-COMPLIANT
         n_matched = n_reference - n_missed  # MIREX-COMPLIANT
 
-        precision = ((n_reference - n_missed) / n_reference) if n_reference > 0 else 0.0  # MIREX-COMPLIANT
+        precision = (
+            ((n_reference - n_missed) / n_reference) if n_reference > 0 else 0.0
+        )  # MIREX-COMPLIANT
 
         if matched_offsets_ms:
             offsets = np.array(matched_offsets_ms, dtype=float)  # MIREX-COMPLIANT
@@ -207,7 +215,9 @@ class ScoreFollowerValidator:
             "reference_events": n_reference,  # MIREX-COMPLIANT
             "matched_events": n_matched,  # MIREX-COMPLIANT
             "missed_notes": n_missed,  # MIREX-COMPLIANT
-            "missed_notes_pct": float((n_missed / n_reference) * 100.0) if n_reference > 0 else 0.0,  # MIREX-COMPLIANT
+            "missed_notes_pct": (
+                float((n_missed / n_reference) * 100.0) if n_reference > 0 else 0.0
+            ),  # MIREX-COMPLIANT
             "false_positives": n_false_positives,  # MIREX-COMPLIANT
             "precision": float(precision),  # MIREX-COMPLIANT
             "precision_pct": float(precision * 100.0),  # MIREX-COMPLIANT
@@ -232,12 +242,16 @@ class ScoreFollowerValidator:
     ) -> None:
         """Persist per-piece history entries and run-level global summary."""
         if implementation_name is None:
-            implementation_name = f"impl_{self.hash_implementation()}"  # MIREX-COMPLIANT
+            implementation_name = (
+                f"impl_{self.hash_implementation()}"  # MIREX-COMPLIANT
+            )
 
         timestamp = datetime.now().isoformat()  # MIREX-COMPLIANT
 
         if self.results_path.exists():
-            with open(self.results_path, "r", encoding="utf-8") as handle:  # MIREX-COMPLIANT
+            with open(
+                self.results_path, "r", encoding="utf-8"
+            ) as handle:  # MIREX-COMPLIANT
                 storage = json.load(handle)  # MIREX-COMPLIANT
         else:
             storage = {}  # MIREX-COMPLIANT
@@ -281,7 +295,9 @@ class ScoreFollowerValidator:
         storage["schema_version"] = SCHEMA_VERSION  # MIREX-COMPLIANT
         storage["last_updated"] = timestamp  # MIREX-COMPLIANT
 
-        with open(self.results_path, "w", encoding="utf-8") as handle:  # MIREX-COMPLIANT
+        with open(
+            self.results_path, "w", encoding="utf-8"
+        ) as handle:  # MIREX-COMPLIANT
             json.dump(storage, handle, indent=2)  # MIREX-COMPLIANT
 
         print(f"\nResults saved to {self.results_path}")  # MIREX-COMPLIANT
@@ -330,7 +346,7 @@ def process_audio_file(
     audio, _ = librosa.load(audio_path, sr=SR)
 
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
-    scofo.parse_score(Path(score_path))
+    scofo.load_score(Path(score_path))
 
     expected_times: Dict[int, float] = {}
     score_context: Dict[int, Dict[str, str]] = {}
@@ -440,14 +456,30 @@ def compute_global_metrics_mirex(piece_results: List[Dict]) -> Dict:
             "average_latency_ms": ONLINE_LATENCY_MS,  # MIREX-COMPLIANT
         }  # MIREX-COMPLIANT
 
-    total_reference_events = sum(piece["metrics"]["reference_events"] for piece in piece_results)  # MIREX-COMPLIANT
-    total_missed_notes = sum(piece["metrics"]["missed_notes"] for piece in piece_results)  # MIREX-COMPLIANT
-    total_false_positives = sum(piece["metrics"]["false_positives"] for piece in piece_results)  # MIREX-COMPLIANT
+    total_reference_events = sum(
+        piece["metrics"]["reference_events"] for piece in piece_results
+    )  # MIREX-COMPLIANT
+    total_missed_notes = sum(
+        piece["metrics"]["missed_notes"] for piece in piece_results
+    )  # MIREX-COMPLIANT
+    total_false_positives = sum(
+        piece["metrics"]["false_positives"] for piece in piece_results
+    )  # MIREX-COMPLIANT
 
-    overall_precision = ((total_reference_events - total_missed_notes) / total_reference_events) if total_reference_events > 0 else 0.0  # MIREX-COMPLIANT
+    overall_precision = (
+        ((total_reference_events - total_missed_notes) / total_reference_events)
+        if total_reference_events > 0
+        else 0.0
+    )  # MIREX-COMPLIANT
 
-    piecewise_precision_values = [piece["metrics"]["precision"] for piece in piece_results]  # MIREX-COMPLIANT
-    piecewise_precision = float(np.mean(piecewise_precision_values)) if piecewise_precision_values else 0.0  # MIREX-COMPLIANT
+    piecewise_precision_values = [
+        piece["metrics"]["precision"] for piece in piece_results
+    ]  # MIREX-COMPLIANT
+    piecewise_precision = (
+        float(np.mean(piecewise_precision_values))
+        if piecewise_precision_values
+        else 0.0
+    )  # MIREX-COMPLIANT
 
     all_offsets: List[float] = []  # MIREX-COMPLIANT
 
@@ -475,7 +507,9 @@ def compute_global_metrics_mirex(piece_results: List[Dict]) -> Dict:
         "overall_precision": float(overall_precision),  # MIREX-COMPLIANT
         "overall_precision_pct": float(overall_precision * 100.0),  # MIREX-COMPLIANT
         "piecewise_precision": float(piecewise_precision),  # MIREX-COMPLIANT
-        "piecewise_precision_pct": float(piecewise_precision * 100.0),  # MIREX-COMPLIANT
+        "piecewise_precision_pct": float(
+            piecewise_precision * 100.0
+        ),  # MIREX-COMPLIANT
         "global_mean_abs_offset_ms": global_mean_abs_offset_ms,  # MIREX-COMPLIANT
         "piecewise_mean_abs_offset_ms": piecewise_mean_abs_offset_ms,  # MIREX-COMPLIANT
         "global_mean_offset_ms": global_mean_offset_ms,  # MIREX-COMPLIANT
@@ -645,26 +679,27 @@ def process_audio_file_worker(
     """
     Worker function for multiprocessing pool.
     Processes one audio file and returns results and status.
-    
+
     Returns:
         Tuple of (piece_result_dict, status_message)
     """
     audio_path = test_file["audio"]
     score_path = test_file["score"]
-    
+
     try:
         if not Path(audio_path).exists():
             return None, f"[WARN] Missing file: {audio_path}"
         if not Path(score_path).exists():
             return None, f"[WARN] Missing file: {score_path}"
-        
+
         # Suppress worker process output to avoid interleaving
         import io
+
         with redirect_stdout(io.StringIO()):
             detected_events, expected_times, score_context = process_audio_file(
                 audio_path, score_path, tolerance_ms
             )
-        
+
         validator = ScoreFollowerValidator(  # MIREX-COMPLIANT
             results_path=RESULTS_PATH,  # MIREX-COMPLIANT
             protocol_name=protocol_name,  # MIREX-COMPLIANT
@@ -674,7 +709,7 @@ def process_audio_file_worker(
         metrics = validator.compute_piece_metrics_mirex(  # MIREX-COMPLIANT
             detected_events, expected_times, tolerance_ms  # MIREX-COMPLIANT
         )  # MIREX-COMPLIANT
-        
+
         piece_result = {
             "audio_file": audio_path,
             "score_file": score_path,
@@ -682,7 +717,7 @@ def process_audio_file_worker(
             "detected_events": detected_events,
             "expected_times": expected_times,
         }
-        
+
         status_msg = (
             f"✓ {Path(audio_path).name}: "
             f"ref={metrics['reference_events']}  "
@@ -692,9 +727,9 @@ def process_audio_file_worker(
             f"mean|offset|={metrics['mean_abs_offset_ms']:.2f}ms  "
             f"std={metrics['std_offset_ms']:.2f}ms"
         )
-        
+
         return piece_result, status_msg
-    
+
     except Exception as e:
         return None, f"✗ {Path(audio_path).name}: {str(e)}"
 
@@ -760,11 +795,22 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    tolerance_ms = 250.0 if args.mirex_strict else (float(args.tolerance_ms) if args.tolerance_ms is not None else PROTOCOL_TOLERANCE_MS[args.protocol])  # MIREX-COMPLIANT
+    tolerance_ms = (
+        250.0
+        if args.mirex_strict
+        else (
+            float(args.tolerance_ms)
+            if args.tolerance_ms is not None
+            else PROTOCOL_TOLERANCE_MS[args.protocol]
+        )
+    )  # MIREX-COMPLIANT
 
     # Determine number of workers
     import os as os_module  # MIREX-COMPLIANT
-    num_workers = args.workers if args.workers is not None else os_module.cpu_count()  # MIREX-COMPLIANT
+
+    num_workers = (
+        args.workers if args.workers is not None else os_module.cpu_count()
+    )  # MIREX-COMPLIANT
 
     print("=" * 72)
     print("EXTENDED TECHNIQUES BENCHMARK - MIREX/CONT PROTOCOL")
@@ -773,7 +819,9 @@ def main() -> None:
     print(f"Missing/misaligned tolerance: {tolerance_ms:.1f} ms")
     print(f"MIREX strict mode: {'enabled' if args.mirex_strict else 'disabled'}")
     print("Missed = no event or |offset| > tolerance")
-    print("False positive = spurious detection with no reference event")  # MIREX-COMPLIANT
+    print(
+        "False positive = spurious detection with no reference event"
+    )  # MIREX-COMPLIANT
     print("Latency metric fixed to zero (strict online)")
     print(f"Parallel workers: {num_workers}")
     print()
@@ -798,7 +846,9 @@ def main() -> None:
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Submit all tasks
         futures = {
-            executor.submit(process_audio_file_worker, test_file, tolerance_ms, args.protocol): test_file  # MIREX-COMPLIANT
+            executor.submit(
+                process_audio_file_worker, test_file, tolerance_ms, args.protocol
+            ): test_file  # MIREX-COMPLIANT
             for test_file in TEST_FILES
         }
 
@@ -814,7 +864,9 @@ def main() -> None:
 
                     # Write result file if requested
                     if args.write_result_files:
-                        result_name = f"{Path(piece_result['audio_file']).stem}.result.txt"
+                        result_name = (
+                            f"{Path(piece_result['audio_file']).stem}.result.txt"
+                        )
                         output_path = Path(args.result_files_dir) / result_name
                         write_result_file(
                             output_path,
@@ -861,7 +913,9 @@ def main() -> None:
         files_processed=len(piece_results),
     )
 
-    rows = sorted(piece_results, key=lambda item: Path(item["audio_file"]).name)  # MIREX-COMPLIANT
+    rows = sorted(
+        piece_results, key=lambda item: Path(item["audio_file"]).name
+    )  # MIREX-COMPLIANT
     header = f"{'File':<22} {'Ref':>6} {'Miss':>6} {'FP':>6} {'Mean|Off|(ms)':>15} {'MeanOff(ms)':>12} {'StdOff(ms)':>11} {'Precision(%)':>13}"  # MIREX-COMPLIANT
     print(header)  # MIREX-COMPLIANT
     print("-" * len(header))  # MIREX-COMPLIANT
@@ -880,15 +934,33 @@ def main() -> None:
 
     print("=" * 72)  # MIREX-COMPLIANT
     print("GLOBAL:")  # MIREX-COMPLIANT
-    print(f"Total Reference Events: {global_metrics['total_reference_events']}")  # MIREX-COMPLIANT
-    print(f"Total Missed Notes:     {global_metrics['total_missed_notes']}")  # MIREX-COMPLIANT
-    print(f"Total False Positives:   {global_metrics['total_false_positives']}")  # MIREX-COMPLIANT
-    print(f"Overall Precision:      {global_metrics['overall_precision_pct']:.2f}%")  # MIREX-COMPLIANT
-    print(f"Piecewise Precision:    {global_metrics['piecewise_precision_pct']:.2f}%")  # MIREX-COMPLIANT
-    print(f"Global Mean |Offset|:   {global_metrics['global_mean_abs_offset_ms']:.1f} ms")  # MIREX-COMPLIANT
-    print(f"Global Mean Offset:     {global_metrics['global_mean_offset_ms']:+.1f} ms")  # MIREX-COMPLIANT
-    print(f"Global Std Offset:      {global_metrics['global_std_offset_ms']:.1f} ms")  # MIREX-COMPLIANT
-    print(f"Average Latency:        {global_metrics['average_latency_ms']:.2f} ms")  # MIREX-COMPLIANT
+    print(
+        f"Total Reference Events: {global_metrics['total_reference_events']}"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Total Missed Notes:     {global_metrics['total_missed_notes']}"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Total False Positives:   {global_metrics['total_false_positives']}"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Overall Precision:      {global_metrics['overall_precision_pct']:.2f}%"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Piecewise Precision:    {global_metrics['piecewise_precision_pct']:.2f}%"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Global Mean |Offset|:   {global_metrics['global_mean_abs_offset_ms']:.1f} ms"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Global Mean Offset:     {global_metrics['global_mean_offset_ms']:+.1f} ms"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Global Std Offset:      {global_metrics['global_std_offset_ms']:.1f} ms"
+    )  # MIREX-COMPLIANT
+    print(
+        f"Average Latency:        {global_metrics['average_latency_ms']:.2f} ms"
+    )  # MIREX-COMPLIANT
 
     if best_run is not None:  # MIREX-COMPLIANT
         best_metrics = best_run["global_metrics"]
