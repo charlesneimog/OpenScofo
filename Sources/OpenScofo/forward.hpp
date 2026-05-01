@@ -2,7 +2,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "states.hpp"
+#include <gtest/gtest.h>
+#include <states.hpp>
 
 namespace OpenScofo {
 
@@ -40,7 +41,7 @@ class OnlineForward {
     // Get Functions
     int GetCurrentBufferIndex();
     int GetTunning();
-    EventActions GetEventActions(int Index);
+    EventActions GetCurrentEventActions();
     std::vector<MarkovState> &GetStates();
     MarkovState GetState(int Index);
     double GetKappa();
@@ -90,6 +91,9 @@ class OnlineForward {
 
     // Get Audio Obs
     void GetAudioObservations();
+
+    // Friend Tests
+    FRIEND_TEST(OnlineForwardKappaTest, A2Properties);
 
   private:
     // Test things

@@ -281,8 +281,8 @@ double OpenScofo::GetLiveBPM() {
 }
 
 // ─────────────────────────────────────
-EventActions OpenScofo::GetEventActions(int Index) {
-    return m_Forward.GetEventActions(Index);
+EventActions OpenScofo::GetCurrentEventActions() {
+    return m_Forward.GetCurrentEventActions();
 }
 
 // ─────────────────────────────────────
@@ -404,6 +404,10 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::EXTENDEDTECHNIQUE;
     } else if (strcmp(s, "onset") == 0) {
         return Descriptors::ODSONSET;
+    } else if (strcmp(s, "irregularity") == 0) {
+        return Descriptors::IRREGULARITY;
+    } else if (strcmp(s, "kurtosis") == 0) {
+        return Descriptors::KURTOSIS;
     } else if (strcmp(s, "yin") == 0) {
         return Descriptors::YIN;
     } else if (strcmp(s, "onnx") == 0) {

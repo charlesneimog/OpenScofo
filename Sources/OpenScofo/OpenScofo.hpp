@@ -62,7 +62,7 @@ class OpenScofo {
     int GetCurrentScorePosition();
     double GetKappa();
     double GetdBValue();
-    EventActions GetEventActions(int Index);
+    EventActions GetCurrentEventActions();
     std::string GetLuaCode();
     double GetPitchProb(double Freq);
     States &GetStates();

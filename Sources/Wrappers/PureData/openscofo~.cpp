@@ -410,7 +410,7 @@ static void oscofo_ticknewevent(PdOpenScofo *x) {
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetCurrentScorePosition());
-    OpenScofo::EventActions Actions = x->OpenScofo->GetEventActions(x->Event);
+    OpenScofo::EventActions Actions = x->OpenScofo->GetCurrentEventActions();
 
     for (OpenScofo::ScoreAction &Act : Actions) {
         double time = Act.Time;

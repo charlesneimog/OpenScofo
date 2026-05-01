@@ -79,12 +79,8 @@ void OnlineForward::UpdateAudioParameters(double Sr, double FFTSize, double HopS
 }
 
 // ─────────────────────────────────────
-EventActions OnlineForward::GetEventActions(int Index) {
-    if (Index < 0 || Index >= (int)m_States.size()) {
-        return EventActions();
-    }
-
-    MarkovState State = m_States[(size_t)Index];
+EventActions OnlineForward::GetCurrentEventActions() {
+    MarkovState State = m_States[m_CurrentStateIndex];
     return State.Actions;
 }
 
@@ -642,7 +638,7 @@ void OnlineForward::GetAudioObservations() {
     EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
     double maxSoundEvidence = 0.0;
 
-    bool allowSilence = (CurrentEventType != FIRSTEVENT);
+    bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         MarkovState &state = m_States[j];
@@ -705,7 +701,7 @@ void OnlineForward::GetAudioObservations() {
             stateLikelihood = m_Desc.SilenceProb;
             break;
         default:
-            spdlog::error("Event type not implemented yet, please remove it");
+            spdlog::error("Event type of line {} of score file is not implemented, please remove it", state.Line);
             break;
         }
 
