@@ -61,7 +61,7 @@ struct ScOpenScofo : public SCUnit {
 
     void ParseScore(const char *path) {
         if (m_OScofo) {
-            bool ok = m_OScofo->ParseScore(path);
+            bool ok = m_OScofo->LoadScore(path);
             if (!ok) {
                 return;
             }

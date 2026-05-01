@@ -166,7 +166,7 @@ void VampOpenScofo::selectProgram(std::string name) {
         m_selectedScoreIndex = int(std::distance(m_scorePaths.begin(), it));
     }
 
-    if (m_OScofo && m_OScofo->ParseScore(name)) {
+    if (m_OScofo && m_OScofo->LoadScore(name)) {
         m_currentProgram = name;
     }
 }
@@ -233,7 +233,7 @@ bool VampOpenScofo::LoadScoreAtIndex(int index) {
         return false;
 
     const std::string &scorePath = m_scorePaths[size_t(index)];
-    if (!m_OScofo->ParseScore(scorePath))
+    if (!m_OScofo->LoadScore(scorePath))
         return false;
 
     m_currentProgram = scorePath;
@@ -371,8 +371,7 @@ static Vamp::PluginAdapter<VampOpenScofo> adapter;
 #define VAMP_PLUGIN_EXPORT extern "C"
 #endif
 
-VAMP_PLUGIN_EXPORT const VampPluginDescriptor *vampGetPluginDescriptor(unsigned int version,
-                                                                        unsigned int index) {
+VAMP_PLUGIN_EXPORT const VampPluginDescriptor *vampGetPluginDescriptor(unsigned int version, unsigned int index) {
     if (version < 1)
         return nullptr;
 

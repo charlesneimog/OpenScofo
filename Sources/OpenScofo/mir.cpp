@@ -374,6 +374,11 @@ void MIR::ONNXExec(Description &Desc) {
     }
 }
 
+// ─────────────────────────────────────
+std::vector<std::string> MIR::GetONNXLabels() {
+    return m_ONNXLabels;
+}
+
 // ╭─────────────────────────────────────╮
 // │           Onset Detector            │
 // ╰─────────────────────────────────────╯

@@ -80,7 +80,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
         scorePath = x->PatchDir + "/" + s->s_name;
     }
 
-    ok = x->OpenScofo->ParseScore(scorePath);
+    ok = x->OpenScofo->LoadScore(scorePath);
     if (ok) {
         logpost(x, 2, "[openscofo~] Score loaded");
     } else {

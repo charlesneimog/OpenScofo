@@ -37,25 +37,11 @@ class Score {
     double GetSyncStrength();
 
     // AI
-    bool HasTimbreModel() {
-        if (m_TimbreONNXModel.empty()) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-    fs::path GetTimbreModel() {
-        return m_TimbreONNXModel;
-    }
-
-    std::vector<std::string> GetTimbreModelDescriptors() {
-        return m_ONNXDescriptors;
-    }
+    bool HasTimbreModel();
+    fs::path GetTimbreModel();
+    std::vector<std::string> GetTimbreModelDescriptors();
 
   private:
-    States m_ScoreStates;
-    std::string m_LuaCode;
-
     // Helpers
     MarkovState AddDummySilence();
     double ModPhases(double Phase);
@@ -92,6 +78,10 @@ class Score {
     MarkovState GetFirstEvent();
     MarkovState AddDumpSilence();
     void AddAction(std::vector<std::string> Tokens);
+
+  private:
+    States m_ScoreStates;
+    std::string m_LuaCode;
 
     // Configurations
     MIRConfig m_MIRConfig;

@@ -40,7 +40,10 @@ class MIR {
     void AddReverb(Description &Desc, double decay);
 
     double GetdB();
+
+    // AI
     void ONNXInit(fs::path path, std::vector<Descriptors> Descriptors);
+    std::vector<std::string> GetONNXLabels();
 
   private:
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;

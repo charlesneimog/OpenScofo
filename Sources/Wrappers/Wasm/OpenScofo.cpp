@@ -99,7 +99,7 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
     // OpenScofo class
     class_<OpenScofo::OpenScofo>("OpenScofo")
         .constructor<float, float, float>()
-        .function("parse_score", &OpenScofo::OpenScofo::ParseScore)
+        .function("load_score", &OpenScofo::OpenScofo::LoadScore)
         .function("set_db_threshold", &OpenScofo::OpenScofo::SetdBTreshold)
         .function("set_tuning", &OpenScofo::OpenScofo::SetTunning)
         .function("set_current_event", &OpenScofo::OpenScofo::SetCurrentEvent)

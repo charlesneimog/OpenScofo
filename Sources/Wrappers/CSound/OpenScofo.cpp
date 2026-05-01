@@ -65,7 +65,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
         STRINGDAT &scorePath = inargs.str_data(1);
         const char *score = reinterpret_cast<const char *>(scorePath.data);
-        if (!oscofo->ParseScore(score)) {
+        if (!oscofo->LoadScore(score)) {
             csound->warning("Failed to parse score");
             return NOTOK;
         }

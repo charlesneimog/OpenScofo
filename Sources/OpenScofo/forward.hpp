@@ -15,12 +15,10 @@ class OnlineForward {
   public:
     OnlineForward(double Sr, double WindowSize, double HopSize);
     void UpdateAudioParameters(double Sr, double WindowSize, double HopSize);
-
-    // Init Functions
     void SetScoreStates(States States);
-
     void UpdateAudioTemplate();
     void UpdatePhaseValues();
+    void ResetDecoding();
 
     // Set
     void SetPitchTemplateSigma(double f);
@@ -121,7 +119,6 @@ class OnlineForward {
     int m_CurrentStateIndex = 0;
 
     // Time
-    double m_SyncStr = 0;
     double m_TimeInPrevEvent = 0;
     std::unordered_map<int, double> m_KappaCache;
     // Cache for the distributions
@@ -138,9 +135,12 @@ class OnlineForward {
     double m_PsiN = 0;
     double m_PsiN1 = 0;
     double m_BPM = 0;
+
     double m_Kappa = 5;
     double m_SyncStrength = 0.5;
     double m_PhaseCoupling = 0.5;
+    double m_SyncStr = 0;
+
     double m_MaxAheadSeconds;
     double m_BeatsAhead = 1;
     double m_NormAlpha = 1;

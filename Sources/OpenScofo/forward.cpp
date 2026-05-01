@@ -67,8 +67,8 @@ void OnlineForward::UpdateAudioParameters(double Sr, double FFTSize, double HopS
 
     m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
     for (MarkovState &State : m_States) {
-        State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
-        State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
+        State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
+        State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
         State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
     }
 
@@ -301,11 +301,10 @@ void OnlineForward::SetCurrentEvent(int Event) {
 
     if (Event == 0) {
         spdlog::info("Initializing Time Decoding Algorithm");
-        InitTimeDecoding();
+        ResetDecoding(); // Use full reset instead of InitTimeDecoding
     }
     m_CurrentStateIndex = Event;
-    m_Tau = 0;
-    std::cout << "\n" << std::endl;
+    m_Tau = 0; // Already set in ResetDecoding, but keep for safety
 }
 
 // ─────────────────────────────────────
@@ -336,7 +335,6 @@ void OnlineForward::SetPitchTemplateSigma(double f) {
 // ╭─────────────────────────────────────╮
 // │            Time Decoding            │
 // ╰─────────────────────────────────────╯
-// CONT 2010
 void OnlineForward::InitTimeDecoding(void) {
     double PsiK = 60 / m_States[0].BPMExpected;
     m_LastPsiN = PsiK;
@@ -347,6 +345,48 @@ void OnlineForward::InitTimeDecoding(void) {
     m_CurrentStateOnset = 0;
     m_LastTn = 0;
     m_TimeInPrevEvent = 0;
+    m_SyncStr = 0;
+    m_Kappa = 10;
+    m_Tau = 0;
+}
+
+// ─────────────────────────────────────
+void OnlineForward::ResetDecoding() {
+    // Reset timing variables
+    m_Tau = 0;
+    m_TimeInPrevEvent = 0;
+    m_CurrentStateOnset = 0;
+    m_LastTn = 0;
+
+    // Reset synchronization variables
+    m_SyncStr = 0;
+    m_Kappa = 10;
+
+    // Reset BPM and period predictions
+    double PsiK = 60 / m_States[0].BPMExpected;
+    m_LastPsiN = PsiK;
+    m_PsiN = PsiK;
+    m_PsiN1 = PsiK;
+    m_BPM = m_States[0].BPMExpected;
+
+    // Reset all state probabilities
+    for (MarkovState &State : m_States) {
+        std::fill(State.Forward.begin(), State.Forward.end(), 0.0);
+        std::fill(State.ExitProb.begin(), State.ExitProb.end(), 0.0);
+        std::fill(State.BestObs.begin(), State.BestObs.end(), 1e-300);
+        State.OnsetObserved = 0;
+        State.PhaseObserved = 0;
+        State.IOIPhiN = 0;
+        State.InitProb = 0.0;
+    }
+
+    // Reset normalization buffer
+    std::fill(m_Normalization.begin(), m_Normalization.end(), 1.0);
+
+    // Reset first state
+    m_States[0].OnsetObserved = 0;
+
+    spdlog::debug("OnlineForward decoding state fully reset");
 }
 
 // ─────────────────────────────────────
@@ -463,8 +503,9 @@ double OnlineForward::CouplingFunction(double phi, double phi_hat, double kappa)
 // CONT 2010 (Section 7.1)
 double OnlineForward::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
-    if (Phase < 0.0)
+    if (Phase < 0.0) {
         Phase += 1.0;
+    }
     return Phase - 0.5;
 }
 
@@ -503,91 +544,96 @@ void OnlineForward::GetDecodeWindow() {
 // ─────────────────────────────────────
 // CONT 2010 (Section 5, algorithm 1)
 double OnlineForward::UpdatePsiN(int StateIndex) {
-    m_TimeInPrevEvent += m_BlockDur;
-    m_Tau += 1;
-
     if (StateIndex == m_CurrentStateIndex) {
-        m_PsiN1 = m_PsiN;
+        m_TimeInPrevEvent += m_BlockDur;
+        m_Tau += 1;
         return m_PsiN;
     }
 
-    if (StateIndex <= 0 || StateIndex < 2) {
-        m_PsiN1 = m_PsiN;
+    if (StateIndex < 2) {
+        double PsiK = 60 / m_States[0].BPMExpected;
+        m_LastPsiN = PsiK;
+        m_PsiN = PsiK;
+        m_PsiN1 = PsiK;
+        m_States[0].OnsetObserved = 0;
+        m_BPM = m_States[0].BPMExpected;
+        m_CurrentStateOnset = 0;
+        m_LastTn = 0;
+        m_TimeInPrevEvent = 0;
+        m_Tau = 0;
         return m_PsiN;
     }
 
+    m_TimeInPrevEvent += m_BlockDur;
+    m_LastTn = m_CurrentStateOnset;
     m_CurrentStateOnset += m_TimeInPrevEvent;
+
+    if (StateIndex + 1 > (int)m_States.size()) {
+        return m_PsiN;
+    }
 
     // Cont (2010), Large and Palmer (1999) and Large and Jones (2002)
     MarkovState &LastState = m_States[StateIndex - 1];
     MarkovState &CurrentState = m_States[StateIndex];
-    MarkovState *NextState = nullptr;
-    if ((size_t)(StateIndex + 1) < m_States.size()) {
-        NextState = &m_States[StateIndex + 1];
-    }
+    MarkovState &NextState = m_States[StateIndex + 1];
 
     double IOISeconds = m_CurrentStateOnset - m_LastTn;
     double LastPhiN = LastState.IOIPhiN;
     double LastHatPhiN = LastState.IOIHatPhiN;
     double HatPhiN = CurrentState.IOIHatPhiN;
+    double PhiNExpected = LastPhiN + ((m_CurrentStateOnset - m_LastTn) / m_PsiN);
+    CurrentState.IOIHatPhiN = PhiNExpected;
     CurrentState.OnsetObserved = m_CurrentStateOnset;
 
-    if (std::isfinite(CurrentState.SyncStrength)) {
-        m_SyncStrength = std::clamp(CurrentState.SyncStrength, 0.0, 1.0);
-    }
-    if (std::isfinite(CurrentState.PhaseCoupling)) {
-        m_PhaseCoupling = std::clamp(CurrentState.PhaseCoupling, 0.0, 2.0);
-    }
-
-    // Correction (1): r_n, kappa_n
+    // Update Variance (Cont, 2010) - Coupling Strength (Large 1999)
     double PhaseDiff = (IOISeconds / m_PsiN) - HatPhiN;
-    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(2.0 * std::numbers::pi * PhaseDiff));
+    double SyncStrength = m_SyncStr - m_SyncStrength * (m_SyncStr - cos(std::numbers::pi * 2 * PhaseDiff));
     double Kappa = InverseA2(SyncStrength);
     m_SyncStr = SyncStrength;
     m_Kappa = Kappa;
 
-    // Correction (2): phi_n
+    // Update and Correct PhiN
     double FValueUpdate = CouplingFunction(LastPhiN, LastHatPhiN, Kappa);
     double PhiN = LastPhiN + (IOISeconds / m_LastPsiN) + (m_PhaseCoupling * FValueUpdate);
     PhiN = ModPhases(PhiN);
     CurrentState.PhaseObserved = PhiN;
-    CurrentState.IOIPhiN = PhiN;
 
-    // Prediction: psi_{n+1}
+    // Prediction for next PsiN+1
     double FValuePrediction = CouplingFunction(PhiN, HatPhiN, Kappa);
     double PsiN1 = m_PsiN * (1 + m_SyncStrength * FValuePrediction);
-    if (PsiN1 < 1e-6) {
-        PsiN1 = 1e-6;
-    }
 
-    if (NextState != nullptr) {
-        double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
-        double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
-        NextState->IOIHatPhiN = PhiN1;
-        NextState->OnsetExpected = Tn1;
+    // Prediction for Next HatPhiN
+    double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
+    double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
+    NextState.IOIHatPhiN = PhiN1;
 
-        double LastOnsetExpected = Tn1;
-        for (int i = m_CurrentStateIndex + 2; i < m_CurrentStateIndex + 20; i++) {
-            if ((size_t)i >= m_States.size()) {
-                break;
-            }
-            MarkovState &FutureState = m_States[i];
-            MarkovState &PreviousFutureState = m_States[(i - 1)];
-            double Duration = PreviousFutureState.Duration;
-            double FutureOnset = LastOnsetExpected + Duration * PsiN1;
+    // Update all next expected onsets
+    NextState.OnsetExpected = Tn1;
+    double LastOnsetExpected = Tn1;
 
-            FutureState.OnsetExpected = FutureOnset;
-            LastOnsetExpected = FutureOnset;
+    // the m_CurrentEvent + 1 already updated, now
+    // we update the future events to get the Sojourn Time
+    for (int i = m_CurrentStateIndex + 2; i < m_CurrentStateIndex + 20; i++) {
+        if ((size_t)i >= m_States.size()) {
+            break;
         }
+        MarkovState &FutureState = m_States[i];
+        MarkovState &PreviousFutureState = m_States[(i - 1)];
+        double Duration = PreviousFutureState.Duration;
+        double FutureOnset = LastOnsetExpected + Duration * PsiN1;
+
+        FutureState.OnsetExpected = FutureOnset;
+        LastOnsetExpected = FutureOnset;
     }
 
-    m_BPM = 60.0f / PsiN1;
+    // Update Values for next calls
+    m_BPM = 60.0f / m_PsiN;
     m_LastPsiN = m_PsiN;
-    m_PsiN1 = PsiN1;
 
-    m_TimeInPrevEvent = 0;
-    m_LastTn = m_CurrentStateOnset;
-
+    if (StateIndex != m_CurrentStateIndex) {
+        m_TimeInPrevEvent = 0;
+        m_Tau = 0;
+    }
     return PsiN1;
 }
 
@@ -601,99 +647,80 @@ void OnlineForward::GetAudioObservations() {
     double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
-
     EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
-
     double maxSoundEvidence = 0.0;
+
     bool allowSilence = (CurrentEventType != FIRSTEVENT);
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         MarkovState &state = m_States[j];
+
+        double bestPitch = 0.0;
+        double bestTech = 0.0;
+        double bestOnset = 0.0;
+        double bestSilence = 0.0;
+
+        double sumPitch = 0.0;
+        int pitchCount = 0;
+
+        for (const AudioState &as : state.AudioStates) {
+            switch (as.Type) {
+            case PITCH: {
+                double p = GetPitchProbability(as.Freq);
+                bestPitch = std::max(bestPitch, p);
+                sumPitch += p;
+                pitchCount++;
+                break;
+            }
+            case LABEL: {
+                double p = m_Desc.ONNX[as.Label];
+                bestTech = std::max(bestTech, p);
+                break;
+            }
+            case ONSET: {
+                bestOnset = std::max(bestOnset, m_Desc.Onset);
+                break;
+            }
+            case SILENCE: {
+                if (allowSilence)
+                    bestSilence = std::max(bestSilence, m_Desc.SilenceProb);
+                break;
+            }
+            }
+        }
+
         double stateLikelihood = 0.0;
 
+        // Get Observation
         switch (state.Type) {
         case NOTE:
-        case TRILL: {
-            double bestNoteProb = 0.0;
-            for (const AudioState &as : state.AudioStates) {
-                if (as.Type == PITCH) {
-                    double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
-                    bestNoteProb = std::max(bestNoteProb, p);
-                } else if (as.Type == SILENCE && allowSilence) {
-                    bestNoteProb = std::max(bestNoteProb, m_Desc.SilenceProb);
-                    // TODO:
-                } else if (as.Type == ONSET) {
-                    bestNoteProb = std::max(bestNoteProb, m_Desc.Onset);
-                }
-            }
-            stateLikelihood = bestNoteProb;
+        case TRILL:
+            stateLikelihood = std::max({bestPitch * pitchWeight * soundProb, bestOnset, bestSilence});
             break;
-        }
-
-        case PTECH: {
-            double bestTechProb = 0.0;
-            for (const AudioState &as : state.AudioStates) {
-                if (as.Type == LABEL) {
-                    double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
-                    bestTechProb = std::max(bestTechProb, p);
-                } else if (as.Type == PITCH) {
-                    double p = GetPitchProbability(as.Freq) * pitchWeight * soundProb;
-                    bestTechProb = std::max(bestTechProb, p);
-                } else if (as.Type == SILENCE && allowSilence) {
-                    bestTechProb = std::max(bestTechProb, m_Desc.SilenceProb);
-                }
-            }
-            stateLikelihood = bestTechProb;
+        case PTECH:
+            stateLikelihood =
+                std::max({bestTech * techWeight * soundProb, bestPitch * pitchWeight * soundProb, bestSilence});
             break;
-        }
-
-        case UTECH: {
-            double bestUTechProb = 0.0;
-            for (const AudioState &as : state.AudioStates) {
-                if (as.Type == LABEL) {
-                    double p = m_Desc.ONNX[as.Label] * techWeight * soundProb;
-                    bestUTechProb = std::max(bestUTechProb, p);
-                } else if (as.Type == SILENCE && allowSilence) {
-                    bestUTechProb = std::max(bestUTechProb, m_Desc.SilenceProb);
-                }
-            }
-            stateLikelihood = bestUTechProb;
+        case UTECH:
+            stateLikelihood = std::max({bestTech * techWeight * soundProb, bestSilence});
             break;
-        }
-
-        case CHORD: {
-            double sumProbs = 0.0;
-            int pitchCount = 0;
-            for (const AudioState &as : state.AudioStates) {
-                if (as.Type == PITCH) {
-                    sumProbs += GetPitchProbability(as.Freq);
-                    pitchCount++;
-                }
-            }
-            if (pitchCount > 0) {
-                // Average the pitches, then apply the global pitch weight and sound probability
-                stateLikelihood = (sumProbs / pitchCount) * pitchWeight * soundProb;
-            }
+        case CHORD:
+            if (pitchCount > 0)
+                stateLikelihood = (sumPitch / pitchCount) * pitchWeight * soundProb;
             break;
-        }
-
         case FIRSTEVENT:
-        case REST: {
+        case REST:
             stateLikelihood = m_Desc.SilenceProb;
             break;
-        }
-
         default:
             spdlog::error("Event type not implemented yet, please remove it");
             break;
         }
 
-        // Clamp to prevent absolute zero, which breaks Viterbi multiplications downstream
         state.BestObs[bufferIndex] = std::max(stateLikelihood, 1e-300);
 
-        if (state.Type != REST) {
+        if (state.Type != REST)
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
-        }
     }
 
     m_IsSilence = (m_Desc.SilenceProb > maxSoundEvidence);

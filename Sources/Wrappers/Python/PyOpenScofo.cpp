@@ -136,7 +136,7 @@ NB_MODULE(_OpenScofo, m) {
         // .def_rw("spectral_magnitude_norm", &OpenScofo::Description::SpectralMagnitudeNorm)
         // .def_rw("spectral_magnitude_frame_norm", &OpenScofo::Description::SpectralMagnitudeFrameNorm)
 
-        .def_rw("logmelspectrum", &OpenScofo::Description::LogMelSpectrum) // MELOGRAM
+        .def_rw("logmel", &OpenScofo::Description::LogMelSpectrum) // MELOGRAM
         // .def_rw("reverb_spectral_power", &OpenScofo::Description::ReverbSpectralPower)
 
         .def_rw("mfcc", &OpenScofo::Description::MFCC)     // MFCC
@@ -200,7 +200,7 @@ NB_MODULE(_OpenScofo, m) {
              })
 
         // Score
-        .def("parse_score", &OpenScofo::OpenScofo::ParseScore)
+        .def("load_score", &OpenScofo::OpenScofo::LoadScore)
         .def("score_is_loaded", &OpenScofo::OpenScofo::ScoreIsLoaded)
 
         // Config
