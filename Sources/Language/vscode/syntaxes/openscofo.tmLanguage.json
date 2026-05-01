@@ -1,0 +1,118 @@
+{
+    "scopeName": "source.openscofo",
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#config" },
+        { "include": "#events" },
+        { "include": "#actions" }
+    ],
+
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.openscofo",
+                    "match": "//.*$"
+                },
+                {
+                    "name": "comment.block.documentation.openscofo",
+                    "begin": "/\\*\\*",
+                    "end": "\\*/"
+                },
+                {
+                    "name": "comment.block.openscofo",
+                    "begin": "/\\*",
+                    "end": "\\*/"
+                }
+            ]
+        },
+
+        "config": {
+            "patterns": [
+                {
+                    "name": "keyword.control.openscofo",
+                    "match": "\\b(BPM|ONNXMODEL|ONNXDESCRIPTORS|FFTSIZE|HOPSIZE|ONSETFUNCTION)\\b"
+                },
+                {
+                    "name": "constant.numeric.openscofo",
+                    "match": "\\b(BPM\\s+)(-?\\d+(\\.\\d+)?)",
+                    "captures": {
+                        "2": { "name": "constant.numeric" }
+                    }
+                },
+                {
+                    "name": "string.quoted.openscofo",
+                    "match": "\"[^\"]+\""
+                }
+            ]
+        },
+
+        "events": {
+            "patterns": [
+                {
+                    "name": "entity.name.type.openscofo",
+                    "match": "\\b(NOTE|REST|PTECH|UTECH|CHORD|TRILL|LUAEVENT)\\b"
+                },
+
+                {
+                    "name": "string.pitch.openscofo",
+                    "match": "\\b[A-Ga-g][b#]?\\d\\b"
+                },
+
+                {
+                    "name": "variable.parameter.openscofo",
+                    "match": "\\b(?:UTECH|PTECH)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+                    "captures": {
+                        "1": { "name": "string" }
+                    }
+                },
+
+                {
+                    "name": "variable.parameter.openscofo",
+                    "match": "\\b(?:NOTE|REST|PTECH|UTECH)\\b[^\\n]*?\\s(-?\\d+(?:\\.\\d+)?)",
+                    "captures": {
+                        "1": { "name": "variable.parameter" }
+                    }
+                }
+            ]
+        },
+
+        "actions": {
+            "patterns": [
+                {
+                    "name": "keyword.openscofo",
+                    "match": "\\b(sendto|luacall|delay)\\b"
+                },
+
+                {
+                    "name": "variable.other.member.openscofo",
+                    "match": "sendto\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+                    "captures": {
+                        "1": { "name": "variable.other.member" }
+                    }
+                },
+
+                {
+                    "name": "meta.delay.openscofo",
+                    "match": "delay\\s+(-?\\d+(?:\\.\\d+)?)\\s+(tempo|sec|ms)",
+                    "captures": {
+                        "1": { "name": "variable.parameter" },
+                        "2": { "name": "storage.type" }
+                    }
+                },
+
+                {
+                    "name": "constant.numeric.openscofo",
+                    "begin": "\\[",
+                    "end": "\\]",
+                    "patterns": [
+                        {
+                            "name": "constant.numeric",
+                            "match": "-?\\d+(\\.\\d+)?"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
