@@ -84,7 +84,7 @@ if(NOT TREE_SITTER_EXECUTABLE)
         FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
 endif()
 
-set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/oscofo_grammar")
+set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
 set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
 
@@ -352,8 +352,12 @@ else() # Linux (GCC or Clang)
                >)
 
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
-
 endif()
+
+# ╭──────────────────────────────────────╮
+# │               Language               │
+# ╰──────────────────────────────────────╯
+add_library(tree-sitter-openscofo SHARED ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
 
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
