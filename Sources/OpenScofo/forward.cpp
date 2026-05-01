@@ -304,6 +304,8 @@ void OnlineForward::SetCurrentEvent(int Event) {
         ResetDecoding(); // Use full reset instead of InitTimeDecoding
     }
     m_CurrentStateIndex = Event;
+
+    // TODO: CHECK THIS
     m_Tau = 0; // Already set in ResetDecoding, but keep for safety
 }
 
@@ -544,30 +546,20 @@ void OnlineForward::GetDecodeWindow() {
 // ─────────────────────────────────────
 // CONT 2010 (Section 5, algorithm 1)
 double OnlineForward::UpdatePsiN(int StateIndex) {
-    if (StateIndex == m_CurrentStateIndex) {
-        m_TimeInPrevEvent += m_BlockDur;
-        m_Tau += 1;
-        return m_PsiN;
-    }
-
-    if (StateIndex < 2) {
-        double PsiK = 60 / m_States[0].BPMExpected;
-        m_LastPsiN = PsiK;
-        m_PsiN = PsiK;
-        m_PsiN1 = PsiK;
-        m_States[0].OnsetObserved = 0;
-        m_BPM = m_States[0].BPMExpected;
-        m_CurrentStateOnset = 0;
-        m_LastTn = 0;
-        m_TimeInPrevEvent = 0;
-        m_Tau = 0;
-        return m_PsiN;
-    }
-
     m_TimeInPrevEvent += m_BlockDur;
-    m_LastTn = m_CurrentStateOnset;
-    m_CurrentStateOnset += m_TimeInPrevEvent;
+    m_Tau += 1;
 
+    if (StateIndex == m_CurrentStateIndex) {
+        m_PsiN1 = m_PsiN;
+        return m_PsiN;
+    }
+
+    if (StateIndex <= 0 || StateIndex < 2) {
+        m_PsiN1 = m_PsiN;
+        return m_PsiN;
+    }
+
+    m_CurrentStateOnset += m_TimeInPrevEvent;
     if (StateIndex + 1 > (int)m_States.size()) {
         return m_PsiN;
     }
@@ -627,13 +619,13 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
     }
 
     // Update Values for next calls
-    m_BPM = 60.0f / m_PsiN;
+    m_BPM = 60.0f / PsiN1;
     m_LastPsiN = m_PsiN;
+    m_PsiN1 = PsiN1;
 
-    if (StateIndex != m_CurrentStateIndex) {
-        m_TimeInPrevEvent = 0;
-        m_Tau = 0;
-    }
+    m_TimeInPrevEvent = 0;
+    m_LastTn = m_CurrentStateOnset;
+
     return PsiN1;
 }
 
