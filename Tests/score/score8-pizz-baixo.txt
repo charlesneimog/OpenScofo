@@ -1,0 +1,55 @@
+BPM 100
+
+ONNXMODEL "flute.onnx"
+ONNXDESCRIPTORS mfcc logmel zcr centroid flatness hfr
+
+// measure 1
+PTECH pizz D3 1
+PTECH pizz C3 1
+PTECH pizz D3 1
+PTECH pizz F3 1
+
+// measure 2
+PTECH pizz E3 1
+PTECH pizz D3 1
+PTECH pizz E3 1
+REST 1
+
+// measure 3
+PTECH pizz D3 1
+NOTE Bb5 1
+PTECH pizz D3 1
+NOTE A5 1
+
+// measure 4
+PTECH pizz D3 1
+PTECH pizz C3 1
+NOTE Bb5 0.5
+NOTE A5 0.5
+PTECH pizz C3 1
+
+// measure 5
+PTECH pizz F3 1
+PTECH pizz E3 1
+PTECH pizz E3 1
+PTECH pizz D3 1
+
+// measure 6
+REST 1
+NOTE G#5 0.5
+NOTE A5 0.5
+PTECH pizz D3 1
+NOTE Bb5 0.5
+NOTE A5 0.5
+
+// measure 7
+PTECH pizz D3 1
+PTECH pizz D3 1
+PTECH pizz D3 1
+PTECH pizz D3 1
+
+// measure 8
+UTECH jet-whistle 1
+REST 3
+
+
