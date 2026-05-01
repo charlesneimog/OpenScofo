@@ -44,7 +44,7 @@ def process_file(args):
     f, amplitude_decay, harmonics, sigma = args
 
     scofo = OpenScofo.OpenScofo(SR, FFT_SIZE, HOP_SIZE)
-    scofo.parse_score("../Resources/tests/canticos.txt")
+    scofo.load_score("../Resources/tests/canticos.txt")
     scofo.set_amplitude_decay(amplitude_decay)
     scofo.set_harmonics(int(harmonics))
     scofo.set_pitch_template_sigma(sigma)

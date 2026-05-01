@@ -38,7 +38,7 @@ allnotes = {}
 files = sorted(p for p in root.rglob("ordinario/**/*.wav"))
 
 scofo = OpenScofo.OpenScofo(SR, FFT_SIZE, HOP_SIZE)
-scofo.parse_score("../Resources/tests/canticos.txt")
+scofo.load_score("../Resources/tests/canticos.txt")
 
 # for f in files:
 #     note = os.path.basename(f).split("-")[2]

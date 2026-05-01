@@ -302,7 +302,7 @@ def process_audio_file(
     audio = audio
 
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
-    scofo.parse_score(Path(score_path))
+    scofo.load_score(Path(score_path))
 
     # Build reference tag -> time map from parser states.
     expected_times: Dict[int, float] = {}

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 os.chdir(os.path.dirname(__file__))
 
 scofo = OpenScofo.OpenScofo(48000, 2048, 1024)
-ok = scofo.parse_score("../../Tests/canticos.txt")
+ok = scofo.load_score("../../Tests/canticos.txt")
 if not ok:
     raise Exception("Error to parse score")
 

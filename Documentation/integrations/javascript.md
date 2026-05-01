@@ -122,7 +122,7 @@ OpenScofo().then(async (mod) => {
 ### Score
 
 ```js
-scofo.parse_score(scoreText)
+scofo.load_score(scoreText)
 ```
 
 ---
@@ -170,7 +170,7 @@ scofo.get_audio_description()
 ```js
 const scofo = new OpenScofo.OpenScofo(44100, 1024, 512);
 
-scofo.parse_score(scoreText);
+scofo.load_score(scoreText);
 
 let buffer = new OpenScofo.VectorDouble();
 // fill buffer with audio samples

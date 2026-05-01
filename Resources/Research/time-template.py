@@ -16,7 +16,7 @@ os.chdir(script_dir)
 
 # --- Initialize OpenScofo ---
 scofo = OpenScofo.OpenScofo(sr, fft_size, hop)
-ok = scofo.parse_score("../Resources/tests/canticos.txt")
+ok = scofo.load_score("../Resources/tests/canticos.txt")
 
 if not ok:
     raise Exception("Failed to parse score.")
