@@ -40,7 +40,7 @@ class OpenScofo {
   public:
     OpenScofo(float Sr, float WindowSize, float HopSize);
     // Main Functions
-    bool ParseScore(fs::path ScorePath);
+    bool LoadScore(fs::path ScorePath);
     bool ScoreIsLoaded();
 
     template <OpenScofoPrecision T> bool ProcessBlock(const T *AudioBuffer, size_t n);
@@ -116,9 +116,6 @@ class OpenScofo {
     int m_HopSize;
     int m_BlockIndex = 0;
     std::vector<double> m_InputBuffer;
-
-    // AI
-    bool m_LoadingONNX = false;
 
     // Errors
     spdlog::level::level_enum m_HasErrors;

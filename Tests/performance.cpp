@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize OpenScofo
     OpenScofo::OpenScofo scofo(48000, 2048, 512);
-    bool ok = scofo.ParseScore(score_path);
+    bool ok = scofo.LoadScore(score_path);
     if (!ok) {
         std::cerr << "ParseScore failed\n";
         exit(-1);

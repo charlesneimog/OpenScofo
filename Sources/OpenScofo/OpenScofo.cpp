@@ -1,4 +1,5 @@
 #include <OpenScofo.hpp>
+#include <fmt/ranges.h>
 
 // ╭─────────────────────────────────────╮
 // │     Construstor and Destructor      │
@@ -244,7 +245,17 @@ void OpenScofo::SetTunning(double Tunning) {
 
 // ─────────────────────────────────────
 void OpenScofo::SetCurrentEvent(int Event) {
+    m_CurrentScorePosition = 0;
+    m_BlockIndex = 0;
+    m_Forward.ResetDecoding();
     m_Forward.SetCurrentEvent(Event);
+    std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
+
+    std::fill(m_Desc.Magnitude.begin(), m_Desc.Magnitude.end(), 0.0);
+    std::fill(m_Desc.Power.begin(), m_Desc.Power.end(), 0.0);
+    std::fill(m_Desc.SpectralMagnitudeNorm.begin(), m_Desc.SpectralMagnitudeNorm.end(), 0.0);
+    std::fill(m_Desc.SpectralMagnitudeFrameNorm.begin(), m_Desc.SpectralMagnitudeFrameNorm.end(), 0.0);
+    std::fill(m_Desc.ReverbSpectralPower.begin(), m_Desc.ReverbSpectralPower.end(), 0.0);
 
     if (Event == 0) {
         m_CurrentScorePosition = 0;
@@ -255,8 +266,6 @@ void OpenScofo::SetCurrentEvent(int Event) {
         m_CurrentScorePosition = m_States[Event].ScorePos;
         return;
     }
-
-    m_CurrentScorePosition = Event;
 }
 
 // ╭─────────────────────────────────────╮
@@ -537,7 +546,7 @@ double OpenScofo::GetBlockDuration() {
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
-bool OpenScofo::ParseScore(fs::path ScorePath) {
+bool OpenScofo::LoadScore(fs::path ScorePath) {
     ClearErrors();
 
     m_CurrentScorePosition = 0;
@@ -546,7 +555,7 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
     m_States.clear();
     m_States = m_Score.Parse(ScorePath);
 
-    // Timbre detection
+    // Timbre/Extended Tech detection
     if (m_Score.HasTimbreModel()) {
         auto model = m_Score.GetTimbreModel();
         std::vector<std::string> descriptors = m_Score.GetTimbreModelDescriptors();
@@ -570,6 +579,19 @@ bool OpenScofo::ParseScore(fs::path ScorePath) {
     m_Forward.SetScoreStates(m_States);
     m_Mode = SCOREFOLLOWER;
 
+    // verify the states.
+    const auto &ONNXLabels = m_MIR.GetONNXLabels();
+    for (auto &State : m_States) {
+        for (auto &AudioState : State.AudioStates) {
+            if (AudioState.Type == LABEL) {
+                const auto &label = AudioState.Label;
+                if (!(std::find(ONNXLabels.begin(), ONNXLabels.end(), label) != ONNXLabels.end())) {
+                    spdlog::error("Extended Technique Label {} is not valid. Valid labels: {}", label, ONNXLabels);
+                    return false;
+                }
+            }
+        }
+    }
     if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
         return true;
     } else {

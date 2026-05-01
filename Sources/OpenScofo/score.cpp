@@ -67,6 +67,25 @@ double Score::GetSyncStrength() {
 }
 
 // ─────────────────────────────────────
+bool Score::HasTimbreModel() {
+    if (m_TimbreONNXModel.empty()) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+// ─────────────────────────────────────
+fs::path Score::GetTimbreModel() {
+    return m_TimbreONNXModel;
+}
+
+// ─────────────────────────────────────
+std::vector<std::string> Score::GetTimbreModelDescriptors() {
+    return m_ONNXDescriptors;
+}
+
+// ─────────────────────────────────────
 bool Score::ScoreIsLoaded() {
     return m_ScoreLoaded;
 }
@@ -250,6 +269,7 @@ MarkovState Score::GetFirstEvent() {
     Event.Type = FIRSTEVENT;
     Event.ScorePos = 0;
     Event.Index = m_ScoreStates.size();
+    Event.Duration = 0.0;
 
     AudioState Silence;
     Silence.Type = SILENCE;
@@ -654,6 +674,11 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
         float v = std::stof(value);
         if (id == "BPM") {
             m_CurrentBPM = v;
+            if (m_CurrentBPM < 1) {
+                spdlog::error("BPM must be bigger than 0");
+                m_CurrentBPM = 1;
+            }
+
             MarkovState Begin = GetFirstEvent();
             ProcessEventTime(Begin);
             Begin.BPMExpected = v;
