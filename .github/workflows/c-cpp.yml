@@ -66,6 +66,7 @@ jobs:
               run: |
                   brew install pd nanobind googletest tree-sitter boost
                   brew install python@3.13
+                  brew install fmt
                   npm install -g tree-sitter-cli
                   pip install build scikit-build-core cibuildwheel twine
             # -----------------------
