@@ -98,6 +98,7 @@ Resources/Extended-Techniques-Random-Tests/*.xml
 
 OpenScofo/
 !/Sources/OpenScofo/
+!/Sources/Wrappers/OpenScofo/
 site
 dist
 
