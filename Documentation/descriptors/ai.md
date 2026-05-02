@@ -120,8 +120,6 @@ trainer = OpenScofo.ExtendedTechniqueClassifier(
     hop_size=512,
 )
 
-# check the ids using in spectral descriptors
-# you must set then in the same order in the score:
 #       ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 trainer.set_descriptors(
     [
@@ -136,46 +134,12 @@ trainer.set_descriptors(
         "kurtosis",
     ]
 )
-
-# folder where there is sub-folder with audios inside, for example:
-'''
-Flute
-├── jet_whistle
-│   ├── jet-whistle1.wav
-│   ├── jet-whistle2.wav
-│   └── jet-whistle-3.wav
-│   └── ...
-├── key_click
-│   ├── Fl-key_cl-A#4-f-N-N.wav
-│   ├── Fl-key_cl-A4-f-N-N.wav
-│   ├── Fl-key_cl-F#4-f-N-N.wav
-│   ├── Fl-key_cl-F4-f-N-N.wav
-│   ├── Fl-key_cl-G#4-f-N-N.wav
-│   └── ...
-├── pizzicato
-│   ├── Fl-pizz-A#4-f-N-N.wav
-│   ├── Fl-pizz-A4-f-N-N.wav
-│   ├── Fl-pizz-B3-f-N-N.wav
-│   ├── Fl-pizz-B3-f-N-N.wav
-│   └── ...
-└── tongue_ram
-    ├── Fl-tng_ram-A3-mf-N-N.wav
-    ├── Fl-tng_ram-B3-mf-N-N.wav
-    ├── Fl-tng_ram-C#3-mf-N-N.wav
-│   └── ...
-'''
-
 trainer.set_train_folder("/home/neimog/Downloads/Flute")
 
 # Impulse Responses are good to prevent overfit.
 trainer.set_ir_folders(["/home/neimog/Nextcloud/MusicData/Impulse_Responses/05_Halls/"])
-
 trainer.analyze()
 trainer.train()
-
-# name of the model, you import it on OpenScofo using 
-# ONNXMODEL flute-v5.onnx
-
 trainer.export_model("flute-v5.onnx")
 ```
 
