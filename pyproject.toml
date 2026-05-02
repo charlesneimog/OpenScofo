@@ -5,9 +5,19 @@ authors = [{ name = "Charles K. Neimog", email = "charlesneimog@outlook.com" }]
 description = "OpenScofo is an open-source score-following system specifically designed for contemporary music."
 readme = "README.md"
 requires-python = ">=3.10, <3.15"
+dependencies = [
+    "numpy",
+    "scipy",
+    "librosa",
+    "scikit-learn",
+    "catboost",
+    "skl2onnx"
+]
 
 [build-system]
-requires = ["scikit-build-core", "nanobind"]
+requires = ["scikit-build-core", "nanobind","librosa","catboost"]
+
+
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
