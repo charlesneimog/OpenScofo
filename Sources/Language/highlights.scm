@@ -61,9 +61,9 @@
 (exec args: (pdargs) @number)
 
 ; actions keywords
-(exec "sendto" @keyword)
-(exec "luacall" @keyword)
-(delay "delay" @keyword)
+(exec "sendto" @function)
+(exec "luacall" @function)
+(delay "delay" @function)
 
 ; delay 
 (delay amount: (number) @variable.parameter)
