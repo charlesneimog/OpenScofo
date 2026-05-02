@@ -1,4 +1,4 @@
-# Onsets
+# Onset Descriptor
 
 ## `Onset Detection`
 **ID**: `onset` 

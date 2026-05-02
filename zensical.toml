@@ -22,6 +22,7 @@ nav = [
     "descriptors/amplitude.md",
     "descriptors/onset.md",
     "descriptors/spectral.md",
+    "descriptors/ai.md",
   ] },
   { "Integrations / Download" = [
     "integrations/index.md",
