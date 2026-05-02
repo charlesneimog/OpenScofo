@@ -2,7 +2,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <states.hpp>
 
 namespace OpenScofo {
@@ -91,9 +90,6 @@ class OnlineForward {
 
     // Get Audio Obs
     void GetAudioObservations();
-
-    // Friend Tests
-    FRIEND_TEST(OnlineForwardKappaTest, A2Properties);
 
   private:
     // Test things
