@@ -215,7 +215,6 @@ jobs:
             # Upload artifacts
             # -----------------------
             - name: Upload Installer
-              if: runner.os == 'Windows' || runner.os == 'macOS'
               uses: actions/upload-artifact@v6
               with:
                   name: Installer-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
