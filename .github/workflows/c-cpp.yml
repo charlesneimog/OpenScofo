@@ -12,7 +12,7 @@ on:
                 type: boolean
 env:
     LIBNAME: OpenScofo
-    LIBVERSION: 0.1.7
+    LIBVERSION: 0.2.2
 permissions:
     contents: write
 jobs:
