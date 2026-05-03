@@ -357,7 +357,10 @@ endif()
 # ╭──────────────────────────────────────╮
 # │               Language               │
 # ╰──────────────────────────────────────╯
-add_library(tree-sitter-openscofo SHARED ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
+if(NOT EMSCRIPTEN)
+    add_library(tree-sitter-openscofo SHARED
+                ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
+endif()
 
 # ╭──────────────────────────────────────╮
 # │            Python Module             │
