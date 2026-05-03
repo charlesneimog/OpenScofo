@@ -34,7 +34,7 @@ jobs:
             - name: Setup Python
               uses: actions/setup-python@v6
               with:
-                  python-version: "3.13"
+                  python-version: "3.11"
             - name: Setup sccache
               uses: mozilla-actions/sccache-action@v0.0.9
             - name: Setup Emscripten
@@ -62,7 +62,6 @@ jobs:
               if: runner.os == 'macOS'
               run: |
                   brew install pd nanobind googletest tree-sitter boost
-                  brew install python@3.13
                   npm install -g tree-sitter-cli
                   pip install build scikit-build-core cibuildwheel twine
             # -----------------------
