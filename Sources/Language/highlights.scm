@@ -57,7 +57,7 @@
 ; ================================
 ; ACTIONS (runtime layer)
 ; ================================
-(exec receiver: (identifier) @variable.member)
+(exec receiver: (identifier) @tag)
 (exec args: (pdargs) @number)
 
 ; actions keywords
