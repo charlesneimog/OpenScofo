@@ -139,7 +139,7 @@ class MIR {
     int m_ONNXDescriptorsSize = 0;
 
     // Env
-    double m_dBTreshold = -50;
+    double m_dBTreshold = -60;
     const std::array<double, 3> m_48kB1 = {1.53512485958697, -2.69169618940638, 1.19839281085285};
     const std::array<double, 3> m_48kA1 = {1.0, -1.69065929318241, 0.73248077421585};
     const std::array<double, 3> m_48kB2 = {1.0, -2.0, 1.0};

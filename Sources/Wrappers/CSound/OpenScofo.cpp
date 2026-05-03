@@ -74,7 +74,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         csound->message(std::format("\nScore has {} states\n", states.size()));
 
         outargs[0] = FL(0.0);
-        outargs[1] = FL(oscofo->GetLiveBPM());
+        outargs[1] = FL(oscofo->GetCurrentBPM());
         outargs[2] = FL(0.0);
         m_LastEvent = -1;
 
@@ -98,7 +98,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
         int event = oscofo->GetCurrentScorePosition();
         outargs[0] = static_cast<MYFLT>(event);
-        outargs[1] = static_cast<MYFLT>(oscofo->GetLiveBPM());
+        outargs[1] = static_cast<MYFLT>(oscofo->GetCurrentBPM());
 
         if (event != m_LastEvent) {
             outargs[2] = FL(1.0);

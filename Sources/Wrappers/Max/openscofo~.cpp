@@ -92,7 +92,7 @@ static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
     x->OpenScofo->SetCurrentEvent(0);
 
     x->Event = 0;
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_float(x->EventOut, 0);
 
     x->FFTSize = x->OpenScofo->GetFFTSize();
@@ -121,7 +121,7 @@ static void oscofo_start(MaxOpenScofo *x) {
     x->OpenScofo->SetCurrentEvent(0);
     x->Event = 0;
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_float(x->EventOut, x->Event);
 
     x->Following = true;
@@ -443,7 +443,7 @@ static void oscofo_ticknewevent(void *xv) {
         return;
     }
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_int(x->EventOut, static_cast<int>(x->Event));
 
     OpenScofo::EventActions actions = x->OpenScofo->GetCurrentEventActions();
