@@ -57,7 +57,7 @@
 ; ================================
 ; ACTIONS (runtime layer)
 ; ================================
-(exec receiver: (identifier) @tag)
+(exec receiver: (identifier) @type)
 (exec args: (pdargs) @number)
 
 ; actions keywords
@@ -66,5 +66,6 @@
 (delay "delay" @function)
 
 ; delay 
+;(delay amount: (number) @variable.parameter)
 (delay amount: (number) @variable.parameter)
-(delay unit: (time_unit) @type)
+(delay unit: (time_unit) @variable.parameter)
