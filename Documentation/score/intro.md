@@ -23,5 +23,5 @@
 After Configuration, the Score will look like this:
 
 <p align="center">
-    <img style="width: 80%; border-radius: 5px" src="../../assets/oscofo-code.png">
+    <img style="width: 80%; border-radius: 5px" src="https://charlesneimog.github.io/OpenScofo/assets/oscofo-code.png">
 </p>
