@@ -779,7 +779,6 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
             } else if (unit == "tempo") {
                 BaseAction.AbsoluteTime = false;
             }
-            spdlog::warn("New Action after {} {}, Score Position {}", BaseAction.Time, unit, Event.ScorePos);
         }
     }
 
