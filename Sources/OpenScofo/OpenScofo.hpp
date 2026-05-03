@@ -59,10 +59,8 @@ class OpenScofo {
 
     // Get Functions
     double GetLiveBPM();
-    int GetCurrentScorePosition();
     double GetKappa();
     double GetdBValue();
-    EventActions GetCurrentEventActions();
     std::string GetLuaCode();
     double GetPitchProb(double Freq);
     States &GetStates();
@@ -74,6 +72,11 @@ class OpenScofo {
     double GetBlockDuration();
     Description GetDescription();
     int GetCurrentBufferIndex();
+
+    // Current Event Data
+    int GetCurrentScorePosition();
+    int GetCurrentStateIndex();
+    EventActions GetCurrentEventActions();
 
     Descriptors GetDescriptorsEnum(const char *s);
     const char *GetDescriptionId(Descriptors d);

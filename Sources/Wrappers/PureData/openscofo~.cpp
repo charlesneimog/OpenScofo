@@ -49,6 +49,7 @@ class PdOpenScofo {
     OpenScofo::OpenScofo *OpenScofo;
     std::unique_ptr<OpenScofo::Description> Desc;
     int Event;
+    int StateIndex;
     float Tempo;
     bool Following;
 
@@ -402,9 +403,10 @@ static void oscofo_tickinfo(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 static void oscofo_ticknewevent(PdOpenScofo *x) {
-    int PrevEvent = x->Event;
+    int PrevStateIndex= x->StateIndex;
     x->Event = x->OpenScofo->GetCurrentScorePosition();
-    if (PrevEvent == x->Event || x->Event == 0) {
+    x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
+    if (PrevStateIndex == x->StateIndex) {
         return;
     }
 
@@ -451,6 +453,7 @@ static t_int *oscofo_perform_score(t_int *w) {
     if (!ok) {
         return (w + 4);
     }
+
     clock_delay(x->ClockActions, 0);
     clock_delay(x->ClockEvent, 0);
     clock_delay(x->ClockInfo, 0);
@@ -507,6 +510,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->Sr = (int)sys_getsr();
     x->Following = false;
     x->Event = -1;
+    x->StateIndex = -1;
 
     // Outlets
     x->EventOut = outlet_new(&x->PdObject, &s_float);

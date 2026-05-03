@@ -39,6 +39,7 @@ class OnlineForward {
 
     // Get Functions
     int GetCurrentBufferIndex();
+    int GetCurrentStateIndex();
     int GetTunning();
     EventActions GetCurrentEventActions();
     std::vector<MarkovState> &GetStates();
