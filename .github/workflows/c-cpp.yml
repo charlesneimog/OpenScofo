@@ -250,30 +250,63 @@ jobs:
                   TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
               run: |
                   python -m twine upload --skip-existing dist/*.whl
+
     publish-release:
         if: ${{ github.event.inputs.publish_release == 'true' }}
         needs: [build]
         runs-on: ubuntu-latest
+
         steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Extract CMake metadata (version + name)
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  VERSION=$(tr '\n' ' ' < CMakeLists.txt \
+                    | sed -nE 's/.*project\([^)]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
+
+                  NAME=$(tr '\n' ' ' < Sources/Wrappers/PureData/CMakeLists.txt \
+                    | sed -nE 's/.*project\([[:space:]]*([A-Za-z0-9_]+).*/\1/p')
+
+                  echo "Extracted VERSION=$VERSION"
+                  echo "Extracted NAME=$NAME"
+
+                  if [[ -z "${VERSION}" || -z "${NAME}" ]]; then
+                    echo "ERROR: Failed to extract LIBVERSION or LIBNAME from CMake files"
+                    exit 1
+                  fi
+
+                  echo "LIBVERSION=$VERSION" >> $GITHUB_ENV
+                  echo "LIBNAME=$NAME" >> $GITHUB_ENV
+
             - name: Download all artifacts
               uses: actions/download-artifact@v4
               with:
                   path: artifacts
+
             - name: Create per-artifact zip archives
+              shell: bash
               run: |
                   set -euo pipefail
+
                   mkdir -p release_assets
+
                   for artifact_dir in artifacts/*; do
                     [ -d "$artifact_dir" ] || continue
                     name="$(basename "$artifact_dir")"
                     (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
                   done
+
                   ls -1 release_assets
+
             - name: Create / Update GitHub Release
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: v${{ env.LIBVERSION }}-alpha
-                  name: ${{ env.LIBNAME }} v${{ env.LIBVERSION }}-alpha
+                  name: v${{ env.LIBVERSION }}-alpha
                   target_commitish: ${{ github.sha }}
                   files: |
                       release_assets/*.zip
