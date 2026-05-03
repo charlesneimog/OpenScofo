@@ -1,8 +1,8 @@
 # AI Model
 
-`OpenScofo` uses a machine learning model based on a **Random Forest classifier** to detect extended techniques.
+The AI model is designed for musicians working with expanded instrumental vocabularies, including extended techniques and non-traditional sounds. It can recognize not only conventional pitched material, but also gestural, percussive, and embodied sound sources such as body percussion, breath, vocal noises, and mouth sounds. The goal is to support performance contexts where sound extends beyond standard pitched instruments.
 
-The model operates on **spectral descriptors** extracted from audio recordings (see previous section). To enable detection in real time, the model must first be trained on labeled examples of the techniques you want to recognize in real time.
+The model operates with **spectral descriptors** provided by `OpenScofo` (see previous section). To enable real-time detection, it must first be trained on labeled examples of the techniques and sound categories you want to recognize during performance.
 
 ---
 
@@ -18,11 +18,11 @@ Training consists of three steps:
 
 ### 1. Dataset Structure
 
-Audio files must be organized in a directory structure where:
+Audio files should be organized using a clear directory hierarchy:
 
-* The **top-level folder** (any good name for it).
-* Each **subfolder represents a technique label**
-* Each subfolder contains `.wav` or `.aif` audio examples of that technique, small samples, not a record of 30 minutes full of tongue-ram.
+* The **top-level folder** can have any descriptive name (e.g., `dataset`, `training_data`, `extended_techniques_dataset`).
+* Each **subfolder corresponds to a technique or sound label** (e.g., `tongue-ram`, `jet-whistle`, `breath_noise`, `clapping`, `finger_snapping`).
+* Each subfolder contains short (few seconds) audio examples (`.wav` or `.aif`) representing that specific class. These should be **isolated, representative samples**, not long continuous recordings (e.g., avoid 30-minute takes of a single technique such as tongue-ram).
 
 Example structure
 
@@ -64,9 +64,9 @@ Commonly used feature set in my pieces:
 * Log-mel spectrogram features
 * Spectral centroid
 * Spectral flatness
-* High-frequency ratio (HFR)
+* High-frequency ratio
 * Spectral flux
-* Zero-crossing rate (ZCR)
+* Zero-crossing rate
 * Irregularity
 
 You may adjust this set depending on the target instrument and recording conditions, but consistency between training and inference is required.
