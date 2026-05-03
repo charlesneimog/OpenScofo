@@ -1,5 +1,4 @@
 #include <OpenScofo.hpp>
-#include <fmt/ranges.h>
 
 // ╭─────────────────────────────────────╮
 // │     Construstor and Destructor      │
@@ -589,18 +588,28 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     m_Mode = SCOREFOLLOWER;
 
     // verify the states.
-    const auto &ONNXLabels = m_MIR.GetONNXLabels();
-    for (auto &State : m_States) {
-        for (auto &AudioState : State.AudioStates) {
-            if (AudioState.Type == LABEL) {
-                const auto &label = AudioState.Label;
-                if (!(std::find(ONNXLabels.begin(), ONNXLabels.end(), label) != ONNXLabels.end())) {
-                    spdlog::error("Extended Technique Label {} is not valid. Valid labels: {}", label, ONNXLabels);
+    const std::vector<std::string> &ONNXLabels = m_MIR.GetONNXLabels();
+    for (auto &state : m_States) {
+        for (auto &audioState : state.AudioStates) {
+            if (audioState.Type == LABEL) {
+                const auto &label = audioState.Label;
+                auto it = std::find(ONNXLabels.begin(), ONNXLabels.end(), label);
+                if (it == ONNXLabels.end()) {
+                    std::string validLabels = "[";
+                    for (size_t i = 0; i < ONNXLabels.size(); ++i) {
+                        validLabels += ONNXLabels[i];
+                        if (i + 1 < ONNXLabels.size()) {
+                            validLabels += ", ";
+                        }
+                    }
+                    validLabels += "]";
+                    spdlog::error("Extended Technique Label '{}' is not valid. Valid labels: {}", label, validLabels);
                     return false;
                 }
             }
         }
     }
+
     if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
         return true;
     } else {
