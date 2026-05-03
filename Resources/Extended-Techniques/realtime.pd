@@ -53,7 +53,7 @@
 #X msg 96 115 set justdescription 1;
 #X obj 80 80 loadbang;
 #X obj 85 273 outlet;
-#X obj 10 208 o.scofo~ onnx;
+#X obj 10 208 openscofo~ onnx;
 #X obj 87 246 route onnx;
 #X msg 115 155 set onnxmodel catboost.onnx mfcc logmelspectrum zcr centroid flatness hfr;
 #X connect 0 0 5 0;

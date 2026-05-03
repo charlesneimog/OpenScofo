@@ -77,12 +77,12 @@ def to_wix_path(path: Path) -> str:
 
 def ensure_max_binary(repo_root: Path, build_dir: Path) -> Path | None:
     candidates = [
-        repo_root / "max" / "o.scofo~.mxe64",
-        repo_root / "max" / "o.scofo~.mxe",
-        repo_root / "max" / "o.scofo~.mxo",
-        build_dir / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxe64",
-        build_dir / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxe",
-        build_dir / "Sources" / "Wrappers" / "Max" / "o.scofo~.mxo",
+        repo_root / "max" / "openscofo~.mxe64",
+        repo_root / "max" / "openscofo~.mxe",
+        repo_root / "max" / "openscofo~.mxo",
+        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe64",
+        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe",
+        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
     ]
     existing = first_existing(candidates)
     if existing is not None:
@@ -137,17 +137,17 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir="Max 9/Packages/OpenScofo",
             destination_subdir_x64=None,
             required=[
-                Path("Sources/Wrappers/Max/o.scofo~.maxhelp"),
+                Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
                 Path("Tests/assets/bwv-1013.wav"),
                 Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
             ],
             optional=[
-                Path("max/o.scofo~.mxe64"),
-                Path("max/o.scofo~.mxe"),
-                Path("build/Sources/Wrappers/Max/o.scofo~.mxe64"),
-                Path("build/Sources/Wrappers/Max/o.scofo~.mxe"),
+                Path("max/openscofo~.mxe64"),
+                Path("max/openscofo~.mxe"),
+                Path("build/Sources/Wrappers/Max/openscofo~.mxe64"),
+                Path("build/Sources/Wrappers/Max/openscofo~.mxe"),
             ],
         ),
         IntegrationSpec(
@@ -155,10 +155,10 @@ def component_specs() -> list[IntegrationSpec]:
             title="Pure Data",
             identifier="org.openscofo.pkg.puredata",
             destination_root="PersonalFolder",
-            destination_subdir="Pd/externals/o.scofo~",
+            destination_subdir="Pd/externals/openscofo~",
             destination_subdir_x64=None,
             required=[
-                Path("Sources/Wrappers/PureData/o.scofo~-help.pd"),
+                Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
                 Path("Tests/assets/bwv-1013.wav"),
                 Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),

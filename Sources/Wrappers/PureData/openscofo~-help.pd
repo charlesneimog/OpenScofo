@@ -21,7 +21,7 @@
 #X obj 30 101 declare -lib xlab;
 #X obj 30 41 declare -path ../Tests/assets;
 #X restore 157 10 pd config;
-#X obj 10 281 o.scofo~, f 18;
+#X obj 10 281 openscofo~, f 18;
 #X obj 218 10 declare -lib xlab;
 #X obj 10 96 mar~;
 #X obj 10 181 snake~ out;
