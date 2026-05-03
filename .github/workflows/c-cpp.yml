@@ -237,6 +237,7 @@ jobs:
                   path: Emscripten
             - name: Publish Pip
               if: ${{ github.event.inputs.publish_release == 'true' }}
+              continue-on-error: true
               env:
                   TWINE_USERNAME: __token__
                   TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
