@@ -50,11 +50,11 @@ jobs:
               if: runner.os == 'Linux'
               run: |
                   sudo apt update
-                  sudo add-apt-repository ppa:pure-data/pure-data -y
                   sudo apt install puredata -y
                   sudo apt install libboost-all-dev libgtest-dev -y
                   npm install -g tree-sitter-cli
                   pip install build scikit-build-core cibuildwheel twine nanobind
+
             # -----------------------
             # macOS dependencies
             # -----------------------
@@ -144,7 +144,7 @@ jobs:
                   $buildArgs = @(
                     "-Cbuild-dir=build"
                     "-Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }}"
-                    "-Ccmake.define.CMAKE_BUILD_TYPE=Release "
+                    "-Ccmake.define.CMAKE_BUILD_TYPE=Release"
                     "-Ccmake.define.TREE_SITTER_EXECUTABLE=$treeSitterBin"
                     "-Ccmake.define.CMAKE_C_COMPILER=clang"
                     "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
@@ -191,6 +191,7 @@ jobs:
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
+                  cmake --install build --prefix install
                   $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
                   $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
 
