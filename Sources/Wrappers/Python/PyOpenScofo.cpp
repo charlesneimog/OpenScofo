@@ -217,16 +217,14 @@ NB_MODULE(_OpenScofo, m) {
         .def("set_pitch_template_sigma", &OpenScofo::OpenScofo::SetPitchTemplateSigma)
 
         // Getters
-        .def("get_live_bpm", &OpenScofo::OpenScofo::GetLiveBPM)
+        .def("get_live_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .def("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
         .def("get_kappa", &OpenScofo::OpenScofo::GetKappa)
-        .def("get_db_value", &OpenScofo::OpenScofo::GetdBValue)
         .def("get_current_event_actions", &OpenScofo::OpenScofo::GetCurrentEventActions)
         .def("get_lua_code", &OpenScofo::OpenScofo::GetLuaCode)
         .def("get_pitch_prob", &OpenScofo::OpenScofo::GetPitchProb)
         .def("get_states", &OpenScofo::OpenScofo::GetStates)
         .def("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
-        .def("get_spectrum_power", &OpenScofo::OpenScofo::GetSpectrumPower)
         .def("get_sr", &OpenScofo::OpenScofo::GetSr)
         .def("get_fft_size", &OpenScofo::OpenScofo::GetFFTSize)
         .def("get_hop_size", &OpenScofo::OpenScofo::GetHopSize)

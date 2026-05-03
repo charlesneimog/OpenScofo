@@ -189,7 +189,7 @@ static int OpenScofoGetLiveBPM(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
         return luaL_error(L, "OpenScofo pointer is null");
-    lua_pushnumber(L, self->GetLiveBPM());
+    lua_pushnumber(L, self->GetCurrentBPM());
     return 1;
 }
 

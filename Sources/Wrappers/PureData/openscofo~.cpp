@@ -92,7 +92,7 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     x->JustDescription = false;
 
     x->Event = 0;
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_float(x->EventOut, 0);
 
     // Update Audio
@@ -123,7 +123,7 @@ static void oscofo_start(PdOpenScofo *x) {
     x->OpenScofo->SetCurrentEvent(0);
     x->Event = 0;
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_float(x->EventOut, x->Event);
 
     x->Following = true;
@@ -403,21 +403,21 @@ static void oscofo_tickinfo(PdOpenScofo *x) {
 
 // ─────────────────────────────────────
 static void oscofo_ticknewevent(PdOpenScofo *x) {
-    int PrevStateIndex= x->StateIndex;
+    int PrevStateIndex = x->StateIndex;
     x->Event = x->OpenScofo->GetCurrentScorePosition();
     x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
     if (PrevStateIndex == x->StateIndex) {
         return;
     }
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
+    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
     outlet_float(x->EventOut, x->OpenScofo->GetCurrentScorePosition());
     OpenScofo::EventActions Actions = x->OpenScofo->GetCurrentEventActions();
 
     for (OpenScofo::ScoreAction &Act : Actions) {
         double time = Act.Time;
         if (!Act.AbsoluteTime) {
-            Act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * Act.Time * 1000;
+            Act.Time = 60.0 / x->OpenScofo->GetCurrentBPM() * Act.Time * 1000;
             time = Act.Time;
         }
 
@@ -510,7 +510,7 @@ static void *oscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->Sr = (int)sys_getsr();
     x->Following = false;
     x->Event = -1;
-    x->StateIndex = -1;
+    x->StateIndex = 0;
 
     // Outlets
     x->EventOut = outlet_new(&x->PdObject, &s_float);

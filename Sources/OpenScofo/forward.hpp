@@ -23,15 +23,13 @@ class OnlineForward {
     // Set
     void SetPitchTemplateSigma(double f);
     void SetHarmonics(int i);
-    void SetBPM(double Bpm);
     void SetAmplitudeDecay(double decay);
     void SetTunning(double Tunning);
     void SetDescription(const Description &Desc);
     void SetCurrentEvent(int Event);
-    void SetdBTreshold(double dB);
 
     // Get
-    double GetLiveBPM();
+    double GetCurrentBPM();
     void ResetLiveBpm();
 
     //
@@ -44,7 +42,6 @@ class OnlineForward {
     EventActions GetCurrentEventActions();
     std::vector<MarkovState> &GetStates();
     MarkovState GetState(int Index);
-    double GetKappa();
     void AddState(MarkovState state);
 
     int GetStatesSize();

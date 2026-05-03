@@ -58,14 +58,11 @@ class OpenScofo {
     void SetNewAudioParameters(float Sr, float FftSize, float HopSize);
 
     // Get Functions
-    double GetLiveBPM();
-    double GetKappa();
-    double GetdBValue();
+    double GetCurrentBPM();
     std::string GetLuaCode();
     double GetPitchProb(double Freq);
     States &GetStates();
     PitchTemplateArray GetPitchTemplate(double Freq);
-    std::vector<double> GetSpectrumPower() const;
     double GetSr();
     double GetFFTSize();
     double GetHopSize();

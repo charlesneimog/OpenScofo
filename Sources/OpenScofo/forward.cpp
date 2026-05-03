@@ -238,28 +238,13 @@ void OnlineForward::ClearStates() {
     m_States.clear();
 }
 // ─────────────────────────────────────
-double OnlineForward::GetLiveBPM() {
+double OnlineForward::GetCurrentBPM() {
     return m_BPM;
-}
-
-// ─────────────────────────────────────
-double OnlineForward::GetKappa() {
-    return m_Kappa;
 }
 
 // ─────────────────────────────────────
 double OnlineForward::GetBlockDuration() {
     return m_BlockDur;
-}
-
-// ─────────────────────────────────────
-void OnlineForward::SetBPM(double BPM) {
-    m_BPM = BPM;
-}
-
-// ─────────────────────────────────────
-void OnlineForward::SetdBTreshold(double dB) {
-    m_dBTreshold = dB;
 }
 
 // ─────────────────────────────────────
