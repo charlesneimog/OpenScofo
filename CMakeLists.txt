@@ -335,7 +335,7 @@ else() # Linux (GCC or Clang)
                -Wnull-dereference
                -march=native
                $<$<CONFIG:Debug>:
-               -g
+               -ggdb
                -O3
                -fno-omit-frame-pointer
                >
