@@ -185,7 +185,7 @@ jobs:
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
               run: |
-                  python Resources/Packages/Linux.py --version ${{ env.LIBVERSION }}
+                  python Resources/Packages/linux.py --version ${{ env.LIBVERSION }}
 
             - name: Generate Windows Component Installer
               if: runner.os == 'Windows'
