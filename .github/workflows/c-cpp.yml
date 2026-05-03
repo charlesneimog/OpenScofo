@@ -10,9 +10,6 @@ on:
                 required: false
                 default: false
                 type: boolean
-env:
-    LIBNAME: OpenScofo
-    LIBVERSION: 0.2.2
 permissions:
     contents: write
 jobs:
@@ -85,6 +82,17 @@ jobs:
                   }
                   python -m pip install --upgrade pip
                   python -m pip install build scikit-build-core cibuildwheel twine nanobind
+
+            - name: Extract version from CMake
+              id: cmake_version
+              shell: bash
+              run: |
+                  VERSION=$(sed -nE 's/.*project\(.*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+                  NAME=$(sed -nE 's/.*project\([[:space:]]*([^[:space:])]+).*/\1/p' Sources/Wrappers/PureData/CMakeLists.txt)
+                  echo "LIBVERSION=$VERSION" >> $GITHUB_ENV
+                  echo "LIBNAME=$NAME" >> $GITHUB_ENV
+                  echo $VERSION
+                  echo $NAME
 
             # -----------------------
             - name: Build (MacOS)
