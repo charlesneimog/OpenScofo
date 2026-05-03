@@ -219,7 +219,6 @@ NB_MODULE(_OpenScofo, m) {
         // Getters
         .def("get_live_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .def("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
-        .def("get_kappa", &OpenScofo::OpenScofo::GetKappa)
         .def("get_current_event_actions", &OpenScofo::OpenScofo::GetCurrentEventActions)
         .def("get_lua_code", &OpenScofo::OpenScofo::GetLuaCode)
         .def("get_pitch_prob", &OpenScofo::OpenScofo::GetPitchProb)

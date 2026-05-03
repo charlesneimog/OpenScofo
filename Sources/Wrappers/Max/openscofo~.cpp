@@ -452,7 +452,7 @@ static void oscofo_ticknewevent(void *xv) {
         double time = act.Time;
 
         if (!act.AbsoluteTime) {
-            act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * act.Time * 1000;
+            act.Time = 60.0 / x->OpenScofo->GetCurrentBPM() * act.Time * 1000;
             time = act.Time;
         }
 
