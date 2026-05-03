@@ -276,6 +276,11 @@ int OpenScofo::GetCurrentScorePosition() {
 }
 
 // ─────────────────────────────────────
+int OpenScofo::GetCurrentStateIndex() {
+    return m_Forward.GetCurrentStateIndex();
+}
+
+// ─────────────────────────────────────
 double OpenScofo::GetLiveBPM() {
     return m_Forward.GetLiveBPM();
 }

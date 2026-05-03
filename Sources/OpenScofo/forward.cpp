@@ -79,6 +79,11 @@ void OnlineForward::UpdateAudioParameters(double Sr, double FFTSize, double HopS
 }
 
 // ─────────────────────────────────────
+int OnlineForward::GetCurrentStateIndex() {
+    return m_CurrentStateIndex;
+}
+
+// ─────────────────────────────────────
 EventActions OnlineForward::GetCurrentEventActions() {
     MarkovState State = m_States[m_CurrentStateIndex];
     return State.Actions;

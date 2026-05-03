@@ -59,7 +59,7 @@ struct ScOpenScofo : public SCUnit {
         delete m_OScofo;
     }
 
-    void ParseScore(const char *path) {
+    void LoadScore(const char *path) {
         if (m_OScofo) {
             bool ok = m_OScofo->LoadScore(path);
             if (!ok) {
@@ -174,10 +174,10 @@ void cmdGetCurrentEvent(ScOpenScofo *unit, sc_msg_iter *args) {
 }
 
 // ─────────────────────────────────────
-void cmdParseScore(ScOpenScofo *unit, sc_msg_iter *args) {
+void cmdLoadScore(ScOpenScofo *unit, sc_msg_iter *args) {
     const char *path = args->gets(); // Get the string argument
     if (path) {
-        unit->ParseScore(path);
+        unit->LoadScore(path);
     }
 }
 
@@ -199,7 +199,7 @@ PluginLoad(OpenScofoUGens) {
     ft = inTable;
 
     registerUnit<ScOpenScofo>(ft, "OpenScofo");
-    DefineUnitCmd("OpenScofo", "parseScore", (UnitCmdFunc)&cmdParseScore);
+    DefineUnitCmd("OpenScofo", "loadScore", (UnitCmdFunc)&cmdLoadScore);
     DefineUnitCmd("OpenScofo", "getCurrentEvent", (UnitCmdFunc)&cmdGetCurrentEvent);
     DefineUnitCmd("OpenScofo", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
     DefineUnitCmd("OpenScofo", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);

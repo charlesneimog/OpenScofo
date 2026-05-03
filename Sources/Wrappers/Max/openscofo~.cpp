@@ -47,6 +47,7 @@ class MaxOpenScofo {
     OpenScofo::OpenScofo *OpenScofo;
     std::unique_ptr<OpenScofo::Description> Desc;
     int Event;
+    int StateIndex;
     float Tempo;
     bool Following;
 
@@ -81,7 +82,7 @@ static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
         scorePath = x->PatchDir + "/" + s->s_name;
     }
 
-    ok = x->OpenScofo->ParseScore(scorePath);
+    ok = x->OpenScofo->LoadScore(scorePath);
     if (ok) {
         object_post((t_object *)x, "Score loaded");
     } else {
@@ -433,18 +434,23 @@ static void oscofo_tickinfo(MaxOpenScofo *xv) {
 static void oscofo_ticknewevent(void *xv) {
     MaxOpenScofo *x = (MaxOpenScofo *)xv;
 
-    int prevEvent = x->Event;
-    x->Event = x->OpenScofo->GetEventIndex();
-    if (prevEvent == x->Event) {
+    int prevStateIndex = x->StateIndex;
+
+    x->Event = x->OpenScofo->GetCurrentScorePosition();
+    x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
+
+    if (prevStateIndex == x->StateIndex) {
         return;
     }
 
     outlet_float(x->TempoOut, x->OpenScofo->GetLiveBPM());
     outlet_int(x->EventOut, static_cast<int>(x->Event));
-    OpenScofo::EventActions actions = x->OpenScofo->GetEventActions(x->Event);
+
+    OpenScofo::EventActions actions = x->OpenScofo->GetCurrentEventActions();
 
     for (OpenScofo::ScoreAction &act : actions) {
         double time = act.Time;
+
         if (!act.AbsoluteTime) {
             act.Time = 60.0 / x->OpenScofo->GetLiveBPM() * act.Time * 1000;
             time = act.Time;
@@ -459,10 +465,14 @@ static void oscofo_ticknewevent(void *xv) {
                 delete[] maxArgs;
             }
         } else {
+            // If Max has an equivalent to Pd's clock_getsystimeafter(), prefer it.
+            // Otherwise retain gettime() but note the semantic difference.
             double sysTime = gettime() + time;
+
             int size = act.Args.size();
             std::string receiver = act.Receiver;
             t_atom *maxArgs = oscofo_convertargs(act);
+
             MaxAction action = {sysTime, act.isLua, receiver, act.Lua, maxArgs, size};
             x->Actions.push_back(action);
         }
