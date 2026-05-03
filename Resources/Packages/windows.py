@@ -327,11 +327,12 @@ def generate_wix_source(
     lines.append('    <Directory Id="TARGETDIR" Name="SourceDir">')
 
     standard_roots = [
-        "ProgramFilesFolder",
-        "ProgramFiles64Folder",
-        "PersonalFolder",
-        "AppDataFolder",
-        "CommonAppDataFolder",
+            "ProgramFilesFolder",
+            "ProgramFiles64Folder",
+            "PersonalFolder",
+            "AppDataFolder",
+            "LocalAppDataFolder",
+            "CommonAppDataFolder",
     ]
 
     for root in standard_roots:
