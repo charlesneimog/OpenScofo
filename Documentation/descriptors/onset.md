@@ -14,7 +14,7 @@ Boolean value (`0` or `1`) indicating whether a sound event onset has been detec
 
         $MKL_n = \sum_{k=0}^{K} \log \left ( 1 + \frac{|S_{n,k}|}{|S_{n-1,k}|} \right )$
 
-        But all methods descripted in the article can be used using the [`ONSETFUNCTION`](score/config.md#onsetfunction){ data-preview } on config. Where $S_{n,k}$ is a FFT bin[^1].
+        But all methods descripted in the article can be used using the [`ONSETFUNCTION`](./../score/config.md#onsetfunction){ data-preview } on config. Where $S_{n,k}$ is a FFT bin.
 
 -   ??? note "Notes"
 

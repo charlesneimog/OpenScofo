@@ -15,7 +15,9 @@ Spectral flatness indicates how noisy versus tonal a sound is. A high flatness m
 
 -   ??? equation "Equation"
 
-        $$Flatness = \frac{\exp\left( \frac{1}{K} \sum_{k=0}^{K-1} \ln(|X[k]|^2) \right)}{\frac{1}{K} \sum_{k=0}^{K-1} |X[k]|^2}$$
+        $$
+        Flatness = \frac{\exp\left( \frac{1}{K} \sum_{k=0}^{K-1} \ln(|X[k]|^2) \right)}{\frac{1}{K} \sum_{k=0}^{K-1} |X[k]|^2}
+        $$
 
 -   ??? note "Notes"
 
@@ -156,7 +158,9 @@ Spectral centroid indicates the “center of mass” of a sound’s spectrum. Hi
 
 -   ??? equation "Equation"
 
-        $$Centroid = \frac{\sum_{k=0}^{K-1} f_k |X[k]|}{\sum_{k=0}^{K-1} |X[k]|}$$
+        $$
+        Centroid = \frac{\sum_{k=0}^{K-1} f_k |X[k]|}{\sum_{k=0}^{K-1} |X[k]|}
+        $$
 
 -   ??? note "Notes"
 
@@ -305,7 +309,7 @@ Harmonicity measures how well a sound’s spectrum aligns with a harmonic series
 
 -   ??? equation "Equation"
 
-        $$Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$$
+        $Harmonicity = \frac{\max_{k>0} |X[k]|}{\sum_{k>0} |X[k]|}$
 
 -   ??? note "Notes"
 
@@ -383,7 +387,6 @@ Chroma features capture the intensity of the twelve pitch classes (C, C♯, …,
 </div>
 
 
-[^1]: `OpenScofo` uses a Hann window and FFTW3 for FFT.
 [^2]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-9}$.
 [^3]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-5}$.
 [^4]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-3}$.
