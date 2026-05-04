@@ -100,19 +100,9 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
     class_<OpenScofo::OpenScofo>("OpenScofo")
         .constructor<float, float, float>()
         .function("load_score", &OpenScofo::OpenScofo::LoadScore)
-        .function("set_db_threshold", &OpenScofo::OpenScofo::SetdBTreshold)
-        .function("set_tuning", &OpenScofo::OpenScofo::SetTunning)
-        .function("set_current_event", &OpenScofo::OpenScofo::SetCurrentEvent)
-        .function("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)
-        .function("set_amplitude_decay", &OpenScofo::OpenScofo::SetAmplitudeDecay)
-        .function("set_harmonics", &OpenScofo::OpenScofo::SetHarmonics)
-        .function("set_pitch_template_sigma", &OpenScofo::OpenScofo::SetPitchTemplateSigma)
         .function("get_current_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .function("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
         .function("get_states", &OpenScofo::OpenScofo::GetStates)
-        .function("get_pitch_template", &OpenScofo::OpenScofo::GetPitchTemplate)
-        .function("get_block_duration", &OpenScofo::OpenScofo::GetBlockDuration)
-        // Note the '+' right before the '['
         .function(
             "process_block", +[](OpenScofo::OpenScofo &self, emscripten::val input) {
                 std::vector<double> vec = emscripten::vecFromJSArray<double>(input);

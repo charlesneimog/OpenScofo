@@ -42,15 +42,10 @@ class OpenScofo {
     // Main Functions
     bool LoadScore(fs::path ScorePath);
     bool ScoreIsLoaded();
-
     template <OpenScofoPrecision T> bool ProcessBlock(const T *AudioBuffer, size_t n);
-
-    // ONNX
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
-
-    // Set Functions
     void SetCurrentEvent(int Event);
-    void UpdateConfiguration(Configuration &Config);
+    void SetConfiguration(Configuration &Config);
 
     // Get Functions
     double GetCurrentBPM();
@@ -63,6 +58,7 @@ class OpenScofo {
     double GetHopSize();
     double GetBlockDuration();
     Description GetDescription();
+    Configuration GetConfiguration();
     int GetCurrentBufferIndex();
 
     // Current Event Data
@@ -92,13 +88,14 @@ class OpenScofo {
     void SetLogLevel(spdlog::level::level_enum level);
 
   private:
-    Configuration m_Config;
+    void UpdateConfiguration(Configuration &Config);
 
+  private:
+    Configuration m_Config;
     OnlineForward m_Forward;
     MIR m_MIR;
     Score m_Score;
     std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
-
 #if defined(OPENSCOFO_LUA)
     lua_State *m_LuaState;
 #endif

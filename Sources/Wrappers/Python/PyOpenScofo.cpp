@@ -146,7 +146,6 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("onnx", &OpenScofo::Description::ONNX); // ONNX
 
     // State Class
-
     nb::class_<OpenScofo::MarkovState>(m, "MarkovState")
         .def(nb::init<>())
 
@@ -186,6 +185,57 @@ NB_MODULE(_OpenScofo, m) {
         // Error
         .def_rw("line", &OpenScofo::MarkovState::Line);
 
+    nb::class_<OpenScofo::Configuration>(m, "Configuration")
+        .def(nb::init<>())
+
+        // Audio parameters
+        .def_rw("sr", &OpenScofo::Configuration::SR)
+        .def_rw("fft_size", &OpenScofo::Configuration::FFTSize)
+        .def_rw("hop_size", &OpenScofo::Configuration::HOPSize)
+
+        // Tuning
+        .def_rw("tuning_a4", &OpenScofo::Configuration::TunningA4)
+
+        // Pitch template
+        .def_rw("pitch_template_sigma", &OpenScofo::Configuration::PitchTemplateSigma)
+        .def_rw("pitch_template_harmonics", &OpenScofo::Configuration::PitchTemplateHarmonics)
+
+        // MFCC
+        .def_rw("mfcc_mels", &OpenScofo::Configuration::MFCCMels)
+        .def_rw("mfcc_count", &OpenScofo::Configuration::MFCCCount)
+
+        // Onset
+        .def_rw("onset_type", &OpenScofo::Configuration::OnsetType)
+        .def_rw("med_span", &OpenScofo::Configuration::MedSpan)
+
+        // Silence
+        .def_rw("db_threshold", &OpenScofo::Configuration::dBTreshold)
+
+        // YIN / spectral
+        .def_rw("spectral_rolloff_cutoff", &OpenScofo::Configuration::SpectralRolloffCutoff)
+        .def_rw("yin_threshold", &OpenScofo::Configuration::YINThreshold)
+        .def_rw("yin_min_freq", &OpenScofo::Configuration::YINMinFrequency)
+        .def_rw("yin_max_freq", &OpenScofo::Configuration::YINMaxFrequency)
+
+        // Chroma
+        .def_rw("chroma_size", &OpenScofo::Configuration::ChromaSize)
+        .def_rw("chroma_center_octave", &OpenScofo::Configuration::ChromaCenterOctave)
+        .def_rw("chroma_octave_width", &OpenScofo::Configuration::ChromaOctaveWidth)
+
+        // ZCR
+        .def_rw("zcr_center", &OpenScofo::Configuration::ZCRCenter)
+        .def_rw("zcr_pad", &OpenScofo::Configuration::ZCRPad)
+        .def_rw("zcr_zero_pos", &OpenScofo::Configuration::ZCRZeroPos)
+        .def_rw("zcr_threshold", &OpenScofo::Configuration::ZCRThreshold)
+
+        // Temporal model
+        .def_rw("sync_strength", &OpenScofo::Configuration::SyncStrength)
+        .def_rw("phase_coupling", &OpenScofo::Configuration::PhaseCoupling)
+
+        // ONNX
+        .def_rw("timbre_onnx_model", &OpenScofo::Configuration::TimbreONNXModel)
+        .def_rw("onnx_descriptors", &OpenScofo::Configuration::ONNXDescriptors);
+
     nb::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
         .def("__init__",
              [](OpenScofo::OpenScofo *self, float sr, float fft_size, float hop) {
@@ -209,7 +259,11 @@ NB_MODULE(_OpenScofo, m) {
         // ONNX
         .def("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)
 
+        // Setters
+        .def("set_configuration", &OpenScofo::OpenScofo::SetConfiguration)
+
         // Getters
+        .def("get_configuration", &OpenScofo::OpenScofo::GetConfiguration)
         .def("get_current_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .def("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
         .def("get_current_event_actions", &OpenScofo::OpenScofo::GetCurrentEventActions)

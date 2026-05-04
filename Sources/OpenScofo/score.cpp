@@ -937,7 +937,6 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
     ts_parser_delete(parser);
 
     m_ScoreLoaded = true;
-    printf("dB %f\n", Config.dBTreshold);
     return {Config, m_ScoreStates};
 }
 } // namespace OpenScofo
