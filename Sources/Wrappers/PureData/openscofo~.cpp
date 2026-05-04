@@ -98,9 +98,9 @@ static void oscofo_score(PdOpenScofo *x, t_symbol *s) {
     // Update Audio
     x->FFTSize = x->OpenScofo->GetFFTSize();
     x->HopSize = x->OpenScofo->GetHopSize();
+    x->Following = 0;
 
     // Get Lua Code
-
 #ifdef OPENSCOFO_LUA
     std::string LuaCode = x->OpenScofo->GetLuaCode();
     bool result = x->OpenScofo->LuaExecute(LuaCode.c_str());

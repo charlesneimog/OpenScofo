@@ -204,17 +204,10 @@ NB_MODULE(_OpenScofo, m) {
         .def("score_is_loaded", &OpenScofo::OpenScofo::ScoreIsLoaded)
 
         // Config
-        .def("set_db_threshold", &OpenScofo::OpenScofo::SetdBTreshold)
-        .def("set_tuning", &OpenScofo::OpenScofo::SetTunning)
         .def("set_current_event", &OpenScofo::OpenScofo::SetCurrentEvent)
 
         // ONNX
         .def("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)
-
-        // Pitch template
-        .def("set_amplitude_decay", &OpenScofo::OpenScofo::SetAmplitudeDecay)
-        .def("set_harmonics", &OpenScofo::OpenScofo::SetHarmonics)
-        .def("set_pitch_template_sigma", &OpenScofo::OpenScofo::SetPitchTemplateSigma)
 
         // Getters
         .def("get_current_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
