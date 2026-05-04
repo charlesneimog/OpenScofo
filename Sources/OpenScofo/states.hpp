@@ -5,8 +5,13 @@
 #include <variant>
 #include <span>
 #include <unordered_map>
+#include <filesystem>
+
+#include <onsetsds.h>
 
 namespace OpenScofo {
+
+namespace fs = std::filesystem;
 
 enum AudioDescType {
     PITCH,
@@ -88,8 +93,7 @@ enum EventType {
 enum HMMType { SEMIMARKOV, MARKOV };
 
 // ─────────────────────────────────────
-class ScoreAction {
-  public:
+struct ScoreAction {
     bool isLua;
     std::string Lua;
     std::string Receiver;
@@ -101,8 +105,7 @@ class ScoreAction {
 using EventActions = std::vector<ScoreAction>;
 
 // ─────────────────────────────────────
-class AudioState {
-  public:
+struct AudioState {
     AudioDescType Type;
     double Freq;
     double Midi;
@@ -111,8 +114,7 @@ class AudioState {
 };
 
 // ─────────────────────────────────────
-class MarkovState {
-  public:
+struct MarkovState {
     int Index;
     int ScorePos;
     int MarkovIndex = -1;
@@ -152,8 +154,7 @@ class MarkovState {
 using States = std::vector<MarkovState>;
 
 // ─────────────────────────────────────
-class Description {
-  public:
+struct Description {
     double Onset;
 
     // Probability
@@ -204,19 +205,54 @@ class Description {
 };
 
 // ─────────────────────────────────────
-struct MIRConfig {
-    double FFTSize;
-    double HopSize;
-    double Chroma;
-    double SilencedB;
-};
+struct Configuration {
+    // Audio Parameters
+    float SR = 48000;
+    float FFTSize = 2048;
+    float HOPSize = 512;
 
-// ─────────────────────────────────────
-struct MDPConfig {
-    double PitchSigma;
-    double HopSize;
-    double Chroma;
-    double SilencedB;
+    double TunningA4 = 440.0;
+
+    // Pitch Template
+    float PitchTemplateSigma = 0.5;
+    int PitchTemplateHarmonics = 10;
+
+    // MFCC
+    int MFCCMels = 40;
+    int MFCCCount = 13;
+
+    // Onset
+    onsetsds_odf_types OnsetType = ODS_ODF_MKL;
+    int MedSpan = 50;
+
+    // Silence Threshold
+    float dBTreshold = -60;
+
+    // Yin
+    double SpectralRolloffCutoff = 0.85;
+    double YINThreshold = 0.15;
+    double YINMinFrequency = 50.0;
+    double YINMaxFrequency = 2000.0;
+
+    // Chroma
+    int ChromaSize = 12;
+    double ChromaTuning = 0.0;
+    double ChromaCenterOctave = 5.0;
+    double ChromaOctaveWidth = 2.0;
+
+    // ZCR
+    bool ZCRCenter = true;
+    bool ZCRPad = false;
+    bool ZCRZeroPos = true;
+    double ZCRThreshold = 1e-10;
+
+    // Temporal model
+    float SyncStrength = 0.5;
+    float PhaseCoupling = 0.5;
+
+    // ONNX
+    fs::path TimbreONNXModel;
+    std::vector<std::string> ONNXDescriptors;
 };
 
 } // namespace OpenScofo

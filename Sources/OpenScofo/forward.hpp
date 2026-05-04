@@ -13,8 +13,8 @@ using PitchTemplateArray = std::vector<double>;
 // ╰─────────────────────────────────────╯
 class OnlineForward {
   public:
-    OnlineForward(double Sr, double WindowSize, double HopSize);
-    void UpdateAudioParameters(double Sr, double WindowSize, double HopSize);
+    OnlineForward();
+    void UpdateConfiguration(Configuration &Config);
     void SetScoreStates(States States);
     void UpdateAudioTemplate();
     void UpdatePhaseValues();

@@ -20,27 +20,23 @@ int luaopen_OpenScofo(lua_State *L);
  * @note Initializes Forward model, MIR extractor, and score handler.
  * @note Configures global spdlog logger (overwrites default).
  */
-OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
-    : m_Forward(Sr, FftSize, HopSize), m_MIR(Sr, FftSize, HopSize), m_Score(FftSize, HopSize) {
-
+OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_Forward(), m_MIR(), m_Score() {
     m_States = States();
     m_Desc = Description();
-    m_Sr = Sr;
-    m_FFTSize = FftSize;
-    m_HopSize = HopSize;
-    m_InBuffer.reserve(FftSize);
+    m_Config = Configuration();
+    m_Config.SR = Sr;
+    m_Config.FFTSize = FftSize;
+    m_Config.HOPSize = HopSize;
+
+    m_InBuffer.reserve(m_Config.FFTSize);
     m_BlockIndex = 0;
 
 #if defined(OPENSCOFO_LUA)
     InitLuaModule();
 #endif
 
-    // #if defined(NDEBUG)
-    //     spdlog::set_level(spdlog::level::info);
-    // #else
     spdlog::set_level(spdlog::level::debug);
     spdlog::enable_backtrace(32);
-    // #endif
 
     // --- Create OpenScofoLog sink ---
     m_Log = std::make_shared<OpenScofoLog<std::mutex>>();
@@ -55,7 +51,7 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
 
     auto logger = std::make_shared<spdlog::logger>("OpenScofo", sinks.begin(), sinks.end());
     spdlog::set_default_logger(logger);
-    SetNewAudioParameters(Sr, FftSize, HopSize);
+    UpdateConfiguration(m_Config);
 }
 
 //  ─────────────────────────────────────
@@ -72,31 +68,29 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize)
  *
  * @warning Not thread-safe. Must not be called during audio processing.
  */
-void OpenScofo::SetNewAudioParameters(float Sr, float FFTSize, float HopSize) {
-    size_t NHalf = FFTSize / 2 + 1;
-    if (m_FFTSize == FFTSize && m_HopSize == HopSize && m_Sr == Sr && m_Desc.Magnitude.size() == NHalf) {
-        spdlog::debug("Everything allocated for FFTSize {}, NHalf {}", FFTSize, NHalf);
-        return;
-    }
-    m_Sr = Sr;
-    m_FFTSize = FFTSize;
-    m_HopSize = HopSize;
-    m_Forward.UpdateAudioParameters(Sr, FFTSize, HopSize);
-    m_MIR.UpdateAudioParameters(Sr, FFTSize, HopSize);
-    m_Score.UpdateAudioParameters(FFTSize, HopSize);
-    m_InBuffer.resize(FFTSize);
+void OpenScofo::UpdateConfiguration(Configuration &Config) {
+    m_Config = Config;
+    m_Sr = static_cast<int>(m_Config.SR);
+    m_FFTSize = static_cast<int>(m_Config.FFTSize);
+    m_HopSize = static_cast<int>(m_Config.HOPSize);
+
+    size_t NHalf = static_cast<size_t>(m_FFTSize / 2 + 1);
+    m_Forward.UpdateConfiguration(m_Config);
+    m_MIR.UpdateConfiguration(m_Config);
+
+    m_InBuffer.resize(static_cast<size_t>(m_FFTSize));
     std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
     m_BlockIndex = 0;
 
-    spdlog::debug("Allocated Description size for Window Size {}, NHalf {}", FFTSize, NHalf);
+    spdlog::debug("Allocated Description size for Window Size {}, NHalf {}", Config.FFTSize, NHalf);
 
-    if (NHalf != m_Desc.Magnitude.size()) {
-        m_Desc.Magnitude.resize(NHalf);
-        m_Desc.Power.resize(NHalf);
-        m_Desc.SpectralMagnitudeNorm.resize(NHalf);
-        m_Desc.SpectralMagnitudeFrameNorm.resize(NHalf);
-        m_Desc.ReverbSpectralPower.resize(NHalf);
-    }
+    m_Desc.Magnitude.resize(NHalf);
+    m_Desc.Power.resize(NHalf);
+    m_Desc.SpectralMagnitudeNorm.resize(NHalf);
+    m_Desc.SpectralMagnitudeFrameNorm.resize(NHalf);
+    m_Desc.ReverbSpectralPower.resize(NHalf);
+    m_Desc.LogMelSpectrum.resize(m_Config.MFCCMels);
+    m_Desc.MFCC.resize(m_Config.MFCCCount);
 }
 
 // ╭─────────────────────────────────────╮
@@ -323,68 +317,6 @@ std::string OpenScofo::LuaGetError() {
 // ╭─────────────────────────────────────╮
 // │            Set Functions            │
 // ╰─────────────────────────────────────╯
-/**
- * @brief Set pitch template variance parameter.
- *
- * @param Sigma Smoothing / spread parameter for pitch template
- *
- * @note Updates forward model and rebuilds its internal audio template.
- */
-void OpenScofo::SetPitchTemplateSigma(double Sigma) {
-    m_Forward.SetPitchTemplateSigma(Sigma);
-    m_Forward.UpdateAudioTemplate();
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Set amplitude decay factor for the forward model.
- *
- * @param decay Decay coefficient applied to amplitude tracking
- *
- * @note Directly updates forward model parameter (no recomputation triggered here).
- */
-void OpenScofo::SetAmplitudeDecay(double decay) {
-    m_Forward.SetAmplitudeDecay(decay);
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Set number of harmonics used in pitch template (default: 10).
- *
- * @param Harmonics Number of harmonic components to model
- *
- * @note Updates forward model and rebuilds its audio template.
- */
-void OpenScofo::SetHarmonics(int Harmonics) {
-    m_Forward.SetHarmonics(Harmonics);
-    m_Forward.UpdateAudioTemplate();
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Set amplitude threshold in dB (default: -60).
- *
- * @param dB Threshold value in decibels
- *
- * @note Applies to both forward model and MIR feature extraction.
- */
-void OpenScofo::SetdBTreshold(double dB) {
-    m_MIR.SetdBTreshold(dB);
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Set reference tuning frequency for A4 (default: 440).
- *
- * @param Tunning Base tuning reference (e.g., 440 Hz standard A4)
- *
- * @note Affects pitch-related interpretation in the scoring system.
- */
-void OpenScofo::SetTunning(double Tunning) {
-    m_Score.SetTunning(Tunning);
-}
-
-// ─────────────────────────────────────
 /**
  * @brief Set active score event and reset decoding state.
  *
@@ -847,30 +779,28 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     ClearErrors();
 
     m_CurrentScorePosition = 0;
-
-    m_Score.UpdateAudioParameters(m_FFTSize, m_HopSize);
-    m_States.clear();
-    m_States = m_Score.Parse(ScorePath);
+    auto [newConfig, newStates] = m_Score.Parse(ScorePath);
+    m_Config = newConfig;
+    m_States = newStates;
 
     // Timbre/Extended Tech detection
-    if (m_Score.HasTimbreModel()) {
-        auto model = m_Score.GetTimbreModel();
-        std::vector<std::string> descriptors = m_Score.GetTimbreModelDescriptors();
+    if (fs::exists(newConfig.TimbreONNXModel)) {
+        std::vector<std::string> descriptors = newConfig.ONNXDescriptors;
         spdlog::warn("Loading ONNX model, wait...");
         std::vector<Descriptors> DescEnum;
         for (auto d : descriptors) {
             DescEnum.push_back(GetDescriptorsEnum(d.c_str()));
         }
-        m_MIR.ONNXInit(model, DescEnum);
+        m_MIR.ONNXInit(newConfig.TimbreONNXModel, DescEnum);
         spdlog::warn("ONNX Model ready");
     }
 
-    m_FFTSize = m_Score.GetFFTSize();
-    m_HopSize = m_Score.GetHopSize();
-    SetNewAudioParameters(m_Sr, m_FFTSize, m_HopSize);
+    m_FFTSize = newConfig.FFTSize;
+    m_HopSize = newConfig.HOPSize;
+    UpdateConfiguration(newConfig);
 
     // Parse Config
-    m_Forward.SetPitchTemplateSigma(m_Score.GetPitchTemplateSigma());
+    m_Forward.SetPitchTemplateSigma(newConfig.PitchTemplateSigma);
 
     // Add States
     m_Forward.SetScoreStates(m_States);

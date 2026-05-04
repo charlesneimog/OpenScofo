@@ -131,56 +131,11 @@ static void PushMarkovState(lua_State *L, const MarkovState &state) {
 }
 
 // ─────────────────────────────────────
-static int OpenScofoSetDbThreshold(lua_State *L) {
-    OpenScofo *self = GetCurrentOpenScofo(L);
-    if (self == nullptr)
-        return luaL_error(L, "OpenScofo pointer is null");
-    self->SetdBTreshold(luaL_checknumber(L, 1));
-    return 0;
-}
-
-// ─────────────────────────────────────
-static int OpenScofoSetTuning(lua_State *L) {
-    OpenScofo *self = GetCurrentOpenScofo(L);
-    if (self == nullptr)
-        return luaL_error(L, "OpenScofo pointer is null");
-    self->SetTunning(luaL_checknumber(L, 1));
-    return 0;
-}
-
-// ─────────────────────────────────────
 static int OpenScofoSetCurrentEvent(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
         return luaL_error(L, "OpenScofo pointer is null");
     self->SetCurrentEvent(static_cast<int>(luaL_checkinteger(L, 1)));
-    return 0;
-}
-
-// ─────────────────────────────────────
-static int OpenScofoSetAmplitudeDecay(lua_State *L) {
-    OpenScofo *self = GetCurrentOpenScofo(L);
-    if (self == nullptr)
-        return luaL_error(L, "OpenScofo pointer is null");
-    self->SetAmplitudeDecay(luaL_checknumber(L, 1));
-    return 0;
-}
-
-// ─────────────────────────────────────
-static int OpenScofoSetHarmonics(lua_State *L) {
-    OpenScofo *self = GetCurrentOpenScofo(L);
-    if (self == nullptr)
-        return luaL_error(L, "OpenScofo pointer is null");
-    self->SetHarmonics(static_cast<int>(luaL_checkinteger(L, 1)));
-    return 0;
-}
-
-// ─────────────────────────────────────
-static int OpenScofoSetPitchTemplateSigma(lua_State *L) {
-    OpenScofo *self = GetCurrentOpenScofo(L);
-    if (self == nullptr)
-        return luaL_error(L, "OpenScofo pointer is null");
-    self->SetPitchTemplateSigma(luaL_checknumber(L, 1));
     return 0;
 }
 
@@ -232,12 +187,7 @@ static int OpenScofoGetCurrentDescription(lua_State *L) {
 
 // ─────────────────────────────────────
 static const luaL_Reg oscofo_funcs[] = {
-    {"set_db_threshold", OpenScofoSetDbThreshold},
-    {"set_tuning", OpenScofoSetTuning},
     {"set_current_event", OpenScofoSetCurrentEvent},
-    {"set_amplitude_decay", OpenScofoSetAmplitudeDecay},
-    {"set_harmonics", OpenScofoSetHarmonics},
-    {"set_pitch_template_sigma", OpenScofoSetPitchTemplateSigma},
     {"get_live_bpm", OpenScofoGetLiveBPM},
     {"get_event_index", OpenScofoGetEventIndex},
     {"get_states", OpenScofoGetStates},

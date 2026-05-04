@@ -8,11 +8,6 @@ namespace OpenScofo {
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
-MIR::MIR(float Sr, float FftSize, float HopSize) {
-    UpdateAudioParameters(Sr, FftSize, HopSize);
-}
-
-// ─────────────────────────────────────
 MIR::~MIR() {
     if (m_FullFFTPlan != nullptr) {
         fftw_destroy_plan(m_FullFFTPlan);
@@ -28,8 +23,10 @@ MIR::~MIR() {
         m_FullFFTOut = nullptr;
     }
 
-    if (m_OnsetInit) {
+    if (m_ODSData) {
         delete[] m_ODSData;
+    }
+    if (m_ODS) {
         delete m_ODS;
     }
 
@@ -43,22 +40,11 @@ MIR::~MIR() {
 }
 
 // ─────────────────────────────────────
-void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
-    const bool sameAudioConfig = (m_HopSize == HopSize && m_FFTSize == FftSize && m_Sr == Sr);
-    if (sameAudioConfig && m_FullFFTPlan != nullptr && m_FullFFTIn != nullptr && m_FullFFTOut != nullptr &&
-        m_FullWindowingFunc.size() == static_cast<size_t>(FftSize)) {
-        return;
-    }
-
-    m_HopSize = HopSize;
-    m_FFTSize = FftSize;
-    m_Sr = Sr;
-    m_OnsetFFTSize = std::max(2, static_cast<int>(std::lround(FftSize)));
-    m_BlockSize = HopSize;
-    m_Accum = 0;
+void MIR::UpdateConfiguration(const Configuration &Config) {
+    m_Config = Config;
     m_PrevCentroid = 0.0;
-
-    m_PreviousSpectralPower.assign(static_cast<size_t>(std::lround(FftSize / 2.0f)) + 1, 0.0);
+    m_PreviousSpectralPower.assign(static_cast<size_t>(std::lround(m_Config.FFTSize / 2.0f)) + 1, 0.0);
+    m_SpectralPrefix.resize(m_Config.FFTSize / 2 + 2);
 
     if (m_FullFFTPlan != nullptr) {
         fftw_destroy_plan(m_FullFFTPlan);
@@ -73,8 +59,6 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
         m_FullFFTOut = nullptr;
     }
 
-    m_PreviousSpectralPower.assign(static_cast<size_t>(std::lround(m_FFTSize / 2.0f)) + 1, 0.0);
-
     FFTWInit();
     OnsetInit();
     MFCCInit();
@@ -83,20 +67,16 @@ void MIR::UpdateAudioParameters(float Sr, float FftSize, float HopSize) {
     YINInit();
     InitITURFilters();
 
-    spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Sr, FftSize, HopSize);
+    spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Config.SR, Config.FFTSize,
+                  Config.HOPSize);
 }
 
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
-void MIR::SetdBTreshold(double dB) {
-    m_dBTreshold = dB;
-}
-
-// ─────────────────────────────────────
 void MIR::FFTWInit() {
-    int WindowHalf = round(m_FFTSize / 2);
-    m_FullFFTIn = fftw_alloc_real(m_FFTSize);
+    int WindowHalf = round(m_Config.FFTSize / 2);
+    m_FullFFTIn = fftw_alloc_real(m_Config.FFTSize);
     if (!m_FullFFTIn) {
         spdlog::critical("fftw_alloc_real failed");
         return;
@@ -109,12 +89,17 @@ void MIR::FFTWInit() {
         return;
     }
 
-    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_ESTIMATE);
+    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_Config.FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_ESTIMATE);
+    if (!m_FullFFTOut) {
+        fftw_free(m_FullFFTIn);
+        fftw_free(m_FullFFTOut);
+        spdlog::critical("FullFFTOut alloc failed");
+    }
 
     // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
-    m_FullWindowingFunc.resize(m_FFTSize);
-    for (size_t i = 0; i < m_FFTSize; i++) {
-        m_FullWindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_FFTSize));
+    m_FullWindowingFunc.resize(m_Config.FFTSize);
+    for (size_t i = 0; i < m_Config.FFTSize; i++) {
+        m_FullWindowingFunc[i] = 0.5 * (1.0 - cos(2.0 * std::numbers::pi * i / m_Config.FFTSize));
     }
 }
 
@@ -122,6 +107,7 @@ void MIR::FFTWInit() {
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
 void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
+
     auto u8 = path.u8string();
     std::string path_utf8(u8.begin(), u8.end());
     m_ONNXContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
@@ -177,13 +163,19 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     for (size_t i = 0; i < m_ONNXDescriptors.size(); i++) {
         switch (m_ONNXDescriptors[i]) {
         case MFCC:
-            m_ONNXDescriptorsSize += m_MFCCCount;
+            m_ONNXDescriptorsSize += m_Config.MFCCCount;
             break;
         case CHROMA:
-            m_ONNXDescriptorsSize += m_ChromaSize;
+            m_ONNXDescriptorsSize += m_Config.ChromaSize;
+            break;
+        case POWERARRAY:
+            m_ONNXDescriptorsSize += (m_Config.FFTSize / 2) + 1;
+            break;
+        case MAGNITUDE:
+            m_ONNXDescriptorsSize += (m_Config.FFTSize / 2) + 1;
             break;
         case MELOGRAM:
-            m_ONNXDescriptorsSize += m_MFCCMels;
+            m_ONNXDescriptorsSize += m_Config.MFCCMels;
             break;
         default:
             m_ONNXDescriptorsSize++;
@@ -199,13 +191,13 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         switch (d) {
         case MFCC:
             m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_MFCCCount; ++i)
+                for (int i = 0; i < m_Config.MFCCCount; ++i)
                     *out++ = desc.MFCC[i];
             });
             break;
         case CHROMA:
             m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_ChromaSize; ++i)
+                for (int i = 0; i < m_Config.ChromaSize; ++i)
                     *out++ = desc.Chroma[i];
             });
             break;
@@ -217,7 +209,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             break;
         case MELOGRAM:
             m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_MFCCMels; ++i)
+                for (int i = 0; i < m_Config.MFCCMels; ++i)
                     *out++ = desc.LogMelSpectrum[i];
             });
             break;
@@ -385,8 +377,7 @@ std::vector<std::string> MIR::GetONNXLabels() {
 void MIR::OnsetInit() {
     m_OnsetInit = false;
 
-    const int onsetFFTSize = std::max(2, m_OnsetFFTSize);
-    const size_t nbytes = onsetsds_memneeded(ODS_ODF_MKL, onsetFFTSize, m_MedSpan);
+    const size_t nbytes = onsetsds_memneeded(m_Config.OnsetType, m_Config.FFTSize, m_Config.MedSpan);
     delete[] m_ODSData;
     m_ODSData = nullptr;
     delete m_ODS;
@@ -399,8 +390,9 @@ void MIR::OnsetInit() {
         return;
     }
 
-    onsetsds_init(m_ODS, m_ODSData, ODS_FFT_FFTW3_R2C, ODS_ODF_MKL, onsetFFTSize, m_MedSpan, m_Sr);
-    m_OnsetFFTFrame.assign(static_cast<size_t>(2 * (onsetFFTSize / 2 + 1)), 0.0f);
+    onsetsds_init(m_ODS, m_ODSData, ODS_FFT_FFTW3_R2C, m_Config.OnsetType, m_Config.FFTSize, m_Config.MedSpan,
+                  m_Config.SR);
+    m_OnsetFFTFrame.assign(static_cast<size_t>(2 * (m_Config.FFTSize / 2 + 1)), 0.0f);
     m_OnsetInit = true;
 }
 
@@ -409,13 +401,7 @@ void MIR::OnsetExec(Description &Desc) {
     if (!m_OnsetInit)
         return;
 
-    const size_t nBins = static_cast<size_t>(m_OnsetFFTSize / 2 + 1);
-    const size_t requiredSize = 2 * nBins;
-    if (m_OnsetFFTFrame.size() != requiredSize) {
-        m_OnsetFFTFrame.assign(requiredSize, 0.0f);
-    }
-
-    // TODO: Would be great without another copy
+    const size_t nBins = static_cast<size_t>(m_Config.FFTSize / 2 + 1);
     for (size_t i = 0; i < nBins; ++i) {
         m_OnsetFFTFrame[2 * i] = static_cast<float>(m_FullFFTOut[i][0]);
         m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FullFFTOut[i][1]);
@@ -451,7 +437,7 @@ void MIR::InitITURFilters() {
     double VH1 = (m_48kB1[0] - m_48kB1[1] + m_48kB1[2]) / (m_48kA1[2] - m_48kA1[1] + 1.0);
     double VL1 = (m_48kB1[0] + m_48kB1[1] + m_48kB1[2]) / (m_48kA1[1] + m_48kA1[2] + 1.0);
 
-    double Knew1 = std::tan(arctanK1 * 48000.0 / m_Sr);
+    double Knew1 = std::tan(arctanK1 * 48000.0 / m_Config.SR);
     double commonFactor1 = 1.0 / (1.0 + Knew1 / Q1 + Knew1 * Knew1);
 
     m_B1[0] = (VH1 + VB1 * Knew1 / Q1 + VL1 * Knew1 * Knew1) * commonFactor1;
@@ -470,7 +456,7 @@ void MIR::InitITURFilters() {
     double VH2 = (m_48kB2[0] - m_48kB2[1] + m_48kB2[2]) / (m_48kA2[2] - m_48kA2[1] + 1.0);
     double VL2 = (m_48kB2[0] + m_48kB2[1] + m_48kB2[2]) / (m_48kA2[1] + m_48kA2[2] + 1.0);
 
-    double Knew2 = std::tan(arctanK2 * 48000.0 / m_Sr);
+    double Knew2 = std::tan(arctanK2 * 48000.0 / m_Config.SR);
     double commonFactor2 = 1.0 / (1.0 + Knew2 / Q2 + Knew2 * Knew2);
 
     m_B2[0] = (VH2 + VB2 * Knew2 / Q2 + VL2 * Knew2 * Knew2) * commonFactor2;
@@ -518,7 +504,6 @@ void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
 
     // Loudness (based on sum of squares)
     double meanSquare = z_loudness / In.size();
-    // printf("\n\n\nDesc.dB %f | size %ld | mean %f | loud %f\n\n\n", Desc.dB, In.size(), meanSquare, z_loudness);
     if (meanSquare <= 0.0) {
         Desc.Loudness = -100.0; // substitui -inf
     } else {
@@ -536,7 +521,7 @@ void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
 // │                Pitch                │
 // ╰─────────────────────────────────────╯
 void MIR::YINInit() {
-    const size_t frameSize = static_cast<size_t>(std::max(2.0f, m_FFTSize));
+    const size_t frameSize = static_cast<size_t>(std::max(2.0f, m_Config.FFTSize));
     const size_t half = frameSize / 2;
     const size_t allocSize = half + 2;
     m_YINDifference.assign(allocSize, 0.0);
@@ -546,8 +531,8 @@ void MIR::YINInit() {
 // ─────────────────────────────────────
 void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
-    const size_t minTau = m_Sr / m_YINMaxFrequency;
-    const size_t maxTauByPitch = std::ceil(m_Sr / m_YINMinFrequency);
+    const size_t minTau = m_Config.SR / m_Config.YINMaxFrequency;
+    const size_t maxTauByPitch = std::ceil(m_Config.SR / m_Config.YINMinFrequency);
     const size_t maxTau = std::min({frame / 2, m_YINDifference.size() - 1, maxTauByPitch});
     if (maxTau <= minTau) {
         Desc.Pitch = 0.0;
@@ -598,7 +583,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 
     for (size_t tau = minTau; tau <= maxTau; ++tau) {
         const double value = Cmnfg[tau];
-        if (value < m_YINThreshold) {
+        if (value < m_Config.YINThreshold) {
             double prevValue = value;
             tauEstimate = tau;
             while (tau + 1 <= maxTau && Cmnfg[tau + 1] < prevValue) {
@@ -635,8 +620,8 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
         return;
     }
 
-    const double Pitch = m_Sr / refinedTau;
-    if (Pitch < m_YINMinFrequency || Pitch > m_YINMaxFrequency) {
+    const double Pitch = m_Config.SR / refinedTau;
+    if (Pitch < m_Config.YINMinFrequency || Pitch > m_Config.YINMaxFrequency) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
@@ -648,18 +633,13 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 
 // ─────────────────────────────────────
 void MIR::GetSpectralDescriptions(Description &Desc) {
-    const size_t NHalf = m_FFTSize / 2 + 1;
-    const double binWidth = static_cast<double>(m_Sr) / static_cast<double>(m_FFTSize);
+    const size_t NHalf = m_Config.FFTSize / 2 + 1;
+    const double binWidth = static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
     const size_t hfStart = NHalf / 4;
-    const double invN = 1.0 / static_cast<double>(m_FFTSize);
+    const double invN = 1.0 / static_cast<double>(m_Config.FFTSize);
     constexpr double amin = 1e-10;
 
     fftw_execute(m_FullFFTPlan);
-
-    // Initialize Essentia Flux buffer
-    if (m_PreviousSpectralPower.size() != NHalf) {
-        m_PreviousSpectralPower.assign(NHalf, 0.0);
-    }
 
     // --- Pre-allocate/Reset Descriptor bounds ---
     Desc.MaxAmp = 0.0;
@@ -803,7 +783,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     // --- Setup for Pass 2 ---
     const double Mean = 1.0 / static_cast<double>(NHalf);
     const double invSpectralEnergy = spectralEnergySum > 0.0 ? (1.0 / spectralEnergySum) : 0.0;
-    const double rolloffCutoffEnergy = std::clamp(m_SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
+    const double rolloffCutoffEnergy = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
 
     double Variance = 0.0;
     double cumulativeEnergy = 0.0;
@@ -811,7 +791,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     bool rolloffFound = false;
 
     Desc.SpectralEntropy = 0.0;
-    m_SpectralPrefix.resize(NHalf + 1);
     m_SpectralPrefix[0] = 0.0;
 
     // =========================================================================
@@ -847,7 +826,8 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     Desc.StdDev = std::sqrt(Variance * Mean);
 
-    const double binToHz = (static_cast<double>(m_Sr) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
+    const double binToHz =
+        (static_cast<double>(m_Config.SR) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
     Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
 
     OnsetExec(Desc);
@@ -859,14 +839,15 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 // │                MFCC                 │
 // ╰─────────────────────────────────────╯
 void MIR::MFCCInit() {
-    const int n_f = m_FFTSize / 2 + 1;
+    const int nHalfPlus1 = m_Config.FFTSize / 2 + 1;
     const double fmin = 0.0;
-    const double fmax = static_cast<double>(m_Sr) * 0.5;
+    const double fmax = static_cast<double>(m_Config.SR) * 0.5;
 
     // FFT bin frequencies (match np.fft.rfftfreq)
-    std::vector<double> fft_freqs(n_f);
-    for (int i = 0; i < n_f; ++i) {
-        fft_freqs[i] = static_cast<double>(i) * static_cast<double>(m_Sr) / static_cast<double>(m_FFTSize);
+    std::vector<double> fft_freqs(nHalfPlus1);
+    for (int i = 0; i < nHalfPlus1; ++i) {
+        fft_freqs[i] =
+            static_cast<double>(i) * static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
     }
 
     // Slaney mel scale (htk=False)
@@ -890,31 +871,32 @@ void MIR::MFCCInit() {
     const double mel_min = hz_to_mel(fmin);
     const double mel_max = hz_to_mel(fmax);
 
-    std::vector<double> mel_pts(m_MFCCMels + 2);
-    for (int i = 0; i < m_MFCCMels + 2; ++i) {
-        mel_pts[i] = mel_min + (mel_max - mel_min) * static_cast<double>(i) / static_cast<double>(m_MFCCMels + 1);
+    std::vector<double> mel_pts(m_Config.MFCCMels + 2);
+    for (int i = 0; i < m_Config.MFCCMels + 2; ++i) {
+        mel_pts[i] =
+            mel_min + (mel_max - mel_min) * static_cast<double>(i) / static_cast<double>(m_Config.MFCCMels + 1);
     }
 
-    std::vector<double> hz_pts(m_MFCCMels + 2);
-    for (int i = 0; i < m_MFCCMels + 2; ++i) {
+    std::vector<double> hz_pts(m_Config.MFCCMels + 2);
+    for (int i = 0; i < m_Config.MFCCMels + 2; ++i) {
         hz_pts[i] = mel_to_hz(mel_pts[i]);
     }
 
     // Slaney triangular filters (area normalized), matching librosa.filters.mel
-    m_MFCCFilter.assign(m_MFCCMels, std::vector<double>(n_f, 0.0));
-    m_MFCCActiveBins.assign(m_MFCCMels, {0, -1});
+    m_MFCCFilter.assign(m_Config.MFCCMels, std::vector<double>(nHalfPlus1, 0.0));
+    m_MFCCActiveBins.assign(m_Config.MFCCMels, {0, -1});
 
-    std::vector<double> fdiff(m_MFCCMels + 1);
-    for (int i = 0; i < m_MFCCMels + 1; ++i) {
+    std::vector<double> fdiff(m_Config.MFCCMels + 1);
+    for (int i = 0; i < m_Config.MFCCMels + 1; ++i) {
         fdiff[i] = hz_pts[i + 1] - hz_pts[i];
     }
 
-    for (int m = 0; m < m_MFCCMels; ++m) {
+    for (int m = 0; m < m_Config.MFCCMels; ++m) {
         const double enorm = 2.0 / (hz_pts[m + 2] - hz_pts[m]);
 
         int first = -1;
         int last = -1;
-        for (int k = 0; k < n_f; ++k) {
+        for (int k = 0; k < nHalfPlus1; ++k) {
             const double ramp = hz_pts[m] - fft_freqs[k];
             const double lower = -ramp / fdiff[m];
             const double upper = (hz_pts[m + 2] - fft_freqs[k]) / fdiff[m + 1];
@@ -933,47 +915,28 @@ void MIR::MFCCInit() {
     }
 
     // Orthonormal DCT-II (librosa: dct_type=2, norm="ortho")
-    m_DCTBasis.assign(m_MFCCCount, std::vector<double>(m_MFCCMels));
+    m_DCTBasis.assign(m_Config.MFCCCount, std::vector<double>(m_Config.MFCCMels));
 
-    const double scale0 = std::sqrt(1.0 / m_MFCCMels);
-    const double scale = std::sqrt(2.0 / m_MFCCMels);
+    const double scale0 = std::sqrt(1.0 / m_Config.MFCCMels);
+    const double scale = std::sqrt(2.0 / m_Config.MFCCMels);
 
-    for (int k = 0; k < m_MFCCCount; ++k) {
-        for (int n = 0; n < m_MFCCMels; ++n) {
-            m_DCTBasis[k][n] = (k == 0 ? scale0 : scale) * std::cos(std::numbers::pi * (n + 0.5) * k / m_MFCCMels);
+    for (int k = 0; k < m_Config.MFCCCount; ++k) {
+        for (int n = 0; n < m_Config.MFCCMels; ++n) {
+            m_DCTBasis[k][n] =
+                (k == 0 ? scale0 : scale) * std::cos(std::numbers::pi * (n + 0.5) * k / m_Config.MFCCMels);
         }
     }
 
-    m_MFCCEnergy.resize(m_MFCCMels);
+    m_MFCCEnergy.resize(m_Config.MFCCMels);
 }
 
 // ─────────────────────────────────────
 void MIR::MFCCExec(Description &Desc) {
-    const int n_mels = std::min<int>(m_MFCCMels, static_cast<int>(m_MFCCFilter.size()));
-    const int n_mfcc = std::min<int>(m_MFCCCount, static_cast<int>(m_DCTBasis.size()));
-
-    if (n_mels <= 0 || n_mfcc <= 0 || Desc.Power.empty()) {
-        Desc.MFCC.assign(std::max(0, n_mfcc), 0.0);
-        Desc.LogMelSpectrum.assign(n_mels, 0.0);
-        return;
-    }
-
-    const int n_f = std::min<int>(static_cast<int>(Desc.Power.size()), static_cast<int>(m_MFCCFilter[0].size()));
-    if (n_f <= 0) {
-        Desc.MFCC.assign(n_mfcc, 0.0);
-        Desc.LogMelSpectrum.assign(n_mels, 0.0);
-        return;
-    }
-
+    const int n_f = m_Config.FFTSize / 2 + 1;
     constexpr double kAmin = 1e-10f;
     constexpr double kTopDb = 80.0f;
 
-    if (static_cast<int>(m_MFCCEnergy.size()) != n_mels)
-        m_MFCCEnergy.resize(n_mels);
-
-    // Mel projection (power domain) -> fill m_MFCCEnergy and Melogram.
-    Desc.LogMelSpectrum.resize(n_mels);
-    for (int m = 0; m < n_mels; ++m) {
+    for (int m = 0; m < m_Config.MFCCMels; ++m) {
         const double *filter = m_MFCCFilter[m].data();
         double melEnergy = 0.0;
         for (int k = 0; k < n_f; ++k) {
@@ -988,25 +951,26 @@ void MIR::MFCCExec(Description &Desc) {
 
     // Apply librosa-style top_db floor.
     float maxLog = -std::numeric_limits<float>::infinity();
-    for (int m = 0; m < n_mels; ++m)
+    for (int m = 0; m < m_Config.MFCCMels; ++m) {
         if (Desc.LogMelSpectrum[m] > maxLog)
             maxLog = static_cast<float>(Desc.LogMelSpectrum[m]);
+    }
 
     if (std::isfinite(maxLog)) {
         const float floor = maxLog - kTopDb;
-        for (int m = 0; m < n_mels; ++m) {
+        for (int m = 0; m < m_Config.MFCCMels; ++m) {
             if (Desc.LogMelSpectrum[m] < floor)
                 Desc.LogMelSpectrum[m] = floor;
         }
     }
 
     // MFCCs are DCT-II over the log-mel (dB) spectrum.
-    Desc.MFCC.assign(n_mfcc, 0.0);
-    for (int k = 0; k < n_mfcc; ++k) {
+    for (int k = 0; k < m_Config.MFCCCount; ++k) {
         const double *basis = m_DCTBasis[k].data();
         double coeff = 0.0;
-        for (int n = 0; n < n_mels; ++n)
+        for (int n = 0; n < m_Config.MFCCMels; ++n) {
             coeff += basis[n] * Desc.LogMelSpectrum[n];
+        }
         Desc.MFCC[k] = coeff;
     }
 }
@@ -1015,7 +979,7 @@ void MIR::MFCCExec(Description &Desc) {
 // │               Chroma                │
 // ╰─────────────────────────────────────╯
 double MIR::HzToOcts(double frequency, double tuning, int binsPerOctave) const {
-    const double a440 = m_ChromaA440 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
+    const double a440 = m_Config.TunningA4 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
     return std::log2(frequency / (a440 / 16.0));
 }
 
@@ -1030,24 +994,20 @@ double MIR::PositiveRemainder(double value, double modulus) const {
 
 // ─────────────────────────────────────
 void MIR::SpectralChromaInit() {
-    const size_t nFft = static_cast<size_t>(m_FFTSize);
+    const size_t nFft = static_cast<size_t>(m_Config.FFTSize);
     const size_t nHalf = nFft / 2 + 1;
-
-    m_ChromaFilter.assign(m_ChromaSize, std::vector<double>(nHalf, 0.0));
-    if (nFft == 0 || nHalf == 0 || m_Sr <= 0.0f) {
-        return;
-    }
-
+    m_ChromaFilter.assign(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
     std::vector<double> frqbins(nFft, 0.0);
     if (nFft > 1) {
         for (size_t k = 1; k < nFft; ++k) {
-            const double frequency = static_cast<double>(k) * static_cast<double>(m_Sr) / static_cast<double>(nFft);
-            frqbins[k] =
-                static_cast<double>(m_ChromaSize) * HzToOcts(frequency, m_ChromaTuning, static_cast<int>(m_ChromaSize));
+            const double frequency =
+                static_cast<double>(k) * static_cast<double>(m_Config.SR) / static_cast<double>(nFft);
+            frqbins[k] = static_cast<double>(m_Config.ChromaSize) *
+                         HzToOcts(frequency, m_Config.TunningA4, static_cast<int>(m_Config.ChromaSize));
         }
-        frqbins[0] = frqbins[1] - 1.5 * static_cast<double>(m_ChromaSize);
+        frqbins[0] = frqbins[1] - 1.5 * static_cast<double>(m_Config.ChromaSize);
     } else {
-        frqbins[0] = -1.5 * static_cast<double>(m_ChromaSize);
+        frqbins[0] = -1.5 * static_cast<double>(m_Config.ChromaSize);
     }
 
     std::vector<double> binwidthbins(nFft, 1.0);
@@ -1055,13 +1015,13 @@ void MIR::SpectralChromaInit() {
         binwidthbins[k] = std::max(frqbins[k + 1] - frqbins[k], 1.0);
     }
 
-    const double nChroma2 = std::round(static_cast<double>(m_ChromaSize) / 2.0);
+    const double nChroma2 = std::round(static_cast<double>(m_Config.ChromaSize) / 2.0);
     for (size_t k = 0; k < nHalf; ++k) {
         double columnNorm = 0.0;
-        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
             const double distance = PositiveRemainder(frqbins[k] - static_cast<double>(chroma) + nChroma2 +
-                                                          10.0 * static_cast<double>(m_ChromaSize),
-                                                      static_cast<double>(m_ChromaSize)) -
+                                                          10.0 * static_cast<double>(m_Config.ChromaSize),
+                                                      static_cast<double>(m_Config.ChromaSize)) -
                                     nChroma2;
             const double weight = std::exp(-0.5 * std::pow(2.0 * distance / binwidthbins[k], 2.0));
             m_ChromaFilter[chroma][k] = weight;
@@ -1070,25 +1030,25 @@ void MIR::SpectralChromaInit() {
 
         if (columnNorm > 0.0) {
             const double invNorm = 1.0 / std::sqrt(columnNorm);
-            for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
+            for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
                 m_ChromaFilter[chroma][k] *= invNorm;
             }
         }
 
-        const double octaveWeight =
-            std::exp(-0.5 * std::pow((frqbins[k] / static_cast<double>(m_ChromaSize) - m_ChromaCenterOctave) /
-                                         m_ChromaOctaveWidth,
-                                     2.0));
-        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
+        const double octaveWeight = std::exp(
+            -0.5 * std::pow((frqbins[k] / static_cast<double>(m_Config.ChromaSize) - m_Config.ChromaCenterOctave) /
+                                m_Config.ChromaOctaveWidth,
+                            2.0));
+        for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
             m_ChromaFilter[chroma][k] *= octaveWeight;
         }
     }
 
-    const int chromaShift = 3 * (m_ChromaSize / 12);
-    if (chromaShift > 0 && chromaShift < m_ChromaSize) {
-        Matrix rolled(m_ChromaSize, std::vector<double>(nHalf, 0.0));
-        for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
-            rolled[chroma] = m_ChromaFilter[(chroma + chromaShift) % m_ChromaSize];
+    const int chromaShift = 3 * (m_Config.ChromaSize / 12);
+    if (chromaShift > 0 && chromaShift < m_Config.ChromaSize) {
+        Matrix rolled(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
+        for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
+            rolled[chroma] = m_ChromaFilter[(chroma + chromaShift) % m_Config.ChromaSize];
         }
         m_ChromaFilter.swap(rolled);
     }
@@ -1098,8 +1058,8 @@ void MIR::SpectralChromaInit() {
 void MIR::SpectralChromaExec(Description &Desc) {
 
     // TODO:
-    if (Desc.Chroma.size() != static_cast<size_t>(m_ChromaSize))
-        Desc.Chroma.resize(m_ChromaSize);
+    if (Desc.Chroma.size() != static_cast<size_t>(m_Config.ChromaSize))
+        Desc.Chroma.resize(m_Config.ChromaSize);
 
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
 
@@ -1108,14 +1068,13 @@ void MIR::SpectralChromaExec(Description &Desc) {
     }
 
     const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
-    for (int chroma = 0; chroma < m_ChromaSize; ++chroma) {
+    for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
         double energy = 0.0;
         const auto &filter = m_ChromaFilter[chroma];
 
         for (size_t k = 0; k < nHalf; ++k) {
             energy += filter[k] * Desc.Power[k];
         }
-
         Desc.Chroma[chroma] = energy;
     }
 }
@@ -1124,19 +1083,9 @@ void MIR::SpectralChromaExec(Description &Desc) {
 // │         Zero Crossing Rate          │
 // ╰─────────────────────────────────────╯
 void MIR::ZeroCrossingRateInit() {
-    m_ZCRFrameLength = static_cast<int>(m_FFTSize);
-    m_ZCRHopLength = static_cast<int>(m_HopSize);
-
-    if (m_ZCRFrameLength <= 0) {
-        m_ZCRFrameLength = 1;
-    }
-    if (m_ZCRHopLength <= 0) {
-        m_ZCRHopLength = 1;
-    }
-
-    // Reuse this buffer across calls to avoid per-block allocations.
-    const size_t pad = m_ZCRCenter ? static_cast<size_t>(m_ZCRFrameLength / 2) : 0;
-    m_ZCRScratch.resize(static_cast<size_t>(m_ZCRFrameLength) + (2 * pad));
+    const size_t frame = static_cast<size_t>(std::max(1.0f, m_Config.FFTSize));
+    const size_t pad = m_Config.ZCRCenter ? (frame / 2) : 0;
+    m_ZCRScratch.resize(frame + (2 * pad));
 }
 
 // ─────────────────────────────────────
@@ -1146,19 +1095,11 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
         return;
     }
 
-    const int frameLength = std::max(1, m_ZCRFrameLength);
-    const size_t frameLengthSz = static_cast<size_t>(frameLength);
     const double *yData = nullptr;
-    size_t ySize = 0;
 
-    if (m_ZCRCenter) {
-        const size_t pad = frameLengthSz / 2;
+    if (m_Config.ZCRCenter) {
+        const size_t pad = m_Config.FFTSize / 2;
         const size_t inSize = In.size();
-        ySize = inSize + (2 * pad);
-        if (m_ZCRScratch.size() < ySize) {
-            m_ZCRScratch.resize(ySize);
-        }
-
         double *dst = m_ZCRScratch.data();
         const double edgeLeft = In.front();
         const double edgeRight = In.back();
@@ -1168,27 +1109,22 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
         yData = dst;
     } else {
         yData = In.data();
-        ySize = In.size();
-    }
-
-    if (ySize < frameLengthSz) {
-        Desc.ZeroCrossingRate = 0.0;
-        return;
+        // ysize = in.size();
     }
 
     size_t crossings = 0;
-    if (m_ZCRPad) {
+    if (m_Config.ZCRPad) {
         crossings += 1;
     }
 
-    const double threshold = m_ZCRThreshold;
-    if (m_ZCRZeroPos) {
+    const double threshold = m_Config.ZCRThreshold;
+    if (m_Config.ZCRZeroPos) {
         double prev = yData[0];
         if (std::abs(prev) <= threshold) {
             prev = 0.0;
         }
 
-        for (int i = 1; i < frameLength; ++i) {
+        for (int i = 1; i < m_Config.FFTSize; ++i) {
             double curr = yData[static_cast<size_t>(i)];
             if (std::abs(curr) <= threshold)
                 curr = 0.0;
@@ -1203,7 +1139,7 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
         }
 
         int prevSign = (prev > 0.0) - (prev < 0.0);
-        for (int i = 1; i < frameLength; ++i) {
+        for (int i = 1; i < m_Config.FFTSize; ++i) {
             double curr = yData[static_cast<size_t>(i)];
             if (std::abs(curr) <= threshold)
                 curr = 0.0;
@@ -1214,7 +1150,7 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
         }
     }
 
-    Desc.ZeroCrossingRate = static_cast<double>(crossings) / static_cast<double>(frameLengthSz);
+    Desc.ZeroCrossingRate = static_cast<double>(crossings) / static_cast<double>(m_Config.FFTSize);
 }
 
 // ─────────────────────────────────────
@@ -1238,7 +1174,7 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     // 2. Frequency Domain (windowing + FFT)
     const double *x = In.data();
     const double *w = m_FullWindowingFunc.data();
-    for (size_t i = 0; i < m_FFTSize; ++i) {
+    for (size_t i = 0; i < m_Config.FFTSize; ++i) {
         m_FullFFTIn[i] = x[i] * w[i];
     }
 

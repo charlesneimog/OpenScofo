@@ -31,61 +31,6 @@ std::string Score::GetLuaCode() {
 }
 
 // ─────────────────────────────────────
-void Score::UpdateAudioParameters(float FftSize, float HopSize) {
-    m_FFTSize = FftSize;
-    m_HopSize = HopSize;
-}
-
-// ─────────────────────────────────────
-void Score::SetTunning(double Tunning) {
-    m_Tunning = Tunning;
-}
-
-// ─────────────────────────────────────
-double Score::GetFFTSize() {
-    return m_FFTSize;
-}
-
-// ─────────────────────────────────────
-double Score::GetHopSize() {
-    return m_HopSize;
-}
-
-// ─────────────────────────────────────
-double Score::GetPitchTemplateSigma() {
-    return m_PitchTemplateSigma;
-}
-
-// ─────────────────────────────────────
-double Score::GetPhaseCoupling() {
-    return m_PhaseCoupling;
-}
-
-// ─────────────────────────────────────
-double Score::GetSyncStrength() {
-    return m_SyncStrength;
-}
-
-// ─────────────────────────────────────
-bool Score::HasTimbreModel() {
-    if (m_TimbreONNXModel.empty()) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
-// ─────────────────────────────────────
-fs::path Score::GetTimbreModel() {
-    return m_TimbreONNXModel;
-}
-
-// ─────────────────────────────────────
-std::vector<std::string> Score::GetTimbreModelDescriptors() {
-    return m_ONNXDescriptors;
-}
-
-// ─────────────────────────────────────
 bool Score::ScoreIsLoaded() {
     return m_ScoreLoaded;
 }
@@ -469,9 +414,10 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
-    if (m_TimbreONNXModel.empty()) {
-        spdlog::error("The ONNXMODEL must be defined to enable UTECH and PTECH events.");
-    }
+    // TODO:
+    // if (m_TimbreONNXModel.empty()) {
+    //     spdlog::error("The ONNXMODEL must be defined to enable UTECH and PTECH events.");
+    // }
 
     Event.Type = UTECH;
     AudioState SubState;
@@ -529,7 +475,6 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     double duration = GetDurationFromNode(ScoreStr, DurationNode);
     Event.Duration = duration;
     Event.Type = REST;
-    m_MinimalDuration = std::min(m_MinimalDuration, duration);
 
     AudioState Silence;
     Silence.Type = SILENCE;
@@ -558,8 +503,7 @@ void Score::ProcessEventTime(MarkovState &Event) {
         Event.IOIPhiN = 0;
         Event.OnsetExpected = 0;
     }
-    Event.PhaseCoupling = m_PhaseCoupling;
-    Event.SyncStrength = m_SyncStrength;
+
     Event.BPMExpected = m_CurrentBPM;
 
     spdlog::debug("Added Time for Event {}, BPM {}, Phase PhaseCoupling {}, SyncStrength {}, "
@@ -651,7 +595,7 @@ std::string GetChildStringFromType(const std::string &source, TSNode parent, con
 }
 
 // ─────────────────────────────────────
-void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
+void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &Config) {
     TSNode keyNode = GetField(node, "key");
     TSNode valueNode = GetField(node, "value");
     TSPoint pos = ts_node_start_point(node);
@@ -693,31 +637,31 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
             if (v < 0 || v > 2) {
                 spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
             } else {
-                m_PhaseCoupling = v;
+                Config.PhaseCoupling = v;
             }
         } else if (id == "SYNCSTRENGTH") {
             if (v < 0 || v > 1) {
                 spdlog::error("Invalid value for SYNCSTRENGTH on line {}.", pos.row + 1);
             } else {
-                m_SyncStrength = v;
+                Config.SyncStrength = v;
             }
         } else if (id == "PITCHTEMPLATESIGMA") {
             if (v < 0 || v > 1) {
                 spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);
             } else {
-                m_PitchTemplateSigma = v;
+                Config.PitchTemplateSigma = v;
             }
         } else if (id == "FFTSIZE") {
             int fft = static_cast<int>(v);
             if (fft > 0 && (fft & (fft - 1)) == 0) {
-                m_FFTSize = fft;
+                Config.FFTSize = fft;
             } else {
                 spdlog::error("FFTSIZE must be a power of two.");
             }
         } else if (id == "HOPSIZE") {
             int hop = static_cast<int>(v);
             if (hop > 0 && (hop & (hop - 1)) == 0) {
-                m_HopSize = hop;
+                Config.HOPSize = hop;
             } else {
                 spdlog::error("HOPSIZE must be a power of two.");
             }
@@ -736,20 +680,20 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node) {
             path = path.substr(1, path.size() - 2);
         }
 
-        m_TimbreONNXModel = m_ScoreRootPath / fs::path(path);
-        if (!fs::exists(m_TimbreONNXModel)) {
-            spdlog::error("Model path not found: {}", m_TimbreONNXModel.string());
+        Config.TimbreONNXModel = m_ScoreRootPath / fs::path(path);
+        if (!fs::exists(Config.TimbreONNXModel)) {
+            spdlog::error("Model path not found: {}", Config.TimbreONNXModel.string());
         }
         return;
     }
 
     if (id == "ONNXDESCRIPTORS") {
-        m_ONNXDescriptors.clear();
+        Config.ONNXDescriptors.clear();
         uint32_t count = ts_node_named_child_count(valueNode);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(valueNode, i);
             std::string d = GetCodeStr(ScoreStr, child);
-            m_ONNXDescriptors.push_back(d);
+            Config.ONNXDescriptors.push_back(d);
         }
     }
 }
@@ -868,21 +812,21 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
 }
 
 // ─────────────────────────────────────
-void FindErrors(TSNode &root, TSNode &node, const std::string &source_code) {
+void FindErrors(TSNode &root, TSNode &node, const std::string &ScoreStr) {
     if (!ts_node_is_null(node) && !ts_node_eq(root, node) && ts_node_has_error(node)) {
         TSPoint start = ts_node_start_point(node);
         uint32_t row = start.row + 1; // 1-based
         uint32_t column = start.column + 1;
         uint32_t byteStart = ts_node_start_byte(node);
         uint32_t byteEnd = ts_node_end_byte(node);
-        std::string tokenText = source_code.substr(byteStart, byteEnd - byteStart);
+        std::string tokenText = ScoreStr.substr(byteStart, byteEnd - byteStart);
         spdlog::error("Fond Error {}, line: {}, column: {}, token: '{}'", ts_node_type(node), row, column, tokenText);
     }
 
     uint32_t childCount = ts_node_child_count(node);
     for (uint32_t i = 0; i < childCount; i++) {
         TSNode child = ts_node_child(node, i);
-        FindErrors(root, child, source_code);
+        FindErrors(root, child, ScoreStr);
     }
 }
 
@@ -922,9 +866,10 @@ bool ScoreIsText(const std::string &path) {
 }
 
 // ─────────────────────────────────────
-States Score::Parse(fs::path ScoreFilePath) {
+std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
     m_ScoreStates.clear();
     m_LuaCode.clear();
+    Configuration Config = Configuration();
 
     if (fs::exists(ScoreFilePath) == false) {
         spdlog::error("Score File not found");
@@ -946,16 +891,13 @@ States Score::Parse(fs::path ScoreFilePath) {
     std::string ScoreStr = Buffer.str();
 
     // Proceed with parsing ScoreStr...
-    // Config Values
-    m_CurrentBPM = -1;
-    m_Transpose = 0;
-    m_PitchTemplateSigma = 0.5;
-
     m_LineCount = 0;
     m_MarkovIndex = 0;
-    m_ScorePosition = 0;
     m_LastOnset = 0;
     m_PrevDuration = 0;
+    m_CurrentBPM = -1;
+    m_Transpose = 0;
+    m_ScorePosition = 0;
     std::string Line;
 
     // read and process score
@@ -970,18 +912,18 @@ States Score::Parse(fs::path ScoreFilePath) {
 
     uint32_t child_count = ts_node_child_count(rootNode);
     for (uint32_t i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(rootNode, i);
-        std::string type = ts_node_type(child);
+        TSNode Child = ts_node_child(rootNode, i);
+        std::string type = ts_node_type(Child);
         if (type == "EVENT") {
             if (m_CurrentBPM == -1) {
                 spdlog::error("BPM is not defined");
                 return {};
             }
-            NewEvent(ScoreStr, child);
+            NewEvent(ScoreStr, Child);
         } else if (type == "CONFIG") {
-            NewConfig(ScoreStr, child);
+            NewConfig(ScoreStr, Child, Config);
         } else if (type == "LUA") {
-            std::string lua_body = GetChildStringFromField(ScoreStr, child, "lua_body");
+            std::string lua_body = GetChildStringFromField(ScoreStr, Child, "lua_body");
             m_LuaCode += lua_body;
         } else if (type == "comment") {
             // ignore
@@ -995,6 +937,7 @@ States Score::Parse(fs::path ScoreFilePath) {
     ts_parser_delete(parser);
 
     m_ScoreLoaded = true;
-    return m_ScoreStates;
+    printf("dB %f\n", Config.dBTreshold);
+    return {Config, m_ScoreStates};
 }
 } // namespace OpenScofo

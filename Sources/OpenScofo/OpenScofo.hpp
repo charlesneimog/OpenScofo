@@ -49,13 +49,8 @@ class OpenScofo {
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
 
     // Set Functions
-    void SetAmplitudeDecay(double decay);
-    void SetPitchTemplateSigma(double Sigma);
-    void SetHarmonics(int Harmonics);
-    void SetdBTreshold(double dB);
-    void SetTunning(double Tunning);
     void SetCurrentEvent(int Event);
-    void SetNewAudioParameters(float Sr, float FftSize, float HopSize);
+    void UpdateConfiguration(Configuration &Config);
 
     // Get Functions
     double GetCurrentBPM();
@@ -97,6 +92,8 @@ class OpenScofo {
     void SetLogLevel(spdlog::level::level_enum level);
 
   private:
+    Configuration m_Config;
+
     OnlineForward m_Forward;
     MIR m_MIR;
     Score m_Score;

@@ -23,6 +23,9 @@ namespace OpenScofo {
 
     * CONT, A. Improvement of Observation Modeling for Score Following. 2004.
 
+    * CUVILLIER, P.. On Temporal Coherency of Probabilistic Models for Audio-to-Score Alignment. Theses,
+        Université Pierre et Marie Curie - Paris VI, 2016. (2016PA066532).
+
     * GUÉDON, Y. Hidden Hybrid Markov/Semi-Markov Chains. Computational Statistics & Data
         Analysis, [S.l.], v.49, n.3, p.663–688, 2005.
 
@@ -36,7 +39,7 @@ namespace OpenScofo {
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
-OnlineForward::OnlineForward(double Sr, double FFTSize, double HopSize) {
+OnlineForward::OnlineForward() {
     m_SyncStrength = 0.5;
     m_PhaseCoupling = 0.5;
     m_TimeInPrevEvent = 0;
@@ -49,16 +52,19 @@ OnlineForward::OnlineForward(double Sr, double FFTSize, double HopSize) {
         double key = i / 1000.0;
         InverseA2(key);
     }
-
-    UpdateAudioParameters(Sr, FFTSize, HopSize);
 }
 
 // ─────────────────────────────────────
-void OnlineForward::UpdateAudioParameters(double Sr, double FFTSize, double HopSize) {
-    m_HopSize = HopSize;
-    m_FFTSize = FFTSize;
-    m_Sr = Sr;
+void OnlineForward::UpdateConfiguration(Configuration &Config) {
+    m_Sr = Config.SR;
+    m_FFTSize = Config.FFTSize;
+    m_HopSize = Config.HOPSize;
     m_BlockDur = (1.0 / m_Sr) * m_HopSize;
+    m_PitchTemplateSigma = Config.PitchTemplateSigma;
+    m_Harmonics = Config.PitchTemplateHarmonics;
+    m_SyncStrength = Config.SyncStrength;
+    m_PhaseCoupling = Config.PhaseCoupling;
+    m_dBTreshold = Config.dBTreshold;
 
     m_PitchTemplates.clear();
     m_PitchCQTTemplates.clear();
@@ -114,10 +120,10 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_LastPsiN = 60.0f / m_States[0].BPMExpected;
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
-    if (std::isfinite(m_States[0].SyncStrength)) {
+    if (std::isfinite(m_States[0].SyncStrength) && m_States[0].SyncStrength != 0.0) {
         m_SyncStrength = std::clamp(m_States[0].SyncStrength, 0.0, 1.0);
     }
-    if (std::isfinite(m_States[0].PhaseCoupling)) {
+    if (std::isfinite(m_States[0].PhaseCoupling) && m_States[0].PhaseCoupling != 0.0) {
         m_PhaseCoupling = std::clamp(m_States[0].PhaseCoupling, 0.0, 2.0);
     }
 
