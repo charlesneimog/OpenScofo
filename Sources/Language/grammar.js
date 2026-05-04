@@ -71,8 +71,6 @@ module.exports = grammar({
         config_key: (_) =>
             token(
                 choice(
-                    "BPM",
-
                     // Audio
                     "FFTSIZE",
                     "HOPSIZE",
@@ -80,10 +78,13 @@ module.exports = grammar({
                     // Tempo
                     "PHASECOUPLING",
                     "SYNCSTRENGTH",
+                    "BPM",
+
+                    // Pitch
+                    "PITCHTEMPLATESIGMA",
                     "TRANSPOSE",
 
                     // Listening model
-                    "PITCHTEMPLATESIGMA",
                     "ONNXMODEL",
                     "ONNXDESCRIPTORS",
                     "ONSETFUNCTION",
