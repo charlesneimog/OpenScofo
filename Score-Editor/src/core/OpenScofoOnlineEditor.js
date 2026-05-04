@@ -4,8 +4,11 @@ import {
     PARSER_LUA_WASM,
     PARSER_OPEN_SCOFO_WASM,
 } from "../config/constants.js";
+
 import { myCustomAutocomplete } from "../utils/autocomplete.js";
+
 import { debounce } from "../utils/debounce.js";
+
 import {
     addGhostText,
     fetchTextFile,
@@ -17,6 +20,7 @@ import {
     runTreeQuery,
     showCodeSuggestions,
 } from "../parser/highlighting.js";
+
 import {
     bootstrapParserInitialization,
     checkErrors,
@@ -182,3 +186,4 @@ Object.assign(OpenScofoOnlineEditor.prototype, {
     uploadScore,
     loadTxtScore,
 });
+
