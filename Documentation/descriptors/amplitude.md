@@ -46,7 +46,9 @@ Maximum normalized spectral amplitude detected in the current frame of audio.
 <div class="grid cards" style="font-weigth:bold" markdown>
 -   ??? equation "Equation"
 
-        $$MaxAmp = \max_{k} |X[k]|$$
+        $$
+        MaxAmp = \max_{k} |X[k]|
+        $$
         Where $X[k]$ is an FFT Bin.
 
 -   ??? note "Notes"

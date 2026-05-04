@@ -10,7 +10,7 @@ This approach allows development to focus on improving the core functionality of
     Always try the examples on [OpenScofo Online Score Editor](https://charlesneimog.github.io/OpenScofo/Editor){:target="_blank"}, with color highlight. Writing scores is easier there.
 
 ---
-## <h2 align="center">Audio Configuration</h2>
+## Audio Configuration
 ---
 
 ### `FFTSIZE`
@@ -40,7 +40,7 @@ HOPSIZE 256
 
 ---
 
-## <h2 align="center">Time Configuration</h2>
+## Time Configuration
 ---
 
 ### `BPM`
@@ -75,7 +75,7 @@ SYNCSTRENGTH 0.4
 ```
 
 ---
-## <h2 align="center">Listening Module Configuration</h2>
+## Listening Module Configuration
 ---
 
 ### `PITCHTEMPLATESIGMA`
@@ -117,7 +117,7 @@ ONNXDESCRIPTORS mfcc zcr centroid spread
 To detect Flute extended techniques, like tongue-ram, pizz, key-click, jet-whistle, etc... A good list would be `mfcc logmel zcr centroid flatness hfr`.
 
 
-Check the `OpenScofo` [descriptors](../listening.md).
+Check the `OpenScofo` [descriptors](./../descriptors/spectral.md).
 
 ---
 ### `ONSETFUNCTION`
@@ -132,9 +132,6 @@ Defines the onset detection function (ODF), each emphasizing different signal ch
 * `rcd` is a rectified version of the complex-domain method that counts only increases in deviation, helping reduce false detections.
 * `hfc` (high frequency content) emphasizes changes in high-frequency spectral bins, which are often strong during percussive attacks.
 * `mkl` (modified Kullback–Leibler divergence) measures changes in the spectral distribution between frames and is effective for detecting structural spectral changes in pitched or harmonic material.
-
-
-
 
 ??? question "More details for Onset Detection"
 
