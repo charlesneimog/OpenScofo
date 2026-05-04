@@ -14,10 +14,12 @@ from scipy.stats import kurtosis
 sr = 48000
 n_fft = 2048
 hop = 512
+analysis_hop = n_fft
 
 os.chdir(os.path.dirname(__file__))
 
-scofo = OpenScofo.OpenScofo(sr, n_fft, hop)
+# Use one analysis per window so flux compares consecutive frames.
+scofo = OpenScofo.OpenScofo(sr, n_fft, analysis_hop)
 
 y, sr = librosa.load(
     "./assets/bwv-1013.wav",
@@ -46,11 +48,13 @@ def print_with_threshold(diff, message):
         print(message)
 
 
-def run_test_logmel(window, label):
-    global MAX_DIFF
-
+def analyze_window(window):
     scofo.process_block(window)
-    scofo_desc = scofo.get_description()
+    return scofo.get_description()
+
+
+def run_test_logmel(window, scofo_desc, label):
+    global MAX_DIFF
 
     # Librosa log-mel
     mel = librosa.feature.melspectrogram(
@@ -66,7 +70,7 @@ def run_test_logmel(window, label):
     )
 
     librosa_logmel = librosa.power_to_db(mel, ref=1.0)[:, 0]
-    scofo_logmel = scofo_desc.logmelspectrum
+    scofo_logmel = scofo_desc.logmel
 
     n = min(len(librosa_logmel), len(scofo_logmel))
     if n == 0:
@@ -103,11 +107,8 @@ def run_test_logmel(window, label):
 
 
 # ---------------- MFCC TEST ----------------
-def run_test_mfcc(window, label):
+def run_test_mfcc(window, scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     mfcc = librosa.feature.mfcc(
         y=window,
@@ -148,13 +149,10 @@ def run_test_mfcc(window, label):
 
 
 # ──────────────────────────────────────
-def run_test_kurtosis(window, label):
+def run_test_kurtosis(window, scofo_desc, label):
     global MAX_DIFF
     S = np.abs(librosa.stft(window))
     k = kurtosis(S, fisher=True, bias=True)
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     s_kurtosis = scofo_desc.kurtosis
     diff = abs(k - s_kurtosis)
@@ -172,11 +170,8 @@ def run_test_kurtosis(window, label):
 
 
 # ---------------- Centroid TEST ----------------
-def run_test_centroid(window, label):
+def run_test_centroid(window, scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     # Librosa spectral centroid
     l_centroid = librosa.feature.spectral_centroid(
@@ -208,10 +203,8 @@ def run_test_centroid(window, label):
 
 
 # ---------------- Spread TEST ----------------
-def run_test_spread(window, label):
+def run_test_spread(window, scofo_desc, label):
     global MAX_DIFF
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     # Librosa spectral spread
     l_spread = librosa.feature.spectral_bandwidth(
@@ -244,10 +237,8 @@ def run_test_spread(window, label):
 
 
 # ---------------- FLATNESS TEST ----------------
-def run_test_flatness(window, label):
+def run_test_flatness(window, scofo_desc, label):
     global MAX_DIFF
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     l_flatness = librosa.feature.spectral_flatness(
         y=window,
@@ -275,12 +266,8 @@ def run_test_flatness(window, label):
 
 
 # ---------------- CREST TEST ----------------
-def run_test_crest(window, label):
+def run_test_crest(scofo_desc, label):
     global MAX_DIFF
-
-    # Scofo
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     o_crest = scofo_desc.crest
 
@@ -305,23 +292,16 @@ def run_test_crest(window, label):
 
 
 # ---------------- FLUX TEST ----------------
-def run_test_flux(prev_window, window, label):
+def run_test_flux(prev_desc, curr_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(prev_window)
-    oscofo_prev_window = scofo.get_description()
-
-    scofo.process_block(window)
-    oscofo_curr_window = scofo.get_description()
-
-    o_flux = oscofo_curr_window.flux
+    o_flux = curr_desc.flux
 
     # Essentia (Flux memory behavior: first call seeds memory, second call computes prev->curr)
     flux_algo = es.Flux(norm="L2", halfRectify=False)
 
     # 1. Use OpenScofo spectra so the comparison is algorithm-only.
-    spec_prev = np.ascontiguousarray(oscofo_prev_window.magnitude, dtype=np.float32)
-    spec_curr = np.ascontiguousarray(oscofo_curr_window.magnitude, dtype=np.float32)
+    spec_prev = np.ascontiguousarray(prev_desc.magnitude, dtype=np.float32)
+    spec_curr = np.ascontiguousarray(curr_desc.magnitude, dtype=np.float32)
 
     # 2. Calculate Flux
     _ = flux_algo(spec_prev)
@@ -342,11 +322,8 @@ def run_test_flux(prev_window, window, label):
 
 
 # ---------------- ROLLOFF TEST ----------------
-def run_test_rolloff(window, label):
+def run_test_rolloff(scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
     o_rolloff = scofo_desc.rolloff
 
     # Essentia rolloff (uses magnitude spectrum)
@@ -370,11 +347,8 @@ def run_test_rolloff(window, label):
 
 
 # ---------------- ENTROPY TEST ----------------
-def run_test_entropy(window, label):
+def run_test_entropy(scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
     o_entropy = scofo_desc.entropy
 
     # Essentia spectral entropy
@@ -404,26 +378,20 @@ def run_test_entropy(window, label):
 
 
 # ---------------- FLUX TEST ----------------
-def run_test_spread_skew_kurt(prev_window, window, label):
+def run_test_spread_skew_kurt(scofo_desc, label):
     global MAX_DIFF
 
-    scofo.process_block(prev_window)
-    _ = scofo.get_description()
-
-    scofo.process_block(window)
-    oscofo_curr_window = scofo.get_description()
-
     # OpenScofo targets
-    o_spread = oscofo_curr_window.spread_variance
-    o_skew = oscofo_curr_window.skewness
-    o_kurt = oscofo_curr_window.kurtosis
+    o_spread = scofo_desc.spread_variance
+    o_skew = scofo_desc.skewness
+    o_kurt = scofo_desc.kurtosis
 
     # Essentia setup
     central_moments = es.CentralMoments()
     dist_shape = es.DistributionShape()
 
     # Use OpenScofo magnitude spectrum
-    spec = np.ascontiguousarray(oscofo_curr_window.magnitude, dtype=np.float32)
+    spec = np.ascontiguousarray(scofo_desc.magnitude, dtype=np.float32)
 
     # Normalize to probability distribution
     s = spec.sum()
@@ -473,11 +441,8 @@ def run_test_spread_skew_kurt(prev_window, window, label):
 
 
 # ---------------- CHROMA TEST ----------------
-def run_test_chroma(window, label):
+def run_test_chroma(window, scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     librosa_chroma = librosa.feature.chroma_stft(
         y=window,
@@ -517,11 +482,8 @@ def run_test_chroma(window, label):
 
 
 # ---------------- RMS TEST ----------------
-def run_test_rms(window, label):
+def run_test_rms(window, scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     # RMS-based loudness (power=2.0 equivalent)
     l_loudness = librosa.feature.rms(
@@ -547,11 +509,8 @@ def run_test_rms(window, label):
 
 
 # ---------------- ZEROCROSS-RATING TEST --------
-def run_test_zcr(window, label):
+def run_test_zcr(window, scofo_desc, label):
     global MAX_DIFF
-
-    scofo.process_block(window)
-    scofo_desc = scofo.get_description()
 
     l_zcr = librosa.feature.zero_crossing_rate(
         y=window,
@@ -585,24 +544,27 @@ n_tests = 20
 for _ in range(n_tests):
     max_start = len(y) - n_fft
     start = random.randint(n_fft, max_start)
-    prev_window = y[start - 512 : start - 512 + n_fft]
+    prev_window = y[start - hop : start - hop + n_fft]
     window = y[start : start + n_fft]
 
-    run_test_logmel(window, f"Start {start:08d}")
-    run_test_mfcc(window, f"Start {start:08d}")
-    run_test_flatness(window, f"Start {start:08d}")
-    run_test_rms(window, f"Start {start:08d}")
-    run_test_zcr(window, f"Start {start:08d}")
-    run_test_spread(window, f"Start {start:08d}")
-    run_test_centroid(window, f"Start {start:08d}")
-    run_test_chroma(window, f"start {start:08d}")
+    prev_desc = analyze_window(prev_window)
+    curr_desc = analyze_window(window)
+
+    run_test_logmel(window, curr_desc, f"Start {start:08d}")
+    run_test_mfcc(window, curr_desc, f"Start {start:08d}")
+    run_test_flatness(window, curr_desc, f"Start {start:08d}")
+    run_test_rms(window, curr_desc, f"Start {start:08d}")
+    run_test_zcr(window, curr_desc, f"Start {start:08d}")
+    run_test_spread(window, curr_desc, f"Start {start:08d}")
+    run_test_centroid(window, curr_desc, f"Start {start:08d}")
+    run_test_chroma(window, curr_desc, f"start {start:08d}")
 
     # Essentia
-    # run_test_rolloff(window, f"Start {start:08d}")
-    # run_test_entropy(window, f"Start {start:08d}")
-    run_test_crest(window, f"start {start:08d}")
-    run_test_flux(prev_window, window, f"Start {start:08d}")
-    run_test_spread_skew_kurt(prev_window, window, f"Start {start:08d}")
+    # run_test_rolloff(curr_desc, f"Start {start:08d}")
+    # run_test_entropy(curr_desc, f"Start {start:08d}")
+    run_test_crest(curr_desc, f"start {start:08d}")
+    run_test_flux(prev_desc, curr_desc, f"Start {start:08d}")
+    run_test_spread_skew_kurt(curr_desc, f"Start {start:08d}")
 
     print("----")
 
