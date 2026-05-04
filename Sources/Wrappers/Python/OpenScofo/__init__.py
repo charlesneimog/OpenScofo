@@ -49,8 +49,7 @@ import onnx
 class ExtendedTechniqueClassifier:
 
     def __init__(self, sample_rate=48000, fft_size=2048, hop_size=512, base_path=None):
-        # I/O callbacks
-        self.on_progress: Optional[Callable[[int], None]] = None
+        self.print = print
 
         # configuration
         self.sample_rate = sample_rate
@@ -280,7 +279,7 @@ class ExtendedTechniqueClassifier:
             self.processed_count += 1
             if self._append_sample_from_window(fallback_window, label, target_list):
                 appended_count += 1
-                print(
+                self.print(
                     f"Class {label}: fallback train sample added from {os.path.basename(filepath)}"
                 )
 
@@ -306,7 +305,7 @@ class ExtendedTechniqueClassifier:
         file_raw_frames = {}
 
         for label, all_files in class_files.items():
-            print(f"Class {label} raw files: {len(all_files)}")
+            self.print(f"Class {label} raw files: {len(all_files)}")
             class_raw_frames = 0
             for file in all_files:
                 y = self._load_audio(file)
@@ -320,10 +319,10 @@ class ExtendedTechniqueClassifier:
                 file_raw_frames[file] = valid_frames
                 class_raw_frames += valid_frames
 
-            print(f"Class {label} raw non-silent frames: {class_raw_frames}")
+            self.print(f"Class {label} raw non-silent frames: {class_raw_frames}")
 
-        print(f"Minimum length: {self.min_y}")
-        print(f"Maximum length: {self.max_y}")
+        self.print(f"Minimum length: {self.min_y}")
+        self.print(f"Maximum length: {self.max_y}")
 
         train_files_by_class = {}
         test_files_by_class = {}
@@ -355,7 +354,7 @@ class ExtendedTechniqueClassifier:
             raw_train_frames = raw_train_frames_by_class.get(label, 0)
             raw_test_frames = raw_test_frames_by_class.get(label, 0)
             loops = loops_by_class.get(label, 1)
-            print(
+            self.print(
                 f"Class {label}: "
                 f"raw train files={raw_train_files}, raw test files={raw_test_files}, "
                 f"raw train non-silent frames={raw_train_frames}, "
@@ -368,7 +367,7 @@ class ExtendedTechniqueClassifier:
         generated_test_by_class = {label: 0 for label in self.folders.keys()}
 
         for label, _ in self.folders.items():
-            print(f"Processing {label} class")
+            self.print(f"Processing {label} class")
             train_files = train_files_by_class.get(label, [])
             test_files = test_files_by_class.get(label, [])
             augmentation_loops = loops_by_class.get(label, 1)
@@ -395,7 +394,7 @@ class ExtendedTechniqueClassifier:
                 )
 
         for label in self.folders.keys():
-            print(
+            self.print(
                 f"Class {label} generated samples: "
                 f"train={generated_train_by_class.get(label, 0)}, "
                 f"test={generated_test_by_class.get(label, 0)}"
@@ -408,7 +407,7 @@ class ExtendedTechniqueClassifier:
         self.y_np_train = np.array(self.y_train)
         self.x_np_test = np.array(self.x_test)
         self.y_np_test = np.array(self.y_test)
-        print("Done!")
+        self.print("Done!")
 
         p = self.base_path
         self.save_data(p + "/" + "dataset.npz")
@@ -458,10 +457,12 @@ class ExtendedTechniqueClassifier:
         if eval_set:
             y_true = np.asarray(self.y_np_test).ravel()
             y_pred = np.asarray(self.clf.predict(self.x_np_test)).ravel()
-            print(classification_report(y_true, y_pred))
-            print(f"Model shrunk to {self.clf.tree_count_} trees via early stopping.")
+            self.print(classification_report(y_true, y_pred))
+            self.print(
+                f"Model shrunk to {self.clf.tree_count_} trees via early stopping."
+            )
 
-        print("Training finished!")
+        self.print("Training finished!")
 
     def _build_payload(self, serialized_model):
         return {
@@ -511,12 +512,12 @@ class ExtendedTechniqueClassifier:
         self.descriptors = args
 
     def print_data(self):
-        print(f"Train samples: {len(self.x_train)}")
-        print(f"Train labels: {len(self.y_train)}")
+        self.print(f"Train samples: {len(self.x_train)}")
+        self.print(f"Train labels: {len(self.y_train)}")
         assert len(self.x_train) == len(self.y_train)
 
-        print(f"Test samples: {len(self.x_test)}")
-        print(f"Test labels: {len(self.y_test)}")
+        self.print(f"Test samples: {len(self.x_test)}")
+        self.print(f"Test labels: {len(self.y_test)}")
         assert len(self.x_test) == len(self.y_test)
 
     def analyze(self):
@@ -544,7 +545,7 @@ class ExtendedTechniqueClassifier:
             ]
 
         if self.ir_files:
-            print(f"Found {len(self.ir_files)} IR files")
+            self.print(f"Found {len(self.ir_files)} IR files")
 
     def set_train_folder(self, folder: str):
         self.trainfolder = self.resolve_trainfolder(folder)
@@ -553,31 +554,34 @@ class ExtendedTechniqueClassifier:
             for f in os.listdir(self.trainfolder)
             if os.path.isdir(os.path.join(self.trainfolder, f))
         }
-        print("Train folder: " + self.trainfolder)
+        self.print("Train folder: " + self.trainfolder)
 
     def export_model(self, model_path: str):
         file = model_path
         path = os.path.join(self.base_path, file)
         if os.path.exists(path):
-            print("Model already exists, will replace it!")
+            self.print("Model already exists, will replace it!")
 
         if file.endswith(".onnx"):
             try:
                 self._export_onnx(path)
-                print(f"Model exported to {path}")
+                self.print(f"Model exported to {path}")
                 return
             except Exception as exc:
                 fallback_path = path[:-5] + ".joblib"
                 payload = self._build_payload(self.clf)
                 joblib.dump(payload, fallback_path)
-                print(
+                self.print(
                     f"ONNX export failed ({exc}). Fallback to joblib at {fallback_path}"
                 )
                 return
 
         payload = self._build_payload(self.clf)
         joblib.dump(payload, path)
-        print(f"Model exported to {path}")
+        self.print(f"Model exported to {path}")
+
+    def set_print_callback(self, func):
+        self.print = func
 
     def set_catboost_config(
         self,
@@ -605,7 +609,7 @@ class ExtendedTechniqueClassifier:
             early_stopping_rounds=self.early_stopping_rounds,
         )
 
-        print("Training, wait...")
+        self.print("Training, wait...")
 
         if len(self.descriptors) == 0:
             raise RuntimeError("You need to define the descriptors used to train")
