@@ -136,6 +136,18 @@ void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
 
 // ─────────────────────────────────────
 /**
+ * @brief Apply configuration settings to the system.
+ *
+ * @param Config Configuration object
+ *
+ * @note Updates internal modules according to provided configuration.
+ */
+void OpenScofo::SetConfiguration(Configuration &Config) {
+    UpdateConfiguration(Config);
+}
+
+// ─────────────────────────────────────
+/**
  * @brief Reset internal error state.
  *
  * @note Clears m_HasErrors unless a critical error was previously set.
@@ -700,46 +712,6 @@ std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
     return m_Forward.GetPitchTemplate(Freq);
 }
 
-// ─────────────────────────────────────
-/**
- * @brief Get current sampling rate.
- *
- * @return Sampling rate in Hz
- */
-double OpenScofo::GetSr() {
-    return m_Sr;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Get FFT window size.
- *
- * @return FFT size in samples
- */
-double OpenScofo::GetFFTSize() {
-    return m_FFTSize;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Get hop size used for frame processing.
- *
- * @return Hop size in samples
- */
-double OpenScofo::GetHopSize() {
-    return m_HopSize;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Get processing block duration in seconds.
- *
- * @return Block duration in seconds (derived from hop size and sampling rate)
- */
-double OpenScofo::GetBlockDuration() {
-    return m_Forward.GetBlockDuration();
-}
-
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
@@ -756,9 +728,23 @@ Description OpenScofo::GetDescription() {
 
 // ─────────────────────────────────────
 /**
+ * @brief Retrieve current system configuration.
+ *
+ * @return Copy of the current configuration object
+ *
+ * @note Returned by value (snapshot, not a live reference).
+ */
+Configuration OpenScofo::GetConfiguration() {
+    return m_Config;
+}
+
+// ─────────────────────────────────────
+/**
  * @brief Get current processing buffer index.
  *
  * @return Current index within the analysis buffer (forward model state)
+ *
+ * @note Can be usefull to plot graphics
  */
 int OpenScofo::GetCurrentBufferIndex() {
     return m_Forward.GetCurrentBufferIndex();

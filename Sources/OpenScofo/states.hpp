@@ -236,7 +236,6 @@ struct Configuration {
 
     // Chroma
     int ChromaSize = 12;
-    double ChromaTuning = 0.0;
     double ChromaCenterOctave = 5.0;
     double ChromaOctaveWidth = 2.0;
 

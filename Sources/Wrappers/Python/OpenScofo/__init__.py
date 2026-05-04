@@ -6,6 +6,7 @@ try:
         AudioState,
         MarkovState,
         Description,
+        Configuration,
     )
 except:
     from _OpenScofo import (
@@ -15,6 +16,7 @@ except:
         AudioState,
         MarkovState,
         Description,
+        Configuration,
     )
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "AudioState",
     "MarkovState",
     "Description",
+    "Configuration",
 ]
 
 
