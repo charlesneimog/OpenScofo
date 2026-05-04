@@ -10,6 +10,7 @@
 ; STRUCTURE
 ; ================================
 (CONFIG) @keyword.directive
+(LUA) @keyword.directive
 (EVENT) @keyword
 
 ; ================================
@@ -28,9 +29,6 @@
 (chord_event) @type.builtin
 (trill_event) @type.builtin
 (lua_event) @type.builtin
-
-
-
 
 ; ================================
 ; EVENT FIELDS
