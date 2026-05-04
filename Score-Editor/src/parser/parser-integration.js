@@ -304,4 +304,3 @@ export function checkErrors(node) {
 
     checkNode(node);
 }
-
