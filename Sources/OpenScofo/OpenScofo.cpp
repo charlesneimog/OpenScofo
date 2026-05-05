@@ -70,15 +70,12 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_Forward(), m_MI
  */
 void OpenScofo::UpdateConfiguration(Configuration &Config) {
     m_Config = Config;
-    m_Sr = static_cast<int>(m_Config.SR);
-    m_FFTSize = static_cast<int>(m_Config.FFTSize);
-    m_HopSize = static_cast<int>(m_Config.HOPSize);
 
-    size_t NHalf = static_cast<size_t>(m_FFTSize / 2 + 1);
+    size_t NHalf = static_cast<size_t>(m_Config.FFTSize / 2 + 1);
     m_Forward.UpdateConfiguration(m_Config);
     m_MIR.UpdateConfiguration(m_Config);
 
-    m_InBuffer.resize(static_cast<size_t>(m_FFTSize));
+    m_InBuffer.resize(static_cast<size_t>(m_Config.FFTSize));
     std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
     m_BlockIndex = 0;
 
@@ -712,6 +709,46 @@ std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
     return m_Forward.GetPitchTemplate(Freq);
 }
 
+// ─────────────────────────────────────
+/**
+ * @brief Get current sampling rate.
+ *
+ * @return Sampling rate in Hz
+ */
+double OpenScofo::GetSr() {
+    return m_Config.SR;
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Get FFT window size.
+ *
+ * @return FFT size in samples
+ */
+double OpenScofo::GetFFTSize() {
+    return m_Config.FFTSize;
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Get hop size used for frame processing.
+ *
+ * @return Hop size in samples
+ */
+double OpenScofo::GetHopSize() {
+    return m_Config.HOPSize;
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Get processing block duration in seconds.
+ *
+ * @return Block duration in seconds (derived from hop size and sampling rate)
+ */
+double OpenScofo::GetBlockDuration() {
+    return m_Forward.GetBlockDuration();
+}
+
 // ╭─────────────────────────────────────╮
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
@@ -743,8 +780,6 @@ Configuration OpenScofo::GetConfiguration() {
  * @brief Get current processing buffer index.
  *
  * @return Current index within the analysis buffer (forward model state)
- *
- * @note Can be usefull to plot graphics
  */
 int OpenScofo::GetCurrentBufferIndex() {
     return m_Forward.GetCurrentBufferIndex();
@@ -781,8 +816,6 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
         spdlog::warn("ONNX Model ready");
     }
 
-    m_FFTSize = newConfig.FFTSize;
-    m_HopSize = newConfig.HOPSize;
     UpdateConfiguration(newConfig);
 
     // Parse Config
@@ -842,7 +875,7 @@ template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffe
     std::copy(m_InBuffer.begin() + n, m_InBuffer.end(), m_InBuffer.begin());
     std::transform(AudioBuffer, AudioBuffer + n, m_InBuffer.end() - n, [](T x) { return static_cast<double>(x); });
 
-    if (m_BlockIndex != m_HopSize) {
+    if (m_BlockIndex != m_Config.HOPSize) {
         return true;
     }
 
