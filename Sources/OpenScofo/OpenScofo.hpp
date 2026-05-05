@@ -105,9 +105,6 @@ class OpenScofo {
     Description m_Desc;
     int m_CurrentScorePosition = -1;
 
-    int m_Sr;
-    int m_FFTSize;
-    int m_HopSize;
     int m_BlockIndex = 0;
     std::vector<double> m_InputBuffer;
 
