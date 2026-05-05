@@ -10,8 +10,8 @@ cpmaddpackage(URI "gh:supercollider/supercollider#Version-3.14.1" NAME supercoll
 file(GLOB_RECURSE OPENSCOFO_SC_SOURCES "*.cpp" "*.h" "*.hpp")
 add_library(SCOpenScofo MODULE ${OPENSCOFO_SC_SOURCES})
 target_include_directories(
-    SCOpenScofo PRIVATE "${supercollider_SOURCE_DIR}/include/plugin_interface"
-                        "${supercollider_SOURCE_DIR}/include/common")
+    SCOpenScofo SYSTEM PRIVATE "${supercollider_SOURCE_DIR}/include/plugin_interface"
+                               "${supercollider_SOURCE_DIR}/include/common")
 target_link_libraries(SCOpenScofo PRIVATE OpenScofo)
 
 # ╭──────────────────────────────────────╮
