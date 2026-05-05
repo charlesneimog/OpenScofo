@@ -19,4 +19,8 @@ target_compile_definitions(main_class PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOU
 target_compile_definitions(score_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 target_compile_definitions(math_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
-cpmaddpackage("gh:lieff/minimp3#master")
+cpmaddpackage("gh:adamstark/AudioFile#master")
+add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
+target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
+target_compile_options(openscofo_perf PRIVATE -O3 -g -fno-omit-frame-pointer -Wno-shadow)
+target_compile_options(openscofo_perf PRIVATE -Wno-shadow -Wno-unused-variable)
