@@ -994,14 +994,13 @@ double MIR::PositiveRemainder(double value, double modulus) const {
 
 // ─────────────────────────────────────
 void MIR::SpectralChromaInit() {
-    const size_t nFft = static_cast<size_t>(m_Config.FFTSize);
-    const size_t nHalf = nFft / 2 + 1;
+    const size_t nHalf = m_Config.FFTSize / 2 + 1;
     m_ChromaFilter.assign(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
-    std::vector<double> frqbins(nFft, 0.0);
-    if (nFft > 1) {
-        for (size_t k = 1; k < nFft; ++k) {
+    std::vector<double> frqbins(m_Config.FFTSize, 0.0);
+    if (m_Config.FFTSize > 1) {
+        for (size_t k = 1; k < m_Config.FFTSize; ++k) {
             const double frequency =
-                static_cast<double>(k) * static_cast<double>(m_Config.SR) / static_cast<double>(nFft);
+                static_cast<double>(k) * static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
             frqbins[k] = static_cast<double>(m_Config.ChromaSize) *
                          HzToOcts(frequency, m_Config.TunningA4, static_cast<int>(m_Config.ChromaSize));
         }
@@ -1010,8 +1009,8 @@ void MIR::SpectralChromaInit() {
         frqbins[0] = -1.5 * static_cast<double>(m_Config.ChromaSize);
     }
 
-    std::vector<double> binwidthbins(nFft, 1.0);
-    for (size_t k = 0; k + 1 < nFft; ++k) {
+    std::vector<double> binwidthbins(m_Config.FFTSize, 1.0);
+    for (size_t k = 0; k + 1 < m_Config.FFTSize; ++k) {
         binwidthbins[k] = std::max(frqbins[k + 1] - frqbins[k], 1.0);
     }
 
