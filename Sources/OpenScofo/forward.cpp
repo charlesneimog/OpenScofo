@@ -73,9 +73,9 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
 
     m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
     for (MarkovState &State : m_States) {
-        State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
-        State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
-        State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), 1e-300);
+        State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
+        State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
+        State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
     }
 
     if (!m_States.empty()) {
@@ -107,9 +107,9 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
 
     m_Normalization.resize(m_BufferSize + 1, 1.0); // init to 1 so first-step division is safe
     for (MarkovState &State : m_States) {
-        State.Forward.resize(m_BufferSize + 1, 0.0);    // F_j(t)
-        State.ExitProb.resize(m_BufferSize + 1, 0.0);   // F_j^o(t)
-        State.BestObs.resize(m_BufferSize + 1, 1e-300); // b_j(x_t), floor avoids /0
+        State.Forward.resize(m_BufferSize + 1, 0.0);                                // F_j(t)
+        State.ExitProb.resize(m_BufferSize + 1, 0.0);                               // F_j^o(t)
+        State.BestObs.resize(m_BufferSize + 1, std::numeric_limits<double>::min()); // b_j(x_t), floor avoids /0
     }
 
     m_CurrentStateIndex = 0;
@@ -367,7 +367,7 @@ void OnlineForward::ResetDecoding() {
     for (MarkovState &State : m_States) {
         std::fill(State.Forward.begin(), State.Forward.end(), 0.0);
         std::fill(State.ExitProb.begin(), State.ExitProb.end(), 0.0);
-        std::fill(State.BestObs.begin(), State.BestObs.end(), 1e-300);
+        std::fill(State.BestObs.begin(), State.BestObs.end(), std::numeric_limits<double>::min());
         State.OnsetObserved = 0;
         State.PhaseObserved = 0;
         State.IOIPhiN = 0;
@@ -413,14 +413,9 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     double current_log_occ = r * log_p;
 
     for (int u = 0; u <= maxU; u++) {
-        // Safely convert log to linear space. Exp(<-708) safely yields 0.0
         occ[u] = std::exp(current_log_occ);
-
         surv[u] = (currentSurv > 0.0) ? currentSurv : 0.0;
         currentSurv -= occ[u];
-
-        // Advance to next step in log space:
-        // ln(P(u+1)) = ln(P(u)) + ln(u + r) - ln(u + 1) + ln(1 - p)
         current_log_occ += std::log(u + r) - std::log(u + 1.0) + log_1_p;
     }
 
@@ -633,7 +628,6 @@ void OnlineForward::GetAudioObservations() {
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
     EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
     double maxSoundEvidence = 0.0;
-
     bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
@@ -678,13 +672,16 @@ void OnlineForward::GetAudioObservations() {
         // Get Observation
         switch (state.Type) {
         case NOTE:
-        case TRILL:
-            stateLikelihood = std::max({bestPitch * pitchWeight * soundProb, bestOnset, bestSilence});
+        case TRILL: {
+            stateLikelihood = std::max({bestPitch * pitchWeight * soundProb, bestSilence});
             break;
-        case PTECH:
-            stateLikelihood =
-                std::max({bestTech * techWeight * soundProb, bestPitch * pitchWeight * soundProb, bestSilence});
+        }
+        case PTECH: {
+            double TechObs = bestTech * techWeight * soundProb;
+            double PitchObs = bestPitch * pitchWeight * soundProb;
+            stateLikelihood = std::max({TechObs, PitchObs, bestSilence});
             break;
+        }
         case UTECH:
             stateLikelihood = std::max({bestTech * techWeight * soundProb, bestSilence});
             break;
@@ -701,7 +698,7 @@ void OnlineForward::GetAudioObservations() {
             break;
         }
 
-        state.BestObs[bufferIndex] = std::max(stateLikelihood, 1e-300);
+        state.BestObs[bufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
 
         if (state.Type != REST)
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
@@ -716,7 +713,7 @@ void OnlineForward::GetAudioObservations() {
 // GONG (2015)
 double OnlineForward::GetPitchProbability(double Freq) {
     if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
-        return 1e-300;
+        return std::numeric_limits<double>::min();
     }
 
     double KLDiv = 0.0;
@@ -726,7 +723,7 @@ double OnlineForward::GetPitchProbability(double Freq) {
         BuildPitchTemplate(Freq);
         it = m_PitchTemplates.find(RootBinFreq);
         if (it == m_PitchTemplates.end()) {
-            return 1e-300;
+            return std::numeric_limits<double>::min();
         }
     }
 
@@ -734,14 +731,14 @@ double OnlineForward::GetPitchProbability(double Freq) {
     const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
     const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
     if (PitchTemplate.empty() || normSpectralPower.empty()) {
-        return 1e-300;
+        return std::numeric_limits<double>::min();
     }
 
     size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
     size_t bins = std::min(halfFft, PitchTemplate.size());
     bins = std::min(bins, normSpectralPower.size());
     if (bins == 0) {
-        return 1e-300;
+        return std::numeric_limits<double>::min();
     }
 
     for (size_t i = 0; i < bins; i++) {
@@ -792,7 +789,6 @@ void OnlineForward::GetInitialDistribution() {
             m_States[j].InitProb = 0.0;
         }
     }
-
     return;
 }
 
@@ -804,7 +800,7 @@ double OnlineForward::GetTransProbability(int i, int j) {
 
 // ─────────────────────────────────────
 // CUVILLIER (2015)
-// Needs review
+// TODO: Needs review
 double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0)
@@ -822,14 +818,14 @@ double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
 
 // ─────────────────────────────────────
 // CUVILLIER (2015)
-// Needs review
+// TODO: Needs review
 double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
-    double expected_frames = (m_PsiN1 * State.Duration) / m_BlockDur;
-    if (expected_frames < 1.0)
-        expected_frames = 1.0;
+    double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
+    if (ExpectedFrames < 1.0)
+        ExpectedFrames = 1.0;
 
-    int key = static_cast<int>(std::round(expected_frames * 10.0));
-    BuildDistributionCache(expected_frames); // Builds only if missing
+    int key = static_cast<int>(std::round(ExpectedFrames * 10.0));
+    BuildDistributionCache(ExpectedFrames); // Builds only if missing
 
     if (u < static_cast<int>(m_SurvivorCache[key].size())) {
         return m_SurvivorCache[key][u];
@@ -839,27 +835,24 @@ double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
 
 // ─────────────────────────────────────
 // CUVILLIER (2015)
-// Needs review
+// TODO: Needs review
 int OnlineForward::GetMaxUForJ(MarkovState &StateJ) {
-    double expected_frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
-    if (expected_frames < 1.0)
-        expected_frames = 1.0;
-
-    // For Negative Binomial, the tail is longer.
-    // 5x expected_frames ensures we capture the "ageing" properties
-    // mentioned in your text without truncating the probability peak.
-    int cap = static_cast<int>(std::ceil(5.0 * expected_frames));
-    return std::max(cap, 1);
+    double Expected_Frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
+    if (Expected_Frames < 1.0) {
+        Expected_Frames = 1.0;
+    }
+    int Cap = static_cast<int>(std::ceil(5.0 * Expected_Frames));
+    return std::max(Cap, 1);
 }
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
 void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
-    double bj = StateJ.BestObs[bufferIndex];
-    double fj;
+    double Bj = StateJ.BestObs[bufferIndex];
+    double Fj;
 
     if (m_Tau == 0) {
-        fj = bj * StateJ.InitProb;
+        Fj = Bj * StateJ.InitProb;
     } else {
         int prevBuf = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
         double sumPrev = 0.0;
@@ -873,59 +866,60 @@ void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
             double trans = GetTransProbability(j - 1, j);
             sumPrev += trans * m_States[j - 1].ExitProb[prevBuf];
         }
-        fj = bj * sumPrev;
+        Fj = Bj * sumPrev;
     }
 
     // For Markov states Forward = ExitProb (they can exit at every step)
-    StateJ.Forward[bufferIndex] = fj;
-    StateJ.ExitProb[bufferIndex] = fj;
+    StateJ.Forward[bufferIndex] = Fj;
+    StateJ.ExitProb[bufferIndex] = Fj;
 }
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
 void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
-    double bj = StateJ.BestObs[bufferIndex];
+    double Bj = StateJ.BestObs[bufferIndex];
 
-    double f_tilde_j = 0.0;
-    double f_tilde_jo = 0.0;
+    double FTildeJ = 0.0;
+    double FTildeJo = 0.0;
     double ObsProd = 1.0;
 
-    int maxU = GetMaxUForJ(StateJ);
+    int MaxU = GetMaxUForJ(StateJ);
 
     for (int u = 1; u <= m_Tau + 1; u++) {
-        double D_bar_ju = GetSurvivorDistribution(StateJ, u);
-        double d_ju = GetOccupancyDistribution(StateJ, u);
+        double Dju = GetSurvivorDistribution(StateJ, u);
+        double dju = GetOccupancyDistribution(StateJ, u);
 
         if (u == m_Tau + 1) {
-            f_tilde_j += D_bar_ju * ObsProd * StateJ.InitProb;
-            f_tilde_jo += d_ju * ObsProd * StateJ.InitProb;
+            FTildeJ += Dju * ObsProd * StateJ.InitProb;
+            FTildeJo += dju * ObsProd * StateJ.InitProb;
             break;
         }
 
-        if (u <= maxU) {
-            int entryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            double transition_sum = 0.0;
+        if (u <= MaxU) {
+            int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+            double TransSum = 0.0;
 
             if (j > 0) {
-                double p_ij = GetTransProbability(j - 1, j);
-                transition_sum += p_ij * m_States[j - 1].ExitProb[entryBuf];
+                double Pij = GetTransProbability(j - 1, j);
+                TransSum += Pij * m_States[j - 1].ExitProb[EntryBuf];
             }
 
-            f_tilde_j += D_bar_ju * ObsProd * transition_sum;
-            f_tilde_jo += d_ju * ObsProd * transition_sum;
+            FTildeJ += Dju * ObsProd * TransSum;
+            FTildeJo += dju * ObsProd * TransSum;
         }
 
         int prevBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double prevObs = StateJ.BestObs[prevBuf];
-        double prevNorm = std::max(m_Normalization[prevBuf], 1e-300);
+        double prevNorm = std::max(m_Normalization[prevBuf], std::numeric_limits<double>::min());
         ObsProd *= prevObs / prevNorm;
 
-        if (ObsProd < 1e-15)
+        if (ObsProd < 1e-15) {
             break;
+        }
     }
 
-    StateJ.Forward[bufferIndex] = bj * (f_tilde_j + 1e-300);
-    StateJ.ExitProb[bufferIndex] = bj * (f_tilde_jo + 1e-300);
+    StateJ.Forward[bufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());
+    StateJ.ExitProb[bufferIndex] = Bj * (FTildeJo + std::numeric_limits<double>::min());
 }
 
 // ─────────────────────────────────────
@@ -935,13 +929,16 @@ int OnlineForward::GetAlphaT() {
     spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
                   m_WinEnd, bIndex, m_Tau, m_Kappa);
 
-    // Compute \tilde{f}_j(t) and \tilde{f}_j^o(t)
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
-        if (StateJ.HSMMType == SEMIMARKOV)
+        switch (StateJ.HSMMType) {
+        case SEMIMARKOV:
             SemiMarkov(StateJ, j, bIndex);
-        else
+            break;
+        case MARKOV:
             Markov(StateJ, j, bIndex);
+            break;
+        }
     }
 
     // Calculate the Normalization Denominator
@@ -950,21 +947,22 @@ int OnlineForward::GetAlphaT() {
         N += m_States[j].Forward[bIndex];
     }
 
-    if (N < 1e-300)
-        N = 1e-300;
+    if (N < std::numeric_limits<double>::min()) {
+        N = std::numeric_limits<double>::min();
+    }
 
     m_Normalization[bIndex] = N;
 
     // Apply Normalization
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         m_States[j].Forward[bIndex] /= N;
-        m_States[j].Forward[bIndex] += 1e-300;
+        m_States[j].Forward[bIndex] += std::numeric_limits<double>::min();
         m_States[j].ExitProb[bIndex] /= N;
-        m_States[j].ExitProb[bIndex] += 1e-300;
+        m_States[j].ExitProb[bIndex] += std::numeric_limits<double>::min();
     }
 
     // Find the Argmax (Best State)
-    double maxVal = 1e-300;
+    double maxVal = std::numeric_limits<double>::min();
     int bestStateIndex = m_CurrentStateIndex;
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
