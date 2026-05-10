@@ -11,6 +11,7 @@
 
 // Callback de erro adaptado para SC
 static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *data) {
+    (void)data;
     // ignorar logs abaixo de warn
     if (log.level < spdlog::level::warn)
         return;
