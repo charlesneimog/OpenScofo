@@ -107,10 +107,10 @@ using EventActions = std::vector<ScoreAction>;
 // ─────────────────────────────────────
 struct AudioState {
     AudioDescType Type;
-    double Freq;
-    double Midi;
-    std::string Label;
-    unsigned Index;
+    double Freq = 0;
+    double Midi = 0;
+    std::string Label = "";
+    unsigned Index = 0;
 };
 
 // ─────────────────────────────────────
@@ -252,6 +252,26 @@ struct Configuration {
     // ONNX
     fs::path TimbreONNXModel;
     std::vector<std::string> ONNXDescriptors;
+};
+
+// ─────────────────────────────────────
+struct SpectralAccumulators {
+    double SumPower = 0.0;
+    double weightedSumFreqs = 0.0;
+    double irregularityNumerator = 0.0;
+    double irregularityDenominator = 0.0;
+    double logSumPower = 0.0;
+    double linSumPower = 0.0;
+    double spectralEnergySum = 0.0;
+    double harmonicityPeak = 0.0;
+    double harmonicitySum = 0.0;
+    double highFreqEnergy = 0.0;
+    double sumFreq2 = 0.0, sumFreq3 = 0.0, sumFreq4 = 0.0;
+    double sumIndex = 0.0, sumIndex2 = 0.0;
+    double sumFreq = 0.0, sumFreqSq = 0.0;
+    double maxMag = 0.0;
+    float sumMagCrest = 0.0f;
+    float maxMagCrest = 0.0f;
 };
 
 } // namespace OpenScofo
