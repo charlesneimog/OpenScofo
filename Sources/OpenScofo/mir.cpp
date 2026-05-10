@@ -37,6 +37,8 @@ MIR::~MIR() {
         }
         m_ONNXModelLoaded = false;
     }
+
+    /// save values
 }
 
 // ─────────────────────────────────────
@@ -57,6 +59,11 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
     if (m_FullFFTOut != nullptr) {
         fftw_free(m_FullFFTOut);
         m_FullFFTOut = nullptr;
+    }
+
+    if (Config.FFTSize < 512) {
+        spdlog::critical("OpenScofo requires FFTSize higher then 256");
+        return;
     }
 
     FFTWInit();
@@ -631,193 +638,195 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     Desc.PitchConfidence = Confidence;
 }
 
+// ╭─────────────────────────────────────╮
+// │              SPECTRAL               │
+// ╰─────────────────────────────────────╯
+void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &acc, size_t NHalf) {
+    Desc.SpectralFlux = std::sqrt(Desc.SpectralFlux);
+
+    const double SumPowerEps = acc.SumPower + 1e-12;
+    const double invSum = 1.0 / SumPowerEps;
+
+    Desc.SpectralCentroid = acc.weightedSumFreqs * invSum;
+    Desc.CentroidVelocity = std::abs(Desc.SpectralCentroid - m_PrevCentroid);
+    m_PrevCentroid = Desc.SpectralCentroid;
+
+    const double E1 = Desc.SpectralCentroid;
+    const double E2 = acc.sumFreq2 * invSum;
+    const double E3 = acc.sumFreq3 * invSum;
+    const double E4 = acc.sumFreq4 * invSum;
+    const double mu3 = E3 - 3.0 * E1 * E2 + 2.0 * E1 * E1 * E1;
+    const double mu4 = E4 - 4.0 * E1 * E3 + 6.0 * E1 * E1 * E2 - 3.0 * E1 * E1 * E1 * E1;
+
+    const double spectralSpreadHzVariance = std::max(0.0, E2 - E1 * E1);
+    Desc.SpectralSpreadHz = acc.SumPower > 0.0 ? std::sqrt(spectralSpreadHzVariance) : 0.0;
+
+    const double EIndex = acc.sumIndex * invSum;
+    const double EIndex2 = acc.sumIndex2 * invSum;
+    const double rawIndexVariance = std::max(0.0, EIndex2 - EIndex * EIndex);
+    const double indexRange = static_cast<double>(std::max<size_t>(1, NHalf - 1));
+    const double invIndexRange = 1.0 / indexRange;
+    Desc.SpectralSpreadVariance = acc.SumPower > 0.0 ? (rawIndexVariance * invIndexRange * invIndexRange) : 0.0;
+
+    const double spreadEps = Desc.SpectralSpreadHz + 1e-12;
+    Desc.SpectralSkewness = mu3 / (spreadEps * spreadEps * spreadEps);
+    Desc.SpectralKurtosis = mu4 / (spreadEps * spreadEps * spreadEps * spreadEps) - 3.0;
+
+    Desc.SpectralIrregularity =
+        acc.irregularityDenominator > 0.0 ? (acc.irregularityNumerator / acc.irregularityDenominator) : 0.0;
+
+    if (acc.maxMagCrest == 0.0f) {
+        Desc.SpectralCrest = 0.0;
+    } else {
+        const float meanMagCrest = acc.sumMagCrest / static_cast<float>(NHalf);
+        Desc.SpectralCrest = meanMagCrest > 0.0f ? static_cast<double>(acc.maxMagCrest / meanMagCrest) : 0.0;
+    }
+
+    Desc.SpectralFlatness = std::exp(acc.logSumPower / NHalf) / (acc.linSumPower / NHalf);
+    Desc.Harmonicity = acc.harmonicityPeak / (acc.harmonicitySum + 1e-12);
+    Desc.HighFreqRatio = acc.highFreqEnergy * invSum;
+
+    const double K = static_cast<double>(NHalf);
+    const double denom = (K * acc.sumFreqSq - acc.sumFreq * acc.sumFreq) + 1e-12;
+    const double slope = (K * acc.weightedSumFreqs - acc.sumFreq * acc.SumPower) / denom;
+    Desc.SpectralSlope = slope * invSum;
+}
+
 // ─────────────────────────────────────
 void MIR::GetSpectralDescriptions(Description &Desc) {
-    const size_t NHalf = m_Config.FFTSize / 2 + 1;
+    const int NHalf = m_Config.FFTSize / 2 + 1;
     const double binWidth = static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
-    const size_t hfStart = NHalf / 4;
     const double invN = 1.0 / static_cast<double>(m_Config.FFTSize);
     constexpr double amin = 1e-10;
+    const int hfStart = NHalf / 4;
 
     fftw_execute(m_FullFFTPlan);
 
-    // --- Pre-allocate/Reset Descriptor bounds ---
     Desc.MaxAmp = 0.0;
     Desc.SpectralFlux = 0.0;
 
-    // --- Accumulators for Pass 1 ---
-    double SumPower = 0.0;
-    double weightedSumFreqs = 0.0;
-    double irregularityNumerator = 0.0;
-    double irregularityDenominator = 0.0;
-    double logSumPower = 0.0;
-    double linSumPower = 0.0;
-    double spectralEnergySum = 0.0;
-    double harmonicityPeak = 0.0;
-    double harmonicitySum = 0.0;
-    double highFreqEnergy = 0.0;
-
-    double sumFreq2 = 0.0, sumFreq3 = 0.0, sumFreq4 = 0.0;
-    double sumIndex = 0.0, sumIndex2 = 0.0;
-    double sumFreq = 0.0, sumFreqSq = 0.0;
-
-    double maxMag = 0.0;
-    float sumMagCrest = 0.0f;
-    float maxMagCrest = 0.0f;
-
-    // State variable to avoid array lookup for (i - 1)
+    SpectralAccumulators acc;
     double prevNorm = 0.0;
 
-    // =========================================================================
-    // PASS 1: MAP & ACCUMULATE
-    // =========================================================================
-    for (size_t i = 0; i < NHalf; ++i) {
-        // 1. Raw extraction
+    // Process first iteration (i = 0) explicitly to avoid "if (i > 0)" in the hot loop
+    {
+        const double re = m_FullFFTOut[0][0];
+        const double im = m_FullFFTOut[0][1];
+        const double p = re * re + im * im;
+        const double mag = std::sqrt(p);
+        const double norm = mag * invN;
+
+        Desc.Power[0] = p;
+        Desc.Magnitude[0] = mag;
+        Desc.SpectralMagnitudeNorm[0] = norm;
+        Desc.MaxAmp = norm;
+
+        acc.maxMag = mag;
+        acc.sumMagCrest += static_cast<float>(mag);
+        acc.maxMagCrest = static_cast<float>(mag);
+
+        acc.SumPower += norm;
+        acc.irregularityDenominator += norm * norm;
+
+        const double v = std::max(amin, p);
+        acc.logSumPower += std::log(v);
+        acc.linSumPower += v;
+        acc.spectralEnergySum += p;
+
+        const double diff = mag - m_PreviousSpectralPower[0];
+        Desc.SpectralFlux += diff * diff;
+        m_PreviousSpectralPower[0] = mag;
+
+        // Note: i=0 is never >= hfStart (assuming FFT >= 8), so no highFreqEnergy addition here
+        prevNorm = norm;
+    }
+
+    // Main Accumulation Loop (i > 0)
+    for (int i = 1; i < NHalf; ++i) {
         const double re = m_FullFFTOut[i][0];
         const double im = m_FullFFTOut[i][1];
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;
 
-        // 2. State storage (Sequential writes)
         Desc.Power[i] = p;
         Desc.Magnitude[i] = mag;
         Desc.SpectralMagnitudeNorm[i] = norm;
         Desc.MaxAmp = std::max(Desc.MaxAmp, norm);
 
-        // 3. Peak tracking & Crest
-        maxMag = std::max(maxMag, mag);
+        acc.maxMag = std::max(acc.maxMag, mag);
         const float magCrest = static_cast<float>(mag);
-        sumMagCrest += magCrest;
-        maxMagCrest = std::max(maxMagCrest, magCrest);
+        acc.sumMagCrest += magCrest;
+        acc.maxMagCrest = std::max(acc.maxMagCrest, magCrest);
 
-        // 4. Frequency/Index mappings
         const double freq = i * binWidth;
         const double freq2 = freq * freq;
         const double index = static_cast<double>(i);
 
-        // 5. Accumulations
-        SumPower += norm;
-        sumFreq += freq;
-        sumFreqSq += freq2;
-        sumFreq2 += freq2 * norm;
-        sumFreq3 += freq2 * freq * norm;
-        sumFreq4 += freq2 * freq2 * norm;
-        weightedSumFreqs += freq * norm;
-        sumIndex += index * norm;
-        sumIndex2 += index * index * norm;
-        irregularityDenominator += norm * norm;
+        acc.SumPower += norm;
+        acc.sumFreq += freq;
+        acc.sumFreqSq += freq2;
+        acc.sumFreq2 += freq2 * norm;
+        acc.sumFreq3 += freq2 * freq * norm;
+        acc.sumFreq4 += freq2 * freq2 * norm;
+        acc.weightedSumFreqs += freq * norm;
+        acc.sumIndex += index * norm;
+        acc.sumIndex2 += index * index * norm;
+        acc.irregularityDenominator += norm * norm;
 
         const double v = std::max(amin, p);
-        logSumPower += std::log(v);
-        linSumPower += v;
-        spectralEnergySum += p;
+        acc.logSumPower += std::log(v);
+        acc.linSumPower += v;
+        acc.spectralEnergySum += p;
 
-        // 6. Flux & Harmonicity
         const double diff = mag - m_PreviousSpectralPower[i];
         Desc.SpectralFlux += diff * diff;
-        m_PreviousSpectralPower[i] = mag; // Simultaneous read/write to same cache line
+        m_PreviousSpectralPower[i] = mag;
 
-        if (i >= hfStart) {
-            highFreqEnergy += norm;
-        }
+        // Branchless execution: static_cast resolves to 1.0 or 0.0
+        acc.highFreqEnergy += norm * static_cast<double>(i >= hfStart);
 
-        if (i > 0) {
-            const double d = prevNorm - norm;
-            irregularityNumerator += d * d;
-            harmonicitySum += norm;
-            harmonicityPeak = std::max(harmonicityPeak, norm);
-        }
-        prevNorm = norm; // Save state for next iteration
+        // Previous iteration dependencies (Safe now that i > 0 is guaranteed)
+        const double d = prevNorm - norm;
+        acc.irregularityNumerator += d * d;
+        acc.harmonicitySum += norm;
+        acc.harmonicityPeak = std::max(acc.harmonicityPeak, norm);
+
+        prevNorm = norm;
     }
 
-    // --- SCALAR CALCULATIONS (Inter-pass logic) ---
-    Desc.SpectralFlux = std::sqrt(Desc.SpectralFlux);
+    // SCALAR CALCULATIONS
+    ComputeScalarFeatures(Desc, acc, NHalf);
 
-    const double SumPowerEps = SumPower + 1e-12;
-    const double invSum = 1.0 / SumPowerEps;
-
-    Desc.SpectralCentroid = weightedSumFreqs * invSum;
-    Desc.CentroidVelocity = std::abs(Desc.SpectralCentroid - m_PrevCentroid);
-    m_PrevCentroid = Desc.SpectralCentroid;
-
-    const double E1 = Desc.SpectralCentroid;
-    const double E2 = sumFreq2 * invSum;
-    const double E3 = sumFreq3 * invSum;
-    const double E4 = sumFreq4 * invSum;
-    const double mu3 = E3 - 3.0 * E1 * E2 + 2.0 * E1 * E1 * E1;
-    const double mu4 = E4 - 4.0 * E1 * E3 + 6.0 * E1 * E1 * E2 - 3.0 * E1 * E1 * E1 * E1;
-
-    const double spectralSpreadHzVariance = std::max(0.0, E2 - E1 * E1);
-    Desc.SpectralSpreadHz = SumPower > 0.0 ? std::sqrt(spectralSpreadHzVariance) : 0.0;
-
-    const double EIndex = sumIndex * invSum;
-    const double EIndex2 = sumIndex2 * invSum;
-    const double rawIndexVariance = std::max(0.0, EIndex2 - EIndex * EIndex);
-    const double indexRange = static_cast<double>(std::max<size_t>(1, NHalf - 1));
-    const double invIndexRange = 1.0 / indexRange;
-    Desc.SpectralSpreadVariance = SumPower > 0.0 ? (rawIndexVariance * invIndexRange * invIndexRange) : 0.0;
-
-    const double spreadEps = Desc.SpectralSpreadHz + 1e-12;
-    Desc.SpectralSkewness = mu3 / (spreadEps * spreadEps * spreadEps);
-    Desc.SpectralKurtosis = mu4 / (spreadEps * spreadEps * spreadEps * spreadEps) - 3.0;
-
-    Desc.SpectralIrregularity = irregularityDenominator > 0.0 ? (irregularityNumerator / irregularityDenominator) : 0.0;
-
-    if (maxMagCrest == 0.0f) {
-        Desc.SpectralCrest = 0.0;
-    } else {
-        const float meanMagCrest = sumMagCrest / static_cast<float>(NHalf);
-        Desc.SpectralCrest = meanMagCrest > 0.0f ? static_cast<double>(maxMagCrest / meanMagCrest) : 0.0;
-    }
-
-    Desc.SpectralFlatness = std::exp(logSumPower / NHalf) / (linSumPower / NHalf);
-    Desc.Harmonicity = harmonicityPeak / (harmonicitySum + 1e-12);
-    Desc.HighFreqRatio = highFreqEnergy * invSum;
-
-    const double K = static_cast<double>(NHalf);
-    const double denom = (K * sumFreqSq - sumFreq * sumFreq) + 1e-12;
-    const double slope = (K * weightedSumFreqs - sumFreq * SumPower) / denom;
-    Desc.SpectralSlope = slope * invSum;
-
-    // --- Setup for Pass 2 ---
+    // PASS 2: NORMALIZE, ENTROPY, ROLLOFF & PREFIX FUSION
+    const double invSum = 1.0 / acc.SumPower;
     const double Mean = 1.0 / static_cast<double>(NHalf);
-    const double invSpectralEnergy = spectralEnergySum > 0.0 ? (1.0 / spectralEnergySum) : 0.0;
-    const double rolloffCutoffEnergy = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * linSumPower;
+    const double invSpectralEnergy = acc.spectralEnergySum > 0.0 ? (1.0 / acc.spectralEnergySum) : 0.0;
+    const double rolloffCutoffEnergy = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * acc.linSumPower;
 
     double Variance = 0.0;
     double cumulativeEnergy = 0.0;
-    size_t rolloffBin = NHalf - 1; // Default to max
+    size_t rolloffBin = NHalf - 1;
     bool rolloffFound = false;
 
     Desc.SpectralEntropy = 0.0;
     m_SpectralPrefix[0] = 0.0;
 
-    // =========================================================================
-    // PASS 2: NORMALIZE, ENTROPY, ROLLOFF & PREFIX FUSION
-    // =========================================================================
-    for (size_t i = 0; i < NHalf; ++i) {
-        // Variance & Frame Norm
-        const double normSp = (Desc.SpectralMagnitudeNorm[i] + 1e-12) * invSum;
+    for (int i = 0; i < NHalf; ++i) {
+        const double normSp = (Desc.SpectralMagnitudeNorm[i]) * invSum;
         Desc.SpectralMagnitudeFrameNorm[i] = normSp;
         const double diffMean = normSp - Mean;
         Variance += diffMean * diffMean;
-
         const double currentPower = Desc.Power[i];
 
-        // Entropy
         if (invSpectralEnergy > 0.0) {
             const double prob = currentPower * invSpectralEnergy;
-            if (prob > 0.0) { // Protect std::log2(0)
+            if (prob > 0.0) {
                 Desc.SpectralEntropy -= prob * std::log2(prob);
             }
         }
-
-        // Cumulative Prefix
         cumulativeEnergy += currentPower;
         m_SpectralPrefix[i + 1] = cumulativeEnergy;
-
-        // Rolloff Tracker (Branch predictor maps this efficiently)
         if (!rolloffFound && cumulativeEnergy >= rolloffCutoffEnergy) {
             rolloffBin = i;
             rolloffFound = true;
@@ -825,9 +834,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     }
 
     Desc.StdDev = std::sqrt(Variance * Mean);
-
-    const double binToHz =
-        (static_cast<double>(m_Config.SR) * 0.5) / static_cast<double>(std::max<size_t>(1, NHalf - 1));
+    const double binToHz = (m_Config.SR * 0.5) / std::max(1, NHalf - 1);
     Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
 
     OnsetExec(Desc);
@@ -839,139 +846,145 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 // │                MFCC                 │
 // ╰─────────────────────────────────────╯
 void MIR::MFCCInit() {
-    const int nHalfPlus1 = m_Config.FFTSize / 2 + 1;
-    const double fmin = 0.0;
-    const double fmax = static_cast<double>(m_Config.SR) * 0.5;
+    const int FFTSize = m_Config.FFTSize;
+    const int NumBins = FFTSize / 2 + 1;
+    const int NumMels = m_Config.MFCCMels;
+    const int NumMFCC = m_Config.MFCCCount;
+    const double SR = static_cast<double>(m_Config.SR);
 
-    // FFT bin frequencies (match np.fft.rfftfreq)
-    std::vector<double> fft_freqs(nHalfPlus1);
-    for (int i = 0; i < nHalfPlus1; ++i) {
-        fft_freqs[i] =
-            static_cast<double>(i) * static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
-    }
+    // librosa.filters.mel(htk=False, norm="slaney")
+    constexpr double FMin = 0.0;
+    const double FMax = SR * 0.5;
 
-    // Slaney mel scale (htk=False)
-    const double f_sp = 200.0 / 3.0;
-    const double min_log_hz = 1000.0;
-    const double min_log_mel = (min_log_hz - fmin) / f_sp;
-    const double logstep = std::log(6.4) / 27.0;
+    constexpr double FSp = 200.0 / 3.0;
+    constexpr double MinLogHz = 1000.0;
+    constexpr double MinLogMel = MinLogHz / FSp;
+    const double LogStep = std::log(6.4) / 27.0;
 
-    auto hz_to_mel = [&](double hz) {
-        if (hz < min_log_hz)
-            return (hz - fmin) / f_sp;
-        return min_log_mel + std::log(hz / min_log_hz) / logstep;
+    auto HzToMel = [&](double hz) noexcept {
+        return (hz < MinLogHz) ? hz / FSp : MinLogMel + std::log(hz / MinLogHz) / LogStep;
     };
 
-    auto mel_to_hz = [&](double mel) {
-        if (mel < min_log_mel)
-            return mel * f_sp + fmin;
-        return min_log_hz * std::exp((mel - min_log_mel) * logstep);
+    auto MelToHz = [&](double mel) noexcept {
+        return (mel < MinLogMel) ? mel * FSp : MinLogHz * std::exp((mel - MinLogMel) * LogStep);
     };
 
-    const double mel_min = hz_to_mel(fmin);
-    const double mel_max = hz_to_mel(fmax);
-
-    std::vector<double> mel_pts(m_Config.MFCCMels + 2);
-    for (int i = 0; i < m_Config.MFCCMels + 2; ++i) {
-        mel_pts[i] =
-            mel_min + (mel_max - mel_min) * static_cast<double>(i) / static_cast<double>(m_Config.MFCCMels + 1);
+    const double MelMin = HzToMel(FMin);
+    const double MelMax = HzToMel(FMax);
+    std::vector<double> HzPts(NumMels + 2);
+    {
+        const double MelStep = (MelMax - MelMin) / (NumMels + 1);
+        for (int i = 0; i < NumMels + 2; ++i) {
+            HzPts[i] = MelToHz(MelMin + MelStep * i);
+        }
     }
 
-    std::vector<double> hz_pts(m_Config.MFCCMels + 2);
-    for (int i = 0; i < m_Config.MFCCMels + 2; ++i) {
-        hz_pts[i] = mel_to_hz(mel_pts[i]);
+    // FFT bin frequencies (exact np.fft.rfftfreq behavior)
+    std::vector<double> FFTFreqs(NumBins);
+    {
+        const double BinHz = SR / static_cast<double>(FFTSize);
+        for (int k = 0; k < NumBins; ++k) {
+            FFTFreqs[k] = static_cast<double>(k) * BinHz;
+        }
     }
 
-    // Slaney triangular filters (area normalized), matching librosa.filters.mel
-    m_MFCCFilter.assign(m_Config.MFCCMels, std::vector<double>(nHalfPlus1, 0.0));
-    m_MFCCActiveBins.assign(m_Config.MFCCMels, {0, -1});
+    // Mel filterbank
+    // Exact librosa.filters.mel(..., norm="slaney")
+    m_MFCCFilter.assign(NumMels, std::vector<double>(NumBins, 0.0));
+    m_MFCCActiveBins.assign(NumMels, {0, 0});
 
-    std::vector<double> fdiff(m_Config.MFCCMels + 1);
-    for (int i = 0; i < m_Config.MFCCMels + 1; ++i) {
-        fdiff[i] = hz_pts[i + 1] - hz_pts[i];
-    }
+    for (int m = 0; m < NumMels; ++m) {
+        const double Left = HzPts[m];
+        const double Center = HzPts[m + 1];
+        const double Right = HzPts[m + 2];
 
-    for (int m = 0; m < m_Config.MFCCMels; ++m) {
-        const double enorm = 2.0 / (hz_pts[m + 2] - hz_pts[m]);
+        const double InvLeftWidth = 1.0 / (Center - Left);
+        const double InvRightWidth = 1.0 / (Right - Center);
 
-        int first = -1;
-        int last = -1;
-        for (int k = 0; k < nHalfPlus1; ++k) {
-            const double ramp = hz_pts[m] - fft_freqs[k];
-            const double lower = -ramp / fdiff[m];
-            const double upper = (hz_pts[m + 2] - fft_freqs[k]) / fdiff[m + 1];
-            const double w = std::max(0.0, std::min(lower, upper));
-            const double v = w * enorm;
-            m_MFCCFilter[m][k] = v;
-
-            if (v > 0.0) {
-                if (first < 0)
-                    first = k;
-                last = k;
+        // Slaney area normalization
+        const double ENorm = 2.0 / (Right - Left);
+        int First = NumBins;
+        int Last = -1;
+        double *Filter = m_MFCCFilter[m].data();
+        for (int k = 0; k < NumBins; ++k) {
+            const double f = FFTFreqs[k];
+            double w;
+            if (f >= Left && f <= Center) {
+                w = (f - Left) * InvLeftWidth;
+            } else if (f > Center && f <= Right) {
+                w = (Right - f) * InvRightWidth;
+            } else {
+                continue;
             }
+            const double v = w * ENorm;
+            Filter[k] = v;
+            First = std::min(First, k);
+            Last = k;
         }
-
-        m_MFCCActiveBins[m] = {first < 0 ? 0 : first, last};
+        if (Last < 0) {
+            First = 0;
+            Last = 0;
+        }
+        m_MFCCActiveBins[m] = {First, Last};
     }
 
-    // Orthonormal DCT-II (librosa: dct_type=2, norm="ortho")
-    m_DCTBasis.assign(m_Config.MFCCCount, std::vector<double>(m_Config.MFCCMels));
-
-    const double scale0 = std::sqrt(1.0 / m_Config.MFCCMels);
-    const double scale = std::sqrt(2.0 / m_Config.MFCCMels);
-
-    for (int k = 0; k < m_Config.MFCCCount; ++k) {
-        for (int n = 0; n < m_Config.MFCCMels; ++n) {
-            m_DCTBasis[k][n] =
-                (k == 0 ? scale0 : scale) * std::cos(std::numbers::pi * (n + 0.5) * k / m_Config.MFCCMels);
+    // DCT-II basis
+    // Exact scipy.fftpack.dct(..., type=2, norm="ortho")
+    m_DCTBasis.assign(NumMFCC, std::vector<double>(NumMels));
+    const double Scale0 = std::sqrt(1.0 / NumMels);
+    const double Scale = std::sqrt(2.0 / NumMels);
+    const double Factor = std::numbers::pi / NumMels;
+    for (int k = 0; k < NumMFCC; ++k) {
+        const double Norm = (k == 0) ? Scale0 : Scale;
+        double *Basis = m_DCTBasis[k].data();
+        for (int n = 0; n < NumMels; ++n) {
+            Basis[n] = Norm * std::cos(Factor * (n + 0.5) * k);
         }
     }
-
-    m_MFCCEnergy.resize(m_Config.MFCCMels);
+    m_MFCCEnergy.resize(NumMels);
 }
 
-// ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
 void MIR::MFCCExec(Description &Desc) {
-    const int n_f = m_Config.FFTSize / 2 + 1;
-    constexpr double kAmin = 1e-10f;
-    constexpr double kTopDb = 80.0f;
+    constexpr double kAmin = 1e-10;
+    constexpr double kTopDb = 80.0;
 
-    for (int m = 0; m < m_Config.MFCCMels; ++m) {
-        const double *filter = m_MFCCFilter[m].data();
-        double melEnergy = 0.0;
-        for (int k = 0; k < n_f; ++k) {
-            melEnergy += filter[k] * Desc.Power[k];
+    const int NumMels = m_Config.MFCCMels;
+    const int NumMFCC = m_Config.MFCCCount;
+
+    // Mel projection + power_to_db(ref=1.0, top_db=80)
+    double MaxLog = -std::numeric_limits<double>::infinity();
+    for (int m = 0; m < NumMels; ++m) {
+        const auto &[First, Last] = m_MFCCActiveBins[m];
+        const double *Filter = m_MFCCFilter[m].data();
+        const double *Power = Desc.Power.data();
+        double MelEnergy = 0.0;
+        // Sparse accumulation using active range only
+        for (int k = First; k <= Last; ++k) {
+            MelEnergy += Filter[k] * Power[k];
         }
-
-        m_MFCCEnergy[m] = melEnergy;
-
-        // Match librosa.power_to_db(ref=1.0): 10 * log10(max(amin, S)).
-        Desc.LogMelSpectrum[m] = 10.0 * std::log10(std::max(kAmin, melEnergy));
+        m_MFCCEnergy[m] = MelEnergy;
+        const double LogMel = 10.0 * std::log10(std::max(kAmin, MelEnergy));
+        Desc.LogMelSpectrum[m] = LogMel;
+        MaxLog = std::max(MaxLog, LogMel);
     }
 
-    // Apply librosa-style top_db floor.
-    float maxLog = -std::numeric_limits<float>::infinity();
-    for (int m = 0; m < m_Config.MFCCMels; ++m) {
-        if (Desc.LogMelSpectrum[m] > maxLog)
-            maxLog = static_cast<float>(Desc.LogMelSpectrum[m]);
+    // librosa power_to_db(..., top_db=80)
+    const double Floor = MaxLog - kTopDb;
+    for (int m = 0; m < NumMels; ++m) {
+        Desc.LogMelSpectrum[m] = std::max(Desc.LogMelSpectrum[m], Floor);
     }
 
-    if (std::isfinite(maxLog)) {
-        const float floor = maxLog - kTopDb;
-        for (int m = 0; m < m_Config.MFCCMels; ++m) {
-            if (Desc.LogMelSpectrum[m] < floor)
-                Desc.LogMelSpectrum[m] = floor;
+    // MFCC = DCT-II(log-mel)
+    const double *LogMel = Desc.LogMelSpectrum.data();
+    for (int k = 0; k < NumMFCC; ++k) {
+        const double *Basis = m_DCTBasis[k].data();
+        double Sum = 0.0;
+        for (int n = 0; n < NumMels; ++n) {
+            Sum += Basis[n] * LogMel[n];
         }
-    }
-
-    // MFCCs are DCT-II over the log-mel (dB) spectrum.
-    for (int k = 0; k < m_Config.MFCCCount; ++k) {
-        const double *basis = m_DCTBasis[k].data();
-        double coeff = 0.0;
-        for (int n = 0; n < m_Config.MFCCMels; ++n) {
-            coeff += basis[n] * Desc.LogMelSpectrum[n];
-        }
-        Desc.MFCC[k] = coeff;
+        Desc.MFCC[k] = Sum;
     }
 }
 
@@ -996,17 +1009,19 @@ double MIR::PositiveRemainder(double value, double modulus) const {
 void MIR::SpectralChromaInit() {
     const size_t nHalf = m_Config.FFTSize / 2 + 1;
     m_ChromaFilter.assign(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
+    const double tuning = 0.0;
     std::vector<double> frqbins(m_Config.FFTSize, 0.0);
-    if (m_Config.FFTSize > 1) {
+    if (m_Config.FFTSize > 0) {
         for (size_t k = 1; k < m_Config.FFTSize; ++k) {
             const double frequency =
                 static_cast<double>(k) * static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
             frqbins[k] = static_cast<double>(m_Config.ChromaSize) *
-                         HzToOcts(frequency, m_Config.TunningA4, static_cast<int>(m_Config.ChromaSize));
+                         HzToOcts(frequency, tuning, static_cast<int>(m_Config.ChromaSize));
         }
         frqbins[0] = frqbins[1] - 1.5 * static_cast<double>(m_Config.ChromaSize);
     } else {
-        frqbins[0] = -1.5 * static_cast<double>(m_Config.ChromaSize);
+        spdlog::critical("FFT is smaller than 1, this should not happen");
+        return;
     }
 
     std::vector<double> binwidthbins(m_Config.FFTSize, 1.0);
@@ -1178,11 +1193,7 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     }
 
     GetSpectralDescriptions(Desc);
-
-    // Perc
     ExtendedTechExec(Desc);
-
-    // ONNX
     ONNXExec(Desc);
 }
 
