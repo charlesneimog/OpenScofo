@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(OpenScofo VERSION 0.2.4 LANGUAGES C CXX
+project(OpenScofo VERSION 0.2.5 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
@@ -12,11 +12,11 @@ set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.8")
-add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}-a1")
+add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
 if(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0601)
-    add_link_options(-static-libgcc -static-libstdc++ -Wl,--enable-auto-import)
+    # add_link_options(-static-libgcc -static-libstdc++ -Wl,--enable-auto-import)
 endif()
 
 if(EMSCRIPTEN)
@@ -283,6 +283,7 @@ elseif(WIN32)
                -Wshadow
                -Wformat=2
                -Wnull-dereference
+               -Weffc++
                $<$<CONFIG:Debug>:
                -O0
                -g
@@ -309,6 +310,14 @@ elseif(APPLE)
                -Wshadow
                -Wformat=2
                -Wnull-dereference
+               -Weffc++
+               -Winit-self
+               -fstack-protector-strong
+               -fsanitize=address
+               -fsanitize=undefined
+               -ftrapv
+               -fno-exception
+               -fstrict-aliasing
                $<$<CONFIG:Debug>:
                -O0
                -g
@@ -325,7 +334,6 @@ elseif(APPLE)
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto -Wl,-dead_strip >)
 
 else() # Linux (GCC or Clang)
-
     target_compile_options(
         OpenScofo
         PUBLIC -Wall
@@ -333,25 +341,29 @@ else() # Linux (GCC or Clang)
                -Wshadow
                -Wformat=2
                -Wnull-dereference
-               -march=native
                $<$<CONFIG:Debug>:
                -ggdb
-               -O3
+               -Og
                -fno-omit-frame-pointer
                >
                $<$<CONFIG:RelWithDebInfo>:
-               -g
+               -O3
+               -ggdb
+               -march=native
+               -ffast-math
                -fno-omit-frame-pointer
                >
                $<$<CONFIG:Release>:
                -O3
+               -march=native
+               -ffast-math
                -DNDEBUG
                -flto=auto
                -ffunction-sections
                -fdata-sections
                >)
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-flto=auto;-Wl,--gc-sections;-s >)
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -422,6 +434,6 @@ if(LINUX)
     include(InstallRequiredSystemLibraries)
     set(CPACK_GENERATOR "STGZ")
     set(CPACK_PACKAGE_NAME "OpenScofo")
-    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}-a6")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
     include(CPack)
 endif()
