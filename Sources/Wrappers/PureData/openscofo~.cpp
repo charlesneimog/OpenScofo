@@ -1,9 +1,11 @@
 #include <filesystem>
 
+extern "C" {
 #include <m_pd.h>
 #include <g_canvas.h>
 #include <m_imp.h>
 #include <s_stuff.h>
+}
 
 #include <OpenScofo.hpp>
 
@@ -54,10 +56,10 @@ class PdOpenScofo {
     bool Following;
 
     // Audio
-    int FFTSize;
-    int HopSize;
-    int BlockSize;
-    int Sr;
+    double FFTSize;
+    double HopSize;
+    double BlockSize;
+    double Sr;
     int BlockIndex;
     bool JustDescription;
 
@@ -282,7 +284,7 @@ static void oscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         char fullpath[MAXPDSTRING];
         int fd = canvas_open(x->Canvas, atom_getsymbol(argv + 1)->s_name, "", dirbuf, &nameptr, MAXPDSTRING, 1);
         sys_close(fd);
-        snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
+        pd_snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
         x->OpenScofo->LoadONNXModel(fullpath, Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
