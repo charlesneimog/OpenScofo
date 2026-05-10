@@ -785,15 +785,18 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
 
                     if (pdargType == "number") {
                         if (isNumber(token)) {
-                            NewAction.Args.push_back(std::stof(token));
+                            float f = std::stof(token);
+                            NewAction.Args.emplace_back(f);
                         } else {
                             spdlog::error("Invalid number argument on line {}.", ts_node_start_point(pdarg).row + 1);
                             return;
                         }
                     } else if (pdargType == "identifier" || pdargType == "symbol") {
-                        NewAction.Args.push_back(token);
+                        std::string s = token;
+                        NewAction.Args.emplace_back(s);
                     } else if (!token.empty()) {
-                        NewAction.Args.push_back(token);
+                        std::string s = token;
+                        NewAction.Args.emplace_back(s);
                     }
                 }
 
