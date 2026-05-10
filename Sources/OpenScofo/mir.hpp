@@ -52,6 +52,7 @@ class MIR {
 
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
     double PositiveRemainder(double value, double modulus) const;
+    void ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &acc, size_t NHalf);
     void GetSpectralDescriptions(Description &Desc);
 
     // MFCC
@@ -103,8 +104,6 @@ class MIR {
     std::vector<float> m_OnsetFFTFrame;
 
     // MFCC
-    // int m_MFCCMels = 40;
-    // int m_MFCCCount = 13;
     std::vector<std::vector<double>> m_MFCCFilter;
     std::vector<std::vector<double>> m_DCTBasis;
     std::vector<double> m_MFCCEnergy;
@@ -137,20 +136,11 @@ class MIR {
     std::array<double, 3> m_A2;
 
     // Audio
-    // float m_FFTSize;
-    // float m_BlockSize;
-    // float m_HopSize;
-    // float m_Sr;
-    // double m_dB;
     std::vector<double> m_PreviousSpectralPower;
     std::vector<double> m_SpectralPrefix;
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;
     double m_PrevCentroid = 0.0;
-    // double m_SpectralRolloffCutoff = 0.85;
-    // double m_YINThreshold = 0.15;
-    // double m_YINMinFrequency = 50.0;
-    // double m_YINMaxFrequency = 2000.0;
 
     // Time
     double m_EventTimeElapsed = 0.0; // ms
