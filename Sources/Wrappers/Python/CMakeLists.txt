@@ -14,7 +14,7 @@ endif()
 find_package(nanobind CONFIG REQUIRED)
 
 # Build python module using stable ABI.
-nanobind_add_module(_OpenScofo STABLE_ABI PyOpenScofo.cpp)
+nanobind_add_module(_OpenScofo NB_SUPPRESS_WARNINGS STABLE_ABI PyOpenScofo.cpp)
 target_compile_options(_OpenScofo PRIVATE -Wno-shadow)
 target_link_libraries(_OpenScofo PRIVATE OpenScofo)
 

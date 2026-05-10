@@ -94,6 +94,7 @@ class ExtendedTechniqueClassifier:
 
         # ir
         self.ir_files = None
+        self.on_progress = None
 
     # Folder / Dataset Management
     def resolve_trainfolder(self, path):
@@ -585,6 +586,9 @@ class ExtendedTechniqueClassifier:
 
     def set_print_callback(self, func):
         self.print = func
+
+    def set_onprogress_callback(self, func):
+        self.on_progress = func
 
     def set_catboost_config(
         self,
