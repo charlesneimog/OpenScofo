@@ -665,6 +665,9 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             } else {
                 spdlog::error("HOPSIZE must be a power of two.");
             }
+        } else {
+            spdlog::error("Unrecognized variable " + id);
+            return;
         }
         return;
     }
