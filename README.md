@@ -45,15 +45,14 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 
 #### Build Options
 
-* `OSCOFO_BUILD_ALL` (ON/OFF): Build all OpenScofo modules, including Python, Pd, and Max. Default: ON.
-* `OSCOFO_BUILD_PD_OBJECT` (ON/OFF): Build the Pure Data (Pd) object. Default: OFF.
-* `OSCOFO_BUILD_PY_MODULE` (ON/OFF): Build the Python module. Default: OFF.
-* `OSCOFO_BUILD_MAX_OBJECT` (ON/OFF): Build the Max object. Default: OFF.
-* `OSCOFO_BUILD_CSOUND_PLUGIN` (ON/OFF): Build the Csound plugin. Default: OFF.
-* `OSCOFO_BUILD_TESTS` (ON/OFF): Build test suite. Default: OFF.
-* `OSCOFO_BUILD_WITH_LUA` (ON/OFF): Build Lua module embedded in OpenScofo. Default: ON.
-* `UPDATE_OSCOFO_LANGUAGE` (ON/OFF): Update OpenScofo language grammar (`grammar.js`). Default: ON.
-
+* `OPENSCOFO_BUILD_ALL` (ON/OFF): Build all OpenScofo modules, including Python, Pd, and Max. Default: ON.
+* `OPENSCOFO_BUILD_PD_OBJECT` (ON/OFF): Build the Pure Data (Pd) object. Default: OFF.
+* `OPENSCOFO_BUILD_PY_MODULE` (ON/OFF): Build the Python module. Default: OFF.
+* `OPENSCOFO_BUILD_MAX_OBJECT` (ON/OFF): Build the Max object. Default: OFF.
+* `OPENSCOFO_BUILD_CSOUND_PLUGIN` (ON/OFF): Build the Csound plugin. Default: OFF.
+* `OPENSCOFO_BUILD_TESTS` (ON/OFF): Build test suite. Default: OFF.
+* `OPENSCOFO_BUILD_WITH_LUA` (ON/OFF): Build Lua module embedded in OpenScofo. Default: ON.
+* `UPDATE_OPENSCOFO_LANGUAGE` (ON/OFF): Update OpenScofo language grammar (`grammar.js`). Default: ON.
 
 #### Building Steps
 
