@@ -166,9 +166,25 @@ function handleThemeChange(e) {
     renderScores();
 }
 
+// ─────────────────────────────────────
+function updatePages() {
+    const path = window.location.pathname;
+
+    if (!path.endsWith("/score/events/")) {
+        return;
+    }
+
+    setTimeout(() => {
+        updateTheme(themeQuery.matches);
+        renderScores();
+    }, 150);
+}
+
+// ─────────────────────────────────────
 themeQuery.addEventListener("change", handleThemeChange);
 
-window.onload = function () {
-    updateTheme(themeQuery.matches);
-    renderScores();
-};
+window.onload = updatePages;
+
+document$.subscribe(() => {
+    updatePages();
+});

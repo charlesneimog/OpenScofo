@@ -90,6 +90,8 @@ PTECH tongue-ram D4 2
 ---
 ### `UTECH` 
 
+<score id="utech_example" timeSig="4/4" notes="C4/h:x, C4/h:tongue-ram"></score>
+
 !!! warning "Experimental"
     These events represent extended techniques **without pitch**. They are rendered as glyphs or symbols instead of traditional notes.
 
