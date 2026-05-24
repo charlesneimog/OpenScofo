@@ -384,7 +384,6 @@ void OnlineForward::ResetDecoding() {
 }
 
 // ─────────────────────────────────────
-// https://stat.ethz.ch/R-manual//R-patched/library/stats/html/NegBinomial.html
 // CUVILLIER 2016 (Check chapter 3 and 4)
 // TODO: Review
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
@@ -395,41 +394,46 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     if (m_OccupancyCache.find(key) != m_OccupancyCache.end())
         return;
 
-    // Determine truncation point: high enough to capture tail
     const int maxU = static_cast<int>(std::ceil(5.0 * ExpectedFrames));
-
     constexpr double p = 0.5;
     constexpr double one_minus_p = 0.5;
-    const double r = ExpectedFrames;
-
     const double log_p = std::log(p);
     const double log_1_p = std::log(one_minus_p);
 
-    std::vector<double> occ_raw(maxU + 1);
-    double current_log_occ = r * log_p; // ln P(0)
+    // Shifted NB: PMF[u] = NB(u-1; r', p), r' = ExpectedFrames - 1
+    // → support on {1,2,...}, E[duration] = ExpectedFrames exactly
+    const double r_prime = ExpectedFrames - 1.0;
+
+    std::vector<double> pmf(maxU + 1, 0.0); // pmf[0] = 0 always
+    std::vector<double> survivor(maxU + 2, 0.0);
+
+    // log PMF[1] = log NB(0; r', p) = r' * log(p)
+    // Special case r'=0 (ExpectedFrames=1): PMF[1]=1, all else=0
+    double current_log_pmf = r_prime * log_p;
     double sum_raw = 0.0;
 
-    for (int u = 0; u <= maxU; ++u) {
-        occ_raw[u] = std::exp(current_log_occ);
-        sum_raw += occ_raw[u];
-        if (u < maxU) {
-            current_log_occ += std::log(u + r) - std::log(u + 1.0) + log_1_p;
-        }
+    std::vector<double> raw(maxU + 1, 0.0);
+    for (int u = 1; u <= maxU; ++u) {
+        raw[u] = std::exp(current_log_pmf);
+        sum_raw += raw[u];
+        // Recurrence: NB(u; r', p) / NB(u-1; r', p) = (u-1+r') / u * (1-p)
+        // PMF[u+1] = NB(u; r', p), PMF[u] = NB(u-1; r', p)
+        if (r_prime > 0.0)
+            current_log_pmf += std::log((u - 1) + r_prime) - std::log((double)u) + log_1_p;
+        else
+            current_log_pmf = -std::numeric_limits<double>::infinity(); // delta at u=1
     }
 
-    // Normalize to proper PMF
-    std::vector<double> pmf(maxU + 1);
-    for (int u = 0; u <= maxU; ++u) {
-        pmf[u] = occ_raw[u] / sum_raw;
-    }
+    // Normalize over {1,...,maxU} (accounts for truncation tail)
+    for (int u = 1; u <= maxU; ++u)
+        pmf[u] = raw[u] / sum_raw;
 
-    // Compute survivor from normalized PMF: D̄(u) = Σ_{k≥u} pmf[k]
-    std::vector<double> survivor(maxU + 2, 0.0); // extra slot for u = maxU+1 → 0
+    // Survivor: D̄(u) = Σ_{k=u}^{maxU} pmf[k]
+    survivor[maxU + 1] = 0.0;
     survivor[maxU] = pmf[maxU];
-    for (int u = maxU - 1; u >= 0; --u) {
+    for (int u = maxU - 1; u >= 1; --u)
         survivor[u] = pmf[u] + survivor[u + 1];
-    }
-    survivor[maxU + 1] = 0.0; // P(sojourn ≥ maxU+1) = 0
+    survivor[0] = 1.0;
 
     m_OccupancyCache.emplace(key, std::move(pmf));
     m_SurvivorCache.emplace(key, std::move(survivor));
@@ -457,7 +461,6 @@ double OnlineForward::A2(double kappa) {
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
 double OnlineForward::InverseA2(double SyncStrength) {
-#if defined(OPENSCOFO_USE_BESSEL)
     SyncStrength = std::clamp(SyncStrength, 0.0, 1.0);
     constexpr int KappaPrecision = 1000;
     int key = static_cast<int>(SyncStrength * KappaPrecision);
@@ -497,19 +500,6 @@ double OnlineForward::InverseA2(double SyncStrength) {
     // Store fallback result too
     m_KappaCache[key] = Mid;
     return Mid;
-#else
-    double A = SyncStrength;
-    A = std::clamp(A, 0.0, 0.9999);
-    if (A >= 0.95) {
-        return 10.0;
-    }
-
-    // Abramowitz & Stegun 26.3.22 approximation
-    // kappa ≈ 2*A + 4*A^3 + 18*A^5 / 5
-    double A2 = A * A;
-    double A4 = A2 * A2;
-    return 2.0 * A + 4.0 * A2 * A + 3.6 * A4 * A; // 18/5 = 3.6
-#endif
 }
 
 // ─────────────────────────────────────
@@ -689,6 +679,7 @@ void OnlineForward::GetAudioObservations() {
                 break;
             }
             case ONSET: {
+                // TODO: not really implemented
                 bestOnset = std::max(bestOnset, m_Desc.Onset);
                 break;
             }
@@ -847,7 +838,6 @@ double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
         return cache[u];
     return 0.0;
 }
-
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
@@ -916,43 +906,49 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
     double FTildeJo = 0.0;
     double ObsProd = 1.0;
 
-    // Get max support from cache
+    // Get max support from distribution cache
     double ExpectedFrames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
-    if (ExpectedFrames < 1.0)
+    if (ExpectedFrames < 1.0) {
         ExpectedFrames = 1.0;
+    }
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
-    int maxU = static_cast<int>(m_SurvivorCache[key].size()) - 1; // last valid index
+
+    const auto &surv_cache = m_SurvivorCache[key];
+    const auto &occ_cache = m_OccupancyCache[key];
+    int maxU = static_cast<int>(occ_cache.size()) - 1;
 
     for (int u = 1; u <= maxU; ++u) {
-        double Dju = GetSurvivorDistribution(StateJ, u);  // P(duration ≥ u)
-        double dju = GetOccupancyDistribution(StateJ, u); // P(duration = u)
+        double Dju = surv_cache[u];
+        double dju = occ_cache[u];
+        int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
 
-        // Transition sum over all previous states i ≠ j
+        // Sum over all i ≠ j
         double TransSum = 0.0;
-        for (int i = m_WinStart; i < m_WinEnd; ++i) {
+        for (int i = m_WinStart; i <= m_WinEnd; ++i) {
             double Pij = GetTransProbability(i, j);
-            int entryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            TransSum += Pij * m_States[i].ExitProb[entryBuf];
+            TransSum += Pij * m_States[i].ExitProb[EntryBuf];
         }
 
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
 
-        // Update observation product with normalization from thesis
+        // Update observation product with normalization
         int prevBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double prevObs = StateJ.BestObs[prevBuf];
-        double prevNorm = m_Normalization[prevBuf]; // Must be Σ_j f̃_j(t) / Σ_j f̃_j(t-1)
-        if (prevNorm < std::numeric_limits<double>::min())
-            prevNorm = 1.0;
-        ObsProd *= prevObs / prevNorm;
+        double prevNorm = m_Normalization[prevBuf];
+        if (prevNorm > std::numeric_limits<double>::min()) {
+            ObsProd *= prevObs / prevNorm;
+        } else {
+            ObsProd = 0.0;
+        }
 
         if (ObsProd < 1e-15)
-            break; // numerical underflow
+            break;
     }
 
-    StateJ.Forward[bufferIndex] = Bj * (FTildeJ + 1e-15);
-    StateJ.ExitProb[bufferIndex] = Bj * (FTildeJo + 1e-15);
+    StateJ.Forward[bufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());
+    StateJ.ExitProb[bufferIndex] = Bj * (FTildeJo + std::numeric_limits<double>::min());
 }
 
 // ─────────────────────────────────────
