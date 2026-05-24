@@ -229,7 +229,7 @@ export function checkErrors(node) {
     const errorContainer = document.getElementById("editor-console");
     errorContainer.style.color = "var(--red)";
     errorContainer.innerHTML = "";
-    console.log(node.toString());
+    // console.log(node.toString());
 
     function checkNode(node) {
         for (let i = 0; i < node.namedChildCount; i++) {
