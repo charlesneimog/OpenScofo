@@ -11,7 +11,7 @@ set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
-set(TREE_SITTER_VERSION "v0.26.8")
+set(TREE_SITTER_VERSION "v0.26.9")
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
 if(WIN32)
@@ -34,11 +34,14 @@ option(OPENSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OPENSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OPENSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(OPENSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
-option(OPENSCOFO_BUILD_TESTS "Build Tests" OFF)
+option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OPENSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
 
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
+
+# Optimizations
+option(OPENSCOFO_USE_BESSEL "Use Bessel function to calculate Kappa" ON)
 
 if(OPENSCOFO_BUILD_ALL)
     set(OPENSCOFO_BUILD_PY_MODULE ON)
@@ -199,20 +202,8 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
-set(FFTW3_FILE ${CMAKE_BINARY_DIR}/fftw-3.3.11.tar.gz)
-if(NOT EXISTS ${FFTW3_FILE})
-    message(STATUS "Downloading FFTW3")
-    file(DOWNLOAD https://www.fftw.org/fftw-3.3.11.tar.gz ${FFTW3_FILE} STATUS DOWNLOAD_STATUS)
-endif()
-
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
-set(ENABLE_FLOAT OFF CACHE BOOL "Enable single precision" FORCE)
-
-file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/fftw-3.3.11.tar.gz DESTINATION ${CMAKE_BINARY_DIR}/)
-add_subdirectory(${CMAKE_BINARY_DIR}/fftw-3.3.11 ${CMAKE_BINARY_DIR}/fftw3 EXCLUDE_FROM_ALL)
-set_target_properties(fftw3 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_target_properties(fftw3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-include_directories("${CMAKE_BINARY_DIR}/fftw-3.3.11/api")
+cpmaddpackage(NAME fftw3 URL https://www.fftw.org/fftw-3.3.11.tar.gz OPTIONS
+              "BUILD_SHARED_LIBS OFF" "CMAKE_POSITION_INDEPENDENT_CODE ON" "ENABLE_FLOAT OFF")
 
 # ╭──────────────────────────────────────╮
 # │               LibONNX                │
@@ -236,6 +227,10 @@ add_library(OpenScofo STATIC ${ScofoSrc})
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
+
+if(OPENSCOFO_USE_BESSEL)
+    target_compile_definitions(OpenScofo PRIVATE OPENSCOFO_USE_BESSEL=1)
+endif()
 
 if(OPENSCOFO_BUILD_WITH_LUA)
     target_link_libraries(OpenScofo PUBLIC lua)
@@ -347,11 +342,11 @@ else() # Linux (GCC or Clang)
                -fno-omit-frame-pointer
                >
                $<$<CONFIG:RelWithDebInfo>:
-               -O3
+               -O2
                -ggdb
-               -march=native
-               -ffast-math
                -fno-omit-frame-pointer
+               -fno-inline
+               -fno-optimize-sibling-calls
                >
                $<$<CONFIG:Release>:
                -O3
