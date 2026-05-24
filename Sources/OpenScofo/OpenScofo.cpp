@@ -841,7 +841,8 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
                         }
                     }
                     validLabels += "]";
-                    spdlog::error("Extended Technique Label '{}' is not valid. Valid labels: {}", label, validLabels);
+                    spdlog::error("Extended Technique Label '{}' is not valid on line {}. Valid labels: {}", label,
+                                  state.Line, validLabels);
                     return false;
                 }
             }
