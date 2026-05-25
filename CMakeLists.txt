@@ -204,13 +204,18 @@ endif()
 # ╰──────────────────────────────────────╯
 cpmaddpackage(NAME fftw3 URL https://www.fftw.org/fftw-3.3.11.tar.gz OPTIONS
               "BUILD_SHARED_LIBS OFF" "CMAKE_POSITION_INDEPENDENT_CODE ON" "ENABLE_FLOAT OFF")
-
-# ╭──────────────────────────────────────╮
-# │               LibONNX                │
-# ╰──────────────────────────────────────╯
-cpmaddpackage("gh:charlesneimog/libonnx#master")
+cpmaddpackage("gh:charlesneimog/libonnx#master" DOWNLOAD_ONLY YES)
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
+
+if(libonnx_ADDED)
+    file(GLOB onnx_sources ${libonnx_SOURCE_DIR}/src/*.c ${libonnx_SOURCE_DIR}/src/default/*.c)
+    add_library(onnx_OpenScofo STATIC ${onnx_sources})
+    target_include_directories(onnx_OpenScofo PUBLIC ${libonnx_SOURCE_DIR}/src)
+    set_target_properties(onnx_OpenScofo PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON
+                                                    POSITION_INDEPENDENT_CODE ON)
+
+endif()
 
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -226,7 +231,8 @@ add_library(OpenScofo STATIC ${ScofoSrc})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx spdlog onsetsds)
+target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx_OpenScofo spdlog
+                                       onsetsds)
 
 if(OPENSCOFO_USE_BESSEL)
     target_compile_definitions(OpenScofo PRIVATE OPENSCOFO_USE_BESSEL=1)
