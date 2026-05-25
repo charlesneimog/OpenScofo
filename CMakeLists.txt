@@ -204,10 +204,10 @@ endif()
 # ╰──────────────────────────────────────╯
 cpmaddpackage(NAME fftw3 URL https://www.fftw.org/fftw-3.3.11.tar.gz OPTIONS
               "BUILD_SHARED_LIBS OFF" "CMAKE_POSITION_INDEPENDENT_CODE ON" "ENABLE_FLOAT OFF")
-cpmaddpackage("gh:charlesneimog/libonnx#master" DOWNLOAD_ONLY YES)
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
+cpmaddpackage(NAME libonnx URI "gh:charlesneimog/libonnx#master" DOWNLOAD_ONLY YES)
 if(libonnx_ADDED)
     file(GLOB onnx_sources ${libonnx_SOURCE_DIR}/src/*.c ${libonnx_SOURCE_DIR}/src/default/*.c)
     add_library(onnx_OpenScofo STATIC ${onnx_sources})
