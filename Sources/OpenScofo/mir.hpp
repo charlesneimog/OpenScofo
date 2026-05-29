@@ -11,7 +11,7 @@
 
 #include <fstream>
 
-#include <fftw3.h>
+#include <pffft/pffft.h>
 #include <onnx.h>
 
 #define CURRENT_ONNX_OPSET 24
@@ -73,8 +73,8 @@ class MIR {
     void ZeroCrossingRateInit();
     void ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc);
 
-    // FFTW
-    void FFTWInit();
+    // FFT
+    void FFTInit();
     void ONNXExec(Description &Desc);
 
     // Get Signal
@@ -86,9 +86,10 @@ class MIR {
 
   private:
     // FFT
-    double *m_FullFFTIn = nullptr;
-    fftw_complex *m_FullFFTOut = nullptr;
-    fftw_plan m_FullFFTPlan = nullptr;
+    float *m_FullFFTIn = nullptr;
+    float *m_FullFFTOut = nullptr;
+    float *m_FullFFTWork = nullptr;
+    PFFFT_Setup *m_FullFFTSetup = nullptr;
     std::vector<double> m_FullWindowingFunc;
 
     double m_PrevPercussiveProb;

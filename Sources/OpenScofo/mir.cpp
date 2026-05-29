@@ -5,22 +5,45 @@
 
 namespace OpenScofo {
 
+namespace {
+inline void ReadPffftBin(const float *out, size_t fftSize, size_t bin, double &re, double &im) {
+    const size_t half = fftSize / 2;
+    if (bin == 0) {
+        re = static_cast<double>(out[0]);
+        im = 0.0;
+        return;
+    }
+    if (bin == half) {
+        re = static_cast<double>(out[1]);
+        im = 0.0;
+        return;
+    }
+    const size_t idx = 2 * bin;
+    re = static_cast<double>(out[idx]);
+    im = static_cast<double>(out[idx + 1]);
+}
+} // namespace
+
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
 MIR::~MIR() {
-    if (m_FullFFTPlan != nullptr) {
-        fftw_destroy_plan(m_FullFFTPlan);
-        m_FullFFTPlan = nullptr;
+    if (m_FullFFTSetup != nullptr) {
+        pffft_destroy_setup(m_FullFFTSetup);
+        m_FullFFTSetup = nullptr;
     }
 
     if (m_FullFFTIn != nullptr) {
-        fftw_free(m_FullFFTIn);
+        pffft_aligned_free(m_FullFFTIn);
         m_FullFFTIn = nullptr;
     }
     if (m_FullFFTOut != nullptr) {
-        fftw_free(m_FullFFTOut);
+        pffft_aligned_free(m_FullFFTOut);
         m_FullFFTOut = nullptr;
+    }
+    if (m_FullFFTWork != nullptr) {
+        pffft_aligned_free(m_FullFFTWork);
+        m_FullFFTWork = nullptr;
     }
 
     if (m_ODSData) {
@@ -48,17 +71,21 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
     m_PreviousSpectralPower.assign(static_cast<size_t>(std::lround(m_Config.FFTSize / 2.0f)) + 1, 0.0);
     m_SpectralPrefix.resize(m_Config.FFTSize / 2 + 2);
 
-    if (m_FullFFTPlan != nullptr) {
-        fftw_destroy_plan(m_FullFFTPlan);
-        m_FullFFTPlan = nullptr;
+    if (m_FullFFTSetup != nullptr) {
+        pffft_destroy_setup(m_FullFFTSetup);
+        m_FullFFTSetup = nullptr;
     }
     if (m_FullFFTIn != nullptr) {
-        fftw_free(m_FullFFTIn);
+        pffft_aligned_free(m_FullFFTIn);
         m_FullFFTIn = nullptr;
     }
     if (m_FullFFTOut != nullptr) {
-        fftw_free(m_FullFFTOut);
+        pffft_aligned_free(m_FullFFTOut);
         m_FullFFTOut = nullptr;
+    }
+    if (m_FullFFTWork != nullptr) {
+        pffft_aligned_free(m_FullFFTWork);
+        m_FullFFTWork = nullptr;
     }
 
     if (Config.FFTSize < 512) {
@@ -66,7 +93,7 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
         return;
     }
 
-    FFTWInit();
+    FFTInit();
     OnsetInit();
     MFCCInit();
     SpectralChromaInit();
@@ -81,26 +108,34 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
-void MIR::FFTWInit() {
-    int WindowHalf = round(m_Config.FFTSize / 2);
-    m_FullFFTIn = fftw_alloc_real(m_Config.FFTSize);
-    if (!m_FullFFTIn) {
-        spdlog::critical("fftw_alloc_real failed");
+void MIR::FFTInit() {
+    const size_t fftSize = static_cast<size_t>(m_Config.FFTSize);
+    m_FullFFTSetup = pffft_new_setup(static_cast<int>(fftSize), PFFFT_REAL);
+    if (!m_FullFFTSetup) {
+        spdlog::critical("pffft_new_setup failed");
         return;
     }
 
-    m_FullFFTOut = fftw_alloc_complex(WindowHalf + 1);
-    if (!m_FullFFTOut) {
-        fftw_free(m_FullFFTIn);
-        spdlog::critical("fftw_alloc_complex failed");
+    m_FullFFTIn = static_cast<float *>(pffft_aligned_malloc(fftSize * sizeof(float)));
+    m_FullFFTOut = static_cast<float *>(pffft_aligned_malloc(fftSize * sizeof(float)));
+    m_FullFFTWork = static_cast<float *>(pffft_aligned_malloc(fftSize * sizeof(float)));
+    if (!m_FullFFTIn || !m_FullFFTOut || !m_FullFFTWork) {
+        if (m_FullFFTIn) {
+            pffft_aligned_free(m_FullFFTIn);
+            m_FullFFTIn = nullptr;
+        }
+        if (m_FullFFTOut) {
+            pffft_aligned_free(m_FullFFTOut);
+            m_FullFFTOut = nullptr;
+        }
+        if (m_FullFFTWork) {
+            pffft_aligned_free(m_FullFFTWork);
+            m_FullFFTWork = nullptr;
+        }
+        pffft_destroy_setup(m_FullFFTSetup);
+        m_FullFFTSetup = nullptr;
+        spdlog::critical("pffft_aligned_malloc failed");
         return;
-    }
-
-    m_FullFFTPlan = fftw_plan_dft_r2c_1d((int)m_Config.FFTSize, m_FullFFTIn, m_FullFFTOut, FFTW_ESTIMATE);
-    if (!m_FullFFTOut) {
-        fftw_free(m_FullFFTIn);
-        fftw_free(m_FullFFTOut);
-        spdlog::critical("FullFFTOut alloc failed");
     }
 
     // Match librosa/scipy get_window('hann', N, fftbins=True): periodic Hann.
@@ -410,8 +445,11 @@ void MIR::OnsetExec(Description &Desc) {
 
     const size_t nBins = static_cast<size_t>(m_Config.FFTSize / 2 + 1);
     for (size_t i = 0; i < nBins; ++i) {
-        m_OnsetFFTFrame[2 * i] = static_cast<float>(m_FullFFTOut[i][0]);
-        m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(m_FullFFTOut[i][1]);
+        double re = 0.0;
+        double im = 0.0;
+        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), i, re, im);
+        m_OnsetFFTFrame[2 * i] = static_cast<float>(re);
+        m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(im);
     }
 
     (void)onsetsds_process(m_ODS, m_OnsetFFTFrame.data());
@@ -700,7 +738,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     constexpr double amin = 1e-10;
     const int hfStart = NHalf / 4;
 
-    fftw_execute(m_FullFFTPlan);
+    pffft_transform_ordered(m_FullFFTSetup, m_FullFFTIn, m_FullFFTOut, m_FullFFTWork, PFFFT_FORWARD);
 
     Desc.MaxAmp = 0.0;
     Desc.SpectralFlux = 0.0;
@@ -710,8 +748,9 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     // Process first iteration (i = 0) explicitly to avoid "if (i > 0)" in the hot loop
     {
-        const double re = m_FullFFTOut[0][0];
-        const double im = m_FullFFTOut[0][1];
+        double re = 0.0;
+        double im = 0.0;
+        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), 0, re, im);
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;
@@ -743,8 +782,9 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     // Main Accumulation Loop (i > 0)
     for (int i = 1; i < NHalf; ++i) {
-        const double re = m_FullFFTOut[i][0];
-        const double im = m_FullFFTOut[i][1];
+        double re = 0.0;
+        double im = 0.0;
+        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), static_cast<size_t>(i), re, im);
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;
@@ -1189,7 +1229,7 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     const double *x = In.data();
     const double *w = m_FullWindowingFunc.data();
     for (size_t i = 0; i < m_Config.FFTSize; ++i) {
-        m_FullFFTIn[i] = x[i] * w[i];
+        m_FullFFTIn[i] = static_cast<float>(x[i] * w[i]);
     }
 
     GetSpectralDescriptions(Desc);
