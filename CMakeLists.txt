@@ -202,8 +202,19 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
-cpmaddpackage(NAME fftw3 URL https://www.fftw.org/fftw-3.3.11.tar.gz OPTIONS
-              "BUILD_SHARED_LIBS OFF" "CMAKE_POSITION_INDEPENDENT_CODE ON" "ENABLE_FLOAT OFF")
+cpmaddpackage(
+    NAME
+    fftw3
+    URL
+    https://www.fftw.org/fftw-3.3.11.tar.gz
+    OPTIONS
+    "BUILD_SHARED_LIBS OFF"
+    "CMAKE_POSITION_INDEPENDENT_CODE ON"
+    "ENABLE_FLOAT OFF"
+    "BUILD_TESTS OFF"
+    "ENABLE_LONG_DOUBLE OFF"
+    "ENABLE_QUAD_PRECISION OFF"
+    "DISABLE_FORTRAN ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
