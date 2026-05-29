@@ -202,19 +202,7 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
-cpmaddpackage(
-    NAME
-    fftw3
-    URL
-    https://www.fftw.org/fftw-3.3.11.tar.gz
-    OPTIONS
-    "BUILD_SHARED_LIBS OFF"
-    "CMAKE_POSITION_INDEPENDENT_CODE ON"
-    "ENABLE_FLOAT OFF"
-    "BUILD_TESTS OFF"
-    "ENABLE_LONG_DOUBLE OFF"
-    "ENABLE_QUAD_PRECISION OFF"
-    "DISABLE_FORTRAN ON")
+cpmaddpackage("gh:marton78/pffft@1.1.0")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
@@ -242,8 +230,8 @@ add_library(OpenScofo STATIC ${ScofoSrc})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(OpenScofo PUBLIC fftw3 tree-sitter score_parser onnx_OpenScofo spdlog
-                                       onsetsds)
+target_link_libraries(OpenScofo PUBLIC tree-sitter score_parser onnx_OpenScofo spdlog onsetsds
+                                       PFFFT::PFFFT)
 
 if(OPENSCOFO_USE_BESSEL)
     target_compile_definitions(OpenScofo PRIVATE OPENSCOFO_USE_BESSEL=1)
