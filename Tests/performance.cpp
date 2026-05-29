@@ -57,7 +57,7 @@ void run_scofo(OpenScofo::OpenScofo &scofo, const std::vector<double> &samples) 
             printf("score failed\n");
             exit(-1);
         }
-        bool score_event = scofo.GetCurrentScorePosition();
+        int score_event = scofo.GetCurrentScorePosition();
         if (score_event != currentEvent) {
             printf("currentEvent %d\n", score_event);
             currentEvent = score_event;
