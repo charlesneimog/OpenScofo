@@ -202,7 +202,7 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
-cpmaddpackage("gh:marton78/pffft@1.1.0")
+cpmaddpackage(NAME pffft URI "gh:marton78/pffft@1.1.0" OPTIONS "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
