@@ -218,7 +218,7 @@ cpmaddpackage(
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
-cpmaddpackage(NAME libonnx URI "gh:charlesneimog/libonnx#master" DOWNLOAD_ONLY YES)
+cpmaddpackage(NAME libonnx GITHUB_REPOSITORY charlesneimog/libonnx GIT_TAG master DOWNLOAD_ONLY YES)
 if(libonnx_ADDED)
     file(GLOB onnx_sources ${libonnx_SOURCE_DIR}/src/*.c ${libonnx_SOURCE_DIR}/src/default/*.c)
     add_library(onnx_OpenScofo STATIC ${onnx_sources})
