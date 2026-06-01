@@ -5,25 +5,6 @@
 
 namespace OpenScofo {
 
-namespace {
-inline void ReadPffftBin(const float *out, size_t fftSize, size_t bin, double &re, double &im) {
-    const size_t half = fftSize / 2;
-    if (bin == 0) {
-        re = static_cast<double>(out[0]);
-        im = 0.0;
-        return;
-    }
-    if (bin == half) {
-        re = static_cast<double>(out[1]);
-        im = 0.0;
-        return;
-    }
-    const size_t idx = 2 * bin;
-    re = static_cast<double>(out[idx]);
-    im = static_cast<double>(out[idx + 1]);
-}
-} // namespace
-
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
@@ -149,9 +130,26 @@ void MIR::FFTInit() {
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
 void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
-
     auto u8 = path.u8string();
     std::string path_utf8(u8.begin(), u8.end());
+
+    if (m_ONNXModelLoaded && m_ONNXModelPath == path) {
+        spdlog::debug("ONNX model already loaded, reusing existing context");
+        return;
+    }
+    m_ONNXModelPath = path;
+
+    if (m_ONNXModelLoaded) {
+        spdlog::debug("Loading different ONNX model, cleaning up old one");
+        if (m_ONNXContext) {
+            onnx_context_free(m_ONNXContext);
+            m_ONNXContext = nullptr;
+        }
+        m_ONNXModelLoaded = false;
+        m_ONNXLabels.clear();
+        m_Writers.clear();
+    }
+
     m_ONNXContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
     if (m_ONNXContext == nullptr) {
         spdlog::error("Failed to load ONNX model: {}.", path.string());
@@ -439,6 +437,24 @@ void MIR::OnsetInit() {
 }
 
 // ─────────────────────────────────────
+inline void ReadPffftBin(const float *out, size_t fftSize, size_t bin, double &re, double &im) {
+    const size_t half = fftSize / 2;
+    if (bin == 0) {
+        re = static_cast<double>(out[0]);
+        im = 0.0;
+        return;
+    }
+    if (bin == half) {
+        re = static_cast<double>(out[1]);
+        im = 0.0;
+        return;
+    }
+    const size_t idx = 2 * bin;
+    re = static_cast<double>(out[idx]);
+    im = static_cast<double>(out[idx + 1]);
+}
+
+// ─────────────────────────────────────
 void MIR::OnsetExec(Description &Desc) {
     if (!m_OnsetInit)
         return;
@@ -447,7 +463,18 @@ void MIR::OnsetExec(Description &Desc) {
     for (size_t i = 0; i < nBins; ++i) {
         double re = 0.0;
         double im = 0.0;
-        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), i, re, im);
+        const size_t half = static_cast<size_t>(m_Config.FFTSize) / 2;
+        if (i == 0) {
+            re = static_cast<double>(m_FullFFTOut[0]);
+            im = 0.0;
+        } else if (i == half) {
+            re = static_cast<double>(m_FullFFTOut[1]);
+            im = 0.0;
+        } else {
+            const size_t idx = 2 * i;
+            re = static_cast<double>(m_FullFFTOut[idx]);
+            im = static_cast<double>(m_FullFFTOut[idx + 1]);
+        }
         m_OnsetFFTFrame[2 * i] = static_cast<float>(re);
         m_OnsetFFTFrame[2 * i + 1] = static_cast<float>(im);
     }
@@ -748,9 +775,8 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     // Process first iteration (i = 0) explicitly to avoid "if (i > 0)" in the hot loop
     {
-        double re = 0.0;
+        double re = static_cast<double>(m_FullFFTOut[0]);
         double im = 0.0;
-        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), 0, re, im);
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;
@@ -784,7 +810,19 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     for (int i = 1; i < NHalf; ++i) {
         double re = 0.0;
         double im = 0.0;
-        ReadPffftBin(m_FullFFTOut, static_cast<size_t>(m_Config.FFTSize), static_cast<size_t>(i), re, im);
+        const size_t half = static_cast<size_t>(m_Config.FFTSize) / 2;
+        const size_t bin = static_cast<size_t>(i);
+        if (bin == 0) {
+            re = static_cast<double>(m_FullFFTOut[0]);
+            im = 0.0;
+        } else if (bin == half) {
+            re = static_cast<double>(m_FullFFTOut[1]);
+            im = 0.0;
+        } else {
+            const size_t idx = 2 * bin;
+            re = static_cast<double>(m_FullFFTOut[idx]);
+            im = static_cast<double>(m_FullFFTOut[idx + 1]);
+        }
         const double p = re * re + im * im;
         const double mag = std::sqrt(p);
         const double norm = mag * invN;

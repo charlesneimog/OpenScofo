@@ -96,14 +96,36 @@ EventActions OnlineForward::GetCurrentEventActions() {
 }
 
 // ─────────────────────────────────────
+void OnlineForward::ResetCaches() {
+    // Clear all caches
+    m_PitchTemplates.clear();
+    m_OccupancyCache.clear();
+    m_SurvivorCache.clear();
+    m_KappaCache.clear();
+
+    // Rehash/compact the maps to free memory
+    m_PitchTemplates.rehash(0);
+    m_OccupancyCache.rehash(0);
+    m_SurvivorCache.rehash(0);
+    m_KappaCache.rehash(0);
+
+    spdlog::debug("All caches cleared and rehashed");
+}
+
+// ─────────────────────────────────────
 void OnlineForward::SetScoreStates(States ScoreStates) {
     if (ScoreStates.size() == 0) {
         return;
     }
 
     m_States.clear();
-    m_States = ScoreStates;
+    m_States.shrink_to_fit();
+    // m_States = ScoreStates;
+    m_States = std::move(ScoreStates);
     spdlog::debug("There is {} score states", m_States.size());
+    ResetCaches(); // Clear all caches
+
+    spdlog::debug("BufferSize is {}", m_BufferSize);
 
     m_Normalization.resize(m_BufferSize + 1, 1.0); // init to 1 so first-step division is safe
     for (MarkovState &State : m_States) {
@@ -120,12 +142,9 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_LastPsiN = 60.0f / m_States[0].BPMExpected;
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
-    if (std::isfinite(m_States[0].SyncStrength) && m_States[0].SyncStrength != 0.0) {
-        m_SyncStrength = std::clamp(m_States[0].SyncStrength, 0.0, 1.0);
-    }
-    if (std::isfinite(m_States[0].PhaseCoupling) && m_States[0].PhaseCoupling != 0.0) {
-        m_PhaseCoupling = std::clamp(m_States[0].PhaseCoupling, 0.0, 2.0);
-    }
+    m_Tau = 0;
+    m_SyncStrength = m_States[0].SyncStrength;
+    m_PhaseCoupling = m_States[0].PhaseCoupling;
 
     UpdateAudioTemplate();
     UpdatePhaseValues();
@@ -391,40 +410,39 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
         ExpectedFrames = 1.0;
 
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
-    if (m_OccupancyCache.find(key) != m_OccupancyCache.end())
-        return;
+
+    // Check if BOTH caches have this key
+    if (m_OccupancyCache.find(key) != m_OccupancyCache.end() && m_SurvivorCache.find(key) != m_SurvivorCache.end()) {
+        return; // Both exist, safe to return
+    }
+
+    // If we get here, rebuild both caches for this key
+    // (even if one exists, rebuild to ensure consistency)
 
     const int maxU = static_cast<int>(std::ceil(5.0 * ExpectedFrames));
     constexpr double p = 0.5;
     constexpr double one_minus_p = 0.5;
     const double log_p = std::log(p);
     const double log_1_p = std::log(one_minus_p);
-
-    // Shifted NB: PMF[u] = NB(u-1; r', p), r' = ExpectedFrames - 1
-    // → support on {1,2,...}, E[duration] = ExpectedFrames exactly
     const double r_prime = ExpectedFrames - 1.0;
 
-    std::vector<double> pmf(maxU + 1, 0.0); // pmf[0] = 0 always
+    std::vector<double> pmf(maxU + 1, 0.0);
     std::vector<double> survivor(maxU + 2, 0.0);
 
-    // log PMF[1] = log NB(0; r', p) = r' * log(p)
-    // Special case r'=0 (ExpectedFrames=1): PMF[1]=1, all else=0
     double current_log_pmf = r_prime * log_p;
     double sum_raw = 0.0;
-
     std::vector<double> raw(maxU + 1, 0.0);
+
     for (int u = 1; u <= maxU; ++u) {
         raw[u] = std::exp(current_log_pmf);
         sum_raw += raw[u];
-        // Recurrence: NB(u; r', p) / NB(u-1; r', p) = (u-1+r') / u * (1-p)
-        // PMF[u+1] = NB(u; r', p), PMF[u] = NB(u-1; r', p)
         if (r_prime > 0.0)
             current_log_pmf += std::log((u - 1) + r_prime) - std::log((double)u) + log_1_p;
         else
-            current_log_pmf = -std::numeric_limits<double>::infinity(); // delta at u=1
+            current_log_pmf = -std::numeric_limits<double>::infinity();
     }
 
-    // Normalize over {1,...,maxU} (accounts for truncation tail)
+    // Normalize over {1,...,maxU}
     for (int u = 1; u <= maxU; ++u)
         pmf[u] = raw[u] / sum_raw;
 
@@ -435,8 +453,9 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
         survivor[u] = pmf[u] + survivor[u + 1];
     survivor[0] = 1.0;
 
-    m_OccupancyCache.emplace(key, std::move(pmf));
-    m_SurvivorCache.emplace(key, std::move(survivor));
+    // Always overwrite to ensure consistency
+    m_OccupancyCache[key] = std::move(pmf);
+    m_SurvivorCache[key] = std::move(survivor);
 }
 
 // ─────────────────────────────────────
