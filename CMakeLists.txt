@@ -204,7 +204,6 @@ endif()
 # ╰──────────────────────────────────────╯
 cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPTIONS
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
-
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 
@@ -215,7 +214,6 @@ if(libonnx_ADDED)
     target_include_directories(onnx_OpenScofo PUBLIC ${libonnx_SOURCE_DIR}/src)
     set_target_properties(onnx_OpenScofo PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON
                                                     POSITION_INDEPENDENT_CODE ON)
-
 endif()
 
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -232,8 +230,17 @@ add_library(OpenScofo STATIC ${ScofoSrc})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(OpenScofo PUBLIC tree-sitter score_parser onnx_OpenScofo spdlog onsetsds
-                                       PFFFT::PFFFT)
+target_link_libraries(
+    OpenScofo
+    PUBLIC # score parser
+           tree-sitter
+           score_parser
+           # logging
+           spdlog
+           # mir
+           onsetsds
+           onnx_OpenScofo
+           PFFFT::PFFFT)
 
 if(OPENSCOFO_USE_BESSEL)
     target_compile_definitions(OpenScofo PRIVATE OPENSCOFO_USE_BESSEL=1)
