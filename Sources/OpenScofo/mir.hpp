@@ -116,6 +116,7 @@ class MIR {
 
     // Machine Learning
     bool m_ONNXModelLoaded = false;
+    fs::path m_ONNXModelPath;
     struct onnx_context_t *m_ONNXContext = nullptr;
     std::vector<std::string> m_ONNXLabels;
     std::vector<Descriptors> m_ONNXDescriptors;

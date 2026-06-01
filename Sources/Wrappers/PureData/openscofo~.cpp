@@ -100,26 +100,25 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
     sys_close(fd);
 
     char fullpath[MAXPDSTRING];
-
     snprintf(fullpath, MAXPDSTRING, "%s/%s", realdir, realname);
-
+    int state = canvas_suspend_dsp();
     bool ok = x->OpenScofo->LoadScore(fullpath);
 
     if (!ok) {
+        canvas_resume_dsp(state);
         logpost(x, 1, "[openscofo~] score has errors");
         return;
     }
 
     logpost(x, 2, "[openscofo~] score loaded");
-
     x->OpenScofo->SetCurrentEvent(0);
     x->JustDescription = false;
 
     x->Event = 0;
 
     outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
-
     outlet_float(x->EventOut, 0);
+    canvas_resume_dsp(state);
 
     // update audio config
     x->FFTSize = x->OpenScofo->GetFFTSize();
@@ -592,7 +591,7 @@ extern "C" void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)openscofo_new, (t_method)openscofo_free,
                              sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[openscofo~] version %s (%s) (openscofo~ %s %s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION,
+    post("[openscofo~] version %s (%s) (openscofo~ %s %s), by Charles K. Neimog", OPENSCOFO_VERSION,
          OPENSCOFO_BUILD_TIME, __DATE__, __TIME__);
 
     // message methods

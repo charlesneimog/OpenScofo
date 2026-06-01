@@ -68,6 +68,7 @@ class OnlineForward {
     double GetSurvivorDistribution(MarkovState &State, int u);
     void InitTimeDecoding();
     void BuildDistributionCache(double ExpectedFrames);
+    void ResetCaches();
 
     // Markov and Probabilities
     double GetTransProbability(int i, int j);
