@@ -39,6 +39,46 @@ hide:
       <div class="card">
         <hr>
         <img
+          src="./assets/pieces/Miniatura1.png"
+          class="card-img"
+          style="width: 80%; object-fit: cover; object-position: left;"
+        />
+        <p><i>Performed by Cássia Carrascoza</i></p>
+        <hr>
+      </div>
+    </a>
+
+    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+      <div class="card">
+        <hr>
+        <img
+          src="./assets/pieces/Miniatura2.png"
+          class="card-img"
+          style="width: 80%; object-fit: cover; object-position: left;"
+        />
+        <p><i>Performed by Cássia Carrascoza</i></p>
+        <hr>
+      </div>
+    </a>
+
+    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+      <div class="card">
+        <hr>
+        <img
+          src="./assets/pieces/Miniatura3.png"
+          class="card-img"
+          style="width: 80%; object-fit: cover; object-position: left;"
+        />
+        <p><i>Performed by Cássia Carrascoza</i></p>
+        <hr>
+      </div>
+    </a>
+
+    
+    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+      <div class="card">
+        <hr>
+        <img
           src="./assets/pieces/001-canticos.png"
           class="card-img"
           style="width: 80%; object-fit: cover; object-position: left;"
@@ -47,9 +87,5 @@ hide:
         <hr>
       </div>
     </a>
-    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
-      <div class="card">
-      </div>
-    </a>
-  
 </div>
+
