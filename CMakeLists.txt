@@ -262,7 +262,6 @@ if(EMSCRIPTEN)
                >
                $<$<CONFIG:Release>:
                -O3
-               -march=native
                -ffast-math
                -DNDEBUG
                -flto=auto
