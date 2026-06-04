@@ -30,6 +30,12 @@ target_include_directories(bench_fftw3 PRIVATE ${FFTW3_INCLUDE_DIR})
 target_link_libraries(bench_fftw3 PRIVATE ${FFTW3F_LIB} m)
 
 # pffft
+include(ExternalProject)
+ExternalProject_Add(mipp EXCLUDE_FROM_ALL TRUE GIT_REPOSITORY https://github.com/aff3ct/MIPP.git
+                    GIT_TAG master)
+
+ExternalProject_Get_Property(mipp source_dir)
+set(MIPP_INCLUDE_DIRS "${source_dir}/include")
 FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG master)
 FetchContent_MakeAvailable(pffft)
 add_executable(bench_pffft benchmark_pffft.cpp)
