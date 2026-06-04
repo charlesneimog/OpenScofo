@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>Pd4Web</title>
+        <meta charset="UTF-8" />
+        <!-- WebApp manifest -->
+        <link rel="manifest" href="manifest.json" />
+        <meta name="theme-color" content="#000000" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="apple-touch-icon" href="icon-192.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <!-- Always BEFORE pd4web.js (it update COI) -->
+        <script src="./pd4web.threads.js"></script>
+        <!-- Main modules -->
+
+        <script src="./pd4web.js"></script>
+        <style>
+            :root {
+                --bg: #f4f6f9;
+                --fg: rgba(20, 25, 31, 0.92);
+                --panel: rgba(255, 255, 255, 0.75);
+                --shadow: rgba(15, 23, 42, 0.12) 0px 2px 4px, rgba(15, 23, 42, 0.22) 0px 10px 24px;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #171b20;
+                    --fg: rgba(255, 255, 255, 0.9);
+                    --panel: rgba(36, 40, 46, 0.7);
+                    --shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px, rgba(0, 0, 0, 0.45) 0px 12px 28px;
+                }
+            }
+
+            body {
+                margin: 0;
+                touch-action: pan-x pan-y;
+                color: var(--fg);
+            }
+
+            span {
+                color: var(--fg);
+            }
+
+            #wasm-loader {
+                position: fixed;
+                top: 1rem;
+                left: 50%;
+                transform: translateX(-50%);
+                display: grid;
+                gap: 0.35rem;
+                text-align: center;
+                width: min(320px, calc(100vw - 2rem));
+                padding: 0.65rem 0.85rem;
+                border-radius: 0.65rem;
+            }
+
+            #status {
+                font-size: 0.72rem;
+            }
+
+            #progress {
+                width: 100%;
+                height: 0.45rem;
+                border-radius: 999px;
+            }
+
+            .pd4web-patch-canvas {
+                margin: 1%;
+                display: block;
+                border-radius: 0.65rem;
+                box-shadow: var(--shadow);
+            }
+
+            .pd4web-patch-canvas:focus {
+                box-shadow:
+                    rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
+                    rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
+                outline: none;
+            }
+
+            .pd4web-sound-switch {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 25px;
+                height: 25px;
+                margin: 0 auto;
+                transform: none;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                .pd4web-sound-switch {
+                    filter: invert(1);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <script type="module" src="score.js"></script>
+        <div id="wasm-loader">
+            <span id="status">Loading...</span>
+            <progress id="progress" value="0" max="100"></progress>
+        </div>
+
+        <h1 style="margin: 0; text-align: center">Miniatura 2</h1>
+        <div style="display: flex">
+            <div>
+                <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
+                <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
+            </div>
+            <div
+                style="
+                    width: 80%;
+                    display: block;
+                    margin: 2%;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    border-radius: 0.65rem;
+                    box-shadow:
+                        rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
+                        rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
+                "
+            >
+                <div id="vexscore" style="margin: auto"></div>
+            </div>
+        </div>
+
+        <script>
+            const getEId = (id) => document.getElementById(id);
+            const ui = { status: getEId("status"), progress: getEId("progress"), loader: getEId("wasm-loader") };
+            var Pd4Web = null;
+
+            const fetchWasm = async (url) => {
+                const res = await fetch(url);
+                if (!res.ok || !res.body) {
+                    throw new Error(`Failed to load ${url}, status ${res.status}`);
+                }
+                const contentLength = Number(res.headers.get("Content-Length")) || 0;
+                const reader = res.body.getReader();
+                let received = 0;
+                const chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    chunks.push(value);
+                    received += value.length;
+
+                    if (contentLength) {
+                        const pct = Math.floor((received / contentLength) * 100);
+                        ui.progress.value = pct;
+                        ui.status.textContent = `Downloading WASM... ${pct}%`;
+                    } else {
+                        ui.status.textContent = `Downloading WASM... ${Math.round(received / 1024)} KB`;
+                    }
+                }
+
+                const buffer = new Uint8Array(received);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    buffer.set(chunk, offset);
+                    offset += chunk.length;
+                }
+                return buffer.buffer;
+            };
+
+            /* Init Pd4Web */
+            (async () => {
+                try {
+                    const wasmBinary = await fetchWasm("./pd4web.wasm");
+                    Pd4WebModule({ wasmBinary }).then(async (module) => {
+                        Pd4Web = new module.Pd4Web();
+                        Pd4Web.openPatch("index.pd", {
+                            canvasId: "Pd4WebCanvas",
+                            soundToggleId: "Pd4WebAudioSwitch",
+                            renderGui: true,
+                        });
+                        ui.loader.style.display = "none";
+                        var eventMap = await loadXml("./miniatura2.musicxml");
+                        if (Pd4Web) {
+                            Pd4Web.onFloatReceived("scoreevent", (r, f) => {
+                                console.log(f);
+                                const sEvents = eventMap.get(f);
+                                if (!sEvents) return;
+
+                                for (const sEvent of sEvents) {
+                                    const id = sEvent.attrs.id;
+                                    const element = document.getElementById("vf-" + id);
+
+                                    if (!element) continue;
+
+                                    element.querySelectorAll(".vf-notehead, .vf-stem, .vf-flag").forEach((el) => {
+                                        el.setAttribute("stroke", "red");
+                                        el.setAttribute("fill", "red");
+                                    });
+                                }
+                            });
+
+                            async function requestArrayOfFile(file) {
+                                const response = await fetch(file);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}`);
+                                }
+                                const fileName = file.split("/").pop();
+                                console.log(fileName);
+                                const arrayBuffer = await response.arrayBuffer();
+                                Pd4Web.sendFile(arrayBuffer, fileName);
+                            }
+
+                            Pd4Web.onFloatReceived("miniatura", async (r, f) => {
+                                if (f == 1) {
+                                    eventMap = await loadXml("./miniatura1.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura1.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura1.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 1);
+                                    }, 200);
+                                } else if (f == 2) {
+                                    eventMap = await loadXml("./miniatura2.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura2.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura2.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 2);
+                                    }, 200);
+                                } else if (f == 3) {
+                                    eventMap = await loadXml("./miniatura3.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura3.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura3.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 3);
+                                    }, 200);
+                                }
+                            });
+                        }
+                    });
+                } catch (error) {
+                    ui.status.textContent = "Failed to load WASM.";
+                    console.error(error);
+                }
+            })();
+        </script>
+    </body>
+</html>
