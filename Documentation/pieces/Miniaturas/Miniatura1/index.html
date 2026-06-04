@@ -102,6 +102,7 @@
             <progress id="progress" value="0" max="100"></progress>
         </div>
 
+        <h1 style="margin: 0; text-align: center">Miniatura 1</h1>
         <!-- All the styles are in the pd4web.style.css -->
         <div style="display: flex">
             <div>
@@ -179,6 +180,7 @@
                         var eventMap = await loadXml("./miniatura1.musicxml");
                         if (Pd4Web) {
                             Pd4Web.onFloatReceived("scoreevent", (r, f) => {
+                                console.log(f);
                                 const sEvents = eventMap.get(f);
                                 if (!sEvents) return;
 
@@ -194,13 +196,43 @@
                                     });
                                 }
                             });
+
+                            async function requestArrayOfFile(file) {
+                                const response = await fetch(file);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}`);
+                                }
+                                const fileName = file.split("/").pop();
+                                console.log(fileName);
+                                const arrayBuffer = await response.arrayBuffer();
+                                Pd4Web.sendFile(arrayBuffer, fileName);
+                            }
+
                             Pd4Web.onFloatReceived("miniatura", async (r, f) => {
                                 if (f == 1) {
                                     eventMap = await loadXml("./miniatura1.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura1.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura1.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 1);
+                                    }, 200);
                                 } else if (f == 2) {
                                     eventMap = await loadXml("./miniatura2.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura2.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura2.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 2);
+                                    }, 200);
                                 } else if (f == 3) {
                                     eventMap = await loadXml("./miniatura3.musicxml");
+                                    await requestArrayOfFile("./../Audios/miniatura3.mp3");
+                                    await requestArrayOfFile("./../Extras/miniatura3.scofo");
+                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
+                                    setTimeout(async () => {
+                                        Pd4Web.sendFloat("piece-to-play", 3);
+                                    }, 200);
                                 }
                             });
                         }
@@ -210,15 +242,6 @@
                     console.error(error);
                 }
             })();
-        </script>
-        <script>
-            // Create an App (installable using PWA ( https://en.wikipedia.org/wiki/Progressive_web_app ))
-            // if ("serviceWorker" in navigator) {
-            //     navigator.serviceWorker
-            //         .register("pd4web.sw.js")
-            //         .then(() => console.log("Service Worker registered"))
-            //         .catch((err) => console.error("Service Worker registration failed:", err));
-            // }
         </script>
     </body>
 </html>
