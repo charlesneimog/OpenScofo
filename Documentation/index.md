@@ -35,7 +35,7 @@ hide:
 -------------------------
 
 <div class="container">
-    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+    <a href="https://charlesneimog.github.io/OpenScofo/pieces/Miniaturas/Miniatura1/" target="_blank" style="text-decoration: none; color: inherit;">
       <div class="card">
         <hr>
         <img
@@ -48,7 +48,7 @@ hide:
       </div>
     </a>
 
-    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+    <a href="https://charlesneimog.github.io/OpenScofo/pieces/Miniaturas/Miniatura2" target="_blank" style="text-decoration: none; color: inherit;">
       <div class="card">
         <hr>
         <img
@@ -61,7 +61,7 @@ hide:
       </div>
     </a>
 
-    <a href="https://charlesneimog.github.io/Canticos-de-Silicio-I/" target="_blank" style="text-decoration: none; color: inherit;">
+    <a href="https://charlesneimog.github.io/OpenScofo/pieces/Miniaturas/Miniatura2" target="_blank" style="text-decoration: none; color: inherit;">
       <div class="card">
         <hr>
         <img
@@ -79,7 +79,7 @@ hide:
       <div class="card">
         <hr>
         <img
-          src="./assets/pieces/001-canticos.png"
+          src="./assets/pieces/canticos.png"
           class="card-img"
           style="width: 80%; object-fit: cover; object-position: left;"
         />
