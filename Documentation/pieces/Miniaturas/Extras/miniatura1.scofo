@@ -1,0 +1,114 @@
+BPM 80
+
+ONNXMODEL ai-flute-model.onnx
+ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+
+
+// sendto delay [<voz> <output_gain> <time> <feedback> <input_gain>]
+
+// Measure number 1
+UTECH jet_whistle 1
+REST 0.5	
+NOTE Bb4 1.5 // tied
+    sendto buffer-record [1 bb4-a4 1]
+    sendto buffer-record [2 bb4 1]
+    delay 1 tempo sendto buffer-record [2 bb4 0]
+NOTE A4 0.5
+REST 0.5
+    sendto buffer-record [1 bb4-a4 0]
+    sendto buffer-play-space [1 init -30 0]
+    sendto buffer-play [1 bb4-a4 0.4]
+
+// Measure number 2
+UTECH jet_whistle 1
+REST 0.5
+NOTE Bb4 1.5 // tied
+NOTE A4 0.5
+REST 0.5
+    sendto buffer-play-space [1 init 30 0]
+    sendto buffer-play [1 bb4 0.2]
+
+// Measure number 3
+PTECH pizzicato D4 0.5
+    sendto delay-space [1 init 0 0]
+    sendto delay-space [1 90 0 5000]
+    sendto delay [1 0.3 250 0.5 1]
+PTECH pizzicato A4 0.5
+REST 0.5
+    sendto delay [1 0.3 250 0.5 0]
+
+PTECH pizzicato D4 0.5
+    sendto delay-space [2 init -90 0]
+    sendto delay-space [2 -40 0 5000]
+    sendto delay [2 0.3 250 0.5 1]
+PTECH pizzicato A4 0.5
+REST 0.5
+    sendto delay [2 0.3 230 0.9 0]
+PTECH pizzicato D4 0.5
+    sendto buffer-play-space [3 init 50 0]
+    sendto buffer-play [3 bb4 0.2]
+
+PTECH pizzicato A4 0.5
+
+// Measure number 4
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato A4 0.5
+REST 0.5
+UTECH jet_whistle 1
+    sendto buffer-play-space [1 init -40 0]
+    sendto buffer-play [1 bb4 0.4]
+REST 1
+    sendto buffer-pitchshift-space [1 init 60 0]
+    sendto buffer-pitchshift [1 bb4 -400 0.05]
+    sendto buffer-pitchshift-space [1 init -50 0]
+    delay 0.5 tempo sendto buffer-pitchshift [1 bb4-a4 -1200 0.05]
+
+// Measure number 5
+PTECH pizzicato D4 0.5
+PTECH pizzicato A4 0.5
+    sendto delay-space [1 init 0 0]
+    sendto delay-space [1 90 0 5000]
+    sendto delay [1 0.2 250 0.5 1]
+REST 0.5
+PTECH pizzicato D4 0.5
+    sendto delay-space [1 init 90 0]
+    sendto delay-space [1 -90 0 1200]
+    sendto delay [1 0.2 250 0.5 0.1]
+PTECH pizzicato Bb4 0.5
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato B4 0.5
+
+// Measure number 6
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato Bb4 0.5
+    sendto delay [1 0.2 250 0.5 0]
+REST 0.5
+UTECH jet_whistle 1
+UTECH jet_whistle 1
+
+// Measure number 7
+UTECH jet_whistle 1
+REST 3
+
+// Measure number 8
+NOTE D4 2
+	sendto pitchshift-space [1 init 90 0]
+	sendto pitchshift-space [2 init -90 0]
+	sendto pitchshift-space [3 init 40 0]
+	sendto pitchshift-space [4 init -40 0]
+
+
+	sendto pitchshift [1 381 0.4]
+	delay 0.33 tempo sendto pitchshift [2 702 0.4]
+	delay 0.66 tempo sendto pitchshift [3 969 0.4]
+	delay 1 tempo sendto pitchshift [4 -969 0.4]
+
+REST 2
+	sendto pitchshift [1 381 0]
+	sendto pitchshift [2 702 0]
+	sendto pitchshift [3 969 0]
+	sendto pitchshift [4 -969 0]
+

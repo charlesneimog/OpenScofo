@@ -1,0 +1,225 @@
+BPM 70
+
+ONNXMODEL ai-flute-model.onnx
+ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+
+// Syntax
+
+// buffer-record [buffername <on|off>]
+// buffer-play [<voz> buffername <gain>]
+// buffer-play [buffername <gain>]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 1             │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-record [1 measure1 1]
+    sendto buffer-play-space [1 init 90 0]
+NOTE Eb5 1
+NOTE C5 1
+REST 1
+    sendto buffer-record [1 measure1 0]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 2             │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-play-space [1 -90 0 3000]
+    sendto buffer-play [1 measure1 1]
+
+NOTE Eb5 0.5
+    sendto buffer-record [1 measure2 1]
+NOTE D5 0.5
+NOTE C5 0.5
+NOTE F#4 0.5
+REST 1
+    sendto buffer-record [1 measure2 0]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 3             │
+// ╰───────────────────────────────────────╯
+REST 1
+    sendto buffer-play [1 measure1 1]
+    sendto buffer-play-space [1 90 0 4000]
+NOTE G5 0.5
+    sendto buffer-play-space [2 init -90 0]
+    sendto buffer-play [2 measure1 0.1]
+NOTE F5 0.5
+NOTE Eb5 0.5
+NOTE Db5 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 4             │
+// ╰───────────────────────────────────────╯
+REST 1
+    sendto buffer-play [1 measure1 1]
+    sendto buffer-play-space [1 90 0 3000]
+NOTE Eb6 0.5
+    // <VOZ> <CENTS> <GAIN>
+    sendto pitchshift [1 200 1]
+    sendto pitchshift [2 -200 1]
+NOTE D6 0.5
+NOTE C6 0.5
+NOTE F#5 0.5
+REST 1
+    sendto pitchshift [1 200 0]
+    sendto pitchshift [2 -200 0]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 5             │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+NOTE Eb5 0.5
+    sendto buffer-play-space [1 90 0 3000]
+    sendto buffer-play [1 measure1 1]
+NOTE D5 0.5
+NOTE C5 0.5
+NOTE F#4 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 6             │
+// ╰───────────────────────────────────────╯
+REST 1
+NOTE G5 0.5
+    sendto buffer-play-space [1 -45 0 3000]
+    sendto buffer-play [1 measure1 1]
+NOTE F5 0.5
+NOTE Eb5 0.5
+NOTE Db5 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 7             │
+// ╰───────────────────────────────────────╯
+REST 1
+NOTE Eb6 0.5
+    sendto buffer-record [1 measure7 1]
+    sendto buffer-play [1 measure1 1]
+    sendto buffer-play-space [1 -45 0 3000]
+NOTE D6 0.5
+NOTE C6 0.5
+NOTE F#5 0.5
+REST 1
+    sendto buffer-record [1 measure7 0]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 8             │
+// ╰───────────────────────────────────────╯
+NOTE C5 2
+    sendto buffer-play-space [5 init 90 0]
+    delay 1 tempo sendto buffer-play [5 measure7 0.1]
+    delay 1 tempo sendto buffer-play-space [5 -45 0 3000]
+REST 2
+    sendto buffer-play-space [1 init 0 0]
+    sendto buffer-play-space [1 95 0 15000]
+    sendto buffer-play [1 measure1 1]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 9             │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-play [2 measure1 0.1]
+PTECH pizzicato Eb4 0.5
+NOTE D5 0.5
+NOTE C5 0.5
+    sendto buffer-play [1 measure1 1]
+NOTE F#4 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 10            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-play [2 measure1 0.1]
+PTECH pizzicato Eb4 0.5
+PTECH pizzicato D4 0.5
+NOTE C5 0.5
+    sendto buffer-play [1 measure1 1]
+NOTE F#4 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 11            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+
+    sendto buffer-play [2 measure1 0.1]
+PTECH pizzicato Eb4 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato C4 0.5
+    sendto buffer-play [1 measure1 1]
+NOTE F#4 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 12            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-play-space [1 init 0 0]
+    sendto buffer-play-space [1 95 0 15000]
+    sendto buffer-play [2 measure1 0.1]
+PTECH pizzicato Eb4 0.5
+PTECH pizzicato D4 0.5
+    sendto buffer-play-space [3 init -45 0]
+    sendto buffer-play [3 measure1 0.05]
+PTECH pizzicato C4 0.5
+    sendto buffer-play [1 measure1 1]
+PTECH pizzicato F#4 0.5
+REST 1
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 13            │
+// ╰───────────────────────────────────────╯
+PTECH pizzicato A5 1
+    sendto buffer-play [2 measure2 0.4]
+PTECH pizzicato Eb4 0.5
+    sendto buffer-play-space [4 init -90 0]
+    sendto buffer-play [4 measure7 0.7]
+PTECH pizzicato D4 0.5
+    sendto delay [1 1 250 0.3 0.1]
+PTECH pizzicato C4 0.5
+    sendto delay [1 1 250 0.3 0]
+
+PTECH pizzicato F#4 0.5
+    sendto delay [1 1 250 0.3 0.1]
+REST 1
+    sendto delay [1 1 250 0.3 0]
+    sendto buffer-play [1 measure1 1]
+
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 14            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto buffer-play [2 measure2 0.4]
+PTECH pizzicato Eb4 1
+    sendto buffer-pitchshift [1 measure1 -200 0.1]
+PTECH pizzicato C4 0.5
+PTECH pizzicato F#4 0.5
+REST 1
+    sendto buffer-play [1 measure1 1]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 15            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto freeze [1 freeze 1 0]
+PTECH pizzicato Eb4 1
+    sendto freeze [1 line 0.3 500]
+PTECH pizzicato C4 1
+REST 1
+    sendto buffer-play [1 measure1 1]
+    sendto freeze [1 line 0 500]
+
+// ╭───────────────────────────────────────╮
+// │          Measure number 16            │
+// ╰───────────────────────────────────────╯
+NOTE A5 1
+    sendto freeze [1 freeze 0 0]
+PTECH pizzicato Eb4 1
+    sendto buffer-play [2 measure2 0.4]
+NOTE C5 2
+    delay 1 tempo sendto pitchshift [1 900 0.3]
+
