@@ -1,0 +1,17 @@
+#N canvas 0 0 925 1132 10;
+#X obj 18 17 inlet~, f 12;
+#X obj 18 331 outlet~, f 13;
+#X obj 87 69 inlet;
+#X obj 18 278 *~, f 33;
+#X obj 324 148 line~;
+#X msg 324 123 \$1 10;
+#X obj 87 91 unpack f f, f 40;
+#X obj 18 229 else/freeze~;
+#X connect 0 0 7 0;
+#X connect 2 0 6 0;
+#X connect 3 0 1 0;
+#X connect 4 0 3 1;
+#X connect 5 0 4 0;
+#X connect 6 0 7 1;
+#X connect 6 1 5 0;
+#X connect 7 0 3 0;
