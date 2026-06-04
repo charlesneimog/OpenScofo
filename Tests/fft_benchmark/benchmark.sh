@@ -1,45 +1,68 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Configurações do Teste
+set -euo pipefail
+
 RUNS=20
+
 BIN_FFTW3="./build/bench_fftw3"
 BIN_PFFFT="./build/bench_pffft"
 
+FFT_SIZES=(512 1024 2048 4096)
+
 echo "==================================================="
-echo " Iniciando Bateria de Testes ($RUNS iterações)"
-echo " Cada iteração executa 1.000.000 de FFTs internas."
+echo " Benchmark Suite ($RUNS runs per FFT size)"
 echo "==================================================="
 
-# Função para executar os binários e extrair a média
 run_and_parse() {
-    local binary=$1
-    local name=$2
-    local total=0
-    
-    echo -n "Avaliando $name "
-    
-    for i in $(seq 1 $RUNS); do
-        # Executa o binário, pega a linha da média e extrai o 6º bloco de texto (o número)
-        val=$($binary | grep "Average Time" | awk '{print $6}')
-        
-        # Soma o valor ao total usando a calculadora de precisão do bash (bc)
-        total=$(echo "$total + $val" | bc -l)
-        
-        # Imprime um ponto para mostrar progresso
-        echo -n "."
+    local binary="$1"
+    local name="$2"
+
+    echo
+    echo "===== $name ====="
+
+    for size in "${FFT_SIZES[@]}"; do
+        local total=0
+
+        printf "FFT Size %d " "$size"
+
+        for ((i=1; i<=RUNS; i++)); do
+
+            # Extract ONLY the matching FFT size result
+            val=$(
+                "$binary" |
+                awk -v target="$size" '
+                    /Running/ {
+                        current_size = $(NF-1)
+                    }
+
+                    /Average Time per FFT:/ {
+                        if (current_size == target) {
+                            print $(NF-1)
+                        }
+                    }
+                '
+            )
+
+            if [[ -z "$val" ]]; then
+                echo
+                echo "ERROR: Failed to parse benchmark output for size $size"
+                exit 1
+            fi
+
+            total=$(echo "$total + $val" | bc -l)
+
+            printf "."
+        done
+
+        avg=$(echo "scale=8; $total / $RUNS" | bc -l)
+
+        printf "\n-> Stable Average (%d): %.5f us\n\n" "$size" "$avg"
     done
-    
-    # Calcula a média real dividindo o total pelo número de execuções
-    local avg=$(echo "$total / $RUNS" | bc -l)
-    
-    # Formata a saída para 5 casas decimais
-    printf "\n-> Média Estável do %s: %.5f us\n\n" "$name" "$avg"
 }
 
-# Executa as funções
-run_and_parse $BIN_FFTW3 "FFTW3"
-run_and_parse $BIN_PFFFT "PFFFT"
+run_and_parse "$BIN_FFTW3" "FFTW3"
+run_and_parse "$BIN_PFFFT" "PFFFT"
 
 echo "==================================================="
-echo " Bateria concluída."
+echo " Benchmark complete."
 echo "==================================================="

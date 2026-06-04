@@ -42,9 +42,8 @@ void fft_cleanup(PFFFTContext &ctx) {
     pffft_destroy_setup(ctx.setup);
 }
 
-int main() {
-    const int N = 2048;
-    const int ITERATIONS = 1000000;
+void run_main(int N) {
+    const int ITERATIONS = 100000;
     const float SAMPLING_FREQ = 8000.0f;
     const float TARGET_FREQ = 440.0f;
 
@@ -72,5 +71,12 @@ int main() {
 
     // Clean up resources
     fft_cleanup(ctx);
+}
+
+int main() {
+    run_main(512);
+    run_main(1024);
+    run_main(2048);
+    run_main(4096);
     return 0;
 }
