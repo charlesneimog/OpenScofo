@@ -3,23 +3,22 @@
     <head>
         <title>Pd4Web</title>
         <meta charset="UTF-8" />
-        <!-- WebApp manifest -->
         <link rel="manifest" href="manifest.json" />
         <meta name="theme-color" content="#000000" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="apple-touch-icon" href="icon-192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <!-- Always BEFORE pd4web.js (it update COI) -->
-        <script src="./pd4web.threads.js"></script>
-        <!-- Main modules -->
 
+        <script src="./pd4web.threads.js"></script>
         <script src="./pd4web.js"></script>
+
         <style>
             :root {
                 --bg: #f4f6f9;
                 --fg: rgba(20, 25, 31, 0.92);
                 --panel: rgba(255, 255, 255, 0.75);
                 --shadow: rgba(15, 23, 42, 0.12) 0px 2px 4px, rgba(15, 23, 42, 0.22) 0px 10px 24px;
+                --accent-shadow: rgba(100, 30, 37, 0.12) 0px 2px 4px 0px, rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
             }
 
             @media (prefers-color-scheme: dark) {
@@ -35,47 +34,50 @@
                 margin: 0;
                 touch-action: pan-x pan-y;
                 color: var(--fg);
+                background-color: var(--bg);
             }
 
             span {
                 color: var(--fg);
             }
 
-            #wasm-loader {
-                position: fixed;
-                top: 1rem;
-                left: 50%;
-                transform: translateX(-50%);
-                display: grid;
-                gap: 0.35rem;
-                text-align: center;
-                width: min(320px, calc(100vw - 2rem));
-                padding: 0.65rem 0.85rem;
+            /* Main Layout Container */
+            .app-container {
+                display: flex;
+                height: 100vh; /* Constrain the entire app to the viewport height */
+                overflow: hidden; /* Prevent the whole body from scrolling */
+            }
+
+            /* Sidebar/Canvas Section */
+            .controls-container {
+                padding: 1rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            /* Score Viewport Container */
+            .score-viewport {
+                width: 80%;
+                margin: 2%;
+                /* Critical: Constrain height to viewport minus margins to force internal scrolling */
+                max-height: 96vh;
+                overflow-x: auto;
+                overflow-y: auto; /* Changed from hidden to auto to allow vertical scrolling */
                 border-radius: 0.65rem;
+                background-color: #ffffff;
+                scroll-behavior: smooth;
             }
 
-            #status {
-                font-size: 0.72rem;
-            }
-
-            #progress {
-                width: 100%;
-                height: 0.45rem;
-                border-radius: 999px;
-            }
-
-            .pd4web-patch-canvas {
-                margin: 1%;
-                display: block;
-                border-radius: 0.65rem;
-                box-shadow: var(--shadow);
-            }
-
-            .pd4web-patch-canvas:focus {
-                box-shadow:
-                    rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
-                    rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
-                outline: none;
+            /* Ensure layout adapts on smaller screens */
+            @media (max-width: 768px) {
+                .app-container {
+                    flex-direction: column;
+                }
+                .score-viewport {
+                    width: 96%;
+                    max-height: 50vh;
+                }
             }
 
             .pd4web-sound-switch {
@@ -88,40 +90,29 @@
                 transform: none;
             }
 
-            @media (prefers-color-scheme: dark) {
-                .pd4web-sound-switch {
-                    filter: invert(1);
-                }
+            .pd4web-patch-canvas:focus {
+                box-shadow:
+                    rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
+                    rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
+                outline: none;
+                border-radius: 10px;
             }
         </style>
     </head>
     <body>
-        <script type="module" src="score.js"></script>
         <div id="wasm-loader">
             <span id="status">Loading...</span>
             <progress id="progress" value="0" max="100"></progress>
         </div>
 
-        <h1 style="margin: 0; text-align: center">Miniatura 2</h1>
-        <div style="display: flex">
-            <div>
+        <div class="app-container">
+            <div class="controls-container">
                 <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
                 <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
             </div>
-            <div
-                style="
-                    width: 80%;
-                    display: block;
-                    margin: 2%;
-                    overflow-x: auto;
-                    overflow-y: hidden;
-                    border-radius: 0.65rem;
-                    box-shadow:
-                        rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
-                        rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
-                "
-            >
-                <div id="vexscore" style="margin: auto"></div>
+
+            <div class="score-viewport" id="score-container">
+                <div id="score"></div>
             </div>
         </div>
 
@@ -130,6 +121,23 @@
             const ui = { status: getEId("status"), progress: getEId("progress"), loader: getEId("wasm-loader") };
             var Pd4Web = null;
 
+            // 1. Fetch and inject the SVG
+            fetch("score.svg")
+                .then((r) => r.text())
+                .then((svgText) => {
+                    const container = document.getElementById("score");
+                    container.innerHTML = svgText;
+                    const svg = container.querySelector("svg");
+                    if (svg) {
+                        svg.style.width = "100%";
+                        svg.style.height = "auto";
+                        svg.style.display = "block";
+                    }
+                    container.style.padding = "20px";
+                })
+                .catch((err) => console.error("Failed to load SVG:", err));
+
+            // 2. Fetch WASM payload
             const fetchWasm = async (url) => {
                 const res = await fetch(url);
                 if (!res.ok || !res.body) {
@@ -164,7 +172,7 @@
                 return buffer.buffer;
             };
 
-            /* Init Pd4Web */
+            // 3. Initialize Pd4Web and handle Auto-Scrolling
             (async () => {
                 try {
                     const wasmBinary = await fetchWasm("./pd4web.wasm");
@@ -173,65 +181,35 @@
                         Pd4Web.openPatch("index.pd", {
                             canvasId: "Pd4WebCanvas",
                             soundToggleId: "Pd4WebAudioSwitch",
-                            renderGui: true,
                         });
                         ui.loader.style.display = "none";
-                        var eventMap = await loadXml("./miniatura2.musicxml");
+
                         if (Pd4Web) {
                             Pd4Web.onFloatReceived("scoreevent", (r, f) => {
-                                console.log(f);
-                                const sEvents = eventMap.get(f);
-                                if (!sEvents) return;
-
-                                for (const sEvent of sEvents) {
-                                    const id = sEvent.attrs.id;
-                                    const element = document.getElementById("vf-" + id);
-
-                                    if (!element) continue;
-
-                                    element.querySelectorAll(".vf-notehead, .vf-stem, .vf-flag").forEach((el) => {
-                                        el.setAttribute("stroke", "red");
-                                        el.setAttribute("fill", "red");
+                                // Event 0: Reset the score
+                                if (f === 0) {
+                                    document.querySelectorAll("[openscofo-event-number]").forEach((note) => {
+                                        note.setAttribute("fill", "black");
                                     });
+                                    return;
                                 }
-                            });
 
-                            async function requestArrayOfFile(file) {
-                                const response = await fetch(file);
-                                if (!response.ok) {
-                                    throw new Error(`HTTP ${response.status}`);
-                                }
-                                const fileName = file.split("/").pop();
-                                console.log(fileName);
-                                const arrayBuffer = await response.arrayBuffer();
-                                Pd4Web.sendFile(arrayBuffer, fileName);
-                            }
+                                // Active Event: Highlight and Scroll
+                                const notes = document.querySelectorAll(`[openscofo-event-number="${f}"]`);
 
-                            Pd4Web.onFloatReceived("miniatura", async (r, f) => {
-                                if (f == 1) {
-                                    eventMap = await loadXml("./miniatura1.musicxml");
-                                    await requestArrayOfFile("./../Audios/miniatura1.mp3");
-                                    await requestArrayOfFile("./../Extras/miniatura1.scofo");
-                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
-                                    setTimeout(async () => {
-                                        Pd4Web.sendFloat("piece-to-play", 1);
-                                    }, 200);
-                                } else if (f == 2) {
-                                    eventMap = await loadXml("./miniatura2.musicxml");
-                                    await requestArrayOfFile("./../Audios/miniatura2.mp3");
-                                    await requestArrayOfFile("./../Extras/miniatura2.scofo");
-                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
-                                    setTimeout(async () => {
-                                        Pd4Web.sendFloat("piece-to-play", 2);
-                                    }, 200);
-                                } else if (f == 3) {
-                                    eventMap = await loadXml("./miniatura3.musicxml");
-                                    await requestArrayOfFile("./../Audios/miniatura3.mp3");
-                                    await requestArrayOfFile("./../Extras/miniatura3.scofo");
-                                    await requestArrayOfFile("./../Extras/ai-flute-model.onnx");
-                                    setTimeout(async () => {
-                                        Pd4Web.sendFloat("piece-to-play", 3);
-                                    }, 200);
+                                if (notes.length > 0) {
+                                    // Highlight all parts of the current event
+                                    for (const note of notes) {
+                                        note.setAttribute("fill", "red");
+                                    }
+
+                                    // Native DOM Auto-Scrolling
+                                    // This forces the browser to calculate the exact offset and center the element
+                                    notes[0].scrollIntoView({
+                                        behavior: "smooth", // Smooth animation
+                                        block: "center", // Center vertically in the container
+                                        inline: "center", // Center horizontally if needed
+                                    });
                                 }
                             });
                         }
