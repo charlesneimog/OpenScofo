@@ -1,4 +1,4 @@
-#N canvas 0 0 925 1132 10;
+#N canvas 0 0 1299 1132 10;
 #X declare -path /home/neimog/Documents/Git/OpenScofo/.build/Sources/Wrappers/PureData/;
 #X declare -path Audios;
 #X declare -path Extras;
