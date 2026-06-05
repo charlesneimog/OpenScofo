@@ -106,3 +106,7 @@ dist
 /Tests/body
 /Documentation/pieces/Miniaturas/.tmp
 /Documentation/pieces/Miniaturas/Pd4Web
+/Resources/Score/*.musixml
+/Resources/Score/*.svg
+
+
