@@ -14,10 +14,10 @@
             "type": "image/png"
         }
     ],
-    "name": "Miniatura1",
+    "name": ".",
     "orientation": "any",
     "screenshots": "",
-    "short_name": "Miniatura1",
+    "short_name": ".",
     "start_url": "index.html",
     "theme_color": "#000000"
 }

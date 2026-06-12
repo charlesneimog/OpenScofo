@@ -110,3 +110,10 @@ dist
 /Resources/Score/*.svg
 
 
+/Tests/miniaturas/.tmp
+/Tests/miniaturas/Pd4Web
+/Tests/miniaturas/CMakeLists.txt
+/Tests/miniaturas/favicon.ico
+/Tests/miniaturas/index.html
+/Tests/miniaturas/WebPatch
+/flamegraph.svg
