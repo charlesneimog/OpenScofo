@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -62,6 +64,8 @@ class OnlineForward {
     double UpdatePsiN(int StateIndex);
     double A2(double kappa);
     double InverseA2(double r);
+    static void InitializeA2Table();
+    static double CalculateA2(double kappa);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
     double GetOccupancyDistribution(MarkovState &State, int u);
@@ -120,6 +124,11 @@ class OnlineForward {
     // Time
     double m_TimeInPrevEvent = 0;
     std::unordered_map<int, double> m_KappaCache;
+    static constexpr int A2TablePrecision = 100;
+    static constexpr int A2TableMaxKappa = 10;
+    static constexpr int A2TableSize = A2TablePrecision * A2TableMaxKappa + 1;
+    static std::array<double, A2TableSize> s_A2Table;
+    static std::once_flag s_A2TableInitFlag;
     // Cache for the distributions
     std::unordered_map<int, std::vector<double>> m_OccupancyCache;
     std::unordered_map<int, std::vector<double>> m_SurvivorCache;
@@ -147,6 +156,10 @@ class OnlineForward {
 
     // Time
     std::unordered_map<double, PitchTemplateArray> m_PitchTemplates;
+    std::unordered_map<double, double> m_PitchProbabilityCache;
+    int m_PitchProbabilityCacheTau = -1;
+    int m_ReverbEnergyCacheTau = -1;
+    bool m_ReverbSpectralPowerHasEnergy = false;
 
     // Pitch
     std::vector<MarkovState> m_States;

@@ -1,5 +1,7 @@
 #include "OpenScofo.hpp"
 
+#include <algorithm>
+
 #if defined(__APPLE__) || defined(__EMSCRIPTEN__)
 #include <boost/math/special_functions/bessel.hpp>
 #define CYL_BESSEL_I(v, x) boost::math::cyl_bessel_i(v, x)
@@ -9,6 +11,9 @@
 #endif
 
 namespace OpenScofo {
+
+std::array<double, OnlineForward::A2TableSize> OnlineForward::s_A2Table = {};
+std::once_flag OnlineForward::s_A2TableInitFlag;
 
 /*
     // ──────────────────────────────── REFERENCES ───────────────────────────────────────
@@ -45,6 +50,8 @@ OnlineForward::OnlineForward() {
     m_TimeInPrevEvent = 0;
     m_EventWindowSize = 20;
     SetTunning(440);
+
+    InitializeA2Table();
 
     constexpr int KappaPrecision = 1000;
     m_KappaCache.reserve(static_cast<size_t>(KappaPrecision + 1));
@@ -99,12 +106,14 @@ EventActions OnlineForward::GetCurrentEventActions() {
 void OnlineForward::ResetCaches() {
     // Clear all caches
     m_PitchTemplates.clear();
+    m_PitchProbabilityCache.clear();
     m_OccupancyCache.clear();
     m_SurvivorCache.clear();
     m_KappaCache.clear();
 
     // Rehash/compact the maps to free memory
     m_PitchTemplates.rehash(0);
+    m_PitchProbabilityCache.rehash(0);
     m_OccupancyCache.rehash(0);
     m_SurvivorCache.rehash(0);
     m_KappaCache.rehash(0);
@@ -280,6 +289,9 @@ void OnlineForward::SetTunning(double Tunning) {
 // ─────────────────────────────────────
 void OnlineForward::SetDescription(const Description &Desc) {
     m_Desc = Desc;
+    m_PitchProbabilityCache.clear();
+    m_PitchProbabilityCacheTau = -1;
+    m_ReverbEnergyCacheTau = -1;
 }
 
 // ─────────────────────────────────────
@@ -460,7 +472,7 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
-double OnlineForward::A2(double kappa) {
+double OnlineForward::CalculateA2(double kappa) {
     if (kappa <= 0.0) {
         return 0.0;
     }
@@ -478,8 +490,38 @@ double OnlineForward::A2(double kappa) {
 }
 
 // ─────────────────────────────────────
+void OnlineForward::InitializeA2Table() {
+    std::call_once(s_A2TableInitFlag, []() {
+        for (int i = 0; i < A2TableSize; ++i) {
+            double kappa = static_cast<double>(i) / A2TablePrecision;
+            s_A2Table[i] = CalculateA2(kappa);
+        }
+    });
+}
+
+// ─────────────────────────────────────
+// CONT 2010 (Section 7.1)
+double OnlineForward::A2(double kappa) {
+    InitializeA2Table();
+
+    if (kappa <= 0.0) {
+        return s_A2Table.front();
+    }
+
+    if (kappa >= A2TableMaxKappa) {
+        return s_A2Table.back();
+    }
+
+    int index = static_cast<int>(std::round(kappa * A2TablePrecision));
+    index = std::clamp(index, 0, A2TableSize - 1);
+    return s_A2Table[static_cast<size_t>(index)];
+}
+
+// ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
 double OnlineForward::InverseA2(double SyncStrength) {
+    InitializeA2Table();
+
     SyncStrength = std::clamp(SyncStrength, 0.0, 1.0);
     constexpr int KappaPrecision = 1000;
     int key = static_cast<int>(SyncStrength * KappaPrecision);
@@ -494,31 +536,25 @@ double OnlineForward::InverseA2(double SyncStrength) {
         return 10.0;
     }
 
-    double Low = 0.0;
-    constexpr double Tol = 1e-6;
-    double High = std::max(SyncStrength, 10.0);
-    double Mid = 0.0;
-
-    for (int i = 0; i < 1000; ++i) {
-        Mid = (Low + High) / 2.0;
-        double I1 = CYL_BESSEL_I(1, Mid);
-        double I0 = CYL_BESSEL_I(0, Mid);
-        double A2Mid = I1 / I0;
-        if (std::fabs(A2Mid - SyncStrength) < Tol) {
-            m_KappaCache[key] = Mid;
-            return Mid;
-        }
-
-        if (A2Mid < SyncStrength) {
-            Low = Mid;
-        } else {
-            High = Mid;
-        }
+    auto lower = std::lower_bound(s_A2Table.begin(), s_A2Table.end(), SyncStrength);
+    if (lower == s_A2Table.begin()) {
+        m_KappaCache[key] = 0.0;
+        return 0.0;
     }
 
-    // Store fallback result too
-    m_KappaCache[key] = Mid;
-    return Mid;
+    if (lower == s_A2Table.end()) {
+        m_KappaCache[key] = 10.0;
+        return 10.0;
+    }
+
+    size_t upperIndex = static_cast<size_t>(std::distance(s_A2Table.begin(), lower));
+    size_t lowerIndex = upperIndex - 1;
+    double lowerA2 = s_A2Table[lowerIndex];
+    double upperA2 = s_A2Table[upperIndex];
+    size_t nearestIndex = (SyncStrength - lowerA2 <= upperA2 - SyncStrength) ? lowerIndex : upperIndex;
+    double Kappa = static_cast<double>(nearestIndex) / A2TablePrecision;
+    m_KappaCache[key] = Kappa;
+    return Kappa;
 }
 
 // ─────────────────────────────────────
@@ -759,14 +795,25 @@ double OnlineForward::GetPitchProbability(double Freq) {
         return std::numeric_limits<double>::min();
     }
 
-    double KLDiv = 0.0;
-    double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
+    if (m_PitchProbabilityCacheTau != m_Tau) {
+        m_PitchProbabilityCache.clear();
+        m_PitchProbabilityCacheTau = m_Tau;
+    }
+
+    const double RootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
+    auto cachedPitch = m_PitchProbabilityCache.find(RootBinFreq);
+    if (cachedPitch != m_PitchProbabilityCache.end()) {
+        return cachedPitch->second;
+    }
+
     auto it = m_PitchTemplates.find(RootBinFreq);
     if (it == m_PitchTemplates.end()) {
         BuildPitchTemplate(Freq);
         it = m_PitchTemplates.find(RootBinFreq);
         if (it == m_PitchTemplates.end()) {
-            return std::numeric_limits<double>::min();
+            double probability = std::numeric_limits<double>::min();
+            m_PitchProbabilityCache[RootBinFreq] = probability;
+            return probability;
         }
     }
 
@@ -774,31 +821,74 @@ double OnlineForward::GetPitchProbability(double Freq) {
     const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
     const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
     if (PitchTemplate.empty() || normSpectralPower.empty()) {
-        return std::numeric_limits<double>::min();
+        double probability = std::numeric_limits<double>::min();
+        m_PitchProbabilityCache[RootBinFreq] = probability;
+        return probability;
     }
 
-    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
+    const size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
     size_t bins = std::min(halfFft, PitchTemplate.size());
     bins = std::min(bins, normSpectralPower.size());
     if (bins == 0) {
-        return std::numeric_limits<double>::min();
+        double probability = std::numeric_limits<double>::min();
+        m_PitchProbabilityCache[RootBinFreq] = probability;
+        return probability;
     }
 
-    for (size_t i = 0; i < bins; i++) {
-        double reverb = (i < reverbSpectralPower.size()) ? reverbSpectralPower[i] : 0.0;
-        double P = PitchTemplate[i] + reverb;
-        double Q = normSpectralPower[i];
-        if (P > 0 && Q > 0) {
-            KLDiv += P * log(P / Q);
-        } else if (P == 0 && Q >= 0) {
-            KLDiv += Q;
+    if (m_ReverbEnergyCacheTau != m_Tau) {
+        m_ReverbSpectralPowerHasEnergy = false;
+        const size_t reverbBins = std::min(bins, reverbSpectralPower.size());
+        for (size_t i = 0; i < reverbBins; ++i) {
+            if (reverbSpectralPower[i] > 0.0) {
+                m_ReverbSpectralPowerHasEnergy = true;
+                break;
+            }
+        }
+        m_ReverbEnergyCacheTau = m_Tau;
+    }
+
+    double KLDiv = 0.0;
+    const double *pitch = PitchTemplate.data();
+    const double *spectrum = normSpectralPower.data();
+
+    if (!m_ReverbSpectralPowerHasEnergy) {
+        for (size_t i = 0; i < bins; ++i) {
+            const double P = pitch[i];
+            const double Q = spectrum[i];
+            if (Q > 0.0) {
+                KLDiv += P * std::log(P / Q);
+            }
+        }
+    } else if (reverbSpectralPower.size() >= bins) {
+        const double *reverb = reverbSpectralPower.data();
+        for (size_t i = 0; i < bins; ++i) {
+            const double P = pitch[i] + reverb[i];
+            const double Q = spectrum[i];
+            if (P > 0.0 && Q > 0.0) {
+                KLDiv += P * std::log(P / Q);
+            } else if (P == 0.0 && Q >= 0.0) {
+                KLDiv += Q;
+            }
+        }
+    } else {
+        const size_t reverbBins = reverbSpectralPower.size();
+        for (size_t i = 0; i < bins; ++i) {
+            const double reverb = (i < reverbBins) ? reverbSpectralPower[i] : 0.0;
+            const double P = pitch[i] + reverb;
+            const double Q = spectrum[i];
+            if (P > 0.0 && Q > 0.0) {
+                KLDiv += P * std::log(P / Q);
+            } else if (P == 0.0 && Q >= 0.0) {
+                KLDiv += Q;
+            }
         }
     }
 
-    double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
+    const double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
     KLDiv *= noise_robustness;
-    KLDiv = exp(-m_PitchScalingFactor * KLDiv);
-    return KLDiv;
+    const double probability = std::exp(-m_PitchScalingFactor * KLDiv);
+    m_PitchProbabilityCache[RootBinFreq] = probability;
+    return probability;
 }
 
 // ─────────────────────────────────────

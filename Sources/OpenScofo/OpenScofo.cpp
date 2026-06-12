@@ -88,6 +88,7 @@ void OpenScofo::UpdateConfiguration(Configuration &Config) {
     m_Desc.ReverbSpectralPower.resize(NHalf);
     m_Desc.LogMelSpectrum.resize(m_Config.MFCCMels);
     m_Desc.MFCC.resize(m_Config.MFCCCount);
+    m_Desc.Chroma.resize(m_Config.ChromaSize);
 }
 
 // ╭─────────────────────────────────────╮

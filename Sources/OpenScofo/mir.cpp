@@ -489,7 +489,7 @@ void MIR::OnsetExec(Description &Desc) {
 void MIR::ExtendedTechExec(Description &Desc) {
     Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
     Desc.ExtendedTechProb *= Desc.SpectralFlux;
-    Desc.ExtendedTechProb *= (1.0f - Desc.PitchConfidence);
+    Desc.ExtendedTechProb *= (1.0f - Desc.ZeroCrossingRate);
     Desc.ExtendedTechProb *= abs(m_ODS->odfvalpost);
     float steepness = 5.0f;
     Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
@@ -1087,6 +1087,7 @@ double MIR::PositiveRemainder(double value, double modulus) const {
 void MIR::SpectralChromaInit() {
     const size_t nHalf = m_Config.FFTSize / 2 + 1;
     m_ChromaFilter.assign(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
+
     const double tuning = 0.0;
     std::vector<double> frqbins(m_Config.FFTSize, 0.0);
     if (m_Config.FFTSize > 0) {
@@ -1148,17 +1149,7 @@ void MIR::SpectralChromaInit() {
 
 // ─────────────────────────────────────
 void MIR::SpectralChromaExec(Description &Desc) {
-
-    // TODO:
-    if (Desc.Chroma.size() != static_cast<size_t>(m_Config.ChromaSize))
-        Desc.Chroma.resize(m_Config.ChromaSize);
-
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
-
-    if (m_ChromaFilter.empty() || m_ChromaFilter[0].empty() || Desc.Power.empty()) {
-        return;
-    }
-
     const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
     for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
         double energy = 0.0;
@@ -1182,13 +1173,7 @@ void MIR::ZeroCrossingRateInit() {
 
 // ─────────────────────────────────────
 void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc) {
-    if (In.empty()) {
-        Desc.ZeroCrossingRate = 0.0;
-        return;
-    }
-
     const double *yData = nullptr;
-
     if (m_Config.ZCRCenter) {
         const size_t pad = m_Config.FFTSize / 2;
         const size_t inSize = In.size();
@@ -1201,7 +1186,6 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
         yData = dst;
     } else {
         yData = In.data();
-        // ysize = in.size();
     }
 
     size_t crossings = 0;
@@ -1260,7 +1244,7 @@ void MIR::AddReverb(Description &Desc, double decay) {
 void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     // 1. Temporal Domain
     GetSignalPower(In, Desc);
-    YINExec(In, Desc);
+    // YINExec(In, Desc);
     ZeroCrossingRateExec(In, Desc);
 
     // 2. Frequency Domain (windowing + FFT)
