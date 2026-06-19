@@ -144,8 +144,8 @@ struct MarkovState {
     double Duration = 0.0;
 
     // Configuration for each event
-    double PhaseCoupling = 0;
-    double SyncStrength = 0;
+    double PhaseCoupling = 0.5;
+    double SyncStrength = 0.5;
 
     // Error Handling
     int Line;
