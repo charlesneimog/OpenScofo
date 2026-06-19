@@ -690,6 +690,7 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 
     m_TimeInPrevEvent = 0;
     m_LastTn = m_CurrentStateOnset;
+    printf("PsiN1 %f\n", PsiN1);
 
     return PsiN1;
 }
@@ -791,104 +792,32 @@ void OnlineForward::GetAudioObservations() {
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
 double OnlineForward::GetPitchProbability(double Freq) {
-    if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
-        return std::numeric_limits<double>::min();
-    }
-
-    if (m_PitchProbabilityCacheTau != m_Tau) {
-        m_PitchProbabilityCache.clear();
-        m_PitchProbabilityCacheTau = m_Tau;
-    }
-
-    const double RootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
-    auto cachedPitch = m_PitchProbabilityCache.find(RootBinFreq);
-    if (cachedPitch != m_PitchProbabilityCache.end()) {
-        return cachedPitch->second;
-    }
-
+    double KLDiv = 0.0;
+    double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
     auto it = m_PitchTemplates.find(RootBinFreq);
-    if (it == m_PitchTemplates.end()) {
-        BuildPitchTemplate(Freq);
-        it = m_PitchTemplates.find(RootBinFreq);
-        if (it == m_PitchTemplates.end()) {
-            double probability = std::numeric_limits<double>::min();
-            m_PitchProbabilityCache[RootBinFreq] = probability;
-            return probability;
-        }
-    }
-
     const PitchTemplateArray &PitchTemplate = it->second;
     const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
     const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
-    if (PitchTemplate.empty() || normSpectralPower.empty()) {
-        double probability = std::numeric_limits<double>::min();
-        m_PitchProbabilityCache[RootBinFreq] = probability;
-        return probability;
-    }
 
-    const size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
+    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
     size_t bins = std::min(halfFft, PitchTemplate.size());
     bins = std::min(bins, normSpectralPower.size());
-    if (bins == 0) {
-        double probability = std::numeric_limits<double>::min();
-        m_PitchProbabilityCache[RootBinFreq] = probability;
-        return probability;
-    }
 
-    if (m_ReverbEnergyCacheTau != m_Tau) {
-        m_ReverbSpectralPowerHasEnergy = false;
-        const size_t reverbBins = std::min(bins, reverbSpectralPower.size());
-        for (size_t i = 0; i < reverbBins; ++i) {
-            if (reverbSpectralPower[i] > 0.0) {
-                m_ReverbSpectralPowerHasEnergy = true;
-                break;
-            }
-        }
-        m_ReverbEnergyCacheTau = m_Tau;
-    }
-
-    double KLDiv = 0.0;
-    const double *pitch = PitchTemplate.data();
-    const double *spectrum = normSpectralPower.data();
-
-    if (!m_ReverbSpectralPowerHasEnergy) {
-        for (size_t i = 0; i < bins; ++i) {
-            const double P = pitch[i];
-            const double Q = spectrum[i];
-            if (Q > 0.0) {
-                KLDiv += P * std::log(P / Q);
-            }
-        }
-    } else if (reverbSpectralPower.size() >= bins) {
-        const double *reverb = reverbSpectralPower.data();
-        for (size_t i = 0; i < bins; ++i) {
-            const double P = pitch[i] + reverb[i];
-            const double Q = spectrum[i];
-            if (P > 0.0 && Q > 0.0) {
-                KLDiv += P * std::log(P / Q);
-            } else if (P == 0.0 && Q >= 0.0) {
-                KLDiv += Q;
-            }
-        }
-    } else {
-        const size_t reverbBins = reverbSpectralPower.size();
-        for (size_t i = 0; i < bins; ++i) {
-            const double reverb = (i < reverbBins) ? reverbSpectralPower[i] : 0.0;
-            const double P = pitch[i] + reverb;
-            const double Q = spectrum[i];
-            if (P > 0.0 && Q > 0.0) {
-                KLDiv += P * std::log(P / Q);
-            } else if (P == 0.0 && Q >= 0.0) {
-                KLDiv += Q;
-            }
+    for (size_t i = 0; i < bins; i++) {
+        double reverb = (i < reverbSpectralPower.size()) ? reverbSpectralPower[i] : 0.0;
+        double P = PitchTemplate[i] + reverb;
+        double Q = normSpectralPower[i];
+        if (P > 0 && Q > 0) {
+            KLDiv += P * log(P / Q);
+        } else if (P == 0 && Q >= 0) {
+            KLDiv += Q;
         }
     }
 
-    const double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
+    double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
     KLDiv *= noise_robustness;
-    const double probability = std::exp(-m_PitchScalingFactor * KLDiv);
-    m_PitchProbabilityCache[RootBinFreq] = probability;
-    return probability;
+    KLDiv = exp(-m_PitchScalingFactor * KLDiv);
+    return KLDiv;
 }
 
 // ─────────────────────────────────────
