@@ -311,7 +311,7 @@ static void openscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         char fullpath[MAXPDSTRING];
         int fd = canvas_open(x->Canvas, atom_getsymbol(argv + 1)->s_name, "", dirbuf, &nameptr, MAXPDSTRING, 1);
         sys_close(fd);
-        pd_snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
+        snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
         x->OpenScofo->LoadONNXModel(fullpath, Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
