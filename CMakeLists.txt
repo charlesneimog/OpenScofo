@@ -365,8 +365,6 @@ else() # Linux (GCC or Clang)
                -O2
                -ggdb
                -fno-omit-frame-pointer
-               -fno-inline
-               -fno-optimize-sibling-calls
                >
                $<$<CONFIG:Release>:
                -O3
