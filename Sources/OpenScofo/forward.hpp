@@ -1,6 +1,6 @@
 #pragma once
 #include <array>
-#include <mutex>
+#include <cstddef>
 #include <unordered_map>
 #include <vector>
 
@@ -9,6 +9,12 @@
 namespace OpenScofo {
 
 using PitchTemplateArray = std::vector<double>;
+
+struct PitchTemplateEntry {
+    size_t bin;
+    double p;
+    double p_log_p;
+};
 
 // ╭─────────────────────────────────────╮
 // │     Markov Description Process      │
@@ -64,7 +70,7 @@ class OnlineForward {
     double UpdatePsiN(int StateIndex);
     double A2(double kappa);
     double InverseA2(double r);
-    static void InitializeA2Table();
+    void InitializeA2Table();
     static double CalculateA2(double kappa);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
@@ -103,6 +109,7 @@ class OnlineForward {
 
     // Config
     double m_MinEntropy = 0;
+    AudioDescType m_CurrentAudioState;
 
     // Audio
     double m_Sr;
@@ -127,8 +134,8 @@ class OnlineForward {
     static constexpr int A2TablePrecision = 100;
     static constexpr int A2TableMaxKappa = 10;
     static constexpr int A2TableSize = A2TablePrecision * A2TableMaxKappa + 1;
-    static std::array<double, A2TableSize> s_A2Table;
-    static std::once_flag s_A2TableInitFlag;
+    std::array<double, A2TableSize> m_A2Table = {};
+    bool m_A2TableInitialized = false;
     // Cache for the distributions
     std::unordered_map<int, std::vector<double>> m_OccupancyCache;
     std::unordered_map<int, std::vector<double>> m_SurvivorCache;
@@ -156,6 +163,7 @@ class OnlineForward {
 
     // Time
     std::unordered_map<double, PitchTemplateArray> m_PitchTemplates;
+    std::unordered_map<double, std::vector<PitchTemplateEntry>> m_PitchTemplatesPrecomputed;
     std::unordered_map<double, double> m_PitchProbabilityCache;
     int m_PitchProbabilityCacheTau = -1;
     int m_ReverbEnergyCacheTau = -1;
