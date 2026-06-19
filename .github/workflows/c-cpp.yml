@@ -75,28 +75,12 @@ jobs:
                   winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
                   winget install -e --id MillerPuckette.PureData --accept-source-agreements
                   choco install wixtoolset --no-progress -y
-                  tree /F "C:\Program Files\Pd\"
-
-
-
-
                   $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
                   if (Test-Path $wixBin) {
                     "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
                   }
                   python -m pip install --upgrade pip
                   python -m pip install build scikit-build-core cibuildwheel twine nanobind
-
-            - name: Extract version from CMake
-              id: cmake_version
-              shell: bash
-              run: |
-                  VERSION=$(sed -nE 's/.*project\(.*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
-                  NAME=$(sed -nE 's/.*project\([[:space:]]*([^[:space:])]+).*/\1/p' Sources/Wrappers/PureData/CMakeLists.txt)
-                  echo "LIBVERSION=$VERSION" >> $GITHUB_ENV
-                  echo "LIBNAME=$NAME" >> $GITHUB_ENV
-                  echo $VERSION
-                  echo $NAME
 
             # -----------------------
             - name: Build (MacOS)
@@ -112,7 +96,7 @@ jobs:
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="arm64" \
                     -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
                     -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
