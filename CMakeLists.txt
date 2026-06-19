@@ -202,6 +202,9 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                FFTW3                 │
 # ╰──────────────────────────────────────╯
+cpmaddpackage(NAME MIPP GITHUB_REPOSITORY "aff3ct/MIPP" GIT_TAG "master" DOWNLOAD_ONLY YES)
+set(MIPP_INCLUDE_DIRS "${MIPP_SOURCE_DIR}/include")
+
 cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPTIONS
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
