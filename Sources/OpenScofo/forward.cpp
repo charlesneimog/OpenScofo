@@ -12,9 +12,6 @@
 
 namespace OpenScofo {
 
-std::array<double, OnlineForward::A2TableSize> OnlineForward::s_A2Table = {};
-std::once_flag OnlineForward::s_A2TableInitFlag;
-
 /*
     // ──────────────────────────────── REFERENCES ───────────────────────────────────────
 
@@ -74,6 +71,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_dBTreshold = Config.dBTreshold;
 
     m_PitchTemplates.clear();
+    m_PitchTemplatesPrecomputed.clear();
     m_PitchCQTTemplates.clear();
     m_OccupancyCache.clear();
     m_SurvivorCache.clear();
@@ -106,6 +104,7 @@ EventActions OnlineForward::GetCurrentEventActions() {
 void OnlineForward::ResetCaches() {
     // Clear all caches
     m_PitchTemplates.clear();
+    m_PitchTemplatesPrecomputed.clear();
     m_PitchProbabilityCache.clear();
     m_OccupancyCache.clear();
     m_SurvivorCache.clear();
@@ -113,6 +112,7 @@ void OnlineForward::ResetCaches() {
 
     // Rehash/compact the maps to free memory
     m_PitchTemplates.rehash(0);
+    m_PitchTemplatesPrecomputed.rehash(0);
     m_PitchProbabilityCache.rehash(0);
     m_OccupancyCache.rehash(0);
     m_SurvivorCache.rehash(0);
@@ -152,6 +152,7 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
     m_Tau = 0;
+
     m_SyncStrength = m_States[0].SyncStrength;
     m_PhaseCoupling = m_States[0].PhaseCoupling;
 
@@ -178,13 +179,13 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
     double shaped = std::pow(1.0 - f0Norm, pitchDecayCurve);
     double beta = m_MaxHarmonicDecay - shaped * (m_MaxHarmonicDecay - m_MinHarmonicDecay);
 
-    double rootBinFreq = round(Freq / binWidth);
+    double rootBinFreq = std::round(Freq / binWidth);
 
     if (m_PitchTemplates.find(rootBinFreq) != m_PitchTemplates.end()) {
         return;
     }
 
-    std::vector<double> templateBins(m_FFTSize / 2, 1e-24);
+    std::vector<double> templateBins(m_FFTSize / 2, 0.0);
 
     const double sigmaLog = m_PitchTemplateSigma / 12.0;
     const double sigmaConst = std::pow(2.0, sigmaLog) - 1.0;
@@ -233,6 +234,17 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
             val *= invSum;
         }
     }
+
+    std::vector<PitchTemplateEntry> precomputedTemplate;
+    precomputedTemplate.reserve(templateBins.size());
+    for (size_t i = 0; i < templateBins.size(); ++i) {
+        double P = templateBins[i];
+        if (P > 0.0) {
+            precomputedTemplate.push_back({i, P, P * std::log(P)});
+        }
+    }
+
+    m_PitchTemplatesPrecomputed[rootBinFreq] = std::move(precomputedTemplate);
     m_PitchTemplates[rootBinFreq] = std::move(templateBins);
 }
 
@@ -241,6 +253,7 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
 void OnlineForward::UpdateAudioTemplate() {
     int StateSize = (int)m_States.size();
     m_PitchTemplates.clear();
+    m_PitchTemplatesPrecomputed.clear();
 
     for (int h = 0; h < StateSize; h++) {
         if (m_States[h].Type == NOTE || m_States[h].Type == TRILL) {
@@ -257,7 +270,7 @@ void OnlineForward::UpdateAudioTemplate() {
 // GONG 2015 (adapted)
 PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
     BuildPitchTemplate(Freq);
-    double rootBinFreq = round(Freq / (m_Sr / m_FFTSize));
+    double rootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
     return m_PitchTemplates[rootBinFreq];
 }
 
@@ -483,20 +496,20 @@ double OnlineForward::CalculateA2(double kappa) {
 
     double I1 = CYL_BESSEL_I(1, kappa);
     double I0 = CYL_BESSEL_I(0, kappa);
-    if (!std::isfinite(I1) || !std::isfinite(I0) || I0 <= 0.0) {
-        return 1.0 - (1.0 / (2.0 * kappa));
-    }
     return I1 / I0;
 }
 
 // ─────────────────────────────────────
 void OnlineForward::InitializeA2Table() {
-    std::call_once(s_A2TableInitFlag, []() {
-        for (int i = 0; i < A2TableSize; ++i) {
-            double kappa = static_cast<double>(i) / A2TablePrecision;
-            s_A2Table[i] = CalculateA2(kappa);
-        }
-    });
+    if (m_A2TableInitialized) {
+        return;
+    }
+
+    for (int i = 0; i < A2TableSize; ++i) {
+        double kappa = static_cast<double>(i) / A2TablePrecision;
+        m_A2Table[i] = CalculateA2(kappa);
+    }
+    m_A2TableInitialized = true;
 }
 
 // ─────────────────────────────────────
@@ -505,16 +518,16 @@ double OnlineForward::A2(double kappa) {
     InitializeA2Table();
 
     if (kappa <= 0.0) {
-        return s_A2Table.front();
+        return m_A2Table.front();
     }
 
     if (kappa >= A2TableMaxKappa) {
-        return s_A2Table.back();
+        return m_A2Table.back();
     }
 
     int index = static_cast<int>(std::round(kappa * A2TablePrecision));
     index = std::clamp(index, 0, A2TableSize - 1);
-    return s_A2Table[static_cast<size_t>(index)];
+    return m_A2Table[static_cast<size_t>(index)];
 }
 
 // ─────────────────────────────────────
@@ -536,21 +549,21 @@ double OnlineForward::InverseA2(double SyncStrength) {
         return 10.0;
     }
 
-    auto lower = std::lower_bound(s_A2Table.begin(), s_A2Table.end(), SyncStrength);
-    if (lower == s_A2Table.begin()) {
+    auto lower = std::lower_bound(m_A2Table.begin(), m_A2Table.end(), SyncStrength);
+    if (lower == m_A2Table.begin()) {
         m_KappaCache[key] = 0.0;
         return 0.0;
     }
 
-    if (lower == s_A2Table.end()) {
+    if (lower == m_A2Table.end()) {
         m_KappaCache[key] = 10.0;
         return 10.0;
     }
 
-    size_t upperIndex = static_cast<size_t>(std::distance(s_A2Table.begin(), lower));
+    size_t upperIndex = static_cast<size_t>(std::distance(m_A2Table.begin(), lower));
     size_t lowerIndex = upperIndex - 1;
-    double lowerA2 = s_A2Table[lowerIndex];
-    double upperA2 = s_A2Table[upperIndex];
+    double lowerA2 = m_A2Table[lowerIndex];
+    double upperA2 = m_A2Table[upperIndex];
     size_t nearestIndex = (SyncStrength - lowerA2 <= upperA2 - SyncStrength) ? lowerIndex : upperIndex;
     double Kappa = static_cast<double>(nearestIndex) / A2TablePrecision;
     m_KappaCache[key] = Kappa;
@@ -690,7 +703,6 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 
     m_TimeInPrevEvent = 0;
     m_LastTn = m_CurrentStateOnset;
-    printf("PsiN1 %f\n", PsiN1);
 
     return PsiN1;
 }
@@ -720,6 +732,7 @@ void OnlineForward::GetAudioObservations() {
         double sumPitch = 0.0;
         int pitchCount = 0;
 
+        // Audio State
         for (const AudioState &as : state.AudioStates) {
             switch (as.Type) {
             case PITCH: {
@@ -780,8 +793,9 @@ void OnlineForward::GetAudioObservations() {
 
         state.BestObs[bufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
 
-        if (state.Type != REST)
+        if (state.Type != REST) {
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
+        }
     }
 
     m_IsSilence = (m_Desc.SilenceProb > maxSoundEvidence);
@@ -793,31 +807,30 @@ void OnlineForward::GetAudioObservations() {
 // GONG (2015)
 double OnlineForward::GetPitchProbability(double Freq) {
     double KLDiv = 0.0;
-    double RootBinFreq = round(Freq / (m_Sr / m_FFTSize));
-    auto it = m_PitchTemplates.find(RootBinFreq);
-    const PitchTemplateArray &PitchTemplate = it->second;
-    const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
-    const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
 
-    size_t halfFft = static_cast<size_t>(m_FFTSize / 2);
-    size_t bins = std::min(halfFft, PitchTemplate.size());
-    bins = std::min(bins, normSpectralPower.size());
+    double RootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
+    auto it = m_PitchTemplatesPrecomputed.find(RootBinFreq);
+    if (it == m_PitchTemplatesPrecomputed.end())
+        return 0.0;
 
-    for (size_t i = 0; i < bins; i++) {
-        double reverb = (i < reverbSpectralPower.size()) ? reverbSpectralPower[i] : 0.0;
-        double P = PitchTemplate[i] + reverb;
-        double Q = normSpectralPower[i];
-        if (P > 0 && Q > 0) {
-            KLDiv += P * log(P / Q);
-        } else if (P == 0 && Q >= 0) {
-            KLDiv += Q;
+    const auto &PitchTemplate = it->second;
+    const auto &QFrame = m_Desc.SpectralMagnitudeFrameNorm;
+    const size_t qSize = QFrame.size();
+
+    for (const auto &e : PitchTemplate) {
+        if (e.bin >= qSize)
+            break;
+
+        double Q = QFrame[e.bin];
+
+        if (Q > 0.0) {
+            KLDiv += e.p_log_p - e.p * std::log(Q);
         }
     }
 
-    double noise_robustness = 1.0 / (1.0 + m_Desc.StdDev);
-    KLDiv *= noise_robustness;
-    KLDiv = exp(-m_PitchScalingFactor * KLDiv);
-    return KLDiv;
+    KLDiv *= 1.0 / (1.0 + m_Desc.StdDev);
+
+    return std::exp(-m_PitchScalingFactor * KLDiv);
 }
 
 // ─────────────────────────────────────
