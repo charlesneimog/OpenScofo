@@ -331,7 +331,6 @@ elseif(APPLE)
                -fsanitize=address
                -fsanitize=undefined
                -ftrapv
-               -fno-exceptions
                -fstrict-aliasing
                $<$<CONFIG:Debug>:
                -O0
