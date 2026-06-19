@@ -28,8 +28,7 @@ set_target_properties(_OpenScofo PROPERTIES CXX_VISIBILITY_PRESET hidden C_VISIB
 target_compile_options(_OpenScofo PRIVATE -Wno-shadow)
 if(UNIX AND NOT APPLE)
     target_link_options(_OpenScofo PRIVATE "-Wl,--exclude-libs,ALL")
-elseif()
-    # TODO: Need to test
+elseif(LINUX)
     target_link_options(_OpenScofo PRIVATE "-Wl,-exported_symbol,_PyInit__OpenScofo")
 endif()
 
