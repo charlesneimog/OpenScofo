@@ -531,7 +531,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 }
 
 // ─────────────────────────────────────
-void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
+void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Config) {
     MarkovState Event;
 
     TSNode definition = GetField(Node, "definition");
@@ -570,6 +570,9 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node) {
             NewEventAction(ScoreStr, child, Event);
         }
     }
+
+    Event.SyncStrength = Config.SyncStrength;
+    Event.PhaseCoupling = Config.PhaseCoupling;
 
     m_PrevDuration = Event.Duration;
     m_LastOnset = Event.OnsetExpected;
@@ -925,7 +928,7 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
                 spdlog::error("BPM is not defined");
                 return {};
             }
-            NewEvent(ScoreStr, Child);
+            NewEvent(ScoreStr, Child, Config);
         } else if (type == "CONFIG") {
             NewConfig(ScoreStr, Child, Config);
         } else if (type == "LUA") {

@@ -37,7 +37,7 @@ class Score {
     TSNode GetField(TSNode Node, std::string s);
     bool isNumber(std::string str);
 
-    void NewEvent(const std::string &Score, TSNode Event);
+    void NewEvent(const std::string &Score, TSNode Event, Configuration &Config);
     void NewConfig(const std::string &Score, TSNode Node, Configuration &Config);
     void NewEventAction(const std::string &Score, TSNode Node, MarkovState &Event);
 
