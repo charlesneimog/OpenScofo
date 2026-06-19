@@ -4,7 +4,13 @@ project(max_openscofo)
 cpmaddpackage("gh:Cycling74/max-sdk#v8.2.0")
 
 set(C74_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/max")
+set(OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-pretarget.cmake")
+if(APPLE AND OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET
+        "${OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET}"
+        CACHE STRING "Minimum macOS version supported by OpenScofo" FORCE)
+endif()
 
 set("${PROJECT_NAME}_EXTERN_OUTPUT_NAME" "openscofo~")
 
@@ -15,3 +21,12 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_MSP_INCLUDES})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-posttarget.cmake")
+if(APPLE AND OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET
+        "${OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET}"
+        CACHE STRING "Minimum macOS version supported by OpenScofo" FORCE)
+    target_compile_options(${PROJECT_NAME}
+                           PRIVATE "-mmacosx-version-min=${OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET}")
+    target_link_options(${PROJECT_NAME}
+                        PRIVATE "-mmacosx-version-min=${OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET}")
+endif()

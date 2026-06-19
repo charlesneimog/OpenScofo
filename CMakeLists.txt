@@ -1,14 +1,56 @@
 cmake_minimum_required(VERSION 3.30)
 
-if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+set(OPENSCOFO_DEFAULT_MACOS_DEPLOYMENT_TARGET "11.0")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET
-        "13.3"
-        CACHE STRING "Minimum macOS deployment target")
+        "${OPENSCOFO_DEFAULT_MACOS_DEPLOYMENT_TARGET}"
+        CACHE STRING "Minimum macOS version supported by OpenScofo")
 endif()
 
 project(OpenScofo VERSION 0.2.5 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
+
+if(APPLE)
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET
+            "${OPENSCOFO_DEFAULT_MACOS_DEPLOYMENT_TARGET}"
+            CACHE STRING "Minimum macOS version supported by OpenScofo" FORCE)
+    endif()
+    set(OPENSCOFO_MACOS_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
+
+function(openscofo_restore_macos_deployment_target)
+    if(APPLE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET
+            "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}"
+            CACHE STRING "Minimum macOS version supported by OpenScofo" FORCE)
+    endif()
+endfunction()
+
+function(openscofo_add_subdirectory DIR)
+    add_subdirectory("${DIR}")
+    openscofo_restore_macos_deployment_target()
+endfunction()
+
+function(openscofo_enforce_macos_deployment_target TARGET_NAME)
+    if(APPLE AND TARGET "${TARGET_NAME}")
+        openscofo_restore_macos_deployment_target()
+        get_target_property(OPENSCOFO_TARGET_TYPE "${TARGET_NAME}" TYPE)
+        target_compile_options(
+            "${TARGET_NAME}" PRIVATE
+            "-mmacosx-version-min=${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}")
+        if(NOT OPENSCOFO_TARGET_TYPE STREQUAL "STATIC_LIBRARY")
+            target_link_options(
+                "${TARGET_NAME}" PRIVATE
+                "-mmacosx-version-min=${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}")
+        endif()
+        set_target_properties(
+            "${TARGET_NAME}" PROPERTIES
+            XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET
+            "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}")
+    endif()
+endfunction()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,7 +86,8 @@ option(OPENSCOFO_BUILD_SC_PLUGIN "Build SuperCollider Plugin" OFF)
 option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OPENSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
-option(OPENSCOFO_ENABLE_SANITIZERS "Build OpenScofo with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(OPENSCOFO_ENABLE_SANITIZERS
+       "Build OpenScofo with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
@@ -404,56 +447,67 @@ endif()
 # │            Python Module             │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_PY_MODULE AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Python")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Python")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │           PureData Object            │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_PD_OBJECT)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/PureData")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/PureData")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_MAX_OBJECT AND NOT LINUX AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Super Collider            │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_SC_PLUGIN AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/SuperCollider")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │              CSound                  │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_CSOUND_PLUGIN AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/CSound")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/CSound")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            Vamp Obj                  │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_VAMP_PLUGIN AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Vamp")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Vamp")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │            WASM Obj                  │
 # ╰──────────────────────────────────────╯
 if(EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Wasm")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Wasm")
 endif()
 
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_TESTS AND NOT EMSCRIPTEN)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
+    openscofo_add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
+endif()
+
+if(APPLE)
+    openscofo_enforce_macos_deployment_target(OpenScofo)
+    openscofo_enforce_macos_deployment_target(_OpenScofo)
+    openscofo_enforce_macos_deployment_target(max_openscofo)
+    openscofo_enforce_macos_deployment_target(openscofo_tilde)
+    openscofo_enforce_macos_deployment_target(SCOpenScofo)
+    openscofo_enforce_macos_deployment_target(OScofoCSound)
+    openscofo_enforce_macos_deployment_target(VampOScofo)
+    openscofo_enforce_macos_deployment_target(tree-sitter-openscofo)
 endif()
 
 if(LINUX)
