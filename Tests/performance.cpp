@@ -28,7 +28,7 @@ std::vector<double> load_audio_as_wave(const char *path, int &sr, int &ch) {
     for (int i = 0; i < numSamplesPerChannel; i++) {
         for (int c = 0; c < ch; c++) {
             // Scale to match previous int16-based pipeline
-            wave.push_back(audioFile.samples[c][i] * 32768.0);
+            wave.push_back(audioFile.samples[c][i]);
         }
     }
 
