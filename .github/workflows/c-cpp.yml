@@ -18,7 +18,7 @@ jobs:
         env:
             SCCACHE_GHA_ENABLED: "true"
             SCCACHE_CACHE_SIZE: 2G
-            SCCACHE_GHA_VERSION: ${{ matrix.os }}
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}-v2
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             matrix:
@@ -96,12 +96,12 @@ jobs:
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="arm64" \
-                    -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
                     -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
-                    -Ccmake.define.BUILD_ALL=ON \
+                    -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
                     -Ccmake.args="-G Ninja"
 
             # -----------------------
@@ -115,11 +115,11 @@ jobs:
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-                    -Ccmake.define.OSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
                     -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
-                    -Ccmake.define.BUILD_ALL=ON \
+                    -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
                     -Ccmake.args="-G Ninja"
 
             # -----------------------
@@ -139,9 +139,9 @@ jobs:
                     "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
                     "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
                     "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-                    "-Ccmake.define.OSCOFO_BUILD_TESTS=OFF"
+                    "-Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF"
                     "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
-                    "-Ccmake.define.BUILD_ALL=ON"
+                    "-Ccmake.define.OPENSCOFO_BUILD_ALL=ON"
                     "-Ccmake.args=-G Ninja"
                   )
                   python -m build --wheel @buildArgs
@@ -155,8 +155,8 @@ jobs:
                     -DCMAKE_BUILD_TYPE=Release \
                     -DCMAKE_C_COMPILER_LAUNCHER=sccache \
                     -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-                    -DOSCOFO_BUILD_TESTS=OFF \
-                    -DBUILD_ALL=ON
+                    -DOPENSCOFO_BUILD_TESTS=OFF \
+                    -DOPENSCOFO_BUILD_ALL=ON
                   cmake --build build-wasm
             - name: Repair Linux wheels
               if: runner.os == 'Linux'

@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.30)
+
+if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET
+        "13.3"
+        CACHE STRING "Minimum macOS deployment target")
+endif()
+
 project(OpenScofo VERSION 0.2.5 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
@@ -10,7 +17,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 set(TREE_SITTER_VERSION "v0.26.9")
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
@@ -34,8 +40,11 @@ option(OPENSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OPENSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OPENSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
 option(OPENSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
+option(OPENSCOFO_BUILD_SC_PLUGIN "Build SuperCollider Plugin" OFF)
+option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OPENSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
+option(OPENSCOFO_ENABLE_SANITIZERS "Build OpenScofo with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
@@ -328,10 +337,12 @@ elseif(APPLE)
                -Weffc++
                -Winit-self
                -fstack-protector-strong
-               -fsanitize=address
-               -fsanitize=undefined
                -ftrapv
                -fstrict-aliasing
+               $<$<BOOL:${OPENSCOFO_ENABLE_SANITIZERS}>:
+               -fsanitize=address
+               -fsanitize=undefined
+               >
                $<$<CONFIG:Debug>:
                -O0
                -g
@@ -346,6 +357,9 @@ elseif(APPLE)
                >)
 
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto -Wl,-dead_strip >)
+    target_link_options(
+        OpenScofo PUBLIC
+        "$<$<BOOL:${OPENSCOFO_ENABLE_SANITIZERS}>:-fsanitize=address;-fsanitize=undefined>")
 
 else() # Linux (GCC or Clang)
     target_compile_options(
