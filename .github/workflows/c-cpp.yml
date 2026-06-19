@@ -75,7 +75,7 @@ jobs:
                   winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
                   winget install -e --id MillerPuckette.PureData --accept-source-agreements
                   choco install wixtoolset --no-progress -y
-                  tree /F C:\Program Files\Pd\
+                  tree /F "C:\Program Files\Pd\"
 
 
 
