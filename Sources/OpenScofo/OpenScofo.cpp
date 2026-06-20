@@ -454,34 +454,50 @@ bool OpenScofo::ScoreIsLoaded() {
  */
 const char *OpenScofo::GetDescriptionId(Descriptors d) {
     switch (d) {
-    case Descriptors::MFCC:
-        return "mfcc";
-    case Descriptors::MELOGRAM:
-        return "logmel";
-    case Descriptors::RMS:
-        return "rms";
+    case Descriptors::ODSONSET:
+        return "onset";
     case Descriptors::LOUDNESS:
         return "loudness";
+    case Descriptors::DB:
+        return "db";
+    case Descriptors::MAXAMP:
+        return "maxamp";
+    case Descriptors::RMS:
+        return "rms";
     case Descriptors::STDDEV:
         return "stddev";
-    case Descriptors::CHROMA:
-        return "chroma";
+    case Descriptors::MAGNITUDE:
+        return "magnitude";
+    case Descriptors::POWERARRAY:
+        return "power";
     case Descriptors::SILENCEPROB:
         return "silence";
-    case Descriptors::CENTROID:
-        return "centroid";
+    case Descriptors::MFCC:
+        return "mfcc";
+    case Descriptors::CHROMA:
+        return "chroma";
+    case Descriptors::MELOGRAM:
+        return "logmel";
     case Descriptors::ZCR:
         return "zcr";
     case Descriptors::HFR:
         return "hfr";
+    case Descriptors::CENTROID:
+        return "centroid";
     case Descriptors::SPREADHZ:
-        return "spread";
+        return "spreadhz";
+    case Descriptors::SPREADVARIANCE:
+        return "spread_variance";
+    case Descriptors::CREST:
+        return "crest";
     case Descriptors::FLATNESS:
         return "flatness";
     case Descriptors::ENTROPY:
         return "entropy";
     case Descriptors::ROLLOFF:
         return "rolloff";
+    case Descriptors::CENTROIDVEL:
+        return "centroid_velocity";
     case Descriptors::FLUX:
         return "flux";
     case Descriptors::SKEWNESS:
@@ -490,12 +506,16 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
         return "slope";
     case Descriptors::KURTOSIS:
         return "kurtosis";
-    case Descriptors::EXTENDEDTECHNIQUE:
-        return "ext";
-    case Descriptors::ODSONSET:
-        return "onset";
+    case Descriptors::IRREGULARITY:
+        return "irregularity";
+    case Descriptors::HARMONICITY:
+        return "harmonicity";
     case Descriptors::YIN:
         return "yin";
+    case Descriptors::YINCONFIDENCE:
+        return "yin_confidence";
+    case Descriptors::EXTENDEDTECHNIQUE:
+        return "ext";
     case Descriptors::ONNX:
         return "onnx";
     default:
@@ -522,6 +542,14 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::RMS;
     } else if (strcmp(s, "loudness") == 0) {
         return Descriptors::LOUDNESS;
+    } else if (strcmp(s, "db") == 0) {
+        return Descriptors::DB;
+    } else if (strcmp(s, "maxamp") == 0 || strcmp(s, "max_amp") == 0) {
+        return Descriptors::MAXAMP;
+    } else if (strcmp(s, "magnitude") == 0) {
+        return Descriptors::MAGNITUDE;
+    } else if (strcmp(s, "power") == 0 || strcmp(s, "powerarray") == 0) {
+        return Descriptors::POWERARRAY;
     } else if (strcmp(s, "stddev") == 0) {
         return Descriptors::STDDEV;
     } else if (strcmp(s, "chroma") == 0) {
@@ -536,8 +564,12 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::ZCR;
     } else if (strcmp(s, "hfr") == 0) {
         return Descriptors::HFR;
-    } else if (strcmp(s, "spread") == 0) {
+    } else if (strcmp(s, "spread") == 0 || strcmp(s, "spreadhz") == 0 || strcmp(s, "spread_hz") == 0) {
         return Descriptors::SPREADHZ;
+    } else if (strcmp(s, "spread_variance") == 0) {
+        return Descriptors::SPREADVARIANCE;
+    } else if (strcmp(s, "crest") == 0) {
+        return Descriptors::CREST;
     } else if (strcmp(s, "flatness") == 0) {
         return Descriptors::FLATNESS;
     } else if (strcmp(s, "entropy") == 0) {
@@ -558,10 +590,10 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::ODSONSET;
     } else if (strcmp(s, "irregularity") == 0) {
         return Descriptors::IRREGULARITY;
-    } else if (strcmp(s, "kurtosis") == 0) {
-        return Descriptors::KURTOSIS;
     } else if (strcmp(s, "yin") == 0) {
         return Descriptors::YIN;
+    } else if (strcmp(s, "yin_confidence") == 0 || strcmp(s, "pitch_confidence") == 0) {
+        return Descriptors::YINCONFIDENCE;
     } else if (strcmp(s, "onnx") == 0) {
         return Descriptors::ONNX;
     } else {
