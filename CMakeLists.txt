@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 
-set(OPENSCOFO_DEFAULT_MACOS_DEPLOYMENT_TARGET "11.0")
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET
-        "${OPENSCOFO_DEFAULT_MACOS_DEPLOYMENT_TARGET}"
-        CACHE STRING "Minimum macOS version supported by OpenScofo")
-endif()
+set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3")
 
 project(OpenScofo VERSION 0.2.5 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
