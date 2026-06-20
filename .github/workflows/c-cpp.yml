@@ -34,7 +34,7 @@ jobs:
             - name: Setup Python
               uses: actions/setup-python@v6
               with:
-                  python-version: "3.11"
+                  python-version: "3.12"
             - name: Setup sccache
               uses: mozilla-actions/sccache-action@v0.0.9
             - name: Setup Emscripten
@@ -115,7 +115,6 @@ jobs:
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
-                    -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \

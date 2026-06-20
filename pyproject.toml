@@ -4,7 +4,7 @@ dynamic = ["version"]
 authors = [{ name = "Charles K. Neimog", email = "charlesneimog@outlook.com" }]
 description = "OpenScofo is an open-source score-following system specifically designed for contemporary music."
 readme = "README.md"
-requires-python = ">=3.10, <3.15"
+requires-python = ">=3.12, <3.15"
 dependencies = [
     "numpy",
     "scipy",
@@ -21,7 +21,7 @@ build-backend = "scikit_build_core.build"
 [tool.scikit-build]
 build-dir = "build"
 wheel.packages = ["OpenScofo"]
-wheel.py-api = "cp310"
+wheel.py-api = "cp312"
 cmake.args = [
   "-DPD_LIB_DIR=./OpenScofo",
   "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",

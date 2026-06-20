@@ -32,6 +32,7 @@ option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_USE_BESSEL "Use Bessel function to calculate Kappa" ON)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS
