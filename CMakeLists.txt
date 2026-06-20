@@ -24,7 +24,7 @@ option(OPENSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
 option(OPENSCOFO_BUILD_SC_PLUGIN "Build SuperCollider Plugin" OFF)
 option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
-option(OPENSCOFO_BUILD_ALL "Build All OScofo Tests and Wrappers" ON)
+option(OPENSCOFO_BUILD_ALL "Build All OpenScofo Tests and Wrappers" ON)
 option(OPENSCOFO_ENABLE_SANITIZERS
        "Build OpenScofo with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
@@ -92,7 +92,7 @@ set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
 set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
 
-set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/OScofo Language/tree-sitter.json")
+set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/OpenScofo Language/tree-sitter.json")
 set(GRAMMAR_JSON_BUILD "${GRAMMAR_BUILD_DIR}/tree-sitter.json")
 
 set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
@@ -132,7 +132,7 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OPENSCOFO_LANGUAGE})
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
         DEPENDS "${GRAMMAR_JS_SRC}"
-        COMMENT "Generating Tree-sitter parser for OScofo Online Editor and WASM..."
+        COMMENT "Generating Tree-sitter parser for OpenScofo Online Editor and WASM..."
         VERBATIM)
 
     set(TS_URL

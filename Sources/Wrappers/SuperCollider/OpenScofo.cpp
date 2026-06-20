@@ -47,8 +47,8 @@ struct ScOpenScofo : public SCUnit {
         m_FFTSize = std::max(1, static_cast<int>(fftSize));
         m_HopSize = std::max(1, static_cast<int>(hopSize));
         m_InBuffer.assign(m_FFTSize, 0.0);
-        m_OScofo = new OpenScofo::OpenScofo(sampleRate, fftSize, hopSize);
-        m_OScofo->SetErrorCallback(OpenScofo_error_callback, nullptr);
+        m_OpenScofo = new OpenScofo::OpenScofo(sampleRate, fftSize, hopSize);
+        m_OpenScofo->SetErrorCallback(OpenScofo_error_callback, nullptr);
 
         if (isAudioRateIn(0)) {
             set_calc_function<ScOpenScofo, &ScOpenScofo::next_a>();
@@ -57,12 +57,12 @@ struct ScOpenScofo : public SCUnit {
     }
 
     ~ScOpenScofo() {
-        delete m_OScofo;
+        delete m_OpenScofo;
     }
 
     void LoadScore(const char *path) {
-        if (m_OScofo) {
-            bool ok = m_OScofo->LoadScore(path);
+        if (m_OpenScofo) {
+            bool ok = m_OpenScofo->LoadScore(path);
             if (!ok) {
                 return;
             }
@@ -75,7 +75,7 @@ struct ScOpenScofo : public SCUnit {
     }
 
     bool LoadOnnxModel(const char *modelPath, const char *descriptorIdsCsv) {
-        if (!m_OScofo || !modelPath || !descriptorIdsCsv) {
+        if (!m_OpenScofo || !modelPath || !descriptorIdsCsv) {
             return false;
         }
 
@@ -99,7 +99,7 @@ struct ScOpenScofo : public SCUnit {
 
             if (begin < end) {
                 std::string descriptorId(begin, end);
-                const auto descriptor = m_OScofo->GetDescriptorsEnum(descriptorId.c_str());
+                const auto descriptor = m_OpenScofo->GetDescriptorsEnum(descriptorId.c_str());
                 if (descriptor != OpenScofo::Descriptors::INVALID) {
                     descriptors.push_back(descriptor);
                 }
@@ -112,19 +112,19 @@ struct ScOpenScofo : public SCUnit {
             return false;
         }
 
-        m_OScofo->LoadONNXModel(modelPath, descriptors);
+        m_OpenScofo->LoadONNXModel(modelPath, descriptors);
         return true;
     }
 
     int GetEventIndex() {
-        if (m_OScofo) {
-            return m_OScofo->GetCurrentScorePosition();
+        if (m_OpenScofo) {
+            return m_OpenScofo->GetCurrentScorePosition();
         }
         return -1;
     }
 
   private:
-    OpenScofo::OpenScofo *m_OScofo = nullptr;
+    OpenScofo::OpenScofo *m_OpenScofo = nullptr;
     int m_FFTSize = 2048;
     int m_HopSize = 512;
     bool m_FollowScore = true;
@@ -134,15 +134,15 @@ struct ScOpenScofo : public SCUnit {
     int m_LastEventIndex = -1;
 
     void EmitCurrentEventIfChanged() {
-        if (!m_EmitEventNotifications || !m_OScofo) {
+        if (!m_EmitEventNotifications || !m_OpenScofo) {
             return;
         }
 
-        if (!m_FollowScore || !m_OScofo->ScoreIsLoaded()) {
+        if (!m_FollowScore || !m_OpenScofo->ScoreIsLoaded()) {
             return;
         }
 
-        const int currentEvent = m_OScofo->GetCurrentScorePosition();
+        const int currentEvent = m_OpenScofo->GetCurrentScorePosition();
         if (currentEvent == m_LastEventIndex) {
             return;
         }
@@ -156,7 +156,7 @@ struct ScOpenScofo : public SCUnit {
         (void)inNumSamples;
         int n = mWorld->mFullRate.mBufLength;
         const float *inBuf = in(0);
-        bool ok = m_OScofo->ProcessBlock(inBuf, n);
+        bool ok = m_OpenScofo->ProcessBlock(inBuf, n);
         if (!ok) {
             // set fail
         }
