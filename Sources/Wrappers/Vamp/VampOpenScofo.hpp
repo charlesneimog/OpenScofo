@@ -54,5 +54,5 @@ class VampOpenScofo : public Vamp::Plugin {
     std::string m_currentProgram;
     int m_selectedScoreIndex;
 
-    OpenScofo::OpenScofo *m_OScofo;
+    OpenScofo::OpenScofo *m_OpenScofo;
 };

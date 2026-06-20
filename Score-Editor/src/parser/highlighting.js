@@ -191,8 +191,8 @@ export function runTreeQuery(_, startRow, endRow) {
         const marks = this.codeEditor.getAllMarks();
         marks.forEach((m) => m.clear());
 
-        if (this.tree && this.OScofoQuery) {
-            const captures = this.OScofoQuery.captures(this.tree.rootNode, {
+        if (this.tree && this.OpenScofoQuery) {
+            const captures = this.OpenScofoQuery.captures(this.tree.rootNode, {
                 startPosition: { row: startRow, column: 0 },
                 endPosition: { row: endRow, column: 0 },
             });

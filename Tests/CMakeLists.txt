@@ -5,7 +5,7 @@ if (NOT APPLE)
     # Executable for the test
     add_executable(main_class "${CMAKE_CURRENT_SOURCE_DIR}/test_openscofo.cpp")
     target_link_libraries(main_class PRIVATE OpenScofo GTest::gtest_main)
-    add_test(NAME OScofo COMMAND main_class)
+    add_test(NAME OpenScofo COMMAND main_class)
 
     add_executable(score_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_score.cpp")
     target_link_libraries(score_tests PRIVATE OpenScofo GTest::gtest_main)

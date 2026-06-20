@@ -19,7 +19,7 @@ export async function initParser() {
     const luaParser = await Language.load(this.parserLuaWasm);
     this.LuaParser.setLanguage(luaParser);
 
-    this.OScofoQuery = new Query(scoreScofo, this.OpenScofoHighlightQuery);
+    this.OpenScofoQuery = new Query(scoreScofo, this.OpenScofoHighlightQuery);
 
     if (!this.LuaStringQuery) {
         await this.fetchTextFile("highlight/lua.scm");

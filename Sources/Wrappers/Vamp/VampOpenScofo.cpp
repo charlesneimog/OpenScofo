@@ -4,70 +4,49 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
-#include <sstream>
 
-namespace {
-
-std::string trim(const std::string &text) {
-    size_t start = 0;
-    while (start < text.size() && std::isspace(static_cast<unsigned char>(text[start]))) {
-        start++;
-    }
-
-    size_t end = text.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
-        end--;
-    }
-
-    return text.substr(start, end - start);
-}
-
-std::vector<std::string> splitSemicolonList(const std::string &text) {
-    std::vector<std::string> out;
-    std::stringstream ss(text);
-    std::string item;
-    while (std::getline(ss, item, ';')) {
-        std::string cleaned = trim(item);
-        if (!cleaned.empty()) {
-            out.push_back(cleaned);
-        }
-    }
-    return out;
-}
-
-} // namespace
-
-// ─────────────────────────────────────
 VampOpenScofo::VampOpenScofo(float inputSampleRate)
-    : Plugin(inputSampleRate), m_blockSize(0), m_stepSize(0), m_selectedScoreIndex(0), m_OScofo(nullptr) {
-    RefreshScorePathsFromEnv();
+    : Plugin(inputSampleRate), m_blockSize(0), m_stepSize(0), m_selectedScoreIndex(0), m_OpenScofo(nullptr) {
+
+    //
 }
 
 // ─────────────────────────────────────
 VampOpenScofo::~VampOpenScofo() {
-    delete m_OScofo;
+    delete m_OpenScofo;
 }
 
 // ─────────────────────────────────────
 std::string VampOpenScofo::getIdentifier() const {
     return "openscorefollower";
 }
+
+// ─────────────────────────────────────
 std::string VampOpenScofo::getName() const {
-    return "Open Score Follower";
+    return "OpenSource Score Follower";
 }
+
+// ─────────────────────────────────────
 std::string VampOpenScofo::getDescription() const {
-    return "OpenScofo Score Follower";
+    return "A Machine Listening System for Contemporary Music (just descriptors work on vamp plugins)";
 }
+
+// ─────────────────────────────────────
 std::string VampOpenScofo::getType() const {
     return "Score Following";
 }
+
+// ─────────────────────────────────────
 std::string VampOpenScofo::getMaker() const {
     return "Charles K. Neimog";
 }
+
+// ─────────────────────────────────────
 int VampOpenScofo::getPluginVersion() const {
     return 1;
 }
 
+// ─────────────────────────────────────
 std::string VampOpenScofo::getCopyright() const {
     return "GPL3";
 }
@@ -116,6 +95,7 @@ Vamp::Plugin::ParameterList VampOpenScofo::getParameterDescriptors() const {
     return list;
 }
 
+// ─────────────────────────────────────
 float VampOpenScofo::getParameter(std::string identifier) const {
     if (identifier == "score_path") {
         return float(m_selectedScoreIndex);
@@ -124,6 +104,7 @@ float VampOpenScofo::getParameter(std::string identifier) const {
     return 0.f;
 }
 
+// ─────────────────────────────────────
 void VampOpenScofo::setParameter(std::string identifier, float value) {
     if (identifier != "score_path")
         return;
@@ -137,11 +118,12 @@ void VampOpenScofo::setParameter(std::string identifier, float value) {
     idx = std::max(0, std::min(idx, int(m_scorePaths.size() - 1)));
     m_selectedScoreIndex = idx;
 
-    if (m_OScofo) {
+    if (m_OpenScofo) {
         LoadScoreAtIndex(m_selectedScoreIndex);
     }
 }
 
+// ─────────────────────────────────────
 Vamp::Plugin::ProgramList VampOpenScofo::getPrograms() const {
     ProgramList list;
     for (const std::string &path : m_scorePaths) {
@@ -150,10 +132,12 @@ Vamp::Plugin::ProgramList VampOpenScofo::getPrograms() const {
     return list;
 }
 
+// ─────────────────────────────────────
 std::string VampOpenScofo::getCurrentProgram() const {
     return m_currentProgram;
 }
 
+// ─────────────────────────────────────
 void VampOpenScofo::selectProgram(std::string name) {
     if (name.empty())
         return;
@@ -166,7 +150,7 @@ void VampOpenScofo::selectProgram(std::string name) {
         m_selectedScoreIndex = int(std::distance(m_scorePaths.begin(), it));
     }
 
-    if (m_OScofo && m_OScofo->LoadScore(name)) {
+    if (m_OpenScofo && m_OpenScofo->LoadScore(name)) {
         m_currentProgram = name;
     }
 }
@@ -178,14 +162,15 @@ Vamp::Plugin::FeatureSet VampOpenScofo::getRemainingFeatures() {
 
 // ─────────────────────────────────────
 bool VampOpenScofo::initialise(size_t channels, size_t stepSize, size_t blockSize) {
-    if (channels != 1)
+    if (channels != 1) {
         return false;
+    }
 
     m_blockSize = blockSize;
     m_stepSize = stepSize;
 
-    delete m_OScofo;
-    m_OScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_blockSize);
+    delete m_OpenScofo;
+    m_OpenScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_blockSize);
 
     if (!m_scorePaths.empty()) {
         LoadScoreAtIndex(m_selectedScoreIndex);
@@ -200,40 +185,18 @@ void VampOpenScofo::reset() {
 
 // ─────────────────────────────────────
 void VampOpenScofo::RefreshScorePathsFromEnv() {
-    m_scorePaths.clear();
-
-    const char *singlePath = std::getenv("OPENSCOFO_VAMP_SCORE_PATH");
-    if (singlePath && *singlePath) {
-        std::string path = trim(std::string(singlePath));
-        if (!path.empty()) {
-            m_scorePaths.push_back(path);
-            m_selectedScoreIndex = 0;
-            return;
-        }
-    }
-
-    const char *env = std::getenv("OPENSCOFO_VAMP_SCORE_PATHS");
-    if (!env || !*env) {
-        m_selectedScoreIndex = 0;
-        return;
-    }
-
-    m_scorePaths = splitSemicolonList(env);
-    if (m_scorePaths.empty() || m_selectedScoreIndex >= int(m_scorePaths.size())) {
-        m_selectedScoreIndex = 0;
-    }
 }
 
 // ─────────────────────────────────────
 bool VampOpenScofo::LoadScoreAtIndex(int index) {
-    if (!m_OScofo)
+    if (!m_OpenScofo)
         return false;
 
     if (index < 0 || index >= int(m_scorePaths.size()))
         return false;
 
     const std::string &scorePath = m_scorePaths[size_t(index)];
-    if (!m_OScofo->LoadScore(scorePath))
+    if (!m_OpenScofo->LoadScore(scorePath))
         return false;
 
     m_currentProgram = scorePath;
@@ -244,10 +207,10 @@ bool VampOpenScofo::LoadScoreAtIndex(int index) {
 Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers, Vamp::RealTime) {
     FeatureSet fs;
 
-    bool ok = m_OScofo->ProcessBlock(inputBuffers[0], m_blockSize);
+    bool ok = m_OpenScofo->ProcessBlock(inputBuffers[0], m_blockSize);
     if (!ok) {
     }
-    OpenScofo::Description Desc = m_OScofo->GetDescription();
+    OpenScofo::Description Desc = m_OpenScofo->GetDescription();
 
     // lambda
     auto pushScalar = [&](int idx, double value) {
@@ -335,7 +298,6 @@ Vamp::Plugin::OutputList VampOpenScofo::getOutputDescriptors() const {
     list.push_back(makeScalar("onset", "Onset"));
     list.push_back(makeScalar("silence", "Silence"));
     list.push_back(makeScalar("ext", "Extended Technique Probability"));
-
     list.push_back(makeScalar("max_amp", "Max Amplitude"));
     list.push_back(makeScalar("loudness", "Loudness"));
     list.push_back(makeScalar("flux", "Spectral Flux"));
@@ -345,16 +307,13 @@ Vamp::Plugin::OutputList VampOpenScofo::getOutputDescriptors() const {
     list.push_back(makeScalar("spreadhz", "Spectral Spread Hz (librosa)"));
     list.push_back(makeScalar("spread_variance", "Spectral Spread Variance (Essentia)"));
     list.push_back(makeScalar("flatness", "Spectral Flatness"));
-
     list.push_back(makeScalar("centroid_velocity", "Centroid Velocity"));
-
     list.push_back(makeScalar("hfr", "High Frequency Ratio"));
     list.push_back(makeScalar("harmonicity", "Harmonicity"));
     list.push_back(makeScalar("zcr", "Zero Crossing Rate"));
     list.push_back(makeScalar("stddev", "Ampltiude Standard Deviation"));
-    list.push_back(makeScalar("pitch", "Pitch"));
-    list.push_back(makeScalar("pitch_confidence", "Pitch Confidence"));
-
+    // list.push_back(makeScalar("pitch", "Pitch"));
+    // list.push_back(makeScalar("pitch_confidence", "Pitch Confidence"));
     list.push_back(makeScalar("db", "dB"));
     list.push_back(makeScalar("rms", "RMS"));
 
