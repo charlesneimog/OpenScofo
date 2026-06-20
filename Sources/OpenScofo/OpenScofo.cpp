@@ -909,11 +909,11 @@ template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffe
     std::copy(m_InBuffer.begin() + n, m_InBuffer.end(), m_InBuffer.begin());
     std::transform(AudioBuffer, AudioBuffer + n, m_InBuffer.end() - n, [](T x) { return static_cast<double>(x); });
 
-    if (m_BlockIndex != m_Config.HOPSize) {
+    if (m_BlockIndex < m_Config.HOPSize) {
         return true;
     }
 
-    m_BlockIndex = 0;
+    m_BlockIndex -= m_Config.HOPSize;
 
     switch (m_Mode) {
     case SCOREFOLLOWER:

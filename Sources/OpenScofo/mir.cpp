@@ -1139,7 +1139,7 @@ void MIR::SpectralChromaInit() {
 
     const int chromaShift = 3 * (m_Config.ChromaSize / 12);
     if (chromaShift > 0 && chromaShift < m_Config.ChromaSize) {
-        Matrix rolled(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
+        std::vector<std::vector<double>> rolled(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
         for (int chroma = 0; chroma < m_Config.ChromaSize; ++chroma) {
             rolled[chroma] = m_ChromaFilter[(chroma + chromaShift) % m_Config.ChromaSize];
         }

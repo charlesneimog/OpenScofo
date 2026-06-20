@@ -23,9 +23,6 @@ namespace OpenScofo {
 
 namespace fs = std::filesystem;
 
-using Spectrum = std::vector<std::complex<double>>;
-using Matrix = std::vector<std::vector<double>>; // row-major: rows x cols
-
 // ╭─────────────────────────────────────╮
 // │     Music Information Retrieval     │
 // ╰─────────────────────────────────────╯
@@ -111,7 +108,7 @@ class MIR {
     std::vector<std::pair<int, int>> m_MFCCActiveBins;
 
     // Chroma
-    Matrix m_ChromaFilter;
+    std::vector<std::vector<double>> m_ChromaFilter;
     std::vector<double> m_ZCRScratch;
 
     // Machine Learning
