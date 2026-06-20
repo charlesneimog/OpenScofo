@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -69,6 +70,18 @@ def short_hash(text: str) -> str:
 
 def escape_attr(value: str) -> str:
     return escape(value, {'"': "&quot;", "'": "&apos;"})
+
+
+def normalize_msi_version(version: str) -> str:
+    parts = re.findall(r"\d+", version)
+    if not parts:
+        return "0.0.0"
+
+    numeric = [str(min(int(part), 65534)) for part in parts[:3]]
+    while len(numeric) < 3:
+        numeric.append("0")
+
+    return ".".join(numeric)
 
 
 def to_wix_path(path: Path) -> str:
@@ -585,7 +598,7 @@ def main() -> int:
         path=wxs_path,
         package_name=args.package_name,
         manufacturer=args.manufacturer,
-        version=args.version,
+        version=normalize_msi_version(args.version),
         upgrade_code=args.upgrade_code,
         arch=args.arch,
         built_components=built_components,
