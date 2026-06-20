@@ -2,6 +2,7 @@
 s.waitForBoot {
     var threshold = 0.45;
     ~lastHfr = -1.0;
+    ~analysisBus = Bus.audio(s, 1);
 
     OSCdef(\oscofoHfr, { |msg|
         var hfr = msg[3].asFloat;
@@ -9,27 +10,28 @@ s.waitForBoot {
             ~lastHfr = hfr;
             ("Bright sound detected. hfr=" ++ hfr.round(0.001)).postln;
         };
-    }, '/oscofo/descriptor/hfr');
+    }, '/oscofo/descriptor/hfr', s.addr);
 
-    SynthDef(\oscofo_descriptors_in, {
-        var in = SoundIn.ar(0);
-        var scofo = OpenScofo.kr(
-            sampleRate: SampleRate.ir,
-            fftSize: 2048,
-            hopSize: 512,
-            in: in
-        );
+    SynthDef(\oscofo_mic_input, { |analysisBus|
+        Out.ar(analysisBus, SoundIn.ar(0));
         Out.ar(0, Silent.ar(2));
     }).add;
+
     s.sync;
 
-    ~oscofoSynth = Synth(\oscofo_descriptors_in);
-    OpenScofo.setFollowScore(~oscofoSynth, false);
+    ~micSynth = Synth(\oscofo_mic_input, [\analysisBus, ~analysisBus]);
+    ~oscofo = OpenScofo.new(
+        scorePath: nil,
+        inBus: ~analysisBus,
+        sampleRate: s.sampleRate,
+        eventNotifications: false
+    );
+    ~oscofo.setFollowScore(false);
 
     ~descriptorPoll = Routine {
         loop {
-            OpenScofo.getDescriptor(~oscofoSynth, "hfr");
-            OpenScofo.getDescriptor(~oscofoSynth, "zcr");
+            ~oscofo.getDescriptor("hfr");
+            ~oscofo.getDescriptor("zcr");
             0.05.wait;
         }
     }.play(SystemClock);
@@ -37,7 +39,9 @@ s.waitForBoot {
     CmdPeriod.doOnce({
         if(~descriptorPoll.notNil) { ~descriptorPoll.stop; };
         OSCdef(\oscofoHfr).free;
-        if(~oscofoSynth.notNil) { ~oscofoSynth.free; };
+        if(~oscofo.notNil) { ~oscofo.free; };
+        if(~micSynth.notNil) { ~micSynth.free; };
+        if(~analysisBus.notNil) { ~analysisBus.free; };
     });
 };
 )

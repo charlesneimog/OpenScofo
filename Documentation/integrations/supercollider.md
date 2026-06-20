@@ -9,19 +9,27 @@
 ## Syntax
 
 ```supercollider
-OpenScofo.ar(in, sampleRate, fftSize, hopSize)
+~oscofo = OpenScofo.new(
+    scorePath: "/path/to/score.txt",
+    inBus: ~analysisBus,
+    sampleRate: s.sampleRate
+);
 ```
 
 ## Description
 
-The `OpenScofo` UGen runs entirely on the server (scsynth) and accepts commands from the client (sclang) to load scores, extract specific audio descriptors, or load ONNX models. Because descriptor arrays (like MFCCs) and string paths cannot be easily output as standard audio/control signals, this UGen heavily utilizes SuperCollider's `UnitCmd` system to receive instructions and `SendReply` to send data back to the client asynchronously.
+`OpenScofo` is a client-side SuperCollider object that owns one server-side `OpenScofoUGen` synth. Each `OpenScofo.new(...)` call creates an independent native OpenScofo instance, so different scores and analysis settings can run at the same time. Descriptor arrays (like MFCCs) and string paths cannot be regular audio/control signals, so the wrapper uses SuperCollider's `UnitCmd` system internally and receives asynchronous `SendReply` OSC messages from the server.
 
 ## Initialization (Inputs)
 
-* **`in`** *(Audio-rate)*: The input audio signal to be analyzed.
+* **`scorePath`** *(String or nil)*: The score file loaded during initialization. Pass `nil` for descriptor-only use.
+* **`inBus`** *(Audio bus, Default: 0)*: The mono audio bus to analyze.
+* **`outBus`** *(Audio bus, Default: 0)*: A silent output bus used by the internal synth.
 * **`sampleRate`** *(Float, Default: 48000.0)*: The expected sample rate.
-* **`fftSize`** *(Float, Default: 2048.0)*: The size of the FFT window.
-* **`hopSize`** *(Float, Default: 512.0)*: The hop size for analysis blocks.
+* **`eventNotifications`** *(Boolean, Default: true)*: Enables automatic current-event replies.
+* **`eventAction`** *(Function or nil)*: Optional callback receiving `(eventIndex, msg)` whenever `/oscofo/currentEvent` is emitted.
+
+`FFTSIZE` and `HOPSIZE` are read from the score file. They are not SuperCollider constructor arguments.
 
 !!! warning "Warning"
     The UGen currently outputs a silent audio signal (`0.0`) and is used purely for its side-effects (analysis and OSC replies).
@@ -30,9 +38,9 @@ The `OpenScofo` UGen runs entirely on the server (scsynth) and accepts commands 
 
 ## Commands (Client to Server)
 
-You communicate with the `OpenScofo` UGen using `Node.set` or `Synth.cmd`.
+You communicate with an `OpenScofo` instance using its methods.
 
-### `parseScore`
+### `loadScore` / `parseScore`
 Loads a text-based score file for the follower.
 
 * **Args:** `path` (String)
@@ -40,12 +48,12 @@ Loads a text-based score file for the follower.
 ### `setFollowScore`
 Enables or disables the score following engine.
 
-* **Args:** `follow` (Integer: 1 for true, 0 for false)
+* **Args:** `follow` (Boolean)
 
 ### `setEventNotifications`
 Enables or disables automatic OSC replies whenever the current score event changes.
 
-* **Args:** `enabled` (Integer: 1 for true, 0 for false)
+* **Args:** `enabled` (Boolean)
 
 ### `getCurrentEvent`
 Requests the current event index from the score follower. The server will reply with an OSC message to `/oscofo/currentEvent`.
@@ -64,6 +72,24 @@ Loads a custom ONNX machine learning model for advanced descriptor with trained 
 * **Args:** 
     1. `modelPath` (String)
     2. `descriptorIdsCsv` (String: A comma-separated list of descriptor IDs expected by the model).
+
+### `listen`
+
+Registers a SuperCollider listener for score `sendto` actions. A score action such as:
+
+```text
+sendto delay [1 0.5 250 0.4]
+```
+
+is delivered to `/OpenScofo/delay` and can be handled with:
+
+```supercollider
+~oscofo.listen("delay", { |args, msg|
+    args.postln;
+});
+```
+
+SuperCollider action messages are float-only. If a `sendto` action contains a string or symbol argument, the wrapper prints a warning and does not send that action. If a receiver has no registered listener, the wrapper also prints a warning.
 
 ---
 
@@ -89,24 +115,23 @@ You must set up `OSCFunc` or `OSCdef` listeners in sclang to receive data from t
 
 ```supercollider
 (
-// 1. Setup the OSC listener for event updates
-OSCdef(\eventTracker, { |msg|
-    var eventIndex = msg[3];
-    "Current Event Index: %".format(eventIndex).postln;
-}, '/oscofo/currentEvent');
+~analysisBus = Bus.audio(s, 1);
 
-// 2. Boot the Synth
-x = {
+SynthDef(\analysisInput, { |analysisBus|
     var sig = SoundIn.ar(0);
-    OpenScofo.ar(sig, 48000, 2048, 512);
-}.play;
+    Out.ar(analysisBus, sig);
+}).add;
+
+s.sync;
+
+~input = Synth(\analysisInput, [\analysisBus, ~analysisBus]);
+~oscofo = OpenScofo.new(
+    scorePath: "/path/to/my/score.txt",
+    inBus: ~analysisBus,
+    sampleRate: s.sampleRate,
+    eventAction: { |eventIndex| "Current Event Index: %".format(eventIndex).postln; }
+);
 )
-
-// 3. Send commands to the UGen
-x.command("parseScore", "/path/to/my/score.txt");
-x.command("setFollowScore", 1);
-x.command("setEventNotifications", 1); // Start receiving automatic updates
-
 ```
 
 ### 2. Requesting Audio Descriptors (e.g., MFCC)
@@ -120,17 +145,22 @@ OSCdef(\mfccTracker, { |msg|
     "MFCCs: %".format(mfccValues).postln;
 }, '/oscofo/descriptor/mfcc');
 
-// 2. Boot the Synth
-x = {
-    var sig = SoundIn.ar(0);
-    OpenScofo.ar(sig, 48000, 2048, 512);
-}.play;
-)
+~analysisBus = Bus.audio(s, 1);
 
-// 3. Request the descriptor (You would typically put this in a Routine/Task)
+SynthDef(\analysisInput, { |analysisBus|
+    var sig = SoundIn.ar(0);
+    Out.ar(analysisBus, sig);
+}).add;
+
+s.sync;
+
+~input = Synth(\analysisInput, [\analysisBus, ~analysisBus]);
+~oscofo = OpenScofo.new(nil, inBus: ~analysisBus, sampleRate: s.sampleRate, eventNotifications: false);
+~oscofo.setFollowScore(false);
+
 Routine({
     loop {
-        x.command("getDescriptor", "mfcc");
+        ~oscofo.getDescriptor("mfcc");
         0.1.wait; // Request 10 times a second
     }
 }).play;

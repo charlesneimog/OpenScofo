@@ -32,4 +32,4 @@ cmake.args = [
 provider = "scikit_build_core.metadata.regex"
 input = "CMakeLists.txt"
 regex = 'project\(OpenScofo[^\)]*VERSION\s+([0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9\.]+)?)'
-result = "{0}a3"
+result = "{0}a1"
