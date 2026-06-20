@@ -206,6 +206,9 @@ endif()
 cpmaddpackage(NAME MIPP GITHUB_REPOSITORY "aff3ct/MIPP" GIT_TAG "master" DOWNLOAD_ONLY YES)
 set(MIPP_INCLUDE_DIRS "${MIPP_SOURCE_DIR}/include")
 
+if(WIN32)
+    set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Do not link libm on Windows" FORCE)
+endif()
 cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPTIONS
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
@@ -312,8 +315,6 @@ elseif(WIN32)
                -ffunction-sections
                -fdata-sections
                >)
-
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto=auto -Wl,--gc-sections -s >)
 
 elseif(APPLE)
     find_package(Boost REQUIRED)
