@@ -73,35 +73,21 @@ function renderReleaseTable(data, assetName) {
     if (filteredAssets.length === 0) return;
 
     const table = document.createElement("table");
-    if (assetName === "All") {
-        table.style.width = "80%";
-    } else {
-        table.style.width = "50%";
-    }
+    table.style.display = "table";
+    table.style.width = "36rem";
+    table.style.maxWidth = "100%";
     table.style.borderCollapse = "collapse";
     table.style.textAlign = "center";
     table.style.tableLayout = "fixed";
 
     const thead = document.createElement("thead");
-
-    if (assetName === "All") {
-        thead.innerHTML = `
+    thead.innerHTML = `
         <tr>
-            <th style="width: 20%;">Enviroment</th>
-            <th style="width: 25%;">OS</th>
-            <th style="width: 5%;">Version</th>
-            <th style="width: 20%;">Download</th>
-        </tr>
-      `;
-    } else {
-        thead.innerHTML = `
-        <tr>
-            <th style="width: 30%;">OS</th>
+            <th style="width: 35%;">OS</th>
             <th style="width: 30%;">Version</th>
-            <th style="width: 40%;">Download</th>
+            <th style="width: 35%;">Download</th>
         </tr>
       `;
-    }
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
@@ -115,11 +101,12 @@ function renderReleaseTable(data, assetName) {
         }
 
         const tr = document.createElement("tr");
+
         const tdVersion = document.createElement("td");
         tdVersion.innerHTML = `<code>${version}</code>`;
 
         const tdOS = document.createElement("td");
-        // tdOS.textContent = os;
+        tdOS.textContent = os;
         tdOS.innerHTML = getIcons(os);
 
         const tdDownload = document.createElement("td");
@@ -128,12 +115,6 @@ function renderReleaseTable(data, assetName) {
         link.textContent = "Download";
         link.target = "_blank";
         tdDownload.appendChild(link);
-
-        if (assetName == "All") {
-            const tdSystem = document.createElement("td");
-            tdSystem.innerHTML = parts[0];
-            tr.appendChild(tdSystem);
-        }
 
         tr.appendChild(tdOS);
         tr.appendChild(tdVersion);
@@ -145,10 +126,6 @@ function renderReleaseTable(data, assetName) {
     table.querySelectorAll("th, td").forEach((cell) => {
         cell.style.border = "1px solid #ccc";
         cell.style.padding = "8px 12px";
-    });
-
-    table.querySelectorAll("th").forEach((th) => {
-        th.style.width = "40%";
     });
 
     const wrapper = document.createElement("div");
