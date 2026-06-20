@@ -5,6 +5,167 @@
 #include <cmath>
 #include <cstdlib>
 
+namespace {
+
+enum class VampOutputKind {
+    Scalar,
+    Magnitude,
+    Power,
+    SpectralMagnitudeNorm,
+    SpectralMagnitudeFrameNorm,
+    ReverbSpectralPower,
+    MFCC,
+    LogMel,
+    Chroma,
+};
+
+struct VampOutputSpec {
+    const char *identifier;
+    const char *name;
+    const char *description;
+    VampOutputKind kind;
+    OpenScofo::Descriptors descriptor;
+};
+
+const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
+    static const std::vector<VampOutputSpec> specs = {
+        // Spectral arrays
+        {"magnitude", "Magnitude", "Spectral array: magnitude spectrum", VampOutputKind::Magnitude,
+         OpenScofo::Descriptors::MAGNITUDE},
+        {"power", "Power", "Spectral array: power spectrum", VampOutputKind::Power,
+         OpenScofo::Descriptors::POWERARRAY},
+        {"spectral_magnitude_norm", "Spectral Magnitude Norm", "Spectral array: bin-normalized magnitude",
+         VampOutputKind::SpectralMagnitudeNorm, OpenScofo::Descriptors::INVALID},
+        {"spectral_magnitude_frame_norm", "Spectral Magnitude Frame Norm",
+         "Spectral array: frame-normalized magnitude", VampOutputKind::SpectralMagnitudeFrameNorm,
+         OpenScofo::Descriptors::INVALID},
+        {"reverb_spectral_power", "Reverb Spectral Power", "Spectral array: reverberant spectral power",
+         VampOutputKind::ReverbSpectralPower, OpenScofo::Descriptors::INVALID},
+
+        // Compact spectral arrays
+        {"mfcc", "MFCC", "Spectral array: mel-frequency cepstral coefficients", VampOutputKind::MFCC,
+         OpenScofo::Descriptors::MFCC},
+        {"logmel", "Log Mel Spectrum", "Spectral array: log mel spectrum", VampOutputKind::LogMel,
+         OpenScofo::Descriptors::MELOGRAM},
+        {"chroma", "Chroma", "Spectral array: chroma energy", VampOutputKind::Chroma,
+         OpenScofo::Descriptors::CHROMA},
+
+        // Event/probability
+        {"onset", "Onset", "Event/probability: onset detection function", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::ODSONSET},
+        {"silence", "Silence Probability", "Event/probability: silence probability", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::SILENCEPROB},
+        {"ext", "Extended Technique Probability", "Event/probability: extended technique probability",
+         VampOutputKind::Scalar, OpenScofo::Descriptors::EXTENDEDTECHNIQUE},
+
+        // Amplitude
+        {"maxamp", "Max Amplitude", "Amplitude: maximum normalized amplitude", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::MAXAMP},
+        {"loudness", "Loudness", "Amplitude: loudness", VampOutputKind::Scalar, OpenScofo::Descriptors::LOUDNESS},
+        {"db", "dB", "Amplitude: decibels", VampOutputKind::Scalar, OpenScofo::Descriptors::DB},
+        {"rms", "RMS", "Amplitude: root mean square", VampOutputKind::Scalar, OpenScofo::Descriptors::RMS},
+        {"stddev", "Amplitude Standard Deviation", "Amplitude: standard deviation", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::STDDEV},
+
+        // Spectral scalars
+        {"flux", "Spectral Flux", "Spectral scalar: flux", VampOutputKind::Scalar, OpenScofo::Descriptors::FLUX},
+        {"irregularity", "Spectral Irregularity", "Spectral scalar: irregularity", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::IRREGULARITY},
+        {"crest", "Spectral Crest", "Spectral scalar: crest", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::CREST},
+        {"centroid", "Spectral Centroid", "Spectral scalar: centroid", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::CENTROID},
+        {"centroid_velocity", "Centroid Velocity", "Spectral scalar: centroid velocity", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::CENTROIDVEL},
+        {"spreadhz", "Spectral Spread Hz", "Spectral scalar: spread in Hz", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::SPREADHZ},
+        {"spread_variance", "Spectral Spread Variance", "Spectral scalar: normalized spread variance",
+         VampOutputKind::Scalar, OpenScofo::Descriptors::SPREADVARIANCE},
+        {"flatness", "Spectral Flatness", "Spectral scalar: flatness", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::FLATNESS},
+        {"entropy", "Spectral Entropy", "Spectral scalar: entropy", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::ENTROPY},
+        {"rolloff", "Spectral Rolloff", "Spectral scalar: rolloff frequency", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::ROLLOFF},
+        {"hfr", "High Frequency Ratio", "Spectral scalar: high-frequency ratio", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::HFR},
+        {"harmonicity", "Harmonicity", "Spectral scalar: harmonicity", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::HARMONICITY},
+        {"zcr", "Zero Crossing Rate", "Spectral scalar: zero crossing rate", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::ZCR},
+        {"skewness", "Spectral Skewness", "Spectral scalar: skewness", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::SKEWNESS},
+        {"slope", "Spectral Slope", "Spectral scalar: slope", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::SLOPE},
+        {"kurtosis", "Spectral Kurtosis", "Spectral scalar: kurtosis", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::KURTOSIS},
+
+        // Pitch
+        {"yin", "Pitch", "Pitch: YIN frequency estimate", VampOutputKind::Scalar, OpenScofo::Descriptors::YIN},
+        {"yin_confidence", "Pitch Confidence", "Pitch: YIN confidence", VampOutputKind::Scalar,
+         OpenScofo::Descriptors::YINCONFIDENCE},
+    };
+
+    return specs;
+}
+
+bool IsVectorOutput(VampOutputKind kind) {
+    return kind != VampOutputKind::Scalar;
+}
+
+size_t GetSpectralBinCount(size_t blockSize) {
+    return blockSize / 2 + 1;
+}
+
+size_t GetBinCount(const VampOutputSpec &spec, const OpenScofo::Configuration &config, size_t blockSize) {
+    switch (spec.kind) {
+    case VampOutputKind::Magnitude:
+    case VampOutputKind::Power:
+    case VampOutputKind::SpectralMagnitudeNorm:
+    case VampOutputKind::SpectralMagnitudeFrameNorm:
+    case VampOutputKind::ReverbSpectralPower:
+        return GetSpectralBinCount(blockSize > 0 ? blockSize : static_cast<size_t>(config.FFTSize));
+    case VampOutputKind::MFCC:
+        return static_cast<size_t>(config.MFCCCount);
+    case VampOutputKind::LogMel:
+        return static_cast<size_t>(config.MFCCMels);
+    case VampOutputKind::Chroma:
+        return static_cast<size_t>(config.ChromaSize);
+    case VampOutputKind::Scalar:
+        return 1;
+    }
+
+    return 1;
+}
+
+const std::vector<double> &GetVectorValue(const OpenScofo::Description &desc, VampOutputKind kind) {
+    switch (kind) {
+    case VampOutputKind::Magnitude:
+        return desc.Magnitude;
+    case VampOutputKind::Power:
+        return desc.Power;
+    case VampOutputKind::SpectralMagnitudeNorm:
+        return desc.SpectralMagnitudeNorm;
+    case VampOutputKind::SpectralMagnitudeFrameNorm:
+        return desc.SpectralMagnitudeFrameNorm;
+    case VampOutputKind::ReverbSpectralPower:
+        return desc.ReverbSpectralPower;
+    case VampOutputKind::MFCC:
+        return desc.MFCC;
+    case VampOutputKind::LogMel:
+        return desc.LogMelSpectrum;
+    case VampOutputKind::Chroma:
+        return desc.Chroma;
+    case VampOutputKind::Scalar:
+        break;
+    }
+
+    static const std::vector<double> empty;
+    return empty;
+}
+
+} // namespace
+
 VampOpenScofo::VampOpenScofo(float inputSampleRate)
     : Plugin(inputSampleRate), m_blockSize(0), m_stepSize(0), m_selectedScoreIndex(0), m_OpenScofo(nullptr) {
 
@@ -212,10 +373,9 @@ Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers
     }
     OpenScofo::Description Desc = m_OpenScofo->GetDescription();
 
-    // lambda
-    auto pushScalar = [&](int idx, double value) {
+    auto pushScalar = [&](int idx, float value) {
         Feature f;
-        f.values.push_back((float)value);
+        f.values.push_back(value);
         fs[idx].push_back(f);
     };
     auto pushVector = [&](int idx, const std::vector<double> &vec) {
@@ -229,38 +389,13 @@ Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers
     };
 
     int i = 0;
-
-    // vectors
-    pushVector(i++, Desc.MFCC);
-    pushVector(i++, Desc.LogMelSpectrum);
-    pushVector(i++, Desc.Chroma);
-
-    // scalars
-    pushScalar(i++, Desc.Onset);
-    pushScalar(i++, Desc.SilenceProb);
-    pushScalar(i++, Desc.ExtendedTechProb);
-
-    pushScalar(i++, Desc.MaxAmp);
-    pushScalar(i++, Desc.Loudness);
-    pushScalar(i++, Desc.SpectralFlux);
-    pushScalar(i++, Desc.SpectralIrregularity);
-    pushScalar(i++, Desc.SpectralCrest);
-    pushScalar(i++, Desc.SpectralCentroid);
-    pushScalar(i++, Desc.SpectralSpreadHz);
-    pushScalar(i++, Desc.SpectralSpreadVariance);
-    pushScalar(i++, Desc.SpectralFlatness);
-
-    pushScalar(i++, Desc.CentroidVelocity);
-
-    pushScalar(i++, Desc.HighFreqRatio);
-    pushScalar(i++, Desc.Harmonicity);
-    pushScalar(i++, Desc.ZeroCrossingRate);
-    pushScalar(i++, Desc.StdDev);
-    pushScalar(i++, Desc.Pitch);
-    pushScalar(i++, Desc.PitchConfidence);
-
-    pushScalar(i++, Desc.dB);
-    pushScalar(i++, Desc.RMS);
+    for (const auto &spec : GetVampOutputSpecs()) {
+        if (IsVectorOutput(spec.kind)) {
+            pushVector(i++, GetVectorValue(Desc, spec.kind));
+        } else {
+            pushScalar(i++, static_cast<float>(m_OpenScofo->GetDescriptionFloat(Desc, spec.descriptor)));
+        }
+    }
 
     return fs;
 }
@@ -269,53 +404,25 @@ Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers
 Vamp::Plugin::OutputList VampOpenScofo::getOutputDescriptors() const {
     OutputList list;
 
-    auto makeScalar = [](const std::string &id, const std::string &name) {
+    OpenScofo::Configuration config;
+    if (m_OpenScofo) {
+        config = m_OpenScofo->GetConfiguration();
+    }
+
+    auto makeDescriptor = [&](const VampOutputSpec &spec) {
         OutputDescriptor d;
-        d.identifier = id;
-        d.name = name;
+        d.identifier = spec.identifier;
+        d.name = spec.name;
+        d.description = spec.description;
         d.hasFixedBinCount = true;
-        d.binCount = 1;
+        d.binCount = GetBinCount(spec, config, m_blockSize > 0 ? m_blockSize : getPreferredBlockSize());
         d.sampleType = OutputDescriptor::OneSamplePerStep;
         return d;
     };
 
-    auto makeVector = [](const std::string &id, const std::string &name, size_t bins) {
-        OutputDescriptor d;
-        d.identifier = id;
-        d.name = name;
-        d.hasFixedBinCount = true;
-        d.binCount = bins;
-        d.sampleType = OutputDescriptor::OneSamplePerStep;
-        return d;
-    };
-
-    // ---- vectors (set fixed sizes!) ----
-    list.push_back(makeVector("mfcc", "MFCC", 13));               // adjust if needed
-    list.push_back(makeVector("melogram", "LogMelSpectrum", 40)); // adjust if needed
-    list.push_back(makeVector("chroma", "Chroma", 12));           // standard
-
-    // ---- scalars ----
-    list.push_back(makeScalar("onset", "Onset"));
-    list.push_back(makeScalar("silence", "Silence"));
-    list.push_back(makeScalar("ext", "Extended Technique Probability"));
-    list.push_back(makeScalar("max_amp", "Max Amplitude"));
-    list.push_back(makeScalar("loudness", "Loudness"));
-    list.push_back(makeScalar("flux", "Spectral Flux"));
-    list.push_back(makeScalar("irregularity", "Spectral Irregularity"));
-    list.push_back(makeScalar("crest", "Spectral Crest"));
-    list.push_back(makeScalar("centroid", "Spectral Centroid"));
-    list.push_back(makeScalar("spreadhz", "Spectral Spread Hz (librosa)"));
-    list.push_back(makeScalar("spread_variance", "Spectral Spread Variance (Essentia)"));
-    list.push_back(makeScalar("flatness", "Spectral Flatness"));
-    list.push_back(makeScalar("centroid_velocity", "Centroid Velocity"));
-    list.push_back(makeScalar("hfr", "High Frequency Ratio"));
-    list.push_back(makeScalar("harmonicity", "Harmonicity"));
-    list.push_back(makeScalar("zcr", "Zero Crossing Rate"));
-    list.push_back(makeScalar("stddev", "Ampltiude Standard Deviation"));
-    // list.push_back(makeScalar("pitch", "Pitch"));
-    // list.push_back(makeScalar("pitch_confidence", "Pitch Confidence"));
-    list.push_back(makeScalar("db", "dB"));
-    list.push_back(makeScalar("rms", "RMS"));
+    for (const auto &spec : GetVampOutputSpecs()) {
+        list.push_back(makeDescriptor(spec));
+    }
 
     return list;
 }

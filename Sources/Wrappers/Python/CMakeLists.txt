@@ -20,9 +20,6 @@ target_link_libraries(_OpenScofo PRIVATE OpenScofo)
 
 target_include_directories(_OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
 
-message(WARNING "Python_SOABI = '.${Python_SOSABI}'")
-message(WARNING "CMAKE_SHARED_MODULE_SUFFIX = '.${CMAKE_SHARED_MODULE_SUFFIX}'")
-
 if(WIN32)
     set_target_properties(_OpenScofo PROPERTIES SUFFIX ".pyd")
 else()
