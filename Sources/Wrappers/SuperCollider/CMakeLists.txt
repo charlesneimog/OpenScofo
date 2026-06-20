@@ -30,6 +30,8 @@ endif()
 # ╰──────────────────────────────────────╯
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/examples/1-score-follow.scd
                ${CMAKE_CURRENT_BINARY_DIR}/examples/1-score-follow.scd COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/examples/2-descriptors-input.scd
+               ${CMAKE_CURRENT_BINARY_DIR}/examples/2-descriptors-input.scd COPYONLY)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/OpenScofo.sc ${CMAKE_CURRENT_BINARY_DIR}/OpenScofo.sc
                COPYONLY)
