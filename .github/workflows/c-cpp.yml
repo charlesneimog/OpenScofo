@@ -235,25 +235,13 @@ jobs:
                       *.pkg
                       *.msi
                       *.sh
-            - name: Upload Emscripten Build
-              if: runner.os == 'Linux'
-              run: |
-                  mkdir -p Emscripten
-                  mkdir -p Emscripten
-                  cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm Emscripten/ 2>/dev/null || true
-                  cp build-wasm/Sources/Wrappers/Wasm/OpenScofo.js Emscripten/ 2>/dev/null || true
-                  cp Sources/Wrappers/Wasm/index.html Emscripten/ 2>/dev/null || true
-            - name: Upload SuperCollider
+
+            - name: Upload Python Wheel
               uses: actions/upload-artifact@v6
               with:
-                  name: SuperCollider-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
-                  path: SuperCollider
-            - name: Upload Emscripten
-              if: runner.os == 'Linux'
-              uses: actions/upload-artifact@v6
-              with:
-                  name: Emscripten-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-WASM
-                  path: Emscripten
+                  name: Python-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
+                  path: dist/*.whl
+
             - name: Publish Pip
               if: ${{ github.event.inputs.publish_release == 'true' }}
               continue-on-error: true
