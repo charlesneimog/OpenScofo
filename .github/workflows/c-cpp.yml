@@ -18,7 +18,7 @@ jobs:
         env:
             SCCACHE_GHA_ENABLED: "true"
             SCCACHE_CACHE_SIZE: 2G
-            SCCACHE_GHA_VERSION: ${{ matrix.os }}-v3
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}-v4
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             matrix:
@@ -86,9 +86,8 @@ jobs:
             - name: Build (MacOS)
               if: runner.os == 'macOS'
               env:
-                  SKBUILD_WHEEL_PLAT_NAME: macosx_11_0_universal2
                   ARCHFLAGS: "-arch x86_64 -arch arm64"
-                  MACOSX_DEPLOYMENT_TARGET: 11.0
+                  MACOSX_DEPLOYMENT_TARGET: 10.15
               run: |
                   python -m build --wheel \
                     -Cbuild-dir=build \
@@ -98,7 +97,7 @@ jobs:
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
-                    -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+                    -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \

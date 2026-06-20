@@ -26,7 +26,7 @@ wheel.packages = ["OpenScofo"]
 wheel.py-api = "cp310"
 cmake.args = [
   "-DPD_LIB_DIR=./OpenScofo",
-  "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0",
+  "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",
   '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"',
 ]
 
