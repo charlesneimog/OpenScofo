@@ -19,12 +19,10 @@ target_link_libraries(_OpenScofo PRIVATE OpenScofo)
 
 target_include_directories(_OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
 
-if(Python_SOSABI)
-    if(WIN32)
-        set_target_properties(_OpenScofo PROPERTIES SUFFIX ".pyd")
-    else()
-        set_target_properties(_OpenScofo PROPERTIES SUFFIX ".${Python_SOSABI}${CMAKE_SHARED_MODULE_SUFFIX}")
-    endif()
+if(WIN32)
+    set_target_properties(_OpenScofo PROPERTIES SUFFIX ".pyd")
+elseif(Python_SOSABI)
+    set_target_properties(_OpenScofo PROPERTIES SUFFIX ".${Python_SOSABI}${CMAKE_SHARED_MODULE_SUFFIX}")
 endif()
 
 # 1. Hide all symbols natively compiled into the wrapper
