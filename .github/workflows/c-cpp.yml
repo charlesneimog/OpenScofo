@@ -165,15 +165,40 @@ jobs:
                   auditwheel repair dist/*.whl -w dist/
                   rm dist/*-linux_*.whl
 
+            - name: Extract version from wheel
+              id: wheel_version
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  wheel="$(find dist -maxdepth 1 -type f -name '*.whl' | sort | head -n 1)"
+
+                  if [[ -z "$wheel" ]]; then
+                    echo "ERROR: No wheel found in dist/"
+                    exit 1
+                  fi
+
+                  wheel_name="$(basename "$wheel")"
+                  wheel_stem="${wheel_name%.whl}"
+                  dist_name="${wheel_stem%%-*}"
+                  version="${wheel_stem#*-}"
+                  version="${version%%-*}"
+
+                  echo "Extracted WHEEL_NAME=$dist_name and WHEEL_VERSION=$version from $wheel_name"
+                  echo "WHEEL_NAME=$dist_name" >> "$GITHUB_ENV"
+                  echo "WHEEL_VERSION=$version" >> "$GITHUB_ENV"
+                  echo "name=$dist_name" >> "$GITHUB_OUTPUT"
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
             - name: Generate macOS Component Installer
               if: runner.os == 'macOS'
               run: |
-                  python Resources/Packages/macos.py --version ${{ env.LIBVERSION }}
+                  python Resources/Packages/macos.py --version "$WHEEL_VERSION"
 
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
               run: |
-                  python Resources/Packages/linux.py --version ${{ env.LIBVERSION }}
+                  python Resources/Packages/linux.py --version "$WHEEL_VERSION"
 
             - name: Generate Windows Component Installer
               if: runner.os == 'Windows'
@@ -193,9 +218,9 @@ jobs:
                   }
 
                   python Resources/Packages/windows.py `
-                    --version ${{ env.LIBVERSION }} `
+                    --version $env:WHEEL_VERSION `
                     --arch x64 `
-                    --output OpenScofo-${{ env.LIBVERSION }}-Win64.msi `
+                    --output "OpenScofo-$($env:WHEEL_VERSION)-Win64.msi" `
                     --candle "$candlePath" `
                     --light "$lightPath"
 
@@ -205,7 +230,7 @@ jobs:
             - name: Upload Installer
               uses: actions/upload-artifact@v6
               with:
-                  name: Installer-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+                  name: Installer-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
                   path: |
                       *.pkg
                       *.msi
@@ -221,13 +246,13 @@ jobs:
             - name: Upload SuperCollider
               uses: actions/upload-artifact@v6
               with:
-                  name: SuperCollider-${{env.LIBNAME}}-${{env.LIBVERSION}}-${{ runner.os }}
+                  name: SuperCollider-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
                   path: SuperCollider
             - name: Upload Emscripten
               if: runner.os == 'Linux'
               uses: actions/upload-artifact@v6
               with:
-                  name: Emscripten-${{env.LIBNAME}}-${{env.LIBVERSION}}-WASM
+                  name: Emscripten-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-WASM
                   path: Emscripten
             - name: Publish Pip
               if: ${{ github.event.inputs.publish_release == 'true' }}
@@ -247,32 +272,33 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Extract CMake metadata (version + name)
-              shell: bash
-              run: |
-                  set -euo pipefail
-
-                  VERSION=$(tr '\n' ' ' < CMakeLists.txt \
-                    | sed -nE 's/.*project\([^)]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
-
-                  NAME=$(tr '\n' ' ' < Sources/Wrappers/PureData/CMakeLists.txt \
-                    | sed -nE 's/.*project\([[:space:]]*([A-Za-z0-9_]+).*/\1/p')
-
-                  echo "Extracted VERSION=$VERSION"
-                  echo "Extracted NAME=$NAME"
-
-                  if [[ -z "${VERSION}" || -z "${NAME}" ]]; then
-                    echo "ERROR: Failed to extract LIBVERSION or LIBNAME from CMake files"
-                    exit 1
-                  fi
-
-                  echo "LIBVERSION=$VERSION" >> $GITHUB_ENV
-                  echo "LIBNAME=$NAME" >> $GITHUB_ENV
-
             - name: Download all artifacts
               uses: actions/download-artifact@v4
               with:
                   path: artifacts
+
+            - name: Extract release version from artifacts
+              id: release_metadata
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  artifact_name="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'Installer-*' -printf '%f\n' | sort | head -n 1)"
+
+                  if [[ -z "$artifact_name" ]]; then
+                    echo "ERROR: No Installer artifact found"
+                    exit 1
+                  fi
+
+                  metadata="${artifact_name#Installer-}"
+                  metadata="${metadata%-Linux}"
+                  metadata="${metadata%-macOS}"
+                  metadata="${metadata%-Windows}"
+                  release_version="${metadata##*-}"
+
+                  echo "Extracted RELEASE_VERSION=$release_version from $artifact_name"
+                  echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
+                  echo "version=$release_version" >> "$GITHUB_OUTPUT"
 
             - name: Create per-artifact zip archives
               shell: bash
@@ -292,8 +318,8 @@ jobs:
             - name: Create / Update GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  tag_name: v${{ env.LIBVERSION }}-alpha
-                  name: v${{ env.LIBVERSION }}-alpha
+                  tag_name: v${{ steps.release_metadata.outputs.version }}-alpha
+                  name: v${{ steps.release_metadata.outputs.version }}-alpha
                   target_commitish: ${{ github.sha }}
                   files: |
                       release_assets/*.zip
