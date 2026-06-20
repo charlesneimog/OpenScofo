@@ -1,4 +1,4 @@
-find_package(Python REQUIRED COMPONENTS Interpreter Development Development.SABIModule)
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
 
 if(NOT nanobind_DIR)
     execute_process(COMMAND ${Python_EXECUTABLE} -m nanobind --cmake_dir
@@ -18,7 +18,13 @@ target_compile_options(_OpenScofo PRIVATE -Wno-shadow)
 target_link_libraries(_OpenScofo PRIVATE OpenScofo)
 
 target_include_directories(_OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
-set_target_properties(_OpenScofo PROPERTIES SUFFIX ".${Python_SOSABI}${CMAKE_SHARED_MODULE_SUFFIX}")
+
+if(WIN32)
+    set_target_properties(_OpenScofo PROPERTIES SUFFIX "abi3.pyd")
+else()
+    set_target_properties(_OpenScofo PROPERTIES SUFFIX
+                                                ".${Python_SOSABI}${CMAKE_SHARED_MODULE_SUFFIX}")
+endif()
 
 # 1. Hide all symbols natively compiled into the wrapper
 set_target_properties(_OpenScofo PROPERTIES CXX_VISIBILITY_PRESET hidden C_VISIBILITY_PRESET hidden

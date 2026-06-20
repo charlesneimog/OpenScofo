@@ -14,6 +14,9 @@ set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(TREE_SITTER_VERSION "v0.26.9")
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
+
 option(OPENSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OPENSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OPENSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
@@ -35,14 +38,10 @@ if(EMSCRIPTEN)
         "${CMAKE_CXX_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1"
     )
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128")
+elseif(WIN32)
+    add_compile_definitions(_WIN32_WINNT=0x0601)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
-
-if(APPLE)
-
-endif()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
 
 if(OPENSCOFO_BUILD_ALL)
     set(OPENSCOFO_BUILD_PY_MODULE ON)
