@@ -16,8 +16,6 @@ dependencies = [
 
 [build-system]
 requires = ["scikit-build-core", "nanobind","librosa","catboost"]
-
-
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
