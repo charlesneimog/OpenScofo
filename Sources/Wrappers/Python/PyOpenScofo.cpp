@@ -245,8 +245,11 @@ NB_MODULE(_OpenScofo, m) {
 
         .def("__repr__",
              [](OpenScofo::OpenScofo &self) {
-                 return std::format("<OpenScofo(sr={}, fft_size={}, hop={})>", self.GetSr(), self.GetFFTSize(),
-                                    self.GetHopSize());
+                 std::ostringstream oss;
+                 oss << "<OpenScofo(sr=" << self.GetSr() << ", fft_size=" << self.GetFFTSize()
+                     << ", hop=" << self.GetHopSize() << ")>";
+
+                 return oss.str();
              })
 
         // Score

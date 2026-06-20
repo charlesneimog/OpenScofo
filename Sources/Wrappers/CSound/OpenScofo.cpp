@@ -24,12 +24,12 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
     case spdlog::level::critical:
     case spdlog::level::err:
     case spdlog::level::warn:
-        csound->warning(std::format("[OpenScofo] {}", text));
+        csound->warning("[OpenScofo] " + text);
         break;
     case spdlog::level::info:
     case spdlog::level::debug:
     case spdlog::level::trace:
-        csound->message(std::format("[OpenScofo] {}", text));
+        csound->message("[OpenScofo] " + text);
         break;
     default:
         break;
@@ -71,7 +71,8 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         }
 
         OpenScofo::States states = oscofo->GetStates();
-        csound->message(std::format("\nScore has {} states\n", states.size()));
+        auto msg = "\nScore has " + std::to_string(states.size()) + " states\n";
+        csound->message(msg.c_str());
 
         outargs[0] = FL(0.0);
         outargs[1] = FL(oscofo->GetCurrentBPM());
@@ -125,7 +126,9 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
 // Registration
 void csnd::on_load(Csound *csound) {
-    csound->message(std::format("\n[OpenScofo] version {} ({}), by Charles K. Neimog\n\n", OPENSCOFO_VERSION,
-                                OPENSCOFO_BUILD_TIME));
+    auto msg = "\n[OpenScofo] version " + std::string(OPENSCOFO_VERSION) + " (" + std::string(OPENSCOFO_BUILD_TIME) +
+               "), by Charles K. Neimog\n\n";
+
+    csound->message(msg.c_str());
     csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aSii", csnd::thread::ik);
 }
