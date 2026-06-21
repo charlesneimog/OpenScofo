@@ -269,6 +269,7 @@ if(EMSCRIPTEN)
                >
                $<$<CONFIG:Release>:
                -O3
+               -ffast-math
                -DNDEBUG
                -flto=auto
                -ffunction-sections
@@ -374,6 +375,7 @@ else() # Linux (GCC or Clang)
                $<$<CONFIG:Release>:
                -O3
                -march=native
+               -ffast-math
                -DNDEBUG
                -flto=auto
                -ffunction-sections

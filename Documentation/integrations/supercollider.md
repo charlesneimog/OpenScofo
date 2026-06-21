@@ -27,7 +27,7 @@
 * **`outBus`** *(Audio bus, Default: 0)*: A silent output bus used by the internal synth.
 * **`sampleRate`** *(Float, Default: 48000.0)*: The expected sample rate.
 * **`eventNotifications`** *(Boolean, Default: true)*: Enables automatic current-event replies.
-* **`eventAction`** *(Function or nil)*: Optional callback receiving `(eventIndex, msg)` whenever `/oscofo/currentEvent` is emitted.
+* **`eventAction`** *(Function or nil)*: Optional callback receiving `(eventIndex, msg)` whenever `/openscofo/currentEvent` is emitted.
 
 `FFTSIZE` and `HOPSIZE` are read from the score file. They are not SuperCollider constructor arguments.
 
@@ -56,14 +56,14 @@ Enables or disables automatic OSC replies whenever the current score event chang
 * **Args:** `enabled` (Boolean)
 
 ### `getCurrentEvent`
-Requests the current event index from the score follower. The server will reply with an OSC message to `/oscofo/currentEvent`.
+Requests the current event index from the score follower. The server will reply with an OSC message to `/openscofo/currentEvent`.
 
 ### `getDescriptor`
 Requests the value(s) of a specific audio descriptor for the current audio block.
 
 * **Args:** `descriptorId` (String, e.g., `"rms"`, `"mfcc"`, `"pitch"`),  check complet list [Descriptors](../descriptors/index.md). 
 
-* **Reply:** The server sends an OSC message to `/oscofo/descriptor/<descriptorId>` containing the float value(s). (Scalar descriptors return 1 float; array descriptors like MFCC return multiple floats).
+* **Reply:** The server sends an OSC message to `/openscofo/descriptor/<descriptorId>` containing the float value(s). (Scalar descriptors return 1 float; array descriptors like MFCC return multiple floats).
 
 ### `loadOnnxModel`
 
@@ -89,7 +89,7 @@ is delivered to `/OpenScofo/delay` and can be handled with:
 });
 ```
 
-SuperCollider action messages are float-only. If a `sendto` action contains a string or symbol argument, the wrapper prints a warning and does not send that action. If a receiver has no registered listener, the wrapper also prints a warning.
+SuperCollider score actions can contain float, int, and string arguments when received through `~openscofo.listen(...)`. Internally, string arguments are encoded as floats for SuperCollider's public `SendNodeReply` API and decoded by the `OpenScofo` class before your callback is called. If a receiver has no registered listener, the wrapper prints a warning.
 
 ---
 
@@ -97,12 +97,12 @@ SuperCollider action messages are float-only. If a `sendto` action contains a st
 
 You must set up `OSCFunc` or `OSCdef` listeners in sclang to receive data from the UGen.
 
-* **`/oscofo/currentEvent`**: 
+* **`/openscofo/currentEvent`**: 
 
     * Triggered automatically if `setEventNotifications` is 1, OR manually requested via `getCurrentEvent`.
     * **Arguments:** `[ nodeID, replyID, eventIndex ]`
 
-* **`/oscofo/descriptor/<descriptorId>`**: 
+* **`/openscofo/descriptor/<descriptorId>`**: 
 
     * Triggered by requesting `getDescriptor`.
     * **Arguments:** `[ nodeID, replyID, val1, val2, ... ]`
