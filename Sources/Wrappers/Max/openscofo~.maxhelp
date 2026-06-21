@@ -110,7 +110,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 183.0, 197.0, 372.0, 35.0 ],
-                                    "text": "set onnxmodel ai-flute-model.onnx mfcc logmel zcr centroid flatness hfr"
+                                    "text": "set onnxmodel ai-flute-model.onnx mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis"
                                 }
                             },
                             {
