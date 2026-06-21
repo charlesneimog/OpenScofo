@@ -1,7 +1,5 @@
 # Vamp 
 
-<release interface="Vamp"><i>Loading Releases</i></release>
-
 **OpenScofo** is also available as a Vamp plugin for offline audio feature extraction. It is designed to be used in host applications like Sonic Visualiser or Audacity.
 
 !!! warning "Note on Score Following"

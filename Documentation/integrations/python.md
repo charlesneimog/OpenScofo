@@ -1,14 +1,12 @@
 # Python
 
-<release interface="Python"><i>Loading Releases</i></release>
-
-!!! tip "Use pip"
+!!! tip "Use pip to install"
     ```bash
     pip install OpenScofo
     ```
 
 
-`OpenScofo` provides Python bindings (via `pybind11`) for development, validation, and research workflows.
+`OpenScofo` provides Python bindings (via `nanobind`) for development, validation, and research workflows.
 
 ## Import and create an object
 
