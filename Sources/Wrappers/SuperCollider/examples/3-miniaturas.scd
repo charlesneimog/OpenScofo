@@ -1,4 +1,5 @@
 (
+s.options.sampleRate = 48000;
 s.waitForBoot {
     ~bus = Bus.audio(s, 1);
     ~namespace = "flute";
