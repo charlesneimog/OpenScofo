@@ -971,24 +971,24 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
     int maxU = static_cast<int>(occ_cache.size()) - 1;
 
     for (int u = 1; u <= maxU; ++u) {
-        double Dju = surv_cache[u];
-        double dju = occ_cache[u];
-        int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+        const double Dju = surv_cache[u];
+        const double dju = occ_cache[u];
 
-        // Sum over all i ≠ j
+        const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+
         double TransSum = 0.0;
-        for (int i = m_WinStart; i <= m_WinEnd; ++i) {
-            double Pij = GetTransProbability(i, j);
-            TransSum += Pij * m_States[i].ExitProb[EntryBuf];
+        const int i = j - 1;
+
+        if (i >= m_WinStart && i <= m_WinEnd) {
+            TransSum = m_States[i].ExitProb[EntryBuf];
         }
 
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
 
-        // Update observation product with normalization
-        int prevBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-        double prevObs = StateJ.BestObs[prevBuf];
-        double prevNorm = m_Normalization[prevBuf];
+        const double prevObs = StateJ.BestObs[EntryBuf];
+        const double prevNorm = m_Normalization[EntryBuf];
+
         if (prevNorm > std::numeric_limits<double>::min()) {
             ObsProd *= prevObs / prevNorm;
         } else {

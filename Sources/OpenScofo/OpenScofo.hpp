@@ -46,6 +46,8 @@ class OpenScofo {
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
     void SetCurrentEvent(int Event);
     void SetConfiguration(Configuration &Config);
+    void SetRequestedDescriptors(std::vector<Descriptors> Descriptors);
+    void RequestDescriptor(Descriptors Descriptor);
 
     // Get Functions
     double GetCurrentBPM();

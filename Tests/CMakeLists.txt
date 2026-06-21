@@ -1,4 +1,4 @@
-if (NOT APPLE)
+if(NOT APPLE)
     enable_testing()
     find_package(GTest REQUIRED)
 
@@ -16,13 +16,16 @@ if (NOT APPLE)
     add_test(NAME Math COMMAND math_tests)
 
     # Passa o caminho da pasta 'assets' para o código C++
-    target_compile_definitions(main_class PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
-    target_compile_definitions(score_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
-    target_compile_definitions(math_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(main_class
+                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(score_tests
+                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(math_tests
+                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
     cpmaddpackage("gh:adamstark/AudioFile#master")
     add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
-    target_compile_options(openscofo_perf PRIVATE -g -fno-omit-frame-pointer -Wno-shadow)
-    target_compile_options(openscofo_perf PRIVATE -Wno-shadow -Wno-unused-variable)
+    target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
+                                                  -Wno-unused-variable)
 endif()

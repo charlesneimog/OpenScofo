@@ -252,6 +252,7 @@ struct Configuration {
     // ONNX
     fs::path TimbreONNXModel;
     std::vector<std::string> ONNXDescriptors;
+    std::vector<Descriptors> RequestedDescriptors;
 };
 
 // ─────────────────────────────────────

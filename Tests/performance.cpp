@@ -59,7 +59,6 @@ void run_scofo(OpenScofo::OpenScofo &scofo, const std::vector<double> &samples) 
         }
         int score_event = scofo.GetCurrentScorePosition();
         if (score_event != currentEvent) {
-            printf("currentEvent %d\n", score_event);
             currentEvent = score_event;
         }
     }
@@ -98,6 +97,11 @@ int main(int argc, char *argv[]) {
 
     // Run processing
     run_scofo(scofo, samples);
+
+    for (int i = 0; i < 20; i++) {
+        scofo.SetCurrentEvent(0);
+        run_scofo(scofo, samples);
+    }
 
     return 0;
 }

@@ -1,4 +1,5 @@
 #include <OpenScofo.hpp>
+#include <algorithm>
 
 // ╭─────────────────────────────────────╮
 // │     Construstor and Destructor      │
@@ -142,6 +143,37 @@ void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
  */
 void OpenScofo::SetConfiguration(Configuration &Config) {
     UpdateConfiguration(Config);
+}
+
+// ─────────────────────────────────────
+void OpenScofo::SetRequestedDescriptors(std::vector<Descriptors> Descriptors) {
+    Descriptors.erase(std::remove(Descriptors.begin(), Descriptors.end(), INVALID), Descriptors.end());
+    std::sort(Descriptors.begin(), Descriptors.end());
+    Descriptors.erase(std::unique(Descriptors.begin(), Descriptors.end()), Descriptors.end());
+
+    if (m_Config.RequestedDescriptors == Descriptors) {
+        return;
+    }
+
+    m_Config.RequestedDescriptors = std::move(Descriptors);
+    m_MIR.UpdateConfiguration(m_Config);
+}
+
+// ─────────────────────────────────────
+void OpenScofo::RequestDescriptor(Descriptors Descriptor) {
+    if (Descriptor == INVALID) {
+        return;
+    }
+
+    if (std::find(m_Config.RequestedDescriptors.begin(), m_Config.RequestedDescriptors.end(), Descriptor) ==
+        m_Config.RequestedDescriptors.end()) {
+        m_Config.RequestedDescriptors.push_back(Descriptor);
+        m_MIR.UpdateConfiguration(m_Config);
+    }
+
+    if (!m_InBuffer.empty()) {
+        m_MIR.GetDescription(m_InBuffer, m_Desc);
+    }
 }
 
 // ─────────────────────────────────────
@@ -833,9 +865,31 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     ClearErrors();
 
     m_CurrentScorePosition = 0;
+    const std::vector<Descriptors> requestedDescriptors = m_Config.RequestedDescriptors;
     auto [newConfig, newStates] = m_Score.Parse(ScorePath);
+    newConfig.RequestedDescriptors = requestedDescriptors;
     m_Config = newConfig;
     m_States = newStates;
+
+    auto requestScoreDescriptor = [&](Descriptors Descriptor) {
+        if (std::find(newConfig.RequestedDescriptors.begin(), newConfig.RequestedDescriptors.end(), Descriptor) ==
+            newConfig.RequestedDescriptors.end()) {
+            newConfig.RequestedDescriptors.push_back(Descriptor);
+        }
+    };
+
+    for (const MarkovState &state : m_States) {
+        for (const AudioState &audioState : state.AudioStates) {
+            if (audioState.Type == LABEL) {
+                requestScoreDescriptor(ONNX);
+                requestScoreDescriptor(EXTENDEDTECHNIQUE);
+            } else if (audioState.Type == ONSET) {
+                requestScoreDescriptor(ODSONSET);
+            }
+        }
+    }
+
+    UpdateConfiguration(newConfig);
 
     // Timbre/Extended Tech detection
     if (fs::exists(newConfig.TimbreONNXModel)) {
@@ -848,8 +902,6 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
         m_MIR.ONNXInit(newConfig.TimbreONNXModel, DescEnum);
         spdlog::warn("ONNX Model ready");
     }
-
-    UpdateConfiguration(newConfig);
 
     // Parse Config
     m_Forward.SetPitchTemplateSigma(newConfig.PitchTemplateSigma);

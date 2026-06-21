@@ -215,6 +215,7 @@ struct ScOpenScofo : public SCUnit {
             return;
         }
 
+        m_OpenScofo->RequestDescriptor(descriptor);
         OpenScofo::Description desc = m_OpenScofo->GetDescription();
         const std::string replyAddress = DescriptorAddress(m_OpenScofo->GetDescriptionId(descriptor));
 

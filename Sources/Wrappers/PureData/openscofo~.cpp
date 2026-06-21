@@ -72,7 +72,7 @@ class PdOpenScofo {
 // ─────────────────────────────────────
 static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
     if (!s || s == &s_ || !s->s_name[0]) {
-        pd_error(x, "[openscofo~] no score file provided");
+        pd_error(x, "[openscofo~] No score file provided");
         return;
     }
 
@@ -93,7 +93,7 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
     }
 
     if (fd < 0) {
-        pd_error(x, "[openscofo~] can't find score file %s", filename);
+        pd_error(x, "[openscofo~] Can't find score file %s", filename);
         return;
     }
 
@@ -106,11 +106,11 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     if (!ok) {
         canvas_resume_dsp(state);
-        logpost(x, 1, "[openscofo~] score has errors");
+        logpost(x, 1, "[openscofo~] Score has errors");
         return;
     }
 
-    logpost(x, 2, "[openscofo~] score loaded");
+    logpost(x, 2, "[openscofo~] Score loaded");
     x->OpenScofo->SetCurrentEvent(0);
     x->JustDescription = false;
 
@@ -133,7 +133,6 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     if (!result) {
         std::string error = x->OpenScofo->LuaGetError();
-
         pd_error(x, "[openscofo~] Lua error");
         pd_error(x, "[openscofo~] %s", error.c_str());
     }
@@ -565,6 +564,7 @@ static void *openscofo_new(t_symbol *s, int argc, t_atom *argv) {
     // OpenScofo Library
     x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
     x->OpenScofo->SetErrorCallback(openscofo_error_callback, static_cast<void *>(x));
+    x->OpenScofo->SetRequestedDescriptors(x->RequestMIR);
 
     x->log = (spdlog::level::warn);
 
