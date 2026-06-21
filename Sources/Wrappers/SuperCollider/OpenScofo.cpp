@@ -4,8 +4,11 @@
 #include <cctype>
 #include <cstdint>
 #include <cmath>
-#include <stdexcept>
+#include <atomic>
+#include <exception>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <variant>
 #include <vector>
@@ -14,7 +17,7 @@
 #error "Supernova is not supported by OpenScofo"
 #endif
 
-// Callback de erro adaptado para SC
+// ─────────────────────────────────────
 static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     (void)data;
     // ignorar logs abaixo de warn
@@ -42,6 +45,11 @@ static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *
 }
 
 static InterfaceTable *ft;
+static constexpr float kEncodedActionMagic = -900001.0f;
+static constexpr float kActionNumberTag = 0.0f;
+static constexpr float kActionStringTag = 1.0f;
+
+// ─────────────────────────────────────
 struct ScOpenScofo : public SCUnit {
   public:
     ScOpenScofo() {
@@ -57,30 +65,62 @@ struct ScOpenScofo : public SCUnit {
         }
     }
 
+    // ─────────────────────────────────────
     ~ScOpenScofo() {
+        if (m_LoadThread.joinable()) {
+            m_LoadThread.join();
+        }
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         delete m_OpenScofo;
     }
 
+    // ─────────────────────────────────────
     void LoadScore(const char *path) {
-        if (m_OpenScofo) {
-            bool ok = m_OpenScofo->LoadScore(path);
-            if (!ok) {
-                return;
-            }
-            m_LastEventIndex = -1;
-            m_LastActionStateIndex = -1;
-            m_ScheduledActions.clear();
+        if (!path || path[0] == '\0') {
+            return;
         }
+
+        if (m_LoadInProgress.exchange(true)) {
+            printf("\n[OpenScofo][WARN] SuperCollider score load ignored because another load is still running.\n");
+            return;
+        }
+
+        if (m_LoadThread.joinable()) {
+            m_LoadThread.join();
+        }
+
+        std::string scorePath(path);
+        m_LoadThread = std::thread([this, scorePath]() {
+            try {
+                std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
+                if (m_OpenScofo) {
+                    bool ok = m_OpenScofo->LoadScore(scorePath);
+                    if (ok) {
+                        m_LastEventIndex = -1;
+                        m_LastActionStateIndex = -1;
+                        m_ScheduledActions.clear();
+                    }
+                }
+            } catch (const std::exception &e) {
+                printf("\n[OpenScofo][ERR] SuperCollider score load failed: %s\n", e.what());
+            } catch (...) {
+                printf("\n[OpenScofo][ERR] SuperCollider score load failed with an unknown exception.\n");
+            }
+            m_LoadInProgress = false;
+        });
     }
 
+    // ─────────────────────────────────────
     void SetEventNotifications(bool enabled) {
         m_EmitEventNotifications = enabled;
     }
 
+    // ─────────────────────────────────────
     void SetFollowScore(bool enabled) {
         m_FollowScore = enabled;
     }
 
+    // ─────────────────────────────────────
     void RegisterActionReceiver(const char *receiver) {
         if (receiver && receiver[0] != '\0') {
             m_ActionReceivers.insert(receiver);
@@ -88,13 +128,16 @@ struct ScOpenScofo : public SCUnit {
         }
     }
 
+    // ─────────────────────────────────────
     void UnregisterActionReceiver(const char *receiver) {
         if (receiver && receiver[0] != '\0') {
             m_ActionReceivers.erase(receiver);
         }
     }
 
+    // ─────────────────────────────────────
     bool LoadOnnxModel(const char *modelPath, const char *descriptorIdsCsv) {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         if (!m_OpenScofo || !modelPath || !descriptorIdsCsv) {
             return false;
         }
@@ -136,7 +179,9 @@ struct ScOpenScofo : public SCUnit {
         return true;
     }
 
+    // ─────────────────────────────────────
     void SendDescriptor(const char *descriptorId) {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         if (!m_OpenScofo || !descriptorId) {
             return;
         }
@@ -147,7 +192,7 @@ struct ScOpenScofo : public SCUnit {
         }
 
         OpenScofo::Description desc = m_OpenScofo->GetDescription();
-        std::string replyAddress = "/oscofo/descriptor/";
+        std::string replyAddress = "/openscofo/descriptor/";
         replyAddress += m_OpenScofo->GetDescriptionId(descriptor);
 
         try {
@@ -188,7 +233,9 @@ struct ScOpenScofo : public SCUnit {
         }
     }
 
+    // ─────────────────────────────────────
     int GetEventIndex() {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         if (m_OpenScofo) {
             return m_OpenScofo->GetCurrentScorePosition();
         }
@@ -202,6 +249,9 @@ struct ScOpenScofo : public SCUnit {
     };
 
     OpenScofo::OpenScofo *m_OpenScofo = nullptr;
+    std::mutex m_OpenScofoMutex;
+    std::thread m_LoadThread;
+    std::atomic_bool m_LoadInProgress = false;
     bool m_FollowScore = true;
     bool m_EmitEventNotifications = false;
     std::unordered_set<std::string> m_ActionReceivers;
@@ -211,20 +261,42 @@ struct ScOpenScofo : public SCUnit {
     int m_LastEventIndex = -1;
     int m_LastActionStateIndex = -1;
 
-    bool ConvertActionArgs(const OpenScofo::ScoreAction &action, std::vector<float> &values) {
+    bool EncodeActionArgs(const OpenScofo::ScoreAction &action, std::vector<float> &values) {
         values.clear();
-        values.reserve(action.Args.size());
+
+        const bool hasStringArg = std::any_of(action.Args.begin(), action.Args.end(), [](const auto &arg) {
+            return std::holds_alternative<std::string>(arg);
+        });
+
+        if (!hasStringArg) {
+            values.reserve(action.Args.size());
+            for (const auto &arg : action.Args) {
+                if (std::holds_alternative<float>(arg)) {
+                    values.push_back(std::get<float>(arg));
+                } else if (std::holds_alternative<int>(arg)) {
+                    values.push_back(static_cast<float>(std::get<int>(arg)));
+                }
+            }
+            return true;
+        }
+
+        values.push_back(kEncodedActionMagic);
+        values.push_back(static_cast<float>(action.Args.size()));
 
         for (const auto &arg : action.Args) {
             if (std::holds_alternative<float>(arg)) {
+                values.push_back(kActionNumberTag);
                 values.push_back(std::get<float>(arg));
             } else if (std::holds_alternative<int>(arg)) {
+                values.push_back(kActionNumberTag);
                 values.push_back(static_cast<float>(std::get<int>(arg)));
             } else if (std::holds_alternative<std::string>(arg)) {
-                printf("\n[OpenScofo][WARN] SuperCollider sendto receiver '%s' was not sent: string argument '%s' is "
-                       "not supported. Use float/int arguments only.\n",
-                       action.Receiver.c_str(), std::get<std::string>(arg).c_str());
-                return false;
+                const auto &text = std::get<std::string>(arg);
+                values.push_back(kActionStringTag);
+                values.push_back(static_cast<float>(text.size()));
+                for (const unsigned char ch : text) {
+                    values.push_back(static_cast<float>(ch));
+                }
             }
         }
 
@@ -237,14 +309,15 @@ struct ScOpenScofo : public SCUnit {
         }
 
         if (m_WarnedMissingReceivers.insert(receiver).second) {
-            printf("\n[OpenScofo][WARN] SuperCollider sendto receiver '/OpenScofo/%s' has no registered listener. "
-                   "Register it with ~oscofo.listen(...) or ~oscofo.registerActionReceiver(...).\n",
+            printf("\n[OpenScofo][WARN] SuperCollider sendto receiver '%s' has no registered listener. "
+                   "Register it with ~openscofo.listen(...) or ~openscofo.registerActionReceiver(...).\n",
                    receiver.c_str());
         }
 
         return false;
     }
 
+    // ─────────────────────────────────────
     void DispatchAction(const OpenScofo::ScoreAction &action) {
         if (action.isLua) {
             printf("\n[OpenScofo][WARN] SuperCollider wrapper does not execute Lua score actions yet.\n");
@@ -252,7 +325,7 @@ struct ScOpenScofo : public SCUnit {
         }
 
         std::vector<float> values;
-        if (!ConvertActionArgs(action, values)) {
+        if (!EncodeActionArgs(action, values)) {
             return;
         }
 
@@ -266,6 +339,7 @@ struct ScOpenScofo : public SCUnit {
                       values.empty() ? nullptr : values.data());
     }
 
+    // ─────────────────────────────────────
     int64_t ActionDelaySamples(const OpenScofo::ScoreAction &action) {
         double timeMs = action.Time;
         if (!action.AbsoluteTime && m_OpenScofo) {
@@ -279,6 +353,7 @@ struct ScOpenScofo : public SCUnit {
         return static_cast<int64_t>(std::ceil(timeMs * m_OpenScofo->GetSr() / 1000.0));
     }
 
+    // ─────────────────────────────────────
     void QueueOrDispatchAction(const OpenScofo::ScoreAction &action) {
         const int64_t delaySamples = ActionDelaySamples(action);
         if (delaySamples <= 0) {
@@ -289,6 +364,7 @@ struct ScOpenScofo : public SCUnit {
         m_ScheduledActions.push_back({delaySamples, action});
     }
 
+    // ─────────────────────────────────────
     void ProcessEventActionsIfChanged() {
         if (!m_OpenScofo || !m_FollowScore || !m_OpenScofo->ScoreIsLoaded()) {
             return;
@@ -306,6 +382,7 @@ struct ScOpenScofo : public SCUnit {
         }
     }
 
+    // ─────────────────────────────────────
     void ProcessScheduledActions(int samplesElapsed) {
         auto it = m_ScheduledActions.begin();
         while (it != m_ScheduledActions.end()) {
@@ -319,6 +396,7 @@ struct ScOpenScofo : public SCUnit {
         }
     }
 
+    // ─────────────────────────────────────
     void EmitCurrentEventIfChanged() {
         if (!m_EmitEventNotifications || !m_OpenScofo) {
             return;
@@ -335,12 +413,23 @@ struct ScOpenScofo : public SCUnit {
 
         m_LastEventIndex = currentEvent;
         float currentEventAsFloat = static_cast<float>(currentEvent);
-        SendNodeReply(&mParent->mNode, 0, "/oscofo/currentEvent", 1, &currentEventAsFloat);
+        SendNodeReply(&mParent->mNode, 0, "/openscofo/currentEvent", 1, &currentEventAsFloat);
     }
 
     void next_a(int inNumSamples) {
         (void)inNumSamples;
         int n = mWorld->mFullRate.mBufLength;
+        if (m_LoadInProgress) {
+            std::fill_n(out(0), n, 0.0f);
+            return;
+        }
+
+        std::unique_lock<std::mutex> lock(m_OpenScofoMutex, std::try_to_lock);
+        if (!lock.owns_lock() || !m_OpenScofo) {
+            std::fill_n(out(0), n, 0.0f);
+            return;
+        }
+
         const float *inBuf = in(0);
         bool ok = m_OpenScofo->ProcessBlock(inBuf, n);
         if (!ok) {
@@ -359,7 +448,7 @@ struct ScOpenScofo : public SCUnit {
 void cmdGetCurrentEvent(ScOpenScofo *unit, sc_msg_iter *args) {
     (void)args;
     float currentEvent = static_cast<float>(unit->GetEventIndex());
-    SendNodeReply(&unit->mParent->mNode, 0, "/oscofo/currentEvent", 1, &currentEvent);
+    SendNodeReply(&unit->mParent->mNode, 0, "/openscofo/currentEvent", 1, &currentEvent);
 }
 
 // ─────────────────────────────────────

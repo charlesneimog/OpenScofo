@@ -461,10 +461,11 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     for (int u = 1; u <= maxU; ++u) {
         raw[u] = std::exp(current_log_pmf);
         sum_raw += raw[u];
-        if (r_prime > 0.0)
+        if (r_prime > 0.0) {
             current_log_pmf += std::log((u - 1) + r_prime) - std::log((double)u) + log_1_p;
-        else
-            current_log_pmf = -std::numeric_limits<double>::infinity();
+        } else {
+            current_log_pmf = -std::numeric_limits<double>::max();
+        }
     }
 
     // Normalize over {1,...,maxU}

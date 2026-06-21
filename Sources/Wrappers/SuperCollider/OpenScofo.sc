@@ -121,6 +121,42 @@ OpenScofo {
         ^this.cmd("unregisterActionReceiver", [receiver.asString]);
     }
 
+    decodeActionPayload { arg payload;
+        var magic = -900001.0, args, argCount, index = 2, type, size;
+
+        if(payload.isNil or: { payload.size == 0 }) {
+            ^[]
+        };
+
+        if(payload[0] != magic) {
+            ^payload
+        };
+
+        argCount = payload[1].asInteger;
+        args = Array.new(argCount);
+
+        argCount.do({
+            type = payload[index].asInteger;
+            index = index + 1;
+
+            if(type == 0) {
+                args = args.add(payload[index]);
+                index = index + 1;
+            } {
+                if(type == 1) {
+                    size = payload[index].asInteger;
+                    index = index + 1;
+                    args = args.add(String.fill(size, { |i|
+                        payload[index + i].asInteger.asAscii
+                    }));
+                    index = index + size;
+                };
+            };
+        });
+
+        ^args
+    }
+
     listen { arg receiver, action;
         var receiverString, oscName, address;
         receiverString = receiver.asString;
@@ -129,7 +165,7 @@ OpenScofo {
 
         this.unlisten(receiverString);
         actionOSCDefs[receiverString] = OSCdef(oscName, { |msg|
-            action.value(msg[3..], msg);
+            action.value(this.decodeActionPayload(msg[3..]), msg);
         }, address, server.addr);
         this.registerActionReceiver(receiverString);
     }
