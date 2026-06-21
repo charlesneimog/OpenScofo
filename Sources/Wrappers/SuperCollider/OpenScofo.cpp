@@ -17,6 +17,8 @@
 #error "Supernova is not supported by OpenScofo"
 #endif
 
+static InterfaceTable *ft;
+
 // ─────────────────────────────────────
 static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     (void)data;
@@ -29,25 +31,38 @@ static void OpenScofo_error_callback(const spdlog::details::log_msg &log, void *
     switch (log.level) {
     case spdlog::level::critical:
     case spdlog::level::err:
-        printf("\n[OpenScofo][ERR] %s\n", text.c_str());
+        Print("[OpenScofo][ERR] %s\n", text.c_str());
         break;
     case spdlog::level::warn:
-        printf("\n[OpenScofo][WARN] %s\n", text.c_str());
+        Print("[OpenScofo][WARN] %s\n", text.c_str());
         break;
     case spdlog::level::info:
     case spdlog::level::debug:
     case spdlog::level::trace:
-        printf("\n[OpenScofo][INFO] %s\n", text.c_str());
+        Print("[OpenScofo][INFO] %s\n", text.c_str());
         break;
     default:
         break;
     }
 }
 
-static InterfaceTable *ft;
 static constexpr float kEncodedActionMagic = -900001.0f;
 static constexpr float kActionNumberTag = 0.0f;
 static constexpr float kActionStringTag = 1.0f;
+static constexpr const char *kDefaultOSCNamespace = "openscofo";
+
+static std::string NormalizeOSCNamespace(const char *namespaceName) {
+    std::string result = namespaceName ? namespaceName : kDefaultOSCNamespace;
+
+    while (!result.empty() && result.front() == '/') {
+        result.erase(result.begin());
+    }
+    while (!result.empty() && result.back() == '/') {
+        result.pop_back();
+    }
+
+    return result.empty() ? kDefaultOSCNamespace : result;
+}
 
 // ─────────────────────────────────────
 struct ScOpenScofo : public SCUnit {
@@ -81,7 +96,7 @@ struct ScOpenScofo : public SCUnit {
         }
 
         if (m_LoadInProgress.exchange(true)) {
-            printf("\n[OpenScofo][WARN] SuperCollider score load ignored because another load is still running.\n");
+            Print("[OpenScofo][WARN] SuperCollider score load ignored because another load is still running.\n");
             return;
         }
 
@@ -102,9 +117,9 @@ struct ScOpenScofo : public SCUnit {
                     }
                 }
             } catch (const std::exception &e) {
-                printf("\n[OpenScofo][ERR] SuperCollider score load failed: %s\n", e.what());
+                Print("[OpenScofo][ERR] SuperCollider score load failed: %s\n", e.what());
             } catch (...) {
-                printf("\n[OpenScofo][ERR] SuperCollider score load failed with an unknown exception.\n");
+                Print("[OpenScofo][ERR] SuperCollider score load failed with an unknown exception.\n");
             }
             m_LoadInProgress = false;
         });
@@ -121,7 +136,15 @@ struct ScOpenScofo : public SCUnit {
     }
 
     // ─────────────────────────────────────
+    void SetNamespace(const char *namespaceName) {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
+        m_OSCNamespace = NormalizeOSCNamespace(namespaceName);
+        m_WarnedMissingReceivers.clear();
+    }
+
+    // ─────────────────────────────────────
     void RegisterActionReceiver(const char *receiver) {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         if (receiver && receiver[0] != '\0') {
             m_ActionReceivers.insert(receiver);
             m_WarnedMissingReceivers.erase(receiver);
@@ -130,6 +153,7 @@ struct ScOpenScofo : public SCUnit {
 
     // ─────────────────────────────────────
     void UnregisterActionReceiver(const char *receiver) {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
         if (receiver && receiver[0] != '\0') {
             m_ActionReceivers.erase(receiver);
         }
@@ -192,8 +216,7 @@ struct ScOpenScofo : public SCUnit {
         }
 
         OpenScofo::Description desc = m_OpenScofo->GetDescription();
-        std::string replyAddress = "/openscofo/descriptor/";
-        replyAddress += m_OpenScofo->GetDescriptionId(descriptor);
+        const std::string replyAddress = DescriptorAddress(m_OpenScofo->GetDescriptionId(descriptor));
 
         try {
             switch (descriptor) {
@@ -229,7 +252,7 @@ struct ScOpenScofo : public SCUnit {
             }
             }
         } catch (const std::exception &e) {
-            printf("\n[OpenScofo][ERR] Failed to send descriptor '%s': %s\n", descriptorId, e.what());
+            Print("[OpenScofo][ERR] Failed to send descriptor '%s': %s\n", descriptorId, e.what());
         }
     }
 
@@ -240,6 +263,18 @@ struct ScOpenScofo : public SCUnit {
             return m_OpenScofo->GetCurrentScorePosition();
         }
         return -1;
+    }
+
+    // ─────────────────────────────────────
+    void SendCurrentEvent() {
+        std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
+        if (!m_OpenScofo) {
+            return;
+        }
+
+        const float currentEvent = static_cast<float>(m_OpenScofo->GetCurrentScorePosition());
+        const std::string replyAddress = EventAddress();
+        SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), 1, &currentEvent);
     }
 
   private:
@@ -256,6 +291,7 @@ struct ScOpenScofo : public SCUnit {
     bool m_EmitEventNotifications = false;
     std::unordered_set<std::string> m_ActionReceivers;
     std::unordered_set<std::string> m_WarnedMissingReceivers;
+    std::string m_OSCNamespace = kDefaultOSCNamespace;
     std::vector<ScheduledAction> m_ScheduledActions;
     OpenScofo::Description m_LastDesc;
     int m_LastEventIndex = -1;
@@ -264,9 +300,8 @@ struct ScOpenScofo : public SCUnit {
     bool EncodeActionArgs(const OpenScofo::ScoreAction &action, std::vector<float> &values) {
         values.clear();
 
-        const bool hasStringArg = std::any_of(action.Args.begin(), action.Args.end(), [](const auto &arg) {
-            return std::holds_alternative<std::string>(arg);
-        });
+        const bool hasStringArg = std::any_of(action.Args.begin(), action.Args.end(),
+                                              [](const auto &arg) { return std::holds_alternative<std::string>(arg); });
 
         if (!hasStringArg) {
             values.reserve(action.Args.size());
@@ -303,15 +338,35 @@ struct ScOpenScofo : public SCUnit {
         return true;
     }
 
+    std::string ActionAddress(const std::string &receiver) const {
+        std::string address = "/";
+        address += m_OSCNamespace;
+        address += "/";
+        address += receiver;
+        return address;
+    }
+
+    std::string EventAddress() const {
+        return ActionAddress("currentEvent");
+    }
+
+    std::string DescriptorAddress(const char *descriptorId) const {
+        std::string address = ActionAddress("descriptor");
+        address += "/";
+        address += descriptorId;
+        return address;
+    }
+
     bool HasActionReceiver(const std::string &receiver) {
         if (m_ActionReceivers.find(receiver) != m_ActionReceivers.end()) {
             return true;
         }
 
         if (m_WarnedMissingReceivers.insert(receiver).second) {
-            printf("\n[OpenScofo][WARN] SuperCollider sendto receiver '%s' has no registered listener. "
-                   "Register it with ~openscofo.listen(...) or ~openscofo.registerActionReceiver(...).\n",
-                   receiver.c_str());
+            const std::string address = ActionAddress(receiver);
+            Print("[OpenScofo][WARN] SuperCollider sendto receiver '%s' has no registered listener. "
+                  "Register it with listen(...) or registerActionReceiver(...).\n",
+                  address.c_str());
         }
 
         return false;
@@ -320,7 +375,7 @@ struct ScOpenScofo : public SCUnit {
     // ─────────────────────────────────────
     void DispatchAction(const OpenScofo::ScoreAction &action) {
         if (action.isLua) {
-            printf("\n[OpenScofo][WARN] SuperCollider wrapper does not execute Lua score actions yet.\n");
+            Print("[OpenScofo][WARN] SuperCollider wrapper does not execute Lua score actions yet.\n");
             return;
         }
 
@@ -333,8 +388,7 @@ struct ScOpenScofo : public SCUnit {
             return;
         }
 
-        std::string replyAddress = "/OpenScofo/";
-        replyAddress += action.Receiver;
+        const std::string replyAddress = ActionAddress(action.Receiver);
         SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), static_cast<int>(values.size()),
                       values.empty() ? nullptr : values.data());
     }
@@ -413,7 +467,8 @@ struct ScOpenScofo : public SCUnit {
 
         m_LastEventIndex = currentEvent;
         float currentEventAsFloat = static_cast<float>(currentEvent);
-        SendNodeReply(&mParent->mNode, 0, "/openscofo/currentEvent", 1, &currentEventAsFloat);
+        const std::string replyAddress = EventAddress();
+        SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), 1, &currentEventAsFloat);
     }
 
     void next_a(int inNumSamples) {
@@ -447,8 +502,7 @@ struct ScOpenScofo : public SCUnit {
 // ─────────────────────────────────────
 void cmdGetCurrentEvent(ScOpenScofo *unit, sc_msg_iter *args) {
     (void)args;
-    float currentEvent = static_cast<float>(unit->GetEventIndex());
-    SendNodeReply(&unit->mParent->mNode, 0, "/openscofo/currentEvent", 1, &currentEvent);
+    unit->SendCurrentEvent();
 }
 
 // ─────────────────────────────────────
@@ -469,6 +523,12 @@ void cmdSetEventNotifications(ScOpenScofo *unit, sc_msg_iter *args) {
 void cmdSetFollowScore(ScOpenScofo *unit, sc_msg_iter *args) {
     const int enabled = args->geti();
     unit->SetFollowScore(enabled != 0);
+}
+
+// ─────────────────────────────────────
+void cmdSetNamespace(ScOpenScofo *unit, sc_msg_iter *args) {
+    const char *namespaceName = args->gets();
+    unit->SetNamespace(namespaceName);
 }
 
 // ─────────────────────────────────────
@@ -505,10 +565,11 @@ PluginLoad(OpenScofoUGens) {
     DefineUnitCmd("OpenScofoUGen", "getCurrentEvent", (UnitCmdFunc)&cmdGetCurrentEvent);
     DefineUnitCmd("OpenScofoUGen", "setFollowScore", (UnitCmdFunc)&cmdSetFollowScore);
     DefineUnitCmd("OpenScofoUGen", "setEventNotifications", (UnitCmdFunc)&cmdSetEventNotifications);
+    DefineUnitCmd("OpenScofoUGen", "setNamespace", (UnitCmdFunc)&cmdSetNamespace);
     DefineUnitCmd("OpenScofoUGen", "registerActionReceiver", (UnitCmdFunc)&cmdRegisterActionReceiver);
     DefineUnitCmd("OpenScofoUGen", "unregisterActionReceiver", (UnitCmdFunc)&cmdUnregisterActionReceiver);
     DefineUnitCmd("OpenScofoUGen", "getDescriptor", (UnitCmdFunc)&cmdGetDescriptor);
     DefineUnitCmd("OpenScofoUGen", "loadOnnxModel", (UnitCmdFunc)&cmdLoadOnnxModel);
 
-    printf("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
+    Print("\nOpenScofo version %s (%s), by Charles K. Neimog\n\n", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
 }

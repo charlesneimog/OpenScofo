@@ -1,8 +1,8 @@
-# Super Collider
+# SuperCollider
 
 <release interface="SuperCollider">Loading Releases</release>
 
-**OpenScofo** is a SuperCollider UGen for real-time score following and audio descriptor extraction. It analyzes an incoming audio stream and communicates with the SuperCollider language (sclang) via OSC messages using `SendReply`.
+**OpenScofo** is a SuperCollider UGen for real-time score following and audio descriptor extraction. It analyzes an incoming audio stream and communicates with the SuperCollider language (`sclang`) through OSC replies from the server.
 
 !!! danger "This is a pre-alpha version!"
 
@@ -12,27 +12,28 @@
 ~oscofo = OpenScofo.new(
     scorePath: "/path/to/score.txt",
     inBus: ~analysisBus,
-    sampleRate: s.sampleRate
+    sampleRate: s.sampleRate,
+    namespace: "flute"
 );
 ```
 
 ## Description
 
-`OpenScofo` is a client-side SuperCollider object that owns one server-side `OpenScofoUGen` synth. Each `OpenScofo.new(...)` call creates an independent native OpenScofo instance, so different scores and analysis settings can run at the same time. Descriptor arrays (like MFCCs) and string paths cannot be regular audio/control signals, so the wrapper uses SuperCollider's `UnitCmd` system internally and receives asynchronous `SendReply` OSC messages from the server.
+Create one `OpenScofo` object for each score follower you want to run. Each instance can load its own score, analyze its own input bus, and use its own OSC namespace for score actions. Use methods like `loadScore`, `getDescriptor`, and `listen` from the SuperCollider language; the wrapper handles the server communication for you.
 
 ## Initialization (Inputs)
 
 * **`scorePath`** *(String or nil)*: The score file loaded during initialization. Pass `nil` for descriptor-only use.
 * **`inBus`** *(Audio bus, Default: 0)*: The mono audio bus to analyze.
-* **`outBus`** *(Audio bus, Default: 0)*: A silent output bus used by the internal synth.
 * **`sampleRate`** *(Float, Default: 48000.0)*: The expected sample rate.
 * **`eventNotifications`** *(Boolean, Default: true)*: Enables automatic current-event replies.
-* **`eventAction`** *(Function or nil)*: Optional callback receiving `(eventIndex, msg)` whenever `/openscofo/currentEvent` is emitted.
+* **`eventAction`** *(Function or nil)*: Optional callback receiving `(eventIndex, msg)` whenever `/<namespace>/currentEvent` is emitted.
+* **`namespace`** *(String, Default: `"openscofo"`)*: OSC namespace used for current-event replies and score `sendto` action replies. Paths are generated as `/<namespace>/<receiver>`.
 
 `FFTSIZE` and `HOPSIZE` are read from the score file. They are not SuperCollider constructor arguments.
 
 !!! warning "Warning"
-    The UGen currently outputs a silent audio signal (`0.0`) and is used purely for its side-effects (analysis and OSC replies).
+    The UGen is used for analysis and OSC replies. It does not produce an audio signal for listening.
 
 ---
 
@@ -56,14 +57,14 @@ Enables or disables automatic OSC replies whenever the current score event chang
 * **Args:** `enabled` (Boolean)
 
 ### `getCurrentEvent`
-Requests the current event index from the score follower. The server will reply with an OSC message to `/openscofo/currentEvent`.
+Requests the current event index from the score follower. The server will reply with an OSC message to `/<namespace>/currentEvent`.
 
 ### `getDescriptor`
 Requests the value(s) of a specific audio descriptor for the current audio block.
 
 * **Args:** `descriptorId` (String, e.g., `"rms"`, `"mfcc"`, `"pitch"`),  check complet list [Descriptors](../descriptors/index.md). 
 
-* **Reply:** The server sends an OSC message to `/openscofo/descriptor/<descriptorId>` containing the float value(s). (Scalar descriptors return 1 float; array descriptors like MFCC return multiple floats).
+* **Reply:** The server sends an OSC message to `/<namespace>/descriptor/<descriptorId>` containing the float value(s). (Scalar descriptors return 1 float; array descriptors like MFCC return multiple floats).
 
 ### `loadOnnxModel`
 
@@ -81,7 +82,7 @@ Registers a SuperCollider listener for score `sendto` actions. A score action su
 sendto delay [1 0.5 250 0.4]
 ```
 
-is delivered to `/OpenScofo/delay` and can be handled with:
+is delivered to `/openscofo/delay` by default and can be handled with:
 
 ```supercollider
 ~oscofo.listen("delay", { |args, msg|
@@ -89,7 +90,57 @@ is delivered to `/OpenScofo/delay` and can be handled with:
 });
 ```
 
-SuperCollider score actions can contain float, int, and string arguments when received through `~openscofo.listen(...)`. Internally, string arguments are encoded as floats for SuperCollider's public `SendNodeReply` API and decoded by the `OpenScofo` class before your callback is called. If a receiver has no registered listener, the wrapper prints a warning.
+`listen` is a convenience method for receiving score actions from the instance namespace plus the score receiver name. Pass only the receiver name, not the full OSC address. For example, use `"delay"` or `"buffer-record"`, not `"/<namespace>/delay"`. The wrapper automatically generates action OSC paths as:
+
+```text
+/<namespace>/<receiver>
+```
+
+The default namespace is `"openscofo"`. You can set another namespace per instance to avoid action-address collisions:
+
+```supercollider
+~score1 = OpenScofo.new(
+    scorePath: "/path/to/score1.scofo",
+    namespace: "openscofo"
+);
+
+~score2 = OpenScofo.new(
+    scorePath: "/path/to/score2.scofo",
+    namespace: "piece2"
+);
+```
+
+With the same score receiver `buffer-record`, `~score1` sends to `/openscofo/buffer-record` and `~score2` sends to `/piece2/buffer-record`. In both cases, the public API stays the same:
+
+```supercollider
+~score2.listen("buffer-record", { |args|
+    args.postln;
+});
+```
+
+Score action arguments can be floats, ints, or strings when received through `~oscofo.listen(...)`. Internally, string arguments are encoded as floats for SuperCollider's public `SendNodeReply` API and decoded by the `OpenScofo` class before your callback is called. If a receiver has no registered listener, the wrapper prints a warning.
+
+For example, this score fragment:
+
+```text
+sendto buffer-record [1 bb4-a4 1]
+sendto buffer-record [2 bb4 1]
+delay 1 tempo sendto buffer-record [2 bb4 0]
+```
+
+can be received in SuperCollider with:
+
+```supercollider
+~oscofo.listen("buffer-record", { |args, msg|
+    var voice = args[0].asInteger;
+    var bufferName = args[1].asString;
+    var recording = args[2] != 0;
+
+    ["buffer-record", voice, bufferName, recording].postln;
+});
+```
+
+The callback receives `args` without the `nodeID` and `replyID` fields. The raw OSC message is still available as `msg`.
 
 ---
 
@@ -97,12 +148,12 @@ SuperCollider score actions can contain float, int, and string arguments when re
 
 You must set up `OSCFunc` or `OSCdef` listeners in sclang to receive data from the UGen.
 
-* **`/openscofo/currentEvent`**: 
+* **`/<namespace>/currentEvent`**: 
 
     * Triggered automatically if `setEventNotifications` is 1, OR manually requested via `getCurrentEvent`.
     * **Arguments:** `[ nodeID, replyID, eventIndex ]`
 
-* **`/openscofo/descriptor/<descriptorId>`**: 
+* **`/<namespace>/descriptor/<descriptorId>`**: 
 
     * Triggered by requesting `getDescriptor`.
     * **Arguments:** `[ nodeID, replyID, val1, val2, ... ]`
@@ -129,6 +180,7 @@ s.sync;
     scorePath: "/path/to/my/score.txt",
     inBus: ~analysisBus,
     sampleRate: s.sampleRate,
+    namespace: "openscofo",
     eventAction: { |eventIndex| "Current Event Index: %".format(eventIndex).postln; }
 );
 )
@@ -138,12 +190,14 @@ s.sync;
 
 ```supercollider
 (
+~namespace = "openscofo";
+
 // 1. Setup the OSC listener for the specific descriptor
 OSCdef(\mfccTracker, { |msg|
     // msg[3...] contains the array of MFCC values
     var mfccValues = msg[3..]; 
     "MFCCs: %".format(mfccValues).postln;
-}, '/oscofo/descriptor/mfcc');
+}, ("/" ++ ~namespace ++ "/descriptor/mfcc").asSymbol);
 
 ~analysisBus = Bus.audio(s, 1);
 
@@ -155,7 +209,13 @@ SynthDef(\analysisInput, { |analysisBus|
 s.sync;
 
 ~input = Synth(\analysisInput, [\analysisBus, ~analysisBus]);
-~oscofo = OpenScofo.new(nil, inBus: ~analysisBus, sampleRate: s.sampleRate, eventNotifications: false);
+~oscofo = OpenScofo.new(
+    nil,
+    inBus: ~analysisBus,
+    sampleRate: s.sampleRate,
+    namespace: ~namespace,
+    eventNotifications: false
+);
 ~oscofo.setFollowScore(false);
 
 Routine({
