@@ -234,7 +234,8 @@ NB_MODULE(_OpenScofo, m) {
 
         // ONNX
         .def_rw("timbre_onnx_model", &OpenScofo::Configuration::TimbreONNXModel)
-        .def_rw("onnx_descriptors", &OpenScofo::Configuration::ONNXDescriptors);
+        .def_rw("onnx_descriptors", &OpenScofo::Configuration::ONNXDescriptors)
+        .def_rw("requested_descriptors", &OpenScofo::Configuration::RequestedDescriptors);
 
     nb::class_<OpenScofo::OpenScofo>(m, "OpenScofo")
         .def("__init__",
@@ -264,6 +265,8 @@ NB_MODULE(_OpenScofo, m) {
 
         // Setters
         .def("set_configuration", &OpenScofo::OpenScofo::SetConfiguration)
+        .def("set_requested_descriptors", &OpenScofo::OpenScofo::SetRequestedDescriptors)
+        .def("request_descriptor", &OpenScofo::OpenScofo::RequestDescriptor)
 
         // Getters
         .def("get_configuration", &OpenScofo::OpenScofo::GetConfiguration)

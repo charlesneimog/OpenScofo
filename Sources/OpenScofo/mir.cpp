@@ -48,6 +48,7 @@ MIR::~MIR() {
 // ─────────────────────────────────────
 void MIR::UpdateConfiguration(const Configuration &Config) {
     m_Config = Config;
+    UpdateDescriptorFlags();
     m_PrevCentroid = 0.0;
     m_PreviousSpectralPower.assign(static_cast<size_t>(std::lround(m_Config.FFTSize / 2.0f)) + 1, 0.0);
     m_SpectralPrefix.resize(m_Config.FFTSize / 2 + 2);
@@ -75,15 +76,75 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
     }
 
     FFTInit();
-    OnsetInit();
-    MFCCInit();
-    SpectralChromaInit();
-    ZeroCrossingRateInit();
-    YINInit();
+    if (m_NeedOnset) {
+        OnsetInit();
+    }
+    if (m_NeedMFCC) {
+        MFCCInit();
+    }
+    if (m_NeedChroma) {
+        SpectralChromaInit();
+    }
+    if (m_NeedZCR) {
+        ZeroCrossingRateInit();
+    }
+    if (m_NeedYIN) {
+        YINInit();
+    }
     InitITURFilters();
 
     spdlog::debug("Init MIR audio parameters using SR {}, FFTSize {}, HopSize {}", Config.SR, Config.FFTSize,
                   Config.HOPSize);
+}
+
+// ─────────────────────────────────────
+bool MIR::DescriptorRequested(Descriptors Descriptor) const {
+    return std::find(m_Config.RequestedDescriptors.begin(), m_Config.RequestedDescriptors.end(), Descriptor) !=
+           m_Config.RequestedDescriptors.end();
+}
+
+// ─────────────────────────────────────
+void MIR::UpdateDescriptorFlags() {
+    m_NeedYIN = DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE);
+    m_NeedMFCC = DescriptorRequested(MFCC) || DescriptorRequested(MELOGRAM);
+    m_NeedChroma = DescriptorRequested(CHROMA);
+    m_NeedZCR = DescriptorRequested(ZCR) || DescriptorRequested(EXTENDEDTECHNIQUE);
+    m_NeedExtendedTech = DescriptorRequested(EXTENDEDTECHNIQUE);
+    m_NeedOnset = DescriptorRequested(ODSONSET) || m_NeedExtendedTech;
+    m_NeedONNX = DescriptorRequested(ONNX);
+
+    if (!m_NeedONNX) {
+        return;
+    }
+
+    for (const Descriptors d : m_ONNXDescriptors) {
+        switch (d) {
+        case MFCC:
+        case MELOGRAM:
+            m_NeedMFCC = true;
+            break;
+        case CHROMA:
+            m_NeedChroma = true;
+            break;
+        case YIN:
+        case YINCONFIDENCE:
+            m_NeedYIN = true;
+            break;
+        case ZCR:
+            m_NeedZCR = true;
+            break;
+        case ODSONSET:
+            m_NeedOnset = true;
+            break;
+        case EXTENDEDTECHNIQUE:
+            m_NeedZCR = true;
+            m_NeedOnset = true;
+            m_NeedExtendedTech = true;
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 // ╭─────────────────────────────────────╮
@@ -197,6 +258,22 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 
     m_ONNXModelLoaded = true;
     m_ONNXDescriptors = Descriptors;
+    UpdateDescriptorFlags();
+    if (m_NeedOnset) {
+        OnsetInit();
+    }
+    if (m_NeedMFCC) {
+        MFCCInit();
+    }
+    if (m_NeedChroma) {
+        SpectralChromaInit();
+    }
+    if (m_NeedZCR) {
+        ZeroCrossingRateInit();
+    }
+    if (m_NeedYIN) {
+        YINInit();
+    }
     spdlog::debug("ONNX Model Loaded");
     // Count
     m_ONNXDescriptorsSize = 0;
@@ -374,9 +451,6 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 
 // ─────────────────────────────────────
 void MIR::ONNXExec(Description &Desc) {
-    if (!m_ONNXModelLoaded) {
-        return;
-    }
 
     float *out = m_ONNXDescriptorsArray.data();
     for (auto &w : m_Writers) {
@@ -914,10 +988,6 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     Desc.StdDev = std::sqrt(Variance * Mean);
     const double binToHz = (m_Config.SR * 0.5) / std::max(1, NHalf - 1);
     Desc.SpectralRolloff = static_cast<double>(rolloffBin) * binToHz;
-
-    OnsetExec(Desc);
-    MFCCExec(Desc);
-    SpectralChromaExec(Desc);
 }
 
 // ╭─────────────────────────────────────╮
@@ -1244,8 +1314,18 @@ void MIR::AddReverb(Description &Desc, double decay) {
 void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     // 1. Temporal Domain
     GetSignalPower(In, Desc);
-    // YINExec(In, Desc);
-    ZeroCrossingRateExec(In, Desc);
+    if (m_NeedZCR) {
+        ZeroCrossingRateExec(In, Desc);
+    } else {
+        Desc.ZeroCrossingRate = 0.0;
+    }
+
+    if (m_NeedYIN) {
+        YINExec(In, Desc);
+    } else {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+    }
 
     // 2. Frequency Domain (windowing + FFT)
     const double *x = In.data();
@@ -1255,8 +1335,32 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     }
 
     GetSpectralDescriptions(Desc);
-    ExtendedTechExec(Desc);
-    ONNXExec(Desc);
+
+    if (m_NeedOnset) {
+        OnsetExec(Desc);
+    } else {
+        Desc.Onset = 0.0;
+    }
+
+    if (m_NeedExtendedTech) {
+        ExtendedTechExec(Desc);
+    } else {
+        Desc.ExtendedTechProb = 0.0;
+    }
+
+    if (m_NeedMFCC) {
+        MFCCExec(Desc);
+    }
+
+    if (m_NeedChroma) {
+        SpectralChromaExec(Desc);
+    }
+
+    if (m_ONNXModelLoaded && m_NeedONNX) {
+        ONNXExec(Desc);
+    } else {
+        Desc.ONNX.clear();
+    }
 }
 
 } // namespace OpenScofo

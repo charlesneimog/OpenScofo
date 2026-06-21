@@ -332,6 +332,13 @@ bool VampOpenScofo::initialise(size_t channels, size_t stepSize, size_t blockSiz
 
     delete m_OpenScofo;
     m_OpenScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_blockSize);
+    std::vector<OpenScofo::Descriptors> descriptors;
+    for (const auto &spec : GetVampOutputSpecs()) {
+        if (spec.descriptor != OpenScofo::Descriptors::INVALID) {
+            descriptors.push_back(spec.descriptor);
+        }
+    }
+    m_OpenScofo->SetRequestedDescriptors(descriptors);
 
     if (!m_scorePaths.empty()) {
         LoadScoreAtIndex(m_selectedScoreIndex);

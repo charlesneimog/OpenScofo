@@ -612,6 +612,7 @@ static void *oscofo_new(t_symbol *s, long argc, t_atom *argv) {
     x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
     x->OpenScofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(x));
     x->OpenScofo->SetLogLevel(x->log);
+    x->OpenScofo->SetRequestedDescriptors(x->RequestMIR);
 
 #ifdef OPENSCOFO_LUA
     x->OpenScofo->LuaAddModule("max", luaopen_max);

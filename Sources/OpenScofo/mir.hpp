@@ -49,6 +49,8 @@ class MIR {
 
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
     double PositiveRemainder(double value, double modulus) const;
+    bool DescriptorRequested(Descriptors Descriptor) const;
+    void UpdateDescriptorFlags();
     void ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &acc, size_t NHalf);
     void GetSpectralDescriptions(Description &Desc);
 
@@ -140,6 +142,14 @@ class MIR {
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;
     double m_PrevCentroid = 0.0;
+
+    bool m_NeedYIN = false;
+    bool m_NeedMFCC = false;
+    bool m_NeedChroma = false;
+    bool m_NeedZCR = false;
+    bool m_NeedOnset = false;
+    bool m_NeedExtendedTech = false;
+    bool m_NeedONNX = false;
 
     // Time
     double m_EventTimeElapsed = 0.0; // ms
