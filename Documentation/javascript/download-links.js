@@ -25,6 +25,20 @@ function getIcons(os_name) {
                 <p style="margin: 0;">${os_name}</p>
             </div>`;
 }
+
+function isInstallerAsset(asset) {
+    return asset.name.startsWith("Installer-");
+}
+
+function getAssetOS(asset, assetName) {
+    if (assetName === "JavaScript" || assetName === "Emscripten") return "WASM";
+
+    const parts = asset.name.replace(/\.zip$/, "").split("-");
+    if (parts[0] === "Emscripten") return "WASM";
+
+    return parts[parts.length - 1] || "unknown";
+}
+
 // ─────────────────────────────────────
 async function getLatestTagWithDetails() {
     console.log("Requesting Github Data");
@@ -63,7 +77,7 @@ function renderReleaseTable(data, assetName) {
 
     let filteredAssets;
     if (assetName === "All") {
-        filteredAssets = data.assets; // no filter
+        filteredAssets = data.assets.filter(isInstallerAsset);
     } else if (assetName === "JavaScript") {
         filteredAssets = data.assets.filter((a) => a.name.includes("Emscripten"));
     } else {
@@ -92,13 +106,8 @@ function renderReleaseTable(data, assetName) {
 
     const tbody = document.createElement("tbody");
     filteredAssets.forEach((a) => {
-        const parts = a.name.replace(".zip", "").split("-");
         const version = data.tag;
-        let os = parts[parts.length - 1] || "unknown";
-        if (assetName === "JavaScript" || assetName === "Emscripten") os = "WASM";
-        if (parts[0] === "Emscripten") {
-            os = "WASM";
-        }
+        const os = getAssetOS(a, assetName);
 
         const tr = document.createElement("tr");
 
