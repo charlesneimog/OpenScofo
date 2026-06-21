@@ -241,6 +241,17 @@ jobs:
                   name: Python-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
                   path: dist/*.whl
 
+            - name: Upload Emscripten
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@v6
+              with:
+                  name: Emscripten-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-Linux
+                  path: |
+                      build-wasm/Sources/Wrappers/Wasm/OpenScofo.js
+                      build-wasm/Sources/Wrappers/Wasm/OpenScofo.wasm
+                      build-wasm/Sources/Wrappers/Wasm/OpenScofo*.worker.js
+                  if-no-files-found: error
+
             - name: Publish Pip
               if: ${{ github.event.inputs.publish_release == 'true' }}
               continue-on-error: true
