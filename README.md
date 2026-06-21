@@ -66,8 +66,10 @@ cmake --build build
 
 OpenScofo is distributed under the GNU General Public License version 3 (GPLv3).
 
-The GPLv3 is a free and open source license. Any software that incorporates, links to (including dynamically), or forms a combined work with OpenScofo and is distributed must also be licensed under the GPLv3, with its complete corresponding source code made available.
+The GPLv3 is a free and open source license. Software distributed as a derivative work of OpenScofo, or as part of a combined work that is subject to the GPLv3, must itself be licensed under the GPLv3 and be accompanied by its complete corresponding source code.
 
-Non-compliance automatically terminates the license rights granted under the GPLv3 and may constitute copyright infringement.
+The Free Software Foundation considers both static and **dynamic** linking to generally create such combined works.
 
-Full license text: [https://www.gnu.org/licenses/gpl-3.0.html](https://www.gnu.org/licenses/gpl-3.0.html)
+Failure to comply with the GPLv3 automatically terminates the rights granted under the license and may constitute copyright infringement.
+
+Full license text: GNU GPLv3 License Text
