@@ -2,6 +2,7 @@
 s.waitForBoot {
     var threshold = 0.45;
     ~lastHfr = -1.0;
+    ~namespace = "openscofo";
     ~analysisBus = Bus.audio(s, 1);
 
     OSCdef(\oscofoHfr, { |msg|
@@ -10,7 +11,7 @@ s.waitForBoot {
             ~lastHfr = hfr;
             ("Bright sound detected. hfr=" ++ hfr.round(0.001)).postln;
         };
-    }, '/oscofo/descriptor/hfr', s.addr);
+    }, ("/" ++ ~namespace ++ "/descriptor/hfr").asSymbol, s.addr);
 
     SynthDef(\oscofo_mic_input, { |analysisBus|
         Out.ar(analysisBus, SoundIn.ar(0));
@@ -24,6 +25,7 @@ s.waitForBoot {
         scorePath: nil,
         inBus: ~analysisBus,
         sampleRate: s.sampleRate,
+        namespace: ~namespace,
         eventNotifications: false
     );
     ~oscofo.setFollowScore(false);

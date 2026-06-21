@@ -10,12 +10,12 @@ OpenScofoUGen : UGen {
 
 OpenScofo {
     var <server, <synth, <scorePath, <sampleRate, <target, <addAction;
-    var <inBus, <outBus, <unitIndex, <eventOSCDef;
+    var <inBus, <unitIndex, <eventOSCDef, <namespace;
     var eventAction, synthDefName, eventOSCDefName, actionOSCDefs;
 
-    *new { arg scorePath, inBus = 0, outBus = 0, sampleRate, server, target, addAction = \addToTail,
-        eventNotifications = true, eventAction;
-        ^super.new.init(scorePath, inBus, outBus, sampleRate, server, target, addAction, eventNotifications, eventAction)
+    *new { arg scorePath, inBus = 0, sampleRate, server, target, addAction = \addToTail,
+        eventNotifications = true, eventAction, namespace = "openscofo";
+        ^super.new.init(scorePath, inBus, sampleRate, server, target, addAction, eventNotifications, eventAction, namespace)
     }
 
     findUnitIndex {
@@ -33,17 +33,17 @@ OpenScofo {
         ^openScofoUGen.synthIndex ? 0;
     }
 
-    init { arg scorePathArg, inBusArg = 0, outBusArg = 0, sampleRateArg, serverArg, targetArg,
-        addActionArg = \addToTail, eventNotifications = true, eventActionArg;
+    init { arg scorePathArg, inBusArg = 0, sampleRateArg, serverArg, targetArg,
+        addActionArg = \addToTail, eventNotifications = true, eventActionArg, namespaceArg = "openscofo";
         var sr;
 
         server = serverArg ? Server.default;
         scorePath = scorePathArg;
         inBus = inBusArg;
-        outBus = outBusArg;
         sampleRate = sampleRateArg ? server.sampleRate;
         target = targetArg ? server.defaultGroup;
         addAction = addActionArg;
+        namespace = this.normalizeNamespace(namespaceArg);
         eventAction = eventActionArg;
         actionOSCDefs = IdentityDictionary.new;
 
@@ -51,23 +51,22 @@ OpenScofo {
         synthDefName = ("OpenScofo_" ++ this.identityHash).asSymbol;
         eventOSCDefName = ("OpenScofo_event_" ++ this.identityHash).asSymbol;
 
-        SynthDef(synthDefName, { arg inBus = 0, outBus = 0, sampleRate = sr;
-            var in, tracker;
+        SynthDef(synthDefName, { arg inBus = 0, sampleRate = sr;
+            var in;
             in = In.ar(inBus, 1);
-            tracker = OpenScofoUGen.ar(in, sampleRate);
-            Out.ar(outBus, Silent.ar(2));
+            OpenScofoUGen.ar(in, sampleRate);
         }).add;
 
         server.sync;
         synth = Synth(synthDefName, [
             \inBus, inBus,
-            \outBus, outBus,
             \sampleRate, sampleRate
         ], target: target, addAction: addAction);
         server.sync;
 
         unitIndex = this.findUnitIndex;
 
+        this.setNamespace(namespace);
         if(scorePath.notNil) {
             this.loadScore(scorePath);
         };
@@ -81,6 +80,26 @@ OpenScofo {
             Error("OpenScofo instance has no Synth").throw;
         };
         synth.server.sendMsg("/u_cmd", synth.nodeID, unitIndex, command.asString, *args.asArray);
+    }
+
+    normalizeNamespace { arg namespaceArg;
+        var value = namespaceArg.asString;
+
+        while({ value.notEmpty and: { value[0] == $/ } }) {
+            value = if(value.size > 1, { value.copyRange(1, value.size - 1) }, { "" });
+        };
+        while({ value.notEmpty and: { value[value.size - 1] == $/ } }) {
+            value = if(value.size > 1, { value.copyRange(0, value.size - 2) }, { "" });
+        };
+
+        if(value.isEmpty) {
+            ^"openscofo"
+        };
+        ^value
+    }
+
+    actionAddress { arg receiver;
+        ^("/" ++ namespace ++ "/" ++ receiver.asString).asSymbol
     }
 
     loadScore { arg path;
@@ -98,6 +117,11 @@ OpenScofo {
 
     setFollowScore { arg enabled = true;
         ^this.cmd("setFollowScore", [if(enabled, 1, 0)]);
+    }
+
+    setNamespace { arg namespaceArg = "openscofo";
+        namespace = this.normalizeNamespace(namespaceArg);
+        ^this.cmd("setNamespace", [namespace]);
     }
 
     setEventNotifications { arg enabled = true;
@@ -161,7 +185,7 @@ OpenScofo {
         var receiverString, oscName, address;
         receiverString = receiver.asString;
         oscName = ("OpenScofo_action_" ++ this.identityHash ++ "_" ++ receiverString).asSymbol;
-        address = ("/OpenScofo/" ++ receiverString).asSymbol;
+        address = this.actionAddress(receiverString);
 
         this.unlisten(receiverString);
         actionOSCDefs[receiverString] = OSCdef(oscName, { |msg|
@@ -190,7 +214,7 @@ OpenScofo {
         if(action.notNil) {
             eventOSCDef = OSCdef(eventOSCDefName, { |msg|
                 action.value(msg[3].asInteger, msg);
-            }, '/oscofo/currentEvent', server.addr);
+            }, this.actionAddress("currentEvent"), server.addr);
         };
     }
 
