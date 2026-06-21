@@ -62,6 +62,20 @@ struct CSoundOpenScofo : Plugin<3, 4> {
     int m_LastActionStateIndex = -1;
     std::vector<ScheduledAction> m_ScheduledActions;
 
+    bool SetControlChannel(const std::string &name, MYFLT value) {
+        CSOUND *cs = csound->get_csound();
+        MYFLT *channel = nullptr;
+        const int result =
+            cs->GetChannelPtr(cs, &channel, name.c_str(), CSOUND_CONTROL_CHANNEL | CSOUND_INPUT_CHANNEL);
+        if (result != CSOUND_SUCCESS || channel == nullptr) {
+            csound->warning("[OpenScofo] Failed to set Csound control channel '" + name + "'.");
+            return false;
+        }
+
+        *channel = value;
+        return true;
+    }
+
     bool ConvertActionArgs(const OpenScofo::ScoreAction &action, std::vector<double> &values) {
         values.clear();
         values.reserve(action.Args.size());
@@ -99,12 +113,11 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         }
 
         const std::string base = "OpenScofo/" + action.Receiver;
-        CSOUND *cs = reinterpret_cast<CSOUND *>(csound);
-        csoundSetControlChannel(cs, (base + "/count").c_str(), static_cast<MYFLT>(values.size()));
+        SetControlChannel(base + "/count", static_cast<MYFLT>(values.size()));
         for (size_t i = 0; i < values.size(); ++i) {
-            csoundSetControlChannel(cs, (base + "/" + std::to_string(i)).c_str(), static_cast<MYFLT>(values[i]));
+            SetControlChannel(base + "/" + std::to_string(i), static_cast<MYFLT>(values[i]));
         }
-        csoundSetControlChannel(cs, (base + "/trigger").c_str(), static_cast<MYFLT>(1.0));
+        SetControlChannel(base + "/trigger", static_cast<MYFLT>(1.0));
     }
 
     int64_t ActionDelaySamples(const OpenScofo::ScoreAction &action) {
