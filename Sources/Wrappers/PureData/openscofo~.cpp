@@ -222,7 +222,7 @@ static void openscofo_get(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     }
 
     std::string method = atom_getsymbol(argv)->s_name;
-    if (method == "descriptors") {
+    if (method == "description") {
         if (argc < 2) {
             pd_error(x, "[openscofo~] descriptors method require <arrayname>");
             return;
