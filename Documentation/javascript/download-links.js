@@ -4,6 +4,24 @@ const assets_list = ["PureData", "Max", "Vamp", "SuperCollider", "CSound", "Pyth
 window.latestData = null;
 
 // ─────────────────────────────────────
+function ensureDownloadLinkStyles() {
+    if (document.getElementById("download-link-styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "download-link-styles";
+    style.textContent = `
+        [data-md-color-scheme="slate"] .release-os {
+            color: #fff;
+        }
+
+        [data-md-color-scheme="slate"] .release-os .twemoji img {
+            filter: invert(1);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ─────────────────────────────────────
 function getIcons(os_name) {
     let iconSrc = "";
     if (os_name == "Windows") {
@@ -20,7 +38,7 @@ function getIcons(os_name) {
             "https://raw.githubusercontent.com/squidfunk/mkdocs-material/master/material/templates/.icons/simple/webassembly.svg";
     }
 
-    return `<div style="display: flex; align-items: center; gap: 0.5em;">
+    return `<div class="release-os" style="display: flex; align-items: center; gap: 0.5em;">
                 <span class="twemoji"><img src="${iconSrc}" ></span>
                 <p style="margin: 0;">${os_name}</p>
             </div>`;
@@ -74,6 +92,8 @@ async function getLatestTagWithDetails() {
 function renderReleaseTable(data, assetName) {
     const container = document.querySelector(`release[interface="${assetName}"]`);
     if (!container) return;
+
+    ensureDownloadLinkStyles();
 
     let filteredAssets;
     if (assetName === "All") {
