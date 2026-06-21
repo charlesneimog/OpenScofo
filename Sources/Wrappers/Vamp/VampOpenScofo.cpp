@@ -32,13 +32,11 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
         // Spectral arrays
         {"magnitude", "Magnitude", "Spectral array: magnitude spectrum", VampOutputKind::Magnitude,
          OpenScofo::Descriptors::MAGNITUDE},
-        {"power", "Power", "Spectral array: power spectrum", VampOutputKind::Power,
-         OpenScofo::Descriptors::POWERARRAY},
+        {"power", "Power", "Spectral array: power spectrum", VampOutputKind::Power, OpenScofo::Descriptors::POWERARRAY},
         {"spectral_magnitude_norm", "Spectral Magnitude Norm", "Spectral array: bin-normalized magnitude",
          VampOutputKind::SpectralMagnitudeNorm, OpenScofo::Descriptors::INVALID},
-        {"spectral_magnitude_frame_norm", "Spectral Magnitude Frame Norm",
-         "Spectral array: frame-normalized magnitude", VampOutputKind::SpectralMagnitudeFrameNorm,
-         OpenScofo::Descriptors::INVALID},
+        {"spectral_magnitude_frame_norm", "Spectral Magnitude Frame Norm", "Spectral array: frame-normalized magnitude",
+         VampOutputKind::SpectralMagnitudeFrameNorm, OpenScofo::Descriptors::INVALID},
         {"reverb_spectral_power", "Reverb Spectral Power", "Spectral array: reverberant spectral power",
          VampOutputKind::ReverbSpectralPower, OpenScofo::Descriptors::INVALID},
 
@@ -47,8 +45,7 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
          OpenScofo::Descriptors::MFCC},
         {"logmel", "Log Mel Spectrum", "Spectral array: log mel spectrum", VampOutputKind::LogMel,
          OpenScofo::Descriptors::MELOGRAM},
-        {"chroma", "Chroma", "Spectral array: chroma energy", VampOutputKind::Chroma,
-         OpenScofo::Descriptors::CHROMA},
+        {"chroma", "Chroma", "Spectral array: chroma energy", VampOutputKind::Chroma, OpenScofo::Descriptors::CHROMA},
 
         // Event/probability
         {"onset", "Onset", "Event/probability: onset detection function", VampOutputKind::Scalar,
@@ -71,8 +68,7 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
         {"flux", "Spectral Flux", "Spectral scalar: flux", VampOutputKind::Scalar, OpenScofo::Descriptors::FLUX},
         {"irregularity", "Spectral Irregularity", "Spectral scalar: irregularity", VampOutputKind::Scalar,
          OpenScofo::Descriptors::IRREGULARITY},
-        {"crest", "Spectral Crest", "Spectral scalar: crest", VampOutputKind::Scalar,
-         OpenScofo::Descriptors::CREST},
+        {"crest", "Spectral Crest", "Spectral scalar: crest", VampOutputKind::Scalar, OpenScofo::Descriptors::CREST},
         {"centroid", "Spectral Centroid", "Spectral scalar: centroid", VampOutputKind::Scalar,
          OpenScofo::Descriptors::CENTROID},
         {"centroid_velocity", "Centroid Velocity", "Spectral scalar: centroid velocity", VampOutputKind::Scalar,
@@ -95,8 +91,7 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
          OpenScofo::Descriptors::ZCR},
         {"skewness", "Spectral Skewness", "Spectral scalar: skewness", VampOutputKind::Scalar,
          OpenScofo::Descriptors::SKEWNESS},
-        {"slope", "Spectral Slope", "Spectral scalar: slope", VampOutputKind::Scalar,
-         OpenScofo::Descriptors::SLOPE},
+        {"slope", "Spectral Slope", "Spectral scalar: slope", VampOutputKind::Scalar, OpenScofo::Descriptors::SLOPE},
         {"kurtosis", "Spectral Kurtosis", "Spectral scalar: kurtosis", VampOutputKind::Scalar,
          OpenScofo::Descriptors::KURTOSIS},
 
@@ -189,7 +184,9 @@ std::string VampOpenScofo::getName() const {
 
 // ─────────────────────────────────────
 std::string VampOpenScofo::getDescription() const {
-    return "A Machine Listening System for Contemporary Music (just descriptors work on vamp plugins)";
+    return "A Machine Listening System for Contemporary Music (just descriptors work on vamp plugins) (v" +
+           std::string(OPENSCOFO_VERSION) + ")";
+    ;
 }
 
 // ─────────────────────────────────────
