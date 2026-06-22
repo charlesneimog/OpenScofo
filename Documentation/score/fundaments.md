@@ -14,10 +14,15 @@ The `OpenScofo` **Score** serves as the foundation for creating an interactive p
 
 <div markdown  style="text-align:center;">
 ```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart TD
-    SCORE{Score}
-    SCORE --> COMMENTS([Comments]) & CONFIG([Config]) & EVENTS([Events]) & LUA([Lua])
+flowchart TB
+    SCORE[Score]
+    subgraph SCORE_CONTENT[" "]
+        COMMENTS[Comments]
+        CONFIG[Config]
+        EVENTS[Events]
+        LUA[Lua]
+    end
+    SCORE --> SCORE_CONTENT
 ```
 </div>
 
