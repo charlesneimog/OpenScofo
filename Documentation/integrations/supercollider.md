@@ -1,7 +1,5 @@
 # SuperCollider
 
-<release interface="SuperCollider">Loading Releases</release>
-
 **OpenScofo** is a SuperCollider UGen for real-time score following and audio descriptor extraction. It analyzes an incoming audio stream and sends analysis results to the SuperCollider language (`sclang`) via OSC messages from the server, enabling the creation of real-time algorithms that respond to and process the sound as it is performed.
 
 !!! danger "This is a pre-alpha version!"

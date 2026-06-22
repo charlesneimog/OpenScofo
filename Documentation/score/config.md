@@ -1,4 +1,4 @@
-# Configuration
+# Score Configuration
 
 `OpenScofo` is configured directly through the score, which simplifies its use across different environments.
 

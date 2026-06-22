@@ -1,10 +1,9 @@
 # CSound
 
-<release interface="CSound">Loading Releases</release>
-
 `OpenScofo` features a Csound opcode dedicated to real-time score following.
 
 !!! danger "This is a pre-alpha version!"
+    The Csound opcode is not ready yet!
 
 ## Loading `OpenScofo`
 
@@ -17,6 +16,7 @@ To load the opcode, reference the compiled library in your `<CsOptions>` block:
 ```
 
 !!! warning "Use `.dylib` for macOS and `.dll` for Windows."
+    For Windows use `--opcode-lib=/path/to/OpenScofo.dll`, for macOS use `--opcode-lib=/path/to/OpenScofo.dylib`.
 
 -----
 

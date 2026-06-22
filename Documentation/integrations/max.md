@@ -1,10 +1,6 @@
 # Max
 
-<release interface="Max"><i>Loading Releases</i></release>
-
 **OpenScofo** is available in Max as the `openscofo~` external. It analyzes a mono audio signal for real-time score following, reports the current score event and tempo, triggers score actions through Max receivers, and can output audio descriptors for analysis or machine-learning workflows.
-
-!!! danger "This is a pre-alpha version!"
 
 ## Syntax
 

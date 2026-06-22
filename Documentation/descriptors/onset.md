@@ -5,22 +5,11 @@
 
 Boolean value (`0` or `1`) indicating whether a sound event onset has been detected. Evaluated using the `onsetsds` library's. We highly recommend the reading of the paper _Adaptive whitening for improved real-time audio onset detection_ to better understand how the onset detection works and how to choose the best method for the music you will use (Table 1 and Table 2). 
 
+Default method uses: 
 
-<div class="grid cards" style="font-weigth:bold" markdown>
+$$MKL_n = \sum_{k=0}^{K} \log \left ( 1 + \frac{|S_{n,k}|}{|S_{n-1,k}|} \right )$$
 
--   ??? equation "Equation"
-
-        Default method uses: 
-
-        $MKL_n = \sum_{k=0}^{K} \log \left ( 1 + \frac{|S_{n,k}|}{|S_{n-1,k}|} \right )$
-
-        But all methods descripted in the article can be used using the [`ONSETFUNCTION`](./../score/config.md#onsetfunction){ data-preview } on config. Where $S_{n,k}$ is a FFT bin.
-
--   ??? note "Notes"
-
-</div>
-
-
+But all methods descripted in the article can be used using the [`ONSETFUNCTION`](./../score/config.md#onsetfunction){ data-preview } on config. Where $S_{n,k}$ is a FFT bin.
 
 ## Different methods
 

@@ -2,7 +2,7 @@
 
 The AI model is designed for musicians working with expanded instrumental vocabularies, including extended techniques and non-traditional sounds. It can recognize not only conventional pitched material, but also gestural, percussive, and embodied sound sources such as body percussion, breath, vocal noises, and mouth sounds. The goal is to support performance contexts where sound extends beyond standard pitched instruments.
 
-The model operates with **spectral descriptors** provided by `OpenScofo` (see previous section). To enable real-time detection, it must first be trained on labeled examples of the techniques and sound categories you want to recognize during performance.
+The model operates with **audio descriptors** provided by `OpenScofo` (see previous sections). These include amplitude, onset, time-domain, pitch, and spectral descriptors. To enable real-time detection, it must first be trained on labeled examples of the techniques and sound categories you want to recognize during performance.
 
 ---
 
@@ -56,7 +56,7 @@ Flute/
 
 ### 2. Feature Extraction
 
-After preparing the dataset, select the spectral descriptors used for training.
+After preparing the dataset, select the audio descriptors used for training.
 
 Commonly used feature set in my pieces:
 
@@ -78,7 +78,7 @@ You may adjust this set depending on the target instrument and recording conditi
 Once the dataset and feature set are defined:
 
 1. Load all audio files from the dataset structure
-2. Extract the selected spectral descriptors
+2. Extract the selected audio descriptors
 3. Train a **Random Forest classifier**
 4. Save the trained model for inference in `OpenScofo`
 

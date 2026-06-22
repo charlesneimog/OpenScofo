@@ -23,7 +23,6 @@ When using `MIDI`, each note corresponds to a specific MIDI number, where middle
 
 Pitch names are organized into three components: **class**, **accidental modifiers**, and **octave**.
 
-
 #### Class 
 
 We follow the standard seven note classes of Western music: `C`, `D`, `E`, `F`, `G`, `A`, `B`. These are the natural notes, forming the diatonic scale. Each note class can be modified by accidentals to indicate pitch alterations.
@@ -45,7 +44,8 @@ We follow the standard seven note classes of Western music: `C`, `D`, `E`, `F`, 
 
 The octave in a pitch name defines its position on the keyboard. `OpenScofo` follows the _Scientific Pitch Notation_ ([SPN](https://rwu.pressbooks.pub/musictheory/chapter/aspn/){:target="_black"}) convention, where `C4` represents middle C (the central C on a piano).
 
-!!! warning "On `OpenScofo`, `C4` refers to middle C (the central C on a piano)."
+!!! warning "C4 notation"
+    `C4` refers to middle C (the central C on a piano).
 
 ---
 ## Time Definition

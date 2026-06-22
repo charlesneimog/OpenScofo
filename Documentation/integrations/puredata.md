@@ -2,8 +2,6 @@
 
 **OpenScofo** is available in Pure Data as the `openscofo~` external. It can follow an OpenScofo score from a mono audio signal, report the current score event and tempo, execute score actions through Pure Data receivers, and output audio descriptors for real-time or offline analysis.
 
-!!! danger "This is a pre-alpha version!"
-
 ## Syntax
 
 ```puredata
