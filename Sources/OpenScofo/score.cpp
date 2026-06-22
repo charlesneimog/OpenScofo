@@ -1,4 +1,6 @@
 #include "OpenScofo.hpp"
+#include <algorithm>
+#include <cctype>
 #include <tree_sitter/api.h>
 
 namespace OpenScofo {
@@ -701,6 +703,7 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             std::string d = GetCodeStr(ScoreStr, child);
             Config.ONNXDescriptors.push_back(d);
         }
+        return;
     }
 }
 

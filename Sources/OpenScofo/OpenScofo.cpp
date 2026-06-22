@@ -508,7 +508,7 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
         return "mfcc";
     case Descriptors::CHROMA:
         return "chroma";
-    case Descriptors::MELOGRAM:
+    case Descriptors::LOGMEL:
         return "logmel";
     case Descriptors::ZCR:
         return "zcr";
@@ -569,7 +569,7 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
     if (strcmp(s, "mfcc") == 0) {
         return Descriptors::MFCC;
     } else if (strcmp(s, "logmel") == 0) {
-        return Descriptors::MELOGRAM;
+        return Descriptors::LOGMEL;
     } else if (strcmp(s, "rms") == 0) {
         return Descriptors::RMS;
     } else if (strcmp(s, "loudness") == 0) {
@@ -703,7 +703,7 @@ double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
 
     // Vector descriptors: cannot return single value
     case Descriptors::MFCC:
-    case Descriptors::MELOGRAM:
+    case Descriptors::LOGMEL:
     case Descriptors::MAGNITUDE:
     case Descriptors::POWERARRAY:
     case Descriptors::CHROMA:
@@ -736,7 +736,7 @@ std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descripto
         return Desc.MFCC;
     case Descriptors::CHROMA:
         return Desc.Chroma;
-    case Descriptors::MELOGRAM:
+    case Descriptors::LOGMEL:
         return Desc.LogMelSpectrum;
     case Descriptors::POWERARRAY:
         return Desc.Power;

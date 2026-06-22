@@ -70,6 +70,10 @@ static void PushDescription(lua_State *L, const Description &desc) {
     lua_setfield(L, -2, "spectral_flux");
     lua_pushnumber(L, desc.SpectralIrregularity);
     lua_setfield(L, -2, "spectral_irregularity");
+    lua_pushnumber(L, desc.SpectralIrregularityJensen);
+    lua_setfield(L, -2, "spectral_irregularity_jensen");
+    lua_pushnumber(L, desc.SpectralIrregularityKrimphoff);
+    lua_setfield(L, -2, "spectral_irregularity_krimphoff");
     lua_pushnumber(L, desc.SpectralCrest);
     lua_setfield(L, -2, "spectral_crest");
     lua_pushnumber(L, desc.SpectralCentroid);

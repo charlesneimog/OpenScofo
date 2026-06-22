@@ -106,7 +106,7 @@ bool MIR::DescriptorRequested(Descriptors Descriptor) const {
 // ─────────────────────────────────────
 void MIR::UpdateDescriptorFlags() {
     m_NeedYIN = DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE);
-    m_NeedMFCC = DescriptorRequested(MFCC) || DescriptorRequested(MELOGRAM);
+    m_NeedMFCC = DescriptorRequested(MFCC) || DescriptorRequested(LOGMEL);
     m_NeedChroma = DescriptorRequested(CHROMA);
     m_NeedZCR = DescriptorRequested(ZCR) || DescriptorRequested(EXTENDEDTECHNIQUE);
     m_NeedExtendedTech = DescriptorRequested(EXTENDEDTECHNIQUE);
@@ -120,7 +120,7 @@ void MIR::UpdateDescriptorFlags() {
     for (const Descriptors d : m_ONNXDescriptors) {
         switch (d) {
         case MFCC:
-        case MELOGRAM:
+        case LOGMEL:
             m_NeedMFCC = true;
             break;
         case CHROMA:
@@ -291,7 +291,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         case MAGNITUDE:
             m_ONNXDescriptorsSize += (m_Config.FFTSize / 2) + 1;
             break;
-        case MELOGRAM:
+        case LOGMEL:
             m_ONNXDescriptorsSize += m_Config.MFCCMels;
             break;
         default:
@@ -324,7 +324,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
                     *out++ = desc.Power[i];
             });
             break;
-        case MELOGRAM:
+        case LOGMEL:
             m_Writers.push_back([this](const Description &desc, float *&out) {
                 for (int i = 0; i < m_Config.MFCCMels; ++i)
                     *out++ = desc.LogMelSpectrum[i];
@@ -786,20 +786,22 @@ void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &a
     const double SumPowerEps = acc.SumPower + 1e-12;
     const double invSum = 1.0 / SumPowerEps;
 
-    Desc.SpectralCentroid = acc.weightedSumFreqs * invSum;
+    // Centroid related
+    Desc.SpectralCentroid = acc.WSumFreqs * invSum;
     Desc.CentroidVelocity = std::abs(Desc.SpectralCentroid - m_PrevCentroid);
     m_PrevCentroid = Desc.SpectralCentroid;
 
+    // Spectral Spread for Librosa
     const double E1 = Desc.SpectralCentroid;
     const double E2 = acc.sumFreq2 * invSum;
     const double E3 = acc.sumFreq3 * invSum;
     const double E4 = acc.sumFreq4 * invSum;
     const double mu3 = E3 - 3.0 * E1 * E2 + 2.0 * E1 * E1 * E1;
     const double mu4 = E4 - 4.0 * E1 * E3 + 6.0 * E1 * E1 * E2 - 3.0 * E1 * E1 * E1 * E1;
-
     const double spectralSpreadHzVariance = std::max(0.0, E2 - E1 * E1);
     Desc.SpectralSpreadHz = acc.SumPower > 0.0 ? std::sqrt(spectralSpreadHzVariance) : 0.0;
 
+    // Essentia DistributionShape spread: normalized second central moment over FFT bin indices.
     const double EIndex = acc.sumIndex * invSum;
     const double EIndex2 = acc.sumIndex2 * invSum;
     const double rawIndexVariance = std::max(0.0, EIndex2 - EIndex * EIndex);
@@ -807,13 +809,19 @@ void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &a
     const double invIndexRange = 1.0 / indexRange;
     Desc.SpectralSpreadVariance = acc.SumPower > 0.0 ? (rawIndexVariance * invIndexRange * invIndexRange) : 0.0;
 
+    // Skewness, Kurtosis
     const double spreadEps = Desc.SpectralSpreadHz + 1e-12;
     Desc.SpectralSkewness = mu3 / (spreadEps * spreadEps * spreadEps);
     Desc.SpectralKurtosis = mu4 / (spreadEps * spreadEps * spreadEps * spreadEps) - 3.0;
 
-    Desc.SpectralIrregularity =
-        acc.irregularityDenominator > 0.0 ? (acc.irregularityNumerator / acc.irregularityDenominator) : 0.0;
+    // Spectral Irregularity
+    Desc.SpectralIrregularityJensen =
+        acc.irregularityDenominator > 0.0 ? (acc.irregularityJensenNumerator / acc.irregularityDenominator) : -1.0;
+    Desc.SpectralIrregularityKrimphoff =
+        acc.irregularityKrimphoffSum > 0.0 ? std::log10(acc.irregularityKrimphoffSum) : -1.0;
+    Desc.SpectralIrregularity = Desc.SpectralIrregularityKrimphoff;
 
+    // Spectral Crest
     if (acc.maxMagCrest == 0.0f) {
         Desc.SpectralCrest = 0.0;
     } else {
@@ -827,7 +835,7 @@ void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &a
 
     const double K = static_cast<double>(NHalf);
     const double denom = (K * acc.sumFreqSq - acc.sumFreq * acc.sumFreq) + 1e-12;
-    const double slope = (K * acc.weightedSumFreqs - acc.sumFreq * acc.SumPower) / denom;
+    const double slope = (K * acc.WSumFreqs - acc.sumFreq * acc.SumPower) / denom;
     Desc.SpectralSlope = slope * invSum;
 }
 
@@ -846,6 +854,8 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
     SpectralAccumulators acc;
     double prevNorm = 0.0;
+    double prevPrevMag = 0.0;
+    double prevMag = 0.0;
 
     // Process first iteration (i = 0) explicitly to avoid "if (i > 0)" in the hot loop
     {
@@ -878,6 +888,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 
         // Note: i=0 is never >= hfStart (assuming FFT >= 8), so no highFreqEnergy addition here
         prevNorm = norm;
+        prevMag = mag;
     }
 
     // Main Accumulation Loop (i > 0)
@@ -921,7 +932,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         acc.sumFreq2 += freq2 * norm;
         acc.sumFreq3 += freq2 * freq * norm;
         acc.sumFreq4 += freq2 * freq2 * norm;
-        acc.weightedSumFreqs += freq * norm;
+        acc.WSumFreqs += freq * norm;
         acc.sumIndex += index * norm;
         acc.sumIndex2 += index * index * norm;
         acc.irregularityDenominator += norm * norm;
@@ -938,13 +949,19 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
         // Branchless execution: static_cast resolves to 1.0 or 0.0
         acc.highFreqEnergy += norm * static_cast<double>(i >= hfStart);
 
-        // Previous iteration dependencies (Safe now that i > 0 is guaranteed)
         const double d = prevNorm - norm;
-        acc.irregularityNumerator += d * d;
+        acc.irregularityJensenNumerator += d * d;
+        if (i > 1) {
+            const double localAvg = (prevPrevMag + prevMag + mag) / 3.0;
+            acc.irregularityKrimphoffSum += std::abs(prevMag - localAvg);
+        }
+
         acc.harmonicitySum += norm;
         acc.harmonicityPeak = std::max(acc.harmonicityPeak, norm);
 
         prevNorm = norm;
+        prevPrevMag = prevMag;
+        prevMag = mag;
     }
 
     // SCALAR CALCULATIONS
