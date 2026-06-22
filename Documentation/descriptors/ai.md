@@ -118,6 +118,7 @@ trainer = OpenScofo.ExtendedTechniqueClassifier(
     sample_rate=48000,
     fft_size=2048,
     hop_size=512,
+    model_type="catboost",  # or "lightgbm"
 )
 
 #       ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
