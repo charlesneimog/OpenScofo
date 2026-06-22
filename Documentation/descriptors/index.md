@@ -8,7 +8,7 @@ To support this goal, `OpenScofo` integrates a machine learning module based on 
     
     Check the link [testing OpenScofo descriptors](./testing){target="_blank"}.
 
-The following section presents the audio descriptors used during the training process, together with their corresponding mathematical formulations. These descriptors form the feature representation used by the machine learning models within the `OpenScofo` framework, and can be accessed through the `py.o.train` object or the `train` model available in the `OpenScofo` Python module.
+The following section presents the audio descriptors used during the training process, together with their corresponding mathematical formulations. These descriptors form the feature representation used by the machine learning models within the `OpenScofo` framework, and can be accessed through the `py.o.train` (check [AI Model](ai.md)) object or the `train` model available in the `OpenScofo` Python module.
 
 For easier integration with AI-oriented environments such as Python, `OpenScofo` descriptors aim to be compatible with both `librosa` and `essentia`. `librosa` is the primary reference due to its strong support for spectral descriptors, although it lacks coverage of some other descriptor types. `essentia` is more comprehensive, but less widely used and somewhat less streamlined.
 
