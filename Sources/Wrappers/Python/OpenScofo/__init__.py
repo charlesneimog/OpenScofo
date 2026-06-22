@@ -1,23 +1,13 @@
-try:
-    from ._OpenScofo import (
-        OpenScofo,
-        EventType,
-        HMMType,
-        AudioState,
-        MarkovState,
-        Description,
-        Configuration,
-    )
-except:
-    from _OpenScofo import (
-        OpenScofo,
-        EventType,
-        HMMType,
-        AudioState,
-        MarkovState,
-        Description,
-        Configuration,
-    )
+from ._OpenScofo import (
+    OpenScofo,
+    EventType,
+    HMMType,
+    AudioState,
+    MarkovState,
+    Description,
+    Descriptors,
+    Configuration,
+)
 
 __all__ = [
     "OpenScofo",
@@ -26,6 +16,7 @@ __all__ = [
     "AudioState",
     "MarkovState",
     "Description",
+    "Descriptors",
     "Configuration",
     "ExtendedTechniqueClassifier",
 ]
@@ -509,9 +500,7 @@ class ExtendedTechniqueClassifier:
                     f"Model shrunk to {self.clf.tree_count_} trees via early stopping."
                 )
             elif getattr(self.clf, "best_iteration_", None):
-                self.print(
-                    f"Best LightGBM iteration: {self.clf.best_iteration_}."
-                )
+                self.print(f"Best LightGBM iteration: {self.clf.best_iteration_}.")
 
         self.print("Training finished!")
 

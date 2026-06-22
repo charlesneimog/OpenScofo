@@ -90,7 +90,7 @@ NB_MODULE(_OpenScofo, m) {
         // Spectral Arrays
         .value("MFCC", OpenScofo::MFCC)
         .value("CHROMA", OpenScofo::CHROMA)
-        .value("MELOGRAM", OpenScofo::MELOGRAM)
+        .value("LOGMEL", OpenScofo::LOGMEL)
 
         // Spectral
         .value("ZCR", OpenScofo::ZCR)
@@ -167,6 +167,8 @@ NB_MODULE(_OpenScofo, m) {
         // Other spectral-related (no enum mapping provided → keep concise names)
         .def_rw("harmonicity", &OpenScofo::Description::Harmonicity)
         .def_rw("irregularity", &OpenScofo::Description::SpectralIrregularity)
+        .def_rw("irregularity_jensen", &OpenScofo::Description::SpectralIrregularityJensen)
+        .def_rw("irregularity_krimphoff", &OpenScofo::Description::SpectralIrregularityKrimphoff)
         .def_rw("crest", &OpenScofo::Description::SpectralCrest)
         .def_rw("centroid_velocity", &OpenScofo::Description::CentroidVelocity)
         .def_rw("spread_variance", &OpenScofo::Description::SpectralSpreadVariance)
