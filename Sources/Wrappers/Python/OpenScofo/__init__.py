@@ -27,6 +27,7 @@ __all__ = [
     "MarkovState",
     "Description",
     "Configuration",
+    "ExtendedTechniqueClassifier",
 ]
 
 
@@ -40,18 +41,51 @@ import librosa
 from scipy.signal import fftconvolve
 
 from sklearn.metrics import classification_report
-from catboost import CatBoostClassifier
 import joblib
 
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
+try:
+    from catboost import CatBoostClassifier
+except ImportError:
+    CatBoostClassifier = None
+
+try:
+    import lightgbm as lgb
+    from lightgbm import LGBMClassifier
+except ImportError:
+    lgb = None
+    LGBMClassifier = None
+
+try:
+    from skl2onnx import convert_sklearn
+    from skl2onnx.common.data_types import FloatTensorType as SklearnFloatTensorType
+except ImportError:
+    convert_sklearn = None
+    SklearnFloatTensorType = None
+
+try:
+    from onnxmltools import convert_lightgbm
+    from onnxmltools.convert.common.data_types import (
+        FloatTensorType as LightGBMFloatTensorType,
+    )
+except ImportError:
+    convert_lightgbm = None
+    LightGBMFloatTensorType = None
 
 import onnx
 
 
 class ExtendedTechniqueClassifier:
 
-    def __init__(self, sample_rate=48000, fft_size=2048, hop_size=512, base_path=None):
+    SUPPORTED_MODEL_TYPES = ("catboost", "lightgbm")
+
+    def __init__(
+        self,
+        sample_rate=48000,
+        fft_size=2048,
+        hop_size=512,
+        base_path=None,
+        model_type="catboost",
+    ):
         self.print = print
 
         # configuration
@@ -76,6 +110,10 @@ class ExtendedTechniqueClassifier:
         self.base_augmentation_loops = 1
         self.max_augmentation_loops = 64
         self.single_file_class_window_split = True
+        self.learning_rate = 0.05
+        self.depth = 6
+        self.early_stopping_rounds = 70
+        self.thread_count = -1
 
         # folders
         self.trainfolder = ""
@@ -90,7 +128,8 @@ class ExtendedTechniqueClassifier:
         self.x_test, self.y_test = [], []
 
         # model
-        self.model_type = "catboost"
+        self.set_model_type(model_type)
+        self.clf = None
 
         # ir
         self.ir_files = None
@@ -451,20 +490,28 @@ class ExtendedTechniqueClassifier:
         if len(self.x_np_test) > 0 and len(self.y_np_test) > 0:
             eval_set = (self.x_np_test, self.y_np_test)
 
-        self.clf.fit(
-            self.x_np_train,
-            self.y_np_train,
-            eval_set=eval_set,
-            use_best_model=True,
-        )
+        fit_kwargs = {}
+        if self.model_type == "catboost":
+            fit_kwargs["use_best_model"] = eval_set is not None
+        elif self.model_type == "lightgbm" and eval_set is not None:
+            fit_kwargs["callbacks"] = [
+                lgb.early_stopping(self.early_stopping_rounds, verbose=False)
+            ]
+
+        self.clf.fit(self.x_np_train, self.y_np_train, eval_set=eval_set, **fit_kwargs)
 
         if eval_set:
             y_true = np.asarray(self.y_np_test).ravel()
             y_pred = np.asarray(self.clf.predict(self.x_np_test)).ravel()
             self.print(classification_report(y_true, y_pred))
-            self.print(
-                f"Model shrunk to {self.clf.tree_count_} trees via early stopping."
-            )
+            if self.model_type == "catboost":
+                self.print(
+                    f"Model shrunk to {self.clf.tree_count_} trees via early stopping."
+                )
+            elif getattr(self.clf, "best_iteration_", None):
+                self.print(
+                    f"Best LightGBM iteration: {self.clf.best_iteration_}."
+                )
 
         self.print("Training finished!")
 
@@ -482,13 +529,26 @@ class ExtendedTechniqueClassifier:
             self.clf.save_model(path, format="onnx")
             return
 
-        if convert_sklearn is None or FloatTensorType is None:
+        n_features = int(self.x_np_train.shape[1])
+
+        if self.model_type == "lightgbm":
+            if convert_lightgbm is None or LightGBMFloatTensorType is None:
+                raise RuntimeError("onnxmltools is not available")
+
+            onnx_model = convert_lightgbm(
+                self.clf,
+                initial_types=[("input", LightGBMFloatTensorType([None, n_features]))],
+                target_opset=17,
+            )
+            onnx.save(onnx_model, path)
+            return
+
+        if convert_sklearn is None or SklearnFloatTensorType is None:
             raise RuntimeError("skl2onnx is not available")
 
-        n_features = int(self.x_np_train.shape[1])
         onnx_model = convert_sklearn(
             self.clf,
-            initial_types=[("input", FloatTensorType([None, n_features]))],
+            initial_types=[("input", SklearnFloatTensorType([None, n_features]))],
             target_opset=17,
         )
 
@@ -590,6 +650,23 @@ class ExtendedTechniqueClassifier:
     def set_onprogress_callback(self, func):
         self.on_progress = func
 
+    def set_model_type(self, model_type: str):
+        normalized = model_type.lower().replace("-", "").replace("_", "")
+        aliases = {
+            "cat": "catboost",
+            "catboost": "catboost",
+            "lgbm": "lightgbm",
+            "lightgbm": "lightgbm",
+        }
+
+        if normalized not in aliases:
+            supported = ", ".join(self.SUPPORTED_MODEL_TYPES)
+            raise ValueError(
+                f"Unsupported model_type '{model_type}'. Use one of: {supported}"
+            )
+
+        self.model_type = aliases[normalized]
+
     def set_catboost_config(
         self,
         iterations=1000,
@@ -604,19 +681,54 @@ class ExtendedTechniqueClassifier:
         self.early_stopping_rounds = early_stopping_rounds
         self.thread_count = thread_count
 
+    def set_lightgbm_config(
+        self,
+        iterations=1000,
+        learning_rate=0.05,
+        depth=6,
+        early_stopping_rounds=70,
+        thread_count=-1,
+    ):
+        self.iterations = iterations
+        self.learning_rate = learning_rate
+        self.depth = depth
+        self.early_stopping_rounds = early_stopping_rounds
+        self.thread_count = thread_count
+
+    def _build_classifier(self):
+        if self.model_type == "catboost":
+            if CatBoostClassifier is None:
+                raise RuntimeError("catboost is not installed")
+
+            return CatBoostClassifier(
+                iterations=self.iterations,
+                depth=self.depth,
+                learning_rate=self.learning_rate,
+                loss_function="MultiClass",
+                thread_count=self.thread_count,
+                early_stopping_rounds=self.early_stopping_rounds,
+                random_seed=self.random_state,
+            )
+
+        if self.model_type == "lightgbm":
+            if LGBMClassifier is None:
+                raise RuntimeError("lightgbm is not installed")
+
+            return LGBMClassifier(
+                n_estimators=self.iterations,
+                max_depth=self.depth,
+                learning_rate=self.learning_rate,
+                objective="multiclass",
+                n_jobs=self.thread_count,
+                random_state=self.random_state,
+            )
+
+        raise RuntimeError(f"Unsupported model_type '{self.model_type}'")
+
     def train(self):
-        self.set_catboost_config()
+        self.clf = self._build_classifier()
 
-        self.clf = CatBoostClassifier(
-            iterations=self.iterations,
-            depth=self.depth,
-            learning_rate=self.learning_rate,
-            loss_function="MultiClass",
-            thread_count=self.thread_count,
-            early_stopping_rounds=self.early_stopping_rounds,
-        )
-
-        self.print("Training, wait...")
+        self.print(f"Training {self.model_type}, wait...")
 
         if len(self.descriptors) == 0:
             raise RuntimeError("You need to define the descriptors used to train")
