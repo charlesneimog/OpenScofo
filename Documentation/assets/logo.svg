@@ -7,8 +7,11 @@
    viewBox="0 0 100 100"
    version="1.1"
    id="svg1"
-   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
    sodipodi:docname="logo.svg"
+   inkscape:export-filename="icon.png"
+   inkscape:export-xdpi="127"
+   inkscape:export-ydpi="127"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -25,13 +28,14 @@
      inkscape:document-units="mm"
      inkscape:zoom="1.5723626"
      inkscape:cx="100.80372"
-     inkscape:cy="114.79541"
+     inkscape:cy="115.74938"
      inkscape:window-width="1860"
-     inkscape:window-height="1164"
+     inkscape:window-height="1163"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="g3" />
+     inkscape:current-layer="g3"
+     inkscape:export-bgcolor="#ffffffff" />
   <defs
      id="defs1" />
   <g
