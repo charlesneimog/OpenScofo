@@ -18,7 +18,7 @@
 namespace csnd {
 
 // ─────────────────────────────────────
-// Logging bridge
+// Logging callback
 // ─────────────────────────────────────
 static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     Csound *csound = static_cast<Csound *>(data);
@@ -31,6 +31,7 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
     switch (log.level) {
     case spdlog::level::critical:
     case spdlog::level::err:
+        csound->init_error("[OpenScofo] " + text);
     case spdlog::level::warn:
         csound->warning("[OpenScofo] " + text);
         break;
@@ -62,11 +63,11 @@ struct CSoundOpenScofo : Plugin<3, 4> {
     int m_LastActionStateIndex = -1;
     std::vector<ScheduledAction> m_ScheduledActions;
 
+    // ─────────────────────────────────────
     bool SetControlChannel(const std::string &name, MYFLT value) {
         CSOUND *cs = csound->get_csound();
         MYFLT *channel = nullptr;
-        const int result =
-            cs->GetChannelPtr(cs, &channel, name.c_str(), CSOUND_CONTROL_CHANNEL | CSOUND_INPUT_CHANNEL);
+        const int result = cs->GetChannelPtr(cs, &channel, name.c_str(), CSOUND_CONTROL_CHANNEL | CSOUND_INPUT_CHANNEL);
         if (result != CSOUND_SUCCESS || channel == nullptr) {
             csound->warning("[OpenScofo] Failed to set Csound control channel '" + name + "'.");
             return false;
@@ -76,6 +77,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         return true;
     }
 
+    // ─────────────────────────────────────
     bool ConvertActionArgs(const OpenScofo::ScoreAction &action, std::vector<double> &values) {
         values.clear();
         values.reserve(action.Args.size());
@@ -97,6 +99,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         return true;
     }
 
+    // ─────────────────────────────────────
     void DispatchAction(const OpenScofo::ScoreAction &action) {
         if (action.isLua) {
             csound->warning("[OpenScofo] Csound wrapper does not execute Lua score actions yet.");
@@ -120,6 +123,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         SetControlChannel(base + "/trigger", static_cast<MYFLT>(1.0));
     }
 
+    // ─────────────────────────────────────
     int64_t ActionDelaySamples(const OpenScofo::ScoreAction &action) {
         double timeMs = action.Time;
         if (!action.AbsoluteTime && oscofo) {
@@ -133,6 +137,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         return static_cast<int64_t>(std::ceil(timeMs * oscofo->GetSr() / 1000.0));
     }
 
+    // ─────────────────────────────────────
     void QueueOrDispatchAction(const OpenScofo::ScoreAction &action) {
         const int64_t delaySamples = ActionDelaySamples(action);
         if (delaySamples <= 0) {
@@ -143,6 +148,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         m_ScheduledActions.push_back({delaySamples, action});
     }
 
+    // ─────────────────────────────────────
     void ProcessEventActionsIfChanged() {
         if (!oscofo || !oscofo->ScoreIsLoaded()) {
             return;
@@ -160,6 +166,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         }
     }
 
+    // ─────────────────────────────────────
     void ProcessScheduledActions(int samplesElapsed) {
         auto it = m_ScheduledActions.begin();
         while (it != m_ScheduledActions.end()) {
@@ -180,7 +187,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         m_HOP = static_cast<MYFLT>(inargs[3]);
 
         if (m_SR <= 0 || m_FFT <= 0 || m_HOP <= 0) {
-            csound->warning("FFT or HOP not defined, defined fft = 2048, hop == 512");
+            csound->init_error("FFT or HOP not defined, defined fft = 2048, hop == 512");
             m_SR = 48000;
             m_FFT = 2048;
             m_HOP = 512;
@@ -192,7 +199,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         STRINGDAT &scorePath = inargs.str_data(1);
         const char *score = reinterpret_cast<const char *>(scorePath.data);
         if (!oscofo->LoadScore(score)) {
-            csound->warning("Failed to parse score");
+            csound->init_error("Failed to parse score");
             return NOTOK;
         }
 
@@ -220,6 +227,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         outargs[2] = static_cast<MYFLT>(0.0);
 
         if (!oscofo->ProcessBlock(audio, n)) {
+            // how to get OPDS?
             csound->warning("[OpenScofo] ProcessBlock failed");
             return NOTOK;
         }
@@ -236,9 +244,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         } else {
             outargs[2] = static_cast<MYFLT>(0.0);
         }
-
         m_LastEvent = event;
-
         return OK;
     }
 
