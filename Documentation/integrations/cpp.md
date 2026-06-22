@@ -1,10 +1,6 @@
 # C++
 
-<release interface="C++"><i>Loading Releases</i></release>
-
 The C++ API gives direct access to the `OpenScofo` engine. Use it when you want to embed score following or descriptor extraction in your own audio application, plugin, or offline analysis tool.
-
-!!! danger "This is a pre-alpha version!"
 
 ## Build
 

@@ -7,7 +7,7 @@
 
 
 ---
-### `NOTE`
+## `NOTE`
 
 `NOTE` events describes tradicional pitches. It must be defined as `NOTE <PITCH> <DURATION>`.
 
@@ -21,7 +21,7 @@ NOTE A5 2
 ```
 
 ---
-### `CHORD`
+## `CHORD`
 
 `CHORD` events describes chords, stable multiphonics, and others events. It must be defined as `CHORD (<PITCH1> <PITCH2>) <DURATION>`. 
 
@@ -33,7 +33,7 @@ CHORD (C4 Ab5 D4) 1
 ```
 
 ---
-### `TRILL`
+## `TRILL`
 
 `TRILL` events describes trill and tremolo events. It must be defined as `TRILL (<PITCH1> <PITCH2>) <DURATION>`.
 
@@ -44,7 +44,7 @@ TRILL (G4 D#4) 4
 ```
 
 ---
-### `REST`
+## `REST`
 
 `REST` events describes rests. It must be defined as `REST <DURATION>`.
 
@@ -59,7 +59,7 @@ NOTE C5 0.25
 ```
 
 ---
-### `PTECH` 
+## `PTECH` 
 
 !!! warning "Experimental"
     Part of ongoing research at the University of São Paulo. These events represent extended techniques **with pitch**, like `tongue-ran`, `key-click`, etc...
@@ -88,7 +88,7 @@ PTECH tongue-ram D4 2
 ```
 
 ---
-### `UTECH` 
+## `UTECH` 
 
 <score id="utech_example" timeSig="4/4" notes="C4/h:x, C4/h:tongue-ram"></score>
 
@@ -112,7 +112,7 @@ UTECH jet-whistle 1
 ```
 
 ---
-### `TIMEDEVENT`
+## `TIMEDEVENT`
 
 !!! danger "Not implemented yet"
     Planned to next research steps.
@@ -121,7 +121,7 @@ This event is adapted from patches by Cort Lippe. In a Max patch, a simple score
 
 
 ---
-### `LUAEVENT`
+## `LUAEVENT`
 
 !!! danger "Not implemented yet"
     Planned to next research steps.
