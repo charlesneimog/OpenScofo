@@ -61,7 +61,7 @@ class PdOpenScofo {
     double BlockSize;
     double Sr;
     int BlockIndex;
-    bool JustDescription;
+    bool Description;
 
     // Outlet
     t_outlet *EventOut;
@@ -112,7 +112,7 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     logpost(x, 2, "[openscofo~] Score loaded");
     x->OpenScofo->SetCurrentEvent(0);
-    x->JustDescription = false;
+    x->Description = false;
 
     x->Event = 0;
 
@@ -167,7 +167,7 @@ static void openscofo_output_descriptors(PdOpenScofo *x, OpenScofo::Description 
             break;
         case OpenScofo::Descriptors::MFCC:
         case OpenScofo::Descriptors::CHROMA:
-        case OpenScofo::Descriptors::MELOGRAM:
+        case OpenScofo::Descriptors::LOGMEL:
         case OpenScofo::Descriptors::MAGNITUDE: {
             std::vector<double> DescArray = x->OpenScofo->GetDescriptionArray(Desc, d);
             int DescSize = DescArray.size();
@@ -333,9 +333,9 @@ static void openscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     } else if (method == "mfcc") {
     } else if (method == "section") {
         pd_error(x, "[openscofo~] Section method not implemented");
-    } else if (method == "justdescription") {
+    } else if (method == "justdescription" || method == "description") {
         int f = atom_getint(argv + 1);
-        x->JustDescription = f != 0;
+        x->Description = f != 0;
         canvas_update_dsp();
     } else {
         pd_error(x, "[openscofo~] Unknown method");
@@ -473,7 +473,7 @@ static t_int *openscofo_perform_score(t_int *w) {
     PdOpenScofo *x = (PdOpenScofo *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
     int n = static_cast<int>(w[3]);
-    if (!x->Following && !x->JustDescription) {
+    if (!x->Following && !x->Description) {
         return (w + 4);
     }
 
@@ -549,7 +549,7 @@ static void *openscofo_new(t_symbol *s, int argc, t_atom *argv) {
     if (x->RequestMIR.size() > 0) {
         x->DescOut = outlet_new(&x->PdObject, &s_list);
         x->MirOutput = true;
-        x->JustDescription = true;
+        x->Description = true;
     }
 
     // Schedule
