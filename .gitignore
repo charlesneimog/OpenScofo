@@ -117,3 +117,4 @@ dist
 /Tests/miniaturas/WebPatch
 /flamegraph.svg
 /Resources/Packages/out-linux
+/Resources/__pycache__
