@@ -524,6 +524,14 @@ class ExtendedTechniqueClassifier:
             "model": serialized_model,
         }
 
+    def _add_onnx_metadata(self, onnx_model):
+        metadata = self._build_payload("onnx")
+        metadata["descriptors"] = json.dumps(metadata["descriptors"])
+        for key, value in metadata.items():
+            prop = onnx_model.metadata_props.add()
+            prop.key = str(key)
+            prop.value = str(value)
+
     def _export_onnx(self, path):
         if self.model_type == "catboost":
             self.clf.save_model(path, format="onnx")
@@ -537,9 +545,13 @@ class ExtendedTechniqueClassifier:
 
             onnx_model = convert_lightgbm(
                 self.clf,
-                initial_types=[("input", LightGBMFloatTensorType([None, n_features]))],
-                target_opset=17,
+                initial_types=[
+                    ("features", LightGBMFloatTensorType([None, n_features]))
+                ],
+                target_opset=15,
+                zipmap=False,
             )
+            self._add_onnx_metadata(onnx_model)
             onnx.save(onnx_model, path)
             return
 
@@ -548,16 +560,11 @@ class ExtendedTechniqueClassifier:
 
         onnx_model = convert_sklearn(
             self.clf,
-            initial_types=[("input", SklearnFloatTensorType([None, n_features]))],
+            initial_types=[("features", SklearnFloatTensorType([None, n_features]))],
             target_opset=17,
         )
 
-        metadata = self._build_payload("onnx")
-        metadata["descriptors"] = json.dumps(metadata["descriptors"])
-        for key, value in metadata.items():
-            prop = onnx_model.metadata_props.add()
-            prop.key = str(key)
-            prop.value = str(value)
+        self._add_onnx_metadata(onnx_model)
 
         onnx.save(onnx_model, path)
 
