@@ -351,7 +351,7 @@ static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         x->OpenScofo->SetLogLevel(x->log);
     } else if (method == "section") {
         object_error((t_object *)x, "Section method not implemented");
-    } else if (method == "justdescription") {
+    } else if (method == "justdescription" || method == "description") {
         if (argc < 2) {
             object_error((t_object *)x, "Wrong number of arguments");
             return;
