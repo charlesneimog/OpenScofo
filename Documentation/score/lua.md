@@ -19,17 +19,17 @@ Also check the [LUAEVENT](events/#luaevent){ data-preview } event type.
 
 
 
-### <h2 align="center">:simple-lua: `OpenScofo` Lua Module</h2>
+## :simple-lua: `OpenScofo`: Lua Module
 
 The `OpenScofo` module exposes classes and functions to interact with the `OpenScofo` follower and listening module.
 
-### Import `OpenScofo` as object
+#### :simple-lua: `OpenScofo` Module
 
 ```lua
 local oscofo = require("OpenScofo")
 ```
 
-### `OpenScofo` methods
+#### :simple-lua: `OpenScofo` Methods
 
 These are all functions exposed using `oscofo`.
 
@@ -83,7 +83,7 @@ These are all functions exposed using `oscofo`.
     - `output`: `OpenScofo.Description` object of the current audio buffer.  
     - `description`: Computes MIR/audio features for the input block.
 
-### Exposed types in `oscofo`
+### :simple-lua: `OpenScofo` Types
 
 - **`OpenScofo.Description`**
     - `mfcc`
@@ -115,7 +115,7 @@ These are all functions exposed using `oscofo`.
     - `duration`
     - `line`
 
-### <h2 align="center">:simple-lua: `PureData` Lua Module</h2>
+## :simple-lua: `PureData` Lua Module
 
 The `pd` module inside Lua allows interaction with Pure Data functionalities, exposing the following functions:
 
@@ -155,7 +155,7 @@ The `pd` module inside Lua allows interaction with Pure Data functionalities, ex
     - **`output`**: no output.
     - **`description`**: Sends a list of values to a specified destination in Pure Data.
 
-### <h2 align="center">:simple-lua: `Max` Lua Module</h2>
+## :simple-lua: `Max` Lua Module
 
 The `max` module inside Lua allows interaction with Max functionalities, exposing the following functions:
 
