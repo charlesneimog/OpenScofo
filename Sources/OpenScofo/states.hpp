@@ -39,7 +39,7 @@ enum Descriptors {
     // Spectral Arrays
     MFCC,
     CHROMA,
-    MELOGRAM,
+    LOGMEL,
 
     // Spectral
     ZCR,
@@ -175,6 +175,8 @@ struct Description {
     double SpectralRolloff = 0.0;
     double SpectralFlux;
     double SpectralIrregularity = 0.0;
+    double SpectralIrregularityJensen = 0.0;
+    double SpectralIrregularityKrimphoff = 0.0;
     double SpectralCrest = 0.0;
     double SpectralCentroid = 0.0;
     double CentroidVelocity = 0.0;
@@ -258,8 +260,9 @@ struct Configuration {
 // ─────────────────────────────────────
 struct SpectralAccumulators {
     double SumPower = 0.0;
-    double weightedSumFreqs = 0.0;
-    double irregularityNumerator = 0.0;
+    double WSumFreqs = 0.0;
+    double irregularityJensenNumerator = 0.0;
+    double irregularityKrimphoffSum = 0.0;
     double irregularityDenominator = 0.0;
     double logSumPower = 0.0;
     double linSumPower = 0.0;
