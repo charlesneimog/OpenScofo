@@ -57,6 +57,8 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
         .property("loudness", &OpenScofo::Description::Loudness)
         .property("flux", &OpenScofo::Description::SpectralFlux)
         .property("irregularity", &OpenScofo::Description::SpectralIrregularity)
+        .property("irregularity_jensen", &OpenScofo::Description::SpectralIrregularityJensen)
+        .property("irregularity_krimphoff", &OpenScofo::Description::SpectralIrregularityKrimphoff)
         .property("crest", &OpenScofo::Description::SpectralCrest)
         .property("centroid", &OpenScofo::Description::SpectralCentroid)
         .property("magnitude", &OpenScofo::Description::SpectralMagnitudeNorm)
