@@ -619,7 +619,6 @@ def convert_markdown_lines(lines: list[str]) -> str:
 
         if re.match(r"^\s*(-{3,}|\*{3,}|_{3,})\s*$", line):
             close_lists()
-            output.append(r"\medskip\hrule\medskip")
             continue
 
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
@@ -696,6 +695,23 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str) -> st
         flags=re.IGNORECASE | re.DOTALL,
     )
     lines = markdown.splitlines()
+    try:
+        current_doc = markdown_path.resolve().relative_to((CURRENT_DOCS_DIR or markdown_path.parent).resolve())
+    except ValueError:
+        current_doc = markdown_path.name
+    if current_doc == Path("integrations/index.md"):
+        filtered_lines: list[str] = []
+        skip_download = False
+        for line in lines:
+            heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+            if heading and strip_markdown_formatting(heading.group(2)).lower() == "download":
+                skip_download = True
+                continue
+            if skip_download and heading and len(heading.group(1)) <= 2:
+                skip_download = False
+            if not skip_download:
+                filtered_lines.append(line)
+        lines = filtered_lines
     footnotes: dict[str, str] = {}
     content_lines: list[str] = []
     index = 0
