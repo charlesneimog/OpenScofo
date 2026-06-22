@@ -1,4 +1,5 @@
 [project]
+
 site_name = "OpenScofo"
 site_url = "https://charlesneimog.github.io/OpenScofo"
 docs_dir = "Documentation"
@@ -6,6 +7,17 @@ copyright = "Copyright &copy 2026 | Charles K. Neimog"
 hooks = ["Documentation/copy-editor.py"]
 repo_url = "https://github.com/charlesneimog/OpenScofo"
 edit_uri = "edit/main/Documentation/"
+extra_javascript = [
+  { path = "javascript/vexflow.mjs" },
+  { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
+  { path = "javascript/download-links.js" },
+
+
+]
+extra_css = [
+  "stylesheets/extra.css",
+  "https://unpkg.com/katex@0/dist/katex.min.css",
+]
 nav = [
   "index.md",
   { "Score" = [
@@ -21,6 +33,7 @@ nav = [
     "descriptors/index.md",
     "descriptors/amplitude.md",
     "descriptors/onset.md",
+    "descriptors/time-pitch.md",
     "descriptors/spectral.md",
     "descriptors/ai.md",
   ] },
@@ -38,17 +51,6 @@ nav = [
   { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
 ]
 
-extra_javascript = [
-  { path = "javascript/vexflow.mjs" },
-  { path = "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js" },
-  { path = "javascript/download-links.js" },
-
-
-]
-extra_css = [
-  "stylesheets/extra.css",
-  "https://unpkg.com/katex@0/dist/katex.min.css",
-]
 
 [project.theme]
 custom_dir = "Documentation/overrides"
@@ -94,6 +96,9 @@ toggle.name = "Switch to light mode"
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
+accent = "blue"
+palette.primary = "indigo"
+
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
@@ -101,6 +106,7 @@ toggle.name = "Switch to dark mode"
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
+accent = "yellow"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
