@@ -72,6 +72,55 @@ NB_MODULE(_OpenScofo, m) {
         .value("UTECH", OpenScofo::UTECH)
         .export_values();
 
+    nb::enum_<OpenScofo::Descriptors>(m, "Descriptors")
+        .value("INVALID", OpenScofo::INVALID)
+
+        .value("ODSONSET", OpenScofo::ODSONSET)
+
+        // Amplitude
+        .value("LOUDNESS", OpenScofo::LOUDNESS)
+        .value("DB", OpenScofo::DB)
+        .value("MAXAMP", OpenScofo::MAXAMP)
+        .value("RMS", OpenScofo::RMS)
+        .value("STDDEV", OpenScofo::STDDEV)
+        .value("MAGNITUDE", OpenScofo::MAGNITUDE)
+        .value("POWERARRAY", OpenScofo::POWERARRAY)
+        .value("SILENCEPROB", OpenScofo::SILENCEPROB)
+
+        // Spectral Arrays
+        .value("MFCC", OpenScofo::MFCC)
+        .value("CHROMA", OpenScofo::CHROMA)
+        .value("MELOGRAM", OpenScofo::MELOGRAM)
+
+        // Spectral
+        .value("ZCR", OpenScofo::ZCR)
+        .value("HFR", OpenScofo::HFR)
+        .value("CENTROID", OpenScofo::CENTROID)
+        .value("SPREADHZ", OpenScofo::SPREADHZ)
+        .value("SPREADVARIANCE", OpenScofo::SPREADVARIANCE)
+        .value("CREST", OpenScofo::CREST)
+        .value("FLATNESS", OpenScofo::FLATNESS)
+        .value("ENTROPY", OpenScofo::ENTROPY)
+        .value("ROLLOFF", OpenScofo::ROLLOFF)
+        .value("CENTROIDVEL", OpenScofo::CENTROIDVEL)
+        .value("FLUX", OpenScofo::FLUX)
+        .value("SKEWNESS", OpenScofo::SKEWNESS)
+        .value("SLOPE", OpenScofo::SLOPE)
+        .value("KURTOSIS", OpenScofo::KURTOSIS)
+        .value("IRREGULARITY", OpenScofo::IRREGULARITY)
+        .value("HARMONICITY", OpenScofo::HARMONICITY)
+
+        // Pitch
+        .value("YIN", OpenScofo::YIN)
+        .value("YINCONFIDENCE", OpenScofo::YINCONFIDENCE)
+
+        // Percussive
+        .value("EXTENDEDTECHNIQUE", OpenScofo::EXTENDEDTECHNIQUE)
+
+        // AI
+        .value("ONNX", OpenScofo::ONNX)
+        .export_values();
+
     nb::enum_<OpenScofo::HMMType>(m, "HMMType")
         .value("SEMIMARKOV", OpenScofo::SEMIMARKOV)
         .value("MARKOV", OpenScofo::MARKOV)
@@ -133,11 +182,8 @@ NB_MODULE(_OpenScofo, m) {
         // Arrays
         .def_rw("power", &OpenScofo::Description::Power)
         .def_rw("magnitude", &OpenScofo::Description::Magnitude)
-        // .def_rw("spectral_magnitude_norm", &OpenScofo::Description::SpectralMagnitudeNorm)
-        // .def_rw("spectral_magnitude_frame_norm", &OpenScofo::Description::SpectralMagnitudeFrameNorm)
 
         .def_rw("logmel", &OpenScofo::Description::LogMelSpectrum) // MELOGRAM
-        // .def_rw("reverb_spectral_power", &OpenScofo::Description::ReverbSpectralPower)
 
         .def_rw("mfcc", &OpenScofo::Description::MFCC)     // MFCC
         .def_rw("chroma", &OpenScofo::Description::Chroma) // CHROMA
