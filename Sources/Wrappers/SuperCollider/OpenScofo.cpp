@@ -223,7 +223,7 @@ struct ScOpenScofo : public SCUnit {
             switch (descriptor) {
             case OpenScofo::Descriptors::MFCC:
             case OpenScofo::Descriptors::CHROMA:
-            case OpenScofo::Descriptors::MELOGRAM:
+            case OpenScofo::Descriptors::LOGMEL:
             case OpenScofo::Descriptors::MAGNITUDE:
             case OpenScofo::Descriptors::POWERARRAY: {
                 std::vector<double> values = m_OpenScofo->GetDescriptionArray(desc, descriptor);
