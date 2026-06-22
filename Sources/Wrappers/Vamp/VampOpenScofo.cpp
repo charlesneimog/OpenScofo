@@ -44,7 +44,7 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
         {"mfcc", "MFCC", "Spectral array: mel-frequency cepstral coefficients", VampOutputKind::MFCC,
          OpenScofo::Descriptors::MFCC},
         {"logmel", "Log Mel Spectrum", "Spectral array: log mel spectrum", VampOutputKind::LogMel,
-         OpenScofo::Descriptors::MELOGRAM},
+         OpenScofo::Descriptors::LOGMEL},
         {"chroma", "Chroma", "Spectral array: chroma energy", VampOutputKind::Chroma, OpenScofo::Descriptors::CHROMA},
 
         // Event/probability
