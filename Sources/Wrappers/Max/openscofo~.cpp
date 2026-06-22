@@ -1,9 +1,9 @@
-#include <filesystem>
 #include <cstring>
 
 #include <ext.h>
 #include <ext_buffer.h>
 #include <ext_obex.h>
+#include <ext_path.h>
 #include <z_dsp.h>
 
 #include <OpenScofo.hpp>
@@ -71,18 +71,30 @@ static void oscofo_assist(MaxOpenScofo *x, void *b, long m, long a, char *s);
 
 // ─────────────────────────────────────
 static void oscofo_score(MaxOpenScofo *x, t_symbol *s) {
-    if (!s) {
+    if (!s || !s->s_name || !s->s_name[0]) {
         object_error((t_object *)x, "No score file provided");
         return;
     }
 
-    bool ok;
-    std::string scorePath = s->s_name;
-    if (!std::filesystem::exists(s->s_name)) {
-        scorePath = x->PatchDir + "/" + s->s_name;
+    char filename[MAX_PATH_CHARS];
+    strncpy_zero(filename, s->s_name, MAX_PATH_CHARS);
+
+    const char *ext = strrchr(filename, '.');
+    if (!ext || strchr(ext, '/')) {
+        snprintf(filename, MAX_PATH_CHARS, "%s.scofo", s->s_name);
     }
 
-    ok = x->OpenScofo->LoadScore(scorePath);
+    short pathId = 0;
+    t_fourcc fileType = 0;
+    if (locatefile_extended(filename, &pathId, &fileType, nullptr, 0) != 0) {
+        object_error((t_object *)x, "Can't find score file %s", s->s_name);
+        return;
+    }
+
+    char scorePath[MAX_PATH_CHARS];
+    path_toabsolutesystempath(pathId, filename, scorePath);
+
+    bool ok = x->OpenScofo->LoadScore(scorePath);
     if (ok) {
         object_post((t_object *)x, "Score loaded");
     } else {
@@ -192,9 +204,9 @@ static void oscofo_get(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
     }
 
     std::string method = atom_getsym(argv)->s_name;
-    if (method == "descriptors") {
+    if (method == "description") {
         if (argc < 2 || argv[1].a_type != A_SYM) {
-            object_error((t_object *)x, "descriptors method requires <buffer~name>");
+            object_error((t_object *)x, "description method requires <buffer~name>");
             return;
         }
 
@@ -256,7 +268,7 @@ static void oscofo_get(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         buffer_unlocksamples(bufferObj);
         object_free(bufferRef);
 
-        bool ok = x->OpenScofo->ProcessBlock(audioBuffer.data(), audioBuffer.size());
+        x->OpenScofo->ProcessBlock(audioBuffer.data(), audioBuffer.size());
         OpenScofo::Description Desc = x->OpenScofo->GetDescription();
         oscofo_output_descriptors(x, Desc);
     }
@@ -292,7 +304,6 @@ static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
             return;
         }
 
-        const char *path = atom_getsym(argv + 1)->s_name;
         std::vector<OpenScofo::Descriptors> desc = oscofo_get_descriptors(x, 2, argc, argv);
 
         if (desc.size() == 0) {
@@ -300,7 +311,19 @@ static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
             return;
         }
 
-        x->OpenScofo->LoadONNXModel(path, desc);
+        char filename[MAX_PATH_CHARS];
+        strncpy_zero(filename, atom_getsym(argv + 1)->s_name, MAX_PATH_CHARS);
+
+        short pathId = 0;
+        t_fourcc fileType = 0;
+        if (locatefile_extended(filename, &pathId, &fileType, nullptr, 0) != 0) {
+            object_error((t_object *)x, "Can't find ONNX model %s", atom_getsym(argv + 1)->s_name);
+            return;
+        }
+
+        char modelPath[MAX_PATH_CHARS];
+        path_toabsolutesystempath(pathId, filename, modelPath);
+        x->OpenScofo->LoadONNXModel(modelPath, desc);
     } else if (method == "verbosity") {
         if (argc < 2) {
             object_error((t_object *)x, "Wrong number of arguments");
