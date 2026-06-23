@@ -47,18 +47,6 @@ def max_bundle_candidates(repo_root: Path) -> list[Path]:
     return [
         repo_root / "max" / "openscofo~.mxo",
         repo_root / "max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
-        repo_root / "max" / "openscofo~.mxo",
-        repo_root / "max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
-        repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
-        repo_root
-        / "build"
-        / "Sources"
-        / "Wrappers"
-        / "Max"
-        / "openscofo~.mxo"
-        / "Contents"
-        / "MacOS"
-        / "openscofo~",
         repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
         repo_root
         / "build"
@@ -75,7 +63,7 @@ def max_bundle_candidates(repo_root: Path) -> list[Path]:
 def ensure_max_bundle(repo_root: Path) -> Path | None:
     for candidate in max_bundle_candidates(repo_root):
         if candidate.exists():
-            return candidate if candidate.is_dir() else candidate.parent.parent
+            return candidate if candidate.is_dir() else candidate.parent.parent.parent
 
     build_dir = repo_root / "build"
     if build_dir.exists():
@@ -88,7 +76,7 @@ def ensure_max_bundle(repo_root: Path) -> Path | None:
 
             for candidate in max_bundle_candidates(repo_root):
                 if candidate.exists():
-                    return candidate if candidate.is_dir() else candidate.parent.parent
+                    return candidate if candidate.is_dir() else candidate.parent.parent.parent
 
     return None
 
@@ -105,6 +93,46 @@ def copy_item(src: Path, dest: Path) -> None:
 
 def copy_into_directory(src: Path, dest_dir: Path) -> None:
     copy_item(src, dest_dir / src.name)
+
+
+def stage_max_package_payload(repo_root: Path, payload_root: Path) -> int:
+    max_root = repo_root / "Sources" / "Wrappers" / "Max"
+    copied = 0
+
+    package_root = max_root / "package"
+    for filename in ["License.md", "Readme.md", "icon.png", "package-info.json"]:
+        src = package_root / filename
+        if src.exists():
+            copy_item(src, payload_root / filename)
+            copied += 1
+
+    docs = [
+        max_root / "docs" / "openscofo~.maxref.xml",
+    ]
+    for src in docs:
+        if src.exists():
+            copy_item(src, payload_root / "docs" / src.name)
+            copied += 1
+
+    help_files = [
+        max_root / "openscofo~.maxhelp",
+        repo_root / "Tests" / "miniaturas" / "Extras" / "ai-flute-model.onnx",
+        repo_root / "Tests" / "assets" / "canticos.txt",
+        repo_root / "Tests" / "assets" / "canticos.wav",
+        repo_root / "Tests" / "miniaturas" / "Audios" / "miniatura1.mp3",
+        repo_root / "Tests" / "miniaturas" / "Extras" / "miniatura1.scofo",
+    ]
+    for src in help_files:
+        if src.exists():
+            copy_item(src, payload_root / "help" / src.name)
+            copied += 1
+
+    bundle = ensure_max_bundle(repo_root)
+    if bundle is not None:
+        copy_into_directory(bundle, payload_root / "externals")
+        copied += 1
+
+    return copied
 
 
 def create_postinstall(script_path: Path, install_to: str, stage_root: str) -> None:
@@ -221,12 +249,17 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             identifier="org.openscofo.pkg.max",
             user_destination="Documents/Max 9/Packages/OpenScofo",
             required=[
+                Path("Sources/Wrappers/Max/package/License.md"),
+                Path("Sources/Wrappers/Max/package/Readme.md"),
+                Path("Sources/Wrappers/Max/package/icon.png"),
+                Path("Sources/Wrappers/Max/package/package-info.json"),
+                Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
                 Path("Tests/miniaturas/Extras/ai-flute-model.onnx"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[
                 Path("max/openscofo~.mxo"),
@@ -244,10 +277,10 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             user_destination="Documents/Pd/externals/openscofo~",
             required=[
                 Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[
                 Path("build/Sources/Wrappers/PureData/openscofo~.pd_darwin"),
@@ -262,10 +295,10 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             user_destination="Library/csound/6.0/plugins64",
             required=[
                 Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[
                 Path("build/Sources/Wrappers/CSound/OpenScofo.dylib"),
@@ -281,10 +314,10 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/SuperCollider/OpenScofo.sc"),
                 Path("Sources/Wrappers/SuperCollider/examples/1-score-follow.scd"),
                 Path("Sources/Wrappers/SuperCollider/examples/2-descriptors-input.scd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[Path("build/Sources/Wrappers/SuperCollider/OpenScofo.scx")],
         ),
@@ -294,10 +327,10 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             identifier="org.openscofo.pkg.vamp",
             user_destination="/Library/Audio/Plug-Ins/Vamp",
             required=[
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[Path("build/Sources/Wrappers/Vamp/OpenScofo.dylib")],
         ),
@@ -311,19 +344,7 @@ def stage_component_payload(
     payload_root.mkdir(parents=True, exist_ok=True)
 
     if spec.key == "max":
-        externals_dir = payload_root / "externals"
-        help_dir = payload_root / "help"
-        externals_dir.mkdir(parents=True, exist_ok=True)
-        help_dir.mkdir(parents=True, exist_ok=True)
-
-        bundle = ensure_max_bundle(repo_root)
-        if bundle is not None:
-            copy_into_directory(bundle, externals_dir)
-
-        for rel in spec.required:
-            src = repo_root / rel
-            if src.exists():
-                copy_into_directory(src, help_dir)
+        stage_max_package_payload(repo_root, payload_root)
         return payload_root
 
     binary = first_existing(repo_root / p for p in spec.optional)
