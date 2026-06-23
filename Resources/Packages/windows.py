@@ -92,10 +92,8 @@ def ensure_max_binary(repo_root: Path, build_dir: Path) -> Path | None:
     candidates = [
         repo_root / "max" / "openscofo~.mxe64",
         repo_root / "max" / "openscofo~.mxe",
-        repo_root / "max" / "openscofo~.mxo",
         build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe64",
         build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe",
-        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
     ]
     existing = first_existing(candidates)
     if existing is not None:
@@ -124,6 +122,46 @@ def copy_item(src: Path, dest: Path) -> None:
         shutil.copy2(src, dest)
 
 
+def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Path) -> int:
+    max_root = repo_root / "Sources" / "Wrappers" / "Max"
+    copied = 0
+
+    package_root = max_root / "package"
+    for filename in ["License.md", "Readme.md", "icon.png", "package-info.json"]:
+        src = package_root / filename
+        if src.exists():
+            copy_item(src, payload_root / filename)
+            copied += 1
+
+    docs = [
+        max_root / "docs" / "openscofo~.maxref.xml",
+    ]
+    for src in docs:
+        if src.exists():
+            copy_item(src, payload_root / "docs" / src.name)
+            copied += 1
+
+    help_files = [
+        max_root / "openscofo~.maxhelp",
+        repo_root / "Tests" / "miniaturas" / "Extras" / "ai-flute-model.onnx",
+        repo_root / "Tests" / "assets" / "canticos.txt",
+        repo_root / "Tests" / "assets" / "canticos.wav",
+        repo_root / "Tests" / "miniaturas" / "Audios" / "miniatura1.mp3",
+        repo_root / "Tests" / "miniaturas" / "Extras" / "miniatura1.scofo",
+    ]
+    for src in help_files:
+        if src.exists():
+            copy_item(src, payload_root / "help" / src.name)
+            copied += 1
+
+    binary = ensure_max_binary(repo_root, build_dir)
+    if binary is not None:
+        copy_item(binary, payload_root / "externals" / binary.name)
+        copied += 1
+
+    return copied
+
+
 def build_destination(spec: IntegrationSpec, arch: str) -> tuple[str, list[str]]:
     sub = spec.destination_subdir_x64 if arch == "x64" and spec.destination_subdir_x64 else spec.destination_subdir
     parts = [p for p in Path(sub).parts if p not in ("", ".")]
@@ -150,11 +188,17 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir="Max 9/Packages/OpenScofo",
             destination_subdir_x64=None,
             required=[
+                Path("Sources/Wrappers/Max/package/License.md"),
+                Path("Sources/Wrappers/Max/package/Readme.md"),
+                Path("Sources/Wrappers/Max/package/icon.png"),
+                Path("Sources/Wrappers/Max/package/package-info.json"),
+                Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
+                Path("Tests/miniaturas/Extras/ai-flute-model.onnx"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[
                 Path("max/openscofo~.mxe64"),
@@ -172,10 +216,10 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir_x64=None,
             required=[
                 Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=pd_candidates,
         ),
@@ -188,10 +232,10 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir_x64=None,
             required=[
                 Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[
                 Path("build/Sources/Wrappers/CSound/OpenScofo.dll"),
@@ -208,10 +252,10 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/SuperCollider/OpenScofo.sc"),
                 Path("Sources/Wrappers/SuperCollider/examples/1-score-follow.scd"),
                 Path("Sources/Wrappers/SuperCollider/examples/2-descriptors-input.scd"),
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[Path("build/Sources/Wrappers/SuperCollider/OpenScofo.scx")],
         ),
@@ -223,10 +267,10 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir="Vamp Plugins",
             destination_subdir_x64=None,
             required=[
-                Path("Tests/assets/bwv-1013.wav"),
-                Path("Tests/assets/bwv-1013.txt"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
+                Path("Tests/miniaturas/Audios/miniatura1.mp3"),
+                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
             ],
             optional=[Path("build/Sources/Wrappers/Vamp/OpenScofo.dll")],
         ),
@@ -238,19 +282,7 @@ def stage_component_payload(repo_root: Path, build_dir: Path, work_dir: Path, sp
     payload_root.mkdir(parents=True, exist_ok=True)
 
     if spec.key == "max":
-        externals_dir = payload_root / "externals"
-        help_dir = payload_root / "help"
-        externals_dir.mkdir(parents=True, exist_ok=True)
-        help_dir.mkdir(parents=True, exist_ok=True)
-
-        binary = ensure_max_binary(repo_root, build_dir)
-        if binary is not None:
-            copy_item(binary, externals_dir / binary.name)
-
-        for rel in spec.required:
-            src = repo_root / rel
-            if src.exists():
-                copy_item(src, help_dir / src.name)
+        stage_max_package_payload(repo_root, build_dir, payload_root)
         return payload_root
 
     binary = first_existing(repo_root / p for p in spec.optional)
