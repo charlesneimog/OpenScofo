@@ -596,7 +596,7 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::ZCR;
     } else if (strcmp(s, "hfr") == 0) {
         return Descriptors::HFR;
-    } else if (strcmp(s, "spread") == 0 || strcmp(s, "spreadhz") == 0 || strcmp(s, "spread_hz") == 0) {
+    } else if (strcmp(s, "spreadhz") == 0) {
         return Descriptors::SPREADHZ;
     } else if (strcmp(s, "spread_variance") == 0) {
         return Descriptors::SPREADVARIANCE;
