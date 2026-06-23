@@ -150,7 +150,7 @@ static void oscofo_output_descriptors(MaxOpenScofo *x, OpenScofo::Description &D
             break;
         case OpenScofo::Descriptors::MFCC:
         case OpenScofo::Descriptors::CHROMA:
-        case OpenScofo::Descriptors::MELOGRAM:
+        case OpenScofo::Descriptors::LOGMEL:
         case OpenScofo::Descriptors::MAGNITUDE: {
             std::vector<double> DescArray = x->OpenScofo->GetDescriptionArray(Desc, d);
             int DescSize = DescArray.size();
