@@ -1,3 +1,12 @@
+/*
+    Copyright (c) 2024-2026 Charles K. Neimog
+    Website: charlesneimog.github.io
+
+    This file is part of a project licensed under the
+    GNU General Public License v3.0 or later (GPL-3.0-or-later).
+    See the LICENSE file for details.
+*/
+
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
