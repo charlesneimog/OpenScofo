@@ -223,6 +223,48 @@ jobs:
                     --candle "$candlePath" `
                     --light "$lightPath"
 
+            - name: Stage Max package payload (macOS)
+              if: runner.os == 'macOS'
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  package_root="max-package/OpenScofo"
+                  mkdir -p "$package_root/docs" "$package_root/help" "$package_root/externals"
+
+                  cp Sources/Wrappers/Max/package/License.md "$package_root/"
+                  cp Sources/Wrappers/Max/package/Readme.md "$package_root/"
+                  cp Sources/Wrappers/Max/package/icon.png "$package_root/"
+                  cp Sources/Wrappers/Max/package/package-info.json "$package_root/"
+                  cp Sources/Wrappers/Max/docs/openscofo~.maxref.xml "$package_root/docs/"
+                  cp Sources/Wrappers/Max/openscofo~.maxhelp "$package_root/help/"
+                  cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/help/"
+                  cp Tests/assets/canticos.txt "$package_root/help/"
+                  cp Tests/assets/canticos.wav "$package_root/help/"
+                  cp Tests/miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
+                  cp Tests/miniaturas/Extras/miniatura1.scofo "$package_root/help/"
+                  cp -R max/openscofo~.mxo "$package_root/externals/"
+
+                  test -f "$package_root/docs/openscofo~.maxref.xml"
+                  test -f "$package_root/help/openscofo~.maxhelp"
+                  test -f "$package_root/help/canticos.wav"
+                  test -f "$package_root/help/ai-flute-model.onnx"
+                  test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
+
+            - name: Stage Max package payload (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $ErrorActionPreference = 'Stop'
+
+                  $packageRoot = 'max-package/OpenScofo'
+                  New-Item -ItemType Directory -Force "$packageRoot/externals" | Out-Null
+                  Copy-Item 'max/openscofo~.mxe64' "$packageRoot/externals/openscofo~.mxe64"
+
+                  if (-not (Test-Path "$packageRoot/externals/openscofo~.mxe64")) {
+                    throw 'Max Windows external was not staged.'
+                  }
+
             # -----------------------
             # Upload artifacts
             # -----------------------
@@ -240,6 +282,14 @@ jobs:
               with:
                   name: Python-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
                   path: dist/*.whl
+
+            - name: Upload Max Package Payload
+              if: runner.os == 'macOS' || runner.os == 'Windows'
+              uses: actions/upload-artifact@v6
+              with:
+                  name: MaxPackagePart-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
+                  path: max-package
+                  if-no-files-found: error
 
             - name: Upload Emscripten
               if: runner.os == 'Linux'
@@ -269,6 +319,8 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Download all artifacts
               uses: actions/download-artifact@v4
@@ -308,10 +360,98 @@ jobs:
                   for artifact_dir in artifacts/*; do
                     [ -d "$artifact_dir" ] || continue
                     name="$(basename "$artifact_dir")"
+                    if [[ "$name" == MaxPackagePart-* ]]; then
+                      continue
+                    fi
                     (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
                   done
 
                   ls -1 release_assets
+
+            - name: Create Max-only package zip
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  mac_part="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'MaxPackagePart-*-macOS' | sort | head -n 1)"
+                  win_part="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'MaxPackagePart-*-Windows' | sort | head -n 1)"
+
+                  if [[ -z "$mac_part" || -z "$win_part" ]]; then
+                    echo "ERROR: Missing Max package payload artifacts."
+                    echo "mac_part=$mac_part"
+                    echo "win_part=$win_part"
+                    exit 1
+                  fi
+
+                  mkdir -p max_release
+                  cp -R "$mac_part/OpenScofo" max_release/
+                  mkdir -p max_release/OpenScofo/externals
+                  cp "$win_part/OpenScofo/externals/openscofo~.mxe64" max_release/OpenScofo/externals/
+
+                  test -f max_release/OpenScofo/docs/openscofo~.maxref.xml
+                  test -f max_release/OpenScofo/help/openscofo~.maxhelp
+                  test -f max_release/OpenScofo/help/canticos.wav
+                  test -f max_release/OpenScofo/help/ai-flute-model.onnx
+                  test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
+                  test -f max_release/OpenScofo/externals/openscofo~.mxe64
+
+                  (cd max_release && zip -r "../release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip" OpenScofo)
+
+                  ls -lh "release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip"
+
+            - name: Generate release notes
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  current_tag="v${RELEASE_VERSION}"
+                  previous_tag=""
+                  previous_target=""
+
+                  release_info="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+                    --jq "(map(select(.tag_name != \"${current_tag}\")) | .[0]) // {} | [.tag_name // \"\", .target_commitish // \"\"] | @tsv" \
+                    || true)"
+
+                  if [[ -n "$release_info" && "$release_info" != "null" ]]; then
+                    previous_tag="$(printf '%s' "$release_info" | cut -f1)"
+                    previous_target="$(printf '%s' "$release_info" | cut -f2)"
+                  fi
+
+                  git fetch --tags --force
+
+                  previous_ref=""
+                  if [[ -n "$previous_tag" ]] && git rev-parse --verify --quiet "${previous_tag}^{commit}" >/dev/null; then
+                    previous_ref="$previous_tag"
+                  elif [[ -n "$previous_target" ]] && git rev-parse --verify --quiet "${previous_target}^{commit}" >/dev/null; then
+                    previous_ref="$previous_target"
+                  else
+                    previous_ref="$(git describe --tags --abbrev=0 --exclude "$current_tag" 2>/dev/null || true)"
+                  fi
+
+                  {
+                    echo "## Changes"
+                    echo
+                    if [[ -n "$previous_ref" ]]; then
+                      echo "Commits from \`${previous_tag:-$previous_ref}\` to \`${current_tag}\`."
+                      range="${previous_ref}..${GITHUB_SHA}"
+                    else
+                      echo "Commits included in \`${current_tag}\`."
+                      range="${GITHUB_SHA}"
+                    fi
+                    echo
+
+                    if [[ "$(git rev-list --count "$range")" == "0" ]]; then
+                      echo "No commits found since the previous release."
+                    else
+                      git log --reverse \
+                        --format="- [%h](https://github.com/${GITHUB_REPOSITORY}/commit/%H) %s%n%w(0,2,2)%b%n" \
+                        "$range"
+                    fi
+                  } > release_notes.md
+
+                  cat release_notes.md
 
             - name: Create / Update GitHub Release
               uses: softprops/action-gh-release@v2
@@ -319,6 +459,7 @@ jobs:
                   tag_name: v${{ steps.release_metadata.outputs.version }}
                   name: v${{ steps.release_metadata.outputs.version }}
                   target_commitish: ${{ github.sha }}
+                  body_path: release_notes.md
                   files: |
                       release_assets/*.zip
                   draft: true
