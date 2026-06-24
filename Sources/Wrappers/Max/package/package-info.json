@@ -1,0 +1,23 @@
+{
+    "author" : "Charles K. Neimog",
+    "description" : "OpenScofo is an open-source score-following system specifically designed for contemporary music.",
+    "max_version_min" : "7.1", "max_version_max" : "none",
+    "name" : "OpenScofo",
+    "os" : {
+        "macintosh" : {
+            "platform" : ["x64", "aarch64" ],
+            "min_version" : "10.15"
+        },
+        "windows" : {
+            "platform" : ["x64" ],
+            "min_version" : "7"
+        }
+    },
+    "package_extra" : {
+        "reverse_domain" : "charlesneimog.github.io/OpenScofo",
+        "copyright" : "GPLv3"
+    },
+    "tags" : [ "score-following", "contemporary music"],
+    "version" : "2.0.7b1",
+    "website" : "https://charlesneimog.github.io/OpenScofo"
+}
