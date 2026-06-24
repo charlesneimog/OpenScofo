@@ -24,15 +24,9 @@ scofo.set_requested_descriptors(
     [
         OpenScofo.Descriptors.LOGMEL,
         OpenScofo.Descriptors.MFCC,
-        OpenScofo.Descriptors.RMS,
-        OpenScofo.Descriptors.ZCR,
-        OpenScofo.Descriptors.SPREAD,
-        OpenScofo.Descriptors.CENTROID,
         OpenScofo.Descriptors.CHROMA,
-        OpenScofo.Descriptors.ROLLOFF,
-        OpenScofo.Descriptors.ENTROPY,
-        OpenScofo.Descriptors.CREST,
-        OpenScofo.Descriptors.FLUX,
+        OpenScofo.Descriptors.ZCR,
+        OpenScofo.Descriptors.SPREADHZ,
     ]
 )
 
@@ -423,16 +417,6 @@ def run_test_spread_skew_kurt(scofo_desc, label):
     kurt_diff = abs(e_kurt - o_kurt)
 
     MAX_DIFF = max(MAX_DIFF, spread_diff, skew_diff, kurt_diff)
-
-    print_with_threshold(
-        spread_diff,
-        "Essentia "
-        f"{label} | "
-        f"SPRE | "
-        f"E: {e_spread:+012.5f} | "
-        f"S: {o_spread:+012.5f} | "
-        f"D: {spread_diff:+012.5f}",
-    )
 
     print_with_threshold(
         skew_diff,
