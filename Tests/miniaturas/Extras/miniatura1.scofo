@@ -1,12 +1,11 @@
-BPM 80
-
 ONNXMODEL ai-flute-model.onnx
 ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 
+BPM 100
 
-// sendto delay [<voz> <output_gain> <time> <feedback> <input_gain>]
-
-// Measure number 1
+ // ╭───────────────────────────────────────╮
+ // │          Measure number 1             │
+ // ╰───────────────────────────────────────╯
 UTECH jet_whistle 1
 REST 0.5	
 NOTE Bb4 1.5 // tied
