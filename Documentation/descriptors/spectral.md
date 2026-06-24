@@ -8,8 +8,9 @@ For the equations, $X[k]$ is one frequency bin of the FFT, $|X[k]|$ is its magni
 
 ---
 
-## `Spectral Flatness`
-**ID**: `flatness` | :custom-librosa:[^2]
+## Spectral Flatness
+
+**ID**: `flatness` :custom-librosa:[^2]
 
 Spectral flatness indicates how noisy versus tonal a sound is. A high flatness means the spectrum is uniform like white noise, while a low flatness shows clear peaks, like a sustained musical note.
 
@@ -19,8 +20,9 @@ $$Flatness = \frac{\exp\left(\frac{1}{K}\sum_{k=0}^{K-1}\ln(\max(\epsilon, P[k])
 
 ---
 
-## `Spectral Flux`
-**ID**: `flux` | :custom-essentia:[^6]
+## Spectral Flux
+
+**ID**: `flux` :custom-essentia:[^6]
 
 Spectral flux measures how quickly the spectrum of a sound changes over time. High flux indicates sudden changes or transients, like drum hits, while low flux corresponds to steady, continuous sounds.
 
@@ -30,19 +32,27 @@ $$Flux_t = \sqrt{\sum_{k=0}^{K-1}\left(M_t[k] - M_{t-1}[k]\right)^2}$$
 
 ---
 
-## `Spectral Irregularity`
+## Spectral Irregularity
+
 **ID**: `irregularity`
 
 Spectral irregularity quantifies how uneven or jagged a spectrum is between adjacent frequency bins. High irregularity indicates complex, inharmonic, or noisy timbres, while low values suggest smooth, harmonic sounds.
 
-The current implementation uses normalized magnitudes and compares adjacent bins.
+`OpenScofo` computes both Jensen's bin-based algorithm and Krimphoff's running-average strategy. The `irregularity` descriptor uses the Krimphoff value by default.
 
-$$Irregularity = \frac{\sum_{k=1}^{K-1}\left(A[k-1] - A[k]\right)^2}{\sum_{k=0}^{K-1}A[k]^2}$$
+Jensen's algorithm, cited by Brent, divides squared adjacent-bin magnitude differences by the total spectral power.[^7] With $K = N/2 + 1$ one-sided FFT bins, this is:
+
+$$Irregularity = \frac{\sum_{k=0}^{K-2}\left(|X[k]| - |X[k+1]|\right)^2}{\sum_{k=0}^{K-1}|X[k]|^2}$$
+
+Krimphoff's strategy compares each interior bin against the average of itself and its two neighbors:
+
+$$Irregularity = \log_{10}\left(\sum_{k=1}^{K-2}\left||X[k]| - \frac{|X[k-1]| + |X[k]| + |X[k+1]|}{3}\right|\right)$$
 
 ---
 
-## `Spectral Crest`
-**ID**: `crest` | :custom-essentia:[^6]
+## Spectral Crest
+
+**ID**: `crest` :custom-essentia:[^6]
 
 Spectral crest measures the ratio of the highest spectral peak to the average spectral amplitude. A high crest indicates a tone dominated by strong harmonics or transients, while a low crest corresponds to more even, noise-like spectra.
 
@@ -52,8 +62,9 @@ $$Crest = \frac{\max_k M[k]}{\frac{1}{K}\sum_{k=0}^{K-1}M[k]}$$
 
 ---
 
-## `Spectral Skewness`
-**ID**: `skewness` | :custom-essentia:[^6]
+## Spectral Skewness
+
+**ID**: `skewness` :custom-essentia:[^6]
 
 Spectral skewness measures the asymmetry of the spectral distribution around its centroid. It indicates whether the energy is biased toward low or high frequencies.
 
@@ -67,8 +78,9 @@ $$Skewness = \frac{\frac{\sum_{k=0}^{K-1}(f_k-\mu)^3A[k]}{\sum_{k=0}^{K-1}A[k]}}
 
 ---
 
-## `Spectral Kurtosis`
-**ID**: `kurtosis` | :custom-essentia:[^6]
+## Spectral Kurtosis
+
+**ID**: `kurtosis` :custom-essentia:[^6]
 
 Spectral kurtosis measures the peakedness or tailedness of the spectral distribution around its centroid. It quantifies how concentrated the spectral energy is in a few frequency bins versus being evenly spread.
 
@@ -78,8 +90,9 @@ $$Kurtosis = \frac{\frac{\sum_{k=0}^{K-1}(f_k-\mu)^4A[k]}{\sum_{k=0}^{K-1}A[k]}}
 
 ---
 
-## `Spectral RollOff`
-**ID**: `rolloff` | :custom-essentia:[^6]
+## Spectral RollOff
+
+**ID**: `rolloff` :custom-essentia:[^6]
 
 Spectral rolloff indicates the frequency below which a fixed percentage of a sound's spectral energy is contained. Higher values make the sound perceptually brighter or sharper, while lower values make it darker or warmer.
 
@@ -91,8 +104,9 @@ $$Rolloff = f_b$$
 
 ---
 
-## `Spectral Entropy`
-**ID**: `entropy` | :custom-essentia:[^6]
+## Spectral Entropy
+
+**ID**: `entropy` :custom-essentia:[^6]
 
 Spectral entropy indicates how uniformly a sound's spectral energy is distributed across frequencies. Higher values make the sound perceptually more noisy or disordered, while lower values make it more tonal or structured.
 
@@ -104,8 +118,9 @@ $$Entropy = -\sum_{k=0}^{K-1}p_k\log_2(p_k)$$
 
 ---
 
-## `Spectral Centroid`
-**ID**: `centroid` | :custom-librosa:[^3]
+## Spectral Centroid
+
+**ID**: `centroid` :custom-librosa:[^3]
 
 Spectral centroid indicates the center of mass of a sound's spectrum. Higher values make the sound perceptually brighter, while lower values make it darker or warmer.
 
@@ -115,8 +130,9 @@ $$Centroid = \frac{\sum_{k=0}^{K-1} f_k A[k]}{\sum_{k=0}^{K-1}A[k]}$$
 
 ---
 
-## `Centroid Velocity`
-**ID**: `velocity` | :custom-essentia:[^6]
+## Centroid Velocity
+
+**ID**: `velocity` :custom-essentia:[^6]
 
 Centroid velocity measures how quickly the spectral centroid changes over time, reflecting dynamic shifts in brightness or timbre.
 
@@ -126,8 +142,9 @@ $$Velocity_t = |Centroid_t - Centroid_{t-1}|$$
 
 ---
 
-## `Spectral Spread`
-**ID**: `spread` | :custom-librosa:[^3]
+## Spectral Spread
+
+**ID**: `spread` :custom-librosa:[^3]
 
 Spectral spread quantifies how dispersed the energy is around the spectral centroid, indicating whether the sound is focused (narrow) or diffuse (wide) in frequency.
 
@@ -135,9 +152,14 @@ The current implementation computes the standard deviation of frequency around t
 
 $$Spread = \sqrt{\frac{\sum_{k=0}^{K-1} f_k^2 A[k]}{\sum_{k=0}^{K-1}A[k]} - Centroid^2}$$
 
+The `spread_variance` descriptor follows Essentia's `CentralMoments` + `DistributionShape` spread value. It treats the normalized magnitude spectrum as a probability distribution over FFT-bin indices and returns the normalized second central moment:
+
+$$SpreadVariance = \frac{\sum_{k=0}^{K-1}(k-\mu_k)^2 A[k]}{(K-1)^2\sum_{k=0}^{K-1}A[k]}$$
+
 ---
 
-## `High Frequency Ratio`
+## High Frequency Ratio
+
 **ID**: `hfr`
 
 High Frequency Ratio measures the proportion of energy in the upper part of the spectrum, reflecting the brightness or presence of high-pitched content in a sound.
@@ -148,7 +170,8 @@ $$HFR = \frac{\sum_{k=\lfloor K/4 \rfloor}^{K-1}A[k]}{\sum_{k=0}^{K-1}A[k]}$$
 
 ---
 
-## `Standard Deviation`
+## Standard Deviation
+
 **ID**: `std`
 
 Standard deviation describes how far the frame-normalized spectral magnitude is from a uniform distribution.
@@ -159,19 +182,8 @@ $$StdDev = \sqrt{\frac{1}{K}\sum_{k=0}^{K-1}\left(A_{norm}[k]-\frac{1}{K}\right)
 
 ---
 
-## `Normalized Magnitude`
+## Harmonicity
 
-The normalized magnitude descriptor stores each FFT magnitude divided by the FFT size.
-
-$$A[k] = \frac{M[k]}{N} = \frac{|X[k]|}{N}$$
-
-The implementation also computes a frame-normalized distribution for descriptors such as standard deviation.
-
-$$A_{norm}[k] = \frac{A[k]}{\sum_{j=0}^{K-1}A[j]}$$
-
----
-
-## `Harmonicity`
 **ID**: `harmonicity`
 
 Harmonicity measures how concentrated the normalized magnitude spectrum is around its strongest non-DC bin. High harmonicity indicates a clear dominant component, while low harmonicity indicates a more distributed or noise-like spectrum.
@@ -182,8 +194,9 @@ $$Harmonicity = \frac{\max_{1 \le k < K} A[k]}{\sum_{k=1}^{K-1}A[k] + \epsilon}$
 
 ---
 
-## `Log-Mel Spectrogram`
-**ID**: `logmel` | :custom-librosa:[^5]
+## Log-Mel Spectrogram
+
+**ID**: `logmel` :custom-librosa:[^5]
 
 The log-mel spectrum represents how the energy of a sound is distributed across perceptual frequency bands, using the mel scale and a logarithmic dB compression to approximate human loudness perception.
 
@@ -197,8 +210,9 @@ $$LogMel[m] = \max(L_m, \max_j L_j - 80)$$
 
 ---
 
-## `MFCC`
-**ID**: `mfcc` | :custom-librosa:[^3]
+## MFCC
+
+**ID**: `mfcc` :custom-librosa:[^3]
 
 MFCCs summarize the shape of a sound's spectrum on a perceptual, mel-based scale, giving a compact representation of timbre and tone color as humans hear it.
 
@@ -212,8 +226,9 @@ $$D_{i,m} = \alpha_i\cos\left(\frac{\pi}{M}(m+0.5)i\right), \quad \alpha_0=\sqrt
 
 ---
 
-## `Chroma`
-**ID**: `chroma` | :custom-librosa:[^4]
+## Chroma
+
+**ID**: `chroma` :custom-librosa:[^4]
 
 Chroma features capture the intensity of the twelve pitch classes (C, C sharp, ..., B) in a sound, representing its harmonic and melodic content independently of octave.
 
@@ -227,5 +242,5 @@ where $W_c[k]$ is the chroma filter weight for pitch class $c$ and FFT bin $k$.
 [^3]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-5}$.
 [^4]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-3}$.
 [^5]: `Descriptor` full compatible with [`librosa`](https://librosa.org/).
-
 [^6]: `Descriptor` compatible with [`essentia`](https://essentia.upf.edu/) in order of $10^{-4}$.
+[^7]: Brent, W. “Physical and Perceptual Aspects of Percussive Timbre.” PhD thesis, UC San Diego, 2010. https://escholarship.org/uc/item/5bx4j1fj.

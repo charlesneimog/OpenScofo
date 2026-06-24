@@ -25,3 +25,9 @@ After Configuration, the Score will look like this:
 <p align="center">
     <img style="width: 80%; border-radius: 5px" src="https://charlesneimog.github.io/OpenScofo/assets/oscofo-code.png">
 </p>
+
+## Filename, Extension, and Syntax Highlighting
+
+An `OpenScofo` score is a plain text file. While any text file can be used, the recommended file extension is `.scofo`.
+
+Syntax highlighting support is still under development, but parsers for `.scofo` files are already available for both VS Code and Neovim.

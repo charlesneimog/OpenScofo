@@ -1,8 +1,8 @@
 # Amplitude Descriptors
 
+## Root Mean Square (RMS)
 
-## `Root Mean Square (RMS)` 
-**ID**: `rms` | :custom-librosa:[^1] :custom-essentia:
+**ID**: `rms` :custom-librosa:[^1] :custom-essentia:
 
 A measure of the amplitude (energy) of the current audio frame. It represents how loud the sound is within a short time window. Higher RMS values indicate louder sounds, while lower values indicate quieter sounds or silence.
 
@@ -15,7 +15,8 @@ Where root mean square of the amplitude representing the energy of the time-doma
 
 ---
 
-## `dB`
+## dB
+
 **ID**: `db` 
 
 A logarithmic measure of sound level derived from the signal amplitude. Unlike RMS, which measures the raw energy of the signal, dB expresses this energy on a logarithmic scale that better reflects how humans perceive changes in loudness.
@@ -23,19 +24,21 @@ A logarithmic measure of sound level derived from the signal amplitude. Unlike R
 The equation implemented is:
 
 $$L_{dB} = 20 \log_{10}(RMS)$$
-
         
 Note that neither `librosa` or `essentia` implemented `dB`, but as it uses `RMS`, once you convert `RMS` to `dB` it is compatible with both.
 
 ---
 
-## `Max Amplitude `
+## Max Amplitude
+
 **ID**: `maxamp` 
 
 Maximum normalized spectral amplitude detected in the current frame of audio. Equation used is $MaxAmp = \max_{k} |X[k]|$, Where $X[k]$ is an FFT Bin.
 
 ---
-## `Loudness`
+
+## Loudness
+
 **ID**: `loudness` 
 
 An estimate of perceived sound intensity based on psychoacoustic models of human hearing. Unlike dB, it applies perceptual models and filters derived from psychoacoustic studies to approximate how humans actually perceive loudness.
@@ -57,7 +60,8 @@ As reference, `OpenScofo` implements the code implemented in [klangfreund/LUFSMe
 
 ---
 
-## `Silence Probability`
+## Silence Probability
+
 **ID**: `silence` 
 
 Probability that the current frame corresponds to silence, derived from Loudness ($L$) via a logistic function where $\alpha = 0.25$ and $L_0 = -60.0$:
