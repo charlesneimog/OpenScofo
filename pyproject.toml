@@ -15,6 +15,13 @@ dependencies = [
     "skl2onnx",
     "onnxmltools"
 ]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/charlesneimog/OpenScofo"
+Repository = "https://github.com/charlesneimog/OpenScofo"
+Issues = "https://github.com/charlesneimog/OpenScofo/issues"
 
 [build-system]
 requires = ["scikit-build-core", "nanobind","librosa","catboost"]
