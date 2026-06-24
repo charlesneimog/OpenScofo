@@ -86,7 +86,7 @@ test.csv
 /Sources/Python/OpenScofo/__pycache__
 /Resources/Extended-Techniques/flute.onnx
 OpenScofo.pkg
-max/
+/max/
 Resources/Packages/out
 Resources/Packages/OpenScofo-macOS.pkg
 Resources/Packages/OpenScofo-macOS.pkg
