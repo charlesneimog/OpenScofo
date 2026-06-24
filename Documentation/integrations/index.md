@@ -4,19 +4,19 @@
 
 The following integrations are available:
 
-* [**Pure Data**](puredata.md) — native object for real-time score following  
-* [**Max/MSP**](max.md) — integration for interactive patching environments  
-* [**Vamp**](vamp.md) — analysis plugins for offline inspection  
-* [**SuperCollider**](supercollider.md) — integration for synthesis and live coding contexts  
-* [**Csound**](csound.md) — support for structured audio programming workflows  
-* [**Python**](python.md) — scripting, prototyping, and analysis workflows  
-* [**JavaScript**](javascript.md) — browser-based deployment and web integration  
-* [**C++**](cpp.md) — direct library access for high-performance applications  
+* [**Pure Data**](puredata.md) 
+* [**Max/MSP**](max.md) 
+* [**Vamp**](vamp.md) 
+* [**SuperCollider**](supercollider.md) 
+* [**Csound**](csound.md) 
+* [**Python**](python.md) 
+* [**JavaScript**](javascript.md) 
+* [**C++**](cpp.md) 
 
 
 Each section provides setup instructions and usage details specific to the target environment.
 
-# Download Links
+## Download
 
 <release interface="All"><i>Loading Releases</i></release>
 

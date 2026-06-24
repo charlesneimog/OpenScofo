@@ -1,6 +1,7 @@
 # Onset Descriptor
 
-## `Onset Detection`
+## Onset Detection
+
 **ID**: `onset` 
 
 Boolean value (`0` or `1`) indicating whether a sound event onset has been detected. Evaluated using the `onsetsds` library's. We highly recommend the reading of the paper _Adaptive whitening for improved real-time audio onset detection_ to better understand how the onset detection works and how to choose the best method for the music you will use (Table 1 and Table 2). 

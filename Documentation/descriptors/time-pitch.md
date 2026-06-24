@@ -6,8 +6,9 @@ They are still useful for machine listening because they describe musical qualit
 
 ---
 
-## `Zero Crossing Rate`
-**ID**: `zcr` | :custom-librosa:[^5]
+## Zero Crossing Rate
+
+**ID**: `zcr` :custom-librosa:[^5]
 
 Zero Crossing Rate counts how often the waveform crosses the zero amplitude line, indicating the noisiness or percussiveness of a sound.
 
@@ -17,7 +18,8 @@ $$ZCR = \frac{1}{N}\sum_{n=1}^{N-1}\mathbb{I}\left[sign(x[n]) \ne sign(x[n-1])\r
 
 ---
 
-## `Pitch` & `PitchConfidence`
+## Pitch & PitchConfidence
+
 **ID**: `pitch`
 
 Estimated fundamental frequency and confidence are calculated using the YIN algorithm's cumulative mean normalized difference function (CMNDF).
