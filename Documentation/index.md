@@ -18,7 +18,7 @@ hide:
   ![Image title](./assets/logo-dark.svg#only-dark){ width="15%" }
 </p>
 
-<h4 align="center"><i>A Machine Listening System for Contemporary Music</i></h4>
+<h4 align="center"><i>Score-follower for contemporary music.</i></h4>
 
 ---
 
