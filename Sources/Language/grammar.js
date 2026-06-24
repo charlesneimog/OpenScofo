@@ -2,10 +2,8 @@
  * @file The OpenScofo language is a specialized scripting language for OpenScofo, an open-source score follower tailored for contemporary live-electronic music. Inspired by the research behind IRCAM's Antescofo, it leverages Lua for flexible scripting and Tree-sitter to parse EVENTs and musical actions. It is built to lower the barrier to entry and setup complexity of live-electronics by enabling interactive scores that integrate seamlessly across PureData (including web deployment via pd4web), Max, Python, and C/C++.
  * @author Charles K. Neimog <charlesneimog@outlook.com>
  * @license GPL3
+ *
  */
-
-///
-//
 
 module.exports = grammar({
     name: "openscofo",
