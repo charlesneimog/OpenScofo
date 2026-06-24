@@ -40,7 +40,7 @@
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 12.0, 198.0, 1264.0, 114.0 ],
+                                    "patching_rect": [ 12.0, 198.0, 1267.0, 114.0 ],
                                     "text": "To recognize these sounds, the model uses the audio descriptors provided by OpenScofo, including amplitude, onset, time-domain, pitch, and spectral features. Before using the model in performance, you must first train it with labeled examples of the techniques or sound categories you want it to identify. OpenScofo currently provides training workflows through either Python or Pure Data, allowing you to build custom classifiers tailored to your instrument, repertoire, and performance context. Once trained, the model can listen to incoming audio and recognize the techniques and sound categories you are performing in real time. For complete training instructions, dataset requirements, and implementation details, please refer to the documentation below.\n"
                                 }
                             },
@@ -63,7 +63,7 @@
                                     "numinlets": 1,
                                     "numoutlets": 0,
                                     "patching_rect": [ 37.5, 587.0, 256.0, 20.0 ],
-                                    "text": "Check complete AI docs"
+                                    "text": "Check Complet AI Documentation."
                                 }
                             },
                             {
@@ -133,7 +133,7 @@
                                     "numinlets": 1,
                                     "numoutlets": 0,
                                     "patching_rect": [ 37.5, 587.0, 256.0, 20.0 ],
-                                    "text": "Check complete docs"
+                                    "text": "Check Actions Complete Documentation."
                                 }
                             },
                             {
@@ -387,7 +387,7 @@
                                     "numinlets": 1,
                                     "numoutlets": 0,
                                     "patching_rect": [ 37.5, 587.0, 256.0, 20.0 ],
-                                    "text": "Check complete docs"
+                                    "text": "Check Descriptors Complete Documentation."
                                 }
                             },
                             {
@@ -410,8 +410,8 @@
                                     "numinlets": 2,
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
-                                    "patching_rect": [ 11.5, 615.0, 401.0, 35.0 ],
-                                    "text": ";\rmax launchbrowser https://charlesneimog.github.io/OpenScofo/score/intro"
+                                    "patching_rect": [ 11.5, 615.0, 407.0, 35.0 ],
+                                    "text": ";\rmax launchbrowser https://charlesneimog.github.io/OpenScofo/descriptors/"
                                 }
                             },
                             {
@@ -662,28 +662,6 @@
                             },
                             {
                                 "box": {
-                                    "id": "obj-10",
-                                    "maxclass": "toggle",
-                                    "numinlets": 1,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "int" ],
-                                    "parameter_enable": 0,
-                                    "patching_rect": [ 113.0, 214.0, 24.0, 24.0 ]
-                                }
-                            },
-                            {
-                                "box": {
-                                    "id": "obj-7",
-                                    "maxclass": "message",
-                                    "numinlets": 2,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
-                                    "patching_rect": [ 113.0, 245.0, 103.0, 22.0 ],
-                                    "text": "set description $1"
-                                }
-                            },
-                            {
-                                "box": {
                                     "color": [ 0.08235294117647059, 0.4745098039215686, 0.08627450980392157, 1.0 ],
                                     "id": "obj-3",
                                     "maxclass": "newobj",
@@ -692,36 +670,6 @@
                                     "outlettype": [ "float", "float", "" ],
                                     "patching_rect": [ 10.400000154972076, 297.0, 285.40000396966934, 22.0 ],
                                     "text": "openscofo~ flatness spread logmel centroid"
-                                }
-                            },
-                            {
-                                "box": {
-                                    "background": 1,
-                                    "bgcolor": [ 0.792294779904983, 0.561867873693578, 0.668313324973563, 1.0 ],
-                                    "bgoncolor": [ 0.55, 0.55, 0.55, 1.0 ],
-                                    "fontface": 1,
-                                    "hint": "",
-                                    "id": "obj-53",
-                                    "ignoreclick": 1,
-                                    "legacytextcolor": 1,
-                                    "maxclass": "textbutton",
-                                    "numinlets": 1,
-                                    "numoutlets": 3,
-                                    "outlettype": [ "", "", "int" ],
-                                    "parameter_enable": 0,
-                                    "patching_rect": [ 143.0, 216.0, 20.0, 20.0 ],
-                                    "rounded": 60.0,
-                                    "saved_attribute_attributes": {
-                                        "bgcolor": {
-                                            "expression": "themecolor.lesson_downloading"
-                                        }
-                                    },
-                                    "text": "1",
-                                    "textcolor": [ 0.34902, 0.34902, 0.34902, 1.0 ],
-                                    "textoncolor": [ 1.0, 1.0, 1.0, 1.0 ],
-                                    "textovercolor": [ 0.2, 0.2, 0.2, 1.0 ],
-                                    "usebgoncolor": 1,
-                                    "usetextovercolor": 1
                                 }
                             },
                             {
@@ -746,7 +694,7 @@
                                             "expression": "themecolor.lesson_downloading"
                                         }
                                     },
-                                    "text": "3",
+                                    "text": "2",
                                     "textcolor": [ 0.34902, 0.34902, 0.34902, 1.0 ],
                                     "textoncolor": [ 1.0, 1.0, 1.0, 1.0 ],
                                     "textovercolor": [ 0.2, 0.2, 0.2, 1.0 ],
@@ -776,7 +724,7 @@
                                             "expression": "themecolor.lesson_downloading"
                                         }
                                     },
-                                    "text": "2",
+                                    "text": "1",
                                     "textcolor": [ 0.34902, 0.34902, 0.34902, 1.0 ],
                                     "textoncolor": [ 1.0, 1.0, 1.0, 1.0 ],
                                     "textovercolor": [ 0.2, 0.2, 0.2, 1.0 ],
@@ -790,12 +738,6 @@
                                 "patchline": {
                                     "destination": [ "obj-2", 0 ],
                                     "source": [ "obj-1", 0 ]
-                                }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "obj-7", 0 ],
-                                    "source": [ "obj-10", 0 ]
                                 }
                             },
                             {
@@ -860,12 +802,6 @@
                                     "destination": [ "obj-66", 0 ],
                                     "source": [ "obj-6", 2 ]
                                 }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "obj-3", 0 ],
-                                    "source": [ "obj-7", 0 ]
-                                }
                             }
                         ]
                     },
@@ -902,7 +838,7 @@
                                     "numinlets": 1,
                                     "numoutlets": 0,
                                     "patching_rect": [ 37.5, 587.0, 256.0, 20.0 ],
-                                    "text": "Check complete docs"
+                                    "text": "Check Score Complete Documentation."
                                 }
                             },
                             {
