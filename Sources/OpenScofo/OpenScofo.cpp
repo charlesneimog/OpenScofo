@@ -220,7 +220,7 @@ void OpenScofo::ClearErrors() {
  */
 void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors) {
     if (Model.extension() != ".onnx") {
-        spdlog::error("OpenScofo just work with onnx models trained with the object py.train from pd-xlab library");
+        spdlog::error("OpenScofo just work with onnx models. Model {} is not valid", Model.string());
         return;
     }
 

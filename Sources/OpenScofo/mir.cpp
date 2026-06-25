@@ -437,10 +437,15 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         return;
     }
 
-    // probabilities
-    m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probabilities");
+    // CatBoost's ONNX exporter emits a ZipMap graph output named
+    // "probabilities" and a raw float tensor named "probability_tensor".
+    // OpenScofo needs the numeric tensor for frame-by-frame inference.
+    m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probability_tensor");
     if (m_OutputTensor == nullptr) {
-        spdlog::error("Tensor 'probabilities', for output, not found");
+        m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probabilities");
+    }
+    if (m_OutputTensor == nullptr) {
+        spdlog::error("Tensor 'probability_tensor' or 'probabilities', for output, not found");
         return;
     }
 
