@@ -1,9 +1,0 @@
-numpy
-scipy
-librosa
-scikit-learn
-catboost
-onnx
-skl2onnx
-joblib
-OpenScofo
