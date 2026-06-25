@@ -1,0 +1,150 @@
+import io
+import sys
+import threading
+
+import OpenScofo
+import puredata as pd
+
+
+class RedirectStdout(io.StringIO):
+    def write(self, s):
+        if s.strip():  # ignore empty lines
+            pd.post(s.strip())  # your custom sink
+        return super().write(s)
+
+
+class pytrain(pd.NewObject):
+    name = "py.o.train"
+
+    def __init__(self, args):
+        # pd
+        self.inlets = 1
+        self.outlets = 2
+        self.sr = 48000
+        self.fftsize = 2048
+        self.hopsize = 512
+        self.descriptors = [
+            "mfcc",
+            "logmel",
+            "centroid",
+            "flatness",
+            "hfr",
+            "flux",
+            "zcr",
+            "irregularity",
+            "kurtosis",
+        ]
+        self.trainfolder = ""
+        self.irfolders = []
+        self.model_type = args[0] if args else "catboost"
+        self.balanced_augmentation_factor = 1.0
+        self.trainer = None
+
+    def in_0_fftsize(self, args):
+        self.fftsize = args[0]
+
+    def in_0_hopsize(self, args):
+        self.hopsize = args[0]
+
+    def in_0_sr(self, args):
+        self.sr = args[0]
+
+    def in_0_descriptors(self, args):
+        self.descriptors = args
+
+    def in_0_trainfolder(self, args):
+        self.trainfolder = args[0]
+
+    def in_0_irfolders(self, args):
+        for arg in args:
+            self.irfolders.append(arg)
+
+    def in_0_modeltype(self, args):
+        self.model_type = args[0]
+        if self.trainer is not None:
+            self.trainer.set_model_type(self.model_type)
+
+    def in_0_model_type(self, args):
+        self.in_0_modeltype(args)
+
+    def in_0_model(self, args):
+        self.in_0_modeltype(args)
+
+    def in_0_balancedaugmentationfactor(self, args):
+        self.balanced_augmentation_factor = args[0]
+
+    def in_0_balanced_augmentation_factor(self, args):
+        self.in_0_balancedaugmentationfactor(args)
+
+    def in_0_clear(self, _):
+        if self.trainer is not None:
+            self.trainer.clear_data()
+            return
+
+        trainer = OpenScofo.ExtendedTechniqueClassifier(
+            sample_rate=self.sr,
+            fft_size=self.fftsize,
+            hop_size=self.hopsize,
+            base_path=self.get_current_dir(),
+            model_type=self.model_type,
+        )
+        trainer.clear_data()
+
+    def in_0_analyze(self, _):
+        def pdprint(value) -> None:
+            self.logpost(2, value)
+
+        def report_analyses(value):
+            self.out(1, pd.FLOAT, value)
+
+        self.trainer = OpenScofo.ExtendedTechniqueClassifier(
+            sample_rate=self.sr,
+            fft_size=self.fftsize,
+            hop_size=self.hopsize,
+            base_path=self.get_current_dir(),
+            model_type=self.model_type,
+        )
+
+        self.trainer.set_onprogress_callback(report_analyses)
+        self.trainer.set_print_callback(pdprint)
+        self.trainer.set_descriptors(self.descriptors)
+        self.trainer.set_ir_folders(self.irfolders)
+        self.trainer.set_balanced_augmentation_factor(
+            self.balanced_augmentation_factor
+        )
+        self.trainer.set_train_folder(self.trainfolder)
+
+        thread = threading.Thread(target=self.trainer.analyze)
+        thread.start()
+
+    def _run_with_callback(self, callback):
+        try:
+            self.trainer.train()
+        except Exception as e:
+            self._train_error = e
+        finally:
+            callback()
+
+    def on_train_finished(self):
+        sys.stdout = self.old_stdout
+
+    def in_0_train(self, _):
+        if self.trainer is not None:
+            buffer = RedirectStdout()
+            self.old_stdout = sys.stdout
+            sys.stdout = buffer
+            thread = threading.Thread(
+                target=self._run_with_callback, args=(self.on_train_finished,)
+            )
+            thread.start()
+        else:
+            raise Exception("You need to analyze first")
+
+    def in_0_export(self, args):
+        if self.trainer is not None:
+            file = self.get_current_dir() + "/" + args[0]
+
+            self.trainer.export_model(file)
+            self.logpost(2, f"Reload this model in openscofo~: {file}")
+        else:
+            raise Exception("You need to analyze first")
