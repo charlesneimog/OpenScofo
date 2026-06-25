@@ -43,13 +43,11 @@ MIR::~MIR() {
         delete m_ODS;
     }
 
-    if (m_ONNXModelLoaded) {
-        if (m_ONNXContext) {
-            onnx_context_free(m_ONNXContext);
-            m_ONNXContext = nullptr;
-        }
-        m_ONNXModelLoaded = false;
+    if (m_ONNXContext) {
+        onnx_context_free(m_ONNXContext);
+        m_ONNXContext = nullptr;
     }
+    m_ONNXModelLoaded = false;
 
     /// save values
 }
@@ -203,22 +201,21 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     auto u8 = path.u8string();
     std::string path_utf8(u8.begin(), u8.end());
 
-    if (m_ONNXModelLoaded && m_ONNXModelPath == path) {
+    if (m_ONNXModelLoaded && m_ONNXModelPath == path && m_ONNXDescriptors == Descriptors) {
         spdlog::debug("ONNX model already loaded, reusing existing context");
         return;
     }
     m_ONNXModelPath = path;
 
-    if (m_ONNXModelLoaded) {
-        spdlog::debug("Loading different ONNX model, cleaning up old one");
-        if (m_ONNXContext) {
-            onnx_context_free(m_ONNXContext);
-            m_ONNXContext = nullptr;
-        }
-        m_ONNXModelLoaded = false;
-        m_ONNXLabels.clear();
-        m_Writers.clear();
+    if (m_ONNXContext) {
+        onnx_context_free(m_ONNXContext);
+        m_ONNXContext = nullptr;
     }
+    m_ONNXModelLoaded = false;
+    m_ONNXLabels.clear();
+    m_Writers.clear();
+    m_InputTensor = nullptr;
+    m_OutputTensor = nullptr;
 
     m_ONNXContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
     if (m_ONNXContext == nullptr) {
@@ -264,8 +261,11 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
             "TreeEnsembleClassifier not found in model, please use PureData py.train to train models for OpenScofo");
         return;
     }
+    if (m_ONNXLabels.empty()) {
+        spdlog::error("TreeEnsembleClassifier labels not found in ONNX model");
+        return;
+    }
 
-    m_ONNXModelLoaded = true;
     m_ONNXDescriptors = Descriptors;
     UpdateDescriptorFlags();
     if (m_NeedOnset) {
@@ -283,7 +283,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     if (m_NeedYIN) {
         YINInit();
     }
-    spdlog::debug("ONNX Model Loaded");
+
     // Count
     m_ONNXDescriptorsSize = 0;
     for (size_t i = 0; i < m_ONNXDescriptors.size(); i++) {
@@ -431,21 +431,41 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         }
     }
 
-    m_InputTensor = onnx_tensor_search(m_ONNXContext, "features");
-    if (m_InputTensor == nullptr) {
-        spdlog::error("Tensor 'features', for input, not found");
+    Onnx__GraphProto *graph = m_ONNXContext->model ? m_ONNXContext->model->graph : nullptr;
+    if (!graph) {
+        spdlog::error("ONNX graph not found");
         return;
     }
 
-    // CatBoost's ONNX exporter emits a ZipMap graph output named
-    // "probabilities" and a raw float tensor named "probability_tensor".
-    // OpenScofo needs the numeric tensor for frame-by-frame inference.
-    m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probability_tensor");
-    if (m_OutputTensor == nullptr) {
-        m_OutputTensor = onnx_tensor_search(m_ONNXContext, "probabilities");
+    auto is_float_tensor = [](const struct onnx_tensor_t *t) {
+        return t && (t->type == ONNX_TENSOR_TYPE_FLOAT32 || t->type == ONNX_TENSOR_TYPE_FLOAT64);
+    };
+
+    m_InputTensor = nullptr;
+    for (size_t i = 0; i < graph->n_input; ++i) {
+        const char *name = graph->input[i] ? graph->input[i]->name : nullptr;
+        struct onnx_tensor_t *t = onnx_tensor_search(m_ONNXContext, name);
+        if (is_float_tensor(t) && t->ndata == (size_t)m_ONNXDescriptorsSize) {
+            m_InputTensor = t;
+            break;
+        }
+    }
+    if (m_InputTensor == nullptr) {
+        spdlog::error("ONNX input tensor with {} float values not found", m_ONNXDescriptorsSize);
+        return;
+    }
+
+    m_OutputTensor = nullptr;
+    for (size_t i = 0; i < graph->n_output; ++i) {
+        const char *name = graph->output[i] ? graph->output[i]->name : nullptr;
+        struct onnx_tensor_t *t = onnx_tensor_search(m_ONNXContext, name);
+        if (is_float_tensor(t) && t->ndata == m_ONNXLabels.size()) {
+            m_OutputTensor = t;
+            break;
+        }
     }
     if (m_OutputTensor == nullptr) {
-        spdlog::error("Tensor 'probability_tensor' or 'probabilities', for output, not found");
+        spdlog::error("ONNX numeric probability output with {} values not found", m_ONNXLabels.size());
         return;
     }
 
@@ -457,23 +477,36 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 
     size_t LabelSize = m_ONNXLabels.size();
     if (LabelSize != m_OutputTensor->ndata) {
-        spdlog::error("Tensor output expect {} values, but labels provided are {}", m_InputTensor->ndata,
-                      m_ONNXDescriptorsSize);
+        spdlog::error("Tensor output has {} values, but labels provided are {}", m_OutputTensor->ndata, LabelSize);
         return;
     }
+
+    m_ONNXModelLoaded = true;
+    spdlog::debug("ONNX Model Loaded");
 }
 
 // ─────────────────────────────────────
 void MIR::ONNXExec(Description &Desc) {
+    if (!m_ONNXModelLoaded || !m_InputTensor || !m_OutputTensor) {
+        return;
+    }
 
     float *out = m_ONNXDescriptorsArray.data();
     for (auto &w : m_Writers) {
         w(Desc, out);
     }
+    if (out != m_ONNXDescriptorsArray.data() + m_ONNXDescriptorsSize) {
+        spdlog::error("ONNX descriptor writer produced {} values, expected {}", out - m_ONNXDescriptorsArray.data(),
+                      m_ONNXDescriptorsSize);
+        Desc.ONNX.clear();
+        return;
+    }
 
-    onnx_tensor_apply(m_InputTensor, m_ONNXDescriptorsArray.data(), m_ONNXDescriptorsSize);
+    onnx_tensor_apply(m_InputTensor, m_ONNXDescriptorsArray.data(),
+                      m_ONNXDescriptorsArray.size() * sizeof(m_ONNXDescriptorsArray[0]));
     onnx_run(m_ONNXContext);
 
+    Desc.ONNX.clear();
     switch (m_OutputTensor->type) {
     case ONNX_TENSOR_TYPE_FLOAT32: {
         float *data = (float *)m_OutputTensor->datas;
