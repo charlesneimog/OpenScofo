@@ -130,8 +130,8 @@ class MIR {
     std::vector<Descriptors> m_ONNXDescriptors;
     std::vector<float> m_ONNXDescriptorsArray;
     std::vector<std::function<void(const Description &, float *&)>> m_Writers;
-    struct onnx_tensor_t *m_InputTensor;
-    struct onnx_tensor_t *m_OutputTensor;
+    struct onnx_tensor_t *m_InputTensor = nullptr;
+    struct onnx_tensor_t *m_OutputTensor = nullptr;
     int m_ONNXDescriptorsSize = 0;
 
     // Env
