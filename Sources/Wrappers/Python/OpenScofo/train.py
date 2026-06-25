@@ -10,15 +10,9 @@ See the LICENSE file for details.
 import math
 import os
 import random
-from collections.abc import Iterable
-from typing import List
-
-os.environ.setdefault(
-    "NUMBA_CACHE_DIR",
-    os.path.join(os.path.abspath(os.getenv("TMPDIR", "/tmp")), "openscofo-numba-cache"),
-)
-
 import librosa
+from collections.abc import Iterable
+
 import numpy as np
 from catboost import CatBoostClassifier
 from scipy.signal import fftconvolve, resample
@@ -50,7 +44,7 @@ class ExtendedTechniqueClassifier:
         self.descriptors = []
         self.redraw = 0
 
-        self.iterations = 3000
+        self.iterations = 1000
         self.random_state = 80
         self.test_fraction = 0.1
         self.min_db = -60.0
@@ -206,9 +200,7 @@ class ExtendedTechniqueClassifier:
         if role not in ("train", "test"):
             return y
 
-        train_region, test_region = self._single_file_split_regions(
-            y, filepath, label
-        )
+        train_region, test_region = self._single_file_split_regions(y, filepath, label)
         if role == "train":
             return train_region
         return test_region
@@ -303,7 +295,8 @@ class ExtendedTechniqueClassifier:
 
         validation_set = set(int(i) for i in validation_indices)
         validation_data = [
-            sample for idx, sample in enumerate(original_train_data)
+            sample
+            for idx, sample in enumerate(original_train_data)
             if idx in validation_set
         ]
 
@@ -316,7 +309,8 @@ class ExtendedTechniqueClassifier:
             return original_train_data, []
 
         original_fit_data = [
-            sample for idx, sample in enumerate(original_train_data)
+            sample
+            for idx, sample in enumerate(original_train_data)
             if idx not in validation_set
         ]
         return original_fit_data, validation_data
@@ -525,9 +519,7 @@ class ExtendedTechniqueClassifier:
                 raw_train_frames_by_class[label] = self._count_valid_windows(
                     train_region
                 )
-                raw_test_frames_by_class[label] = self._count_valid_windows(
-                    test_region
-                )
+                raw_test_frames_by_class[label] = self._count_valid_windows(test_region)
             else:
                 raw_train_frames_by_class[label] = sum(
                     file_raw_frames.get(f, 0) for f in train_files
@@ -605,9 +597,7 @@ class ExtendedTechniqueClassifier:
                 )
                 continue
 
-            self.print(
-                f"Augmenting {label} class: target additional samples={needed}"
-            )
+            self.print(f"Augmenting {label} class: target additional samples={needed}")
             attempts = 0
             file_index = 0
             while (
@@ -703,9 +693,7 @@ class ExtendedTechniqueClassifier:
         }
 
         self.x_train, self.y_train = zip(*fit_data) if fit_data else ([], [])
-        self.x_val, self.y_val = (
-            zip(*validation_data) if validation_data else ([], [])
-        )
+        self.x_val, self.y_val = zip(*validation_data) if validation_data else ([], [])
         self.x_test, self.y_test = zip(*test_data) if test_data else ([], [])
 
         self.x_np_train = np.array(self.x_train)
@@ -785,7 +773,9 @@ class ExtendedTechniqueClassifier:
             "sample_rate": int(self.sample_rate),
             "fft_size": int(self.fft_size),
             "hop_size": int(self.hop_size),
-            "trainfolder": os.path.abspath(self.trainfolder) if self.trainfolder else "",
+            "trainfolder": (
+                os.path.abspath(self.trainfolder) if self.trainfolder else ""
+            ),
             "audio_files": self._audio_file_signature() if self.folders else [],
             "min_db": float(self.min_db),
             "test_fraction": float(self.test_fraction),
@@ -877,12 +867,16 @@ class ExtendedTechniqueClassifier:
         )
 
         if eval_set:
-            self.print(f"Model shrunk to {self.clf.tree_count_} trees via early stopping.")
+            self.print(
+                f"Model shrunk to {self.clf.tree_count_} trees via early stopping."
+            )
 
         if len(self.x_np_test) > 0 and len(self.y_np_test) > 0:
             self._print_evaluation()
         else:
-            self.print("No independent test samples available; skipped test evaluation.")
+            self.print(
+                "No independent test samples available; skipped test evaluation."
+            )
 
         self.print("Training finished!")
 
