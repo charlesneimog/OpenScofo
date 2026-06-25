@@ -9,11 +9,7 @@ dependencies = [
     "numpy",
     "scipy",
     "librosa",
-    "scikit-learn",
-    "catboost",
-    "lightgbm",
-    "skl2onnx",
-    "onnxmltools"
+    "catboost"
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
