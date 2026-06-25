@@ -9,7 +9,7 @@ pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/README.md")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/LICENSE")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Documentation/assets/icon.png")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/miniaturas/Extras/ai-flute-model.onnx")
-pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Tests/miniaturas/Extras/miniatura1.scofo")
+pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Resources/Pieces/miniatura1.scofo")
 pd_add_datafile(openscofo~ "${CMAKE_SOURCE_DIR}/Resources/Pieces/miniatura1.wav")
 
 if(LINUX)
