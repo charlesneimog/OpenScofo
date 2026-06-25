@@ -9,9 +9,10 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/vector.h>
 #include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/unordered_map.h>
+#include <nanobind/stl/vector.h>
 
 #include <OpenScofo.hpp>
 
