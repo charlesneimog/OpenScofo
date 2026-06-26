@@ -12,6 +12,7 @@ import os
 import random
 import librosa
 from collections.abc import Iterable
+from typing import List
 
 import numpy as np
 from catboost import CatBoostClassifier
@@ -21,11 +22,12 @@ from ._OpenScofo import OpenScofo
 
 class ExtendedTechniqueClassifier:
     SUPPORTED_MODEL_TYPES = ("catboost",)
-    DATASET_CACHE_VERSION = 12
+    DATASET_CACHE_VERSION = 13
 
     def __init__(
         self,
         sample_rate=48000,
+        training_sample_rates=(44100, 48000),
         fft_size=2048,
         hop_size=512,
         base_path=None,
@@ -34,6 +36,9 @@ class ExtendedTechniqueClassifier:
         self.print = print
 
         self.sample_rate = sample_rate
+        self.training_sample_rates = self._normalize_sample_rates(
+            training_sample_rates
+        )
         self.fft_size = fft_size
         self.hop_size = hop_size
         self.base_path = base_path or os.getcwd()
@@ -49,6 +54,7 @@ class ExtendedTechniqueClassifier:
         self.test_fraction = 0.1
         self.min_db = -60.0
         self.oscofo: OpenScofo = OpenScofo(sample_rate, fft_size, hop_size)
+        self._oscofos = {sample_rate: self.oscofo}
         self.max_augmentation_loops = 128
         self.balanced_augmentation_factor = 1.0
         self.single_file_class_window_split = False
@@ -79,6 +85,32 @@ class ExtendedTechniqueClassifier:
         self._single_file_split_cache = {}
         self.set_random_seed(self.random_state)
 
+    def _normalize_sample_rates(self, sample_rates):
+        if sample_rates is None:
+            sample_rates = (self.sample_rate,)
+        if isinstance(sample_rates, (int, np.integer)):
+            sample_rates = (int(sample_rates),)
+
+        normalized = []
+        for sample_rate in sample_rates:
+            sample_rate = int(sample_rate)
+            if sample_rate <= 0:
+                raise ValueError("training sample rates must be positive integers")
+            if sample_rate not in normalized:
+                normalized.append(sample_rate)
+
+        if not normalized:
+            raise ValueError("at least one training sample rate is required")
+        return tuple(normalized)
+
+    def _oscofo_for_sample_rate(self, sample_rate):
+        sample_rate = int(sample_rate)
+        if sample_rate not in self._oscofos:
+            self._oscofos[sample_rate] = OpenScofo(
+                sample_rate, self.fft_size, self.hop_size
+            )
+        return self._oscofos[sample_rate]
+
     def resolve_trainfolder(self, path):
         """Resolve a training-related folder against base_path when needed."""
         if os.path.exists(path):
@@ -103,8 +135,9 @@ class ExtendedTechniqueClassifier:
         y_conv = y_conv / (np.max(np.abs(y_conv)) + 1e-8)
         return y_conv.astype(np.float32)
 
-    def _load_audio(self, filepath):
-        y, _ = librosa.load(filepath, sr=self.sample_rate)
+    def _load_audio(self, filepath, sample_rate=None):
+        sample_rate = self.sample_rate if sample_rate is None else int(sample_rate)
+        y, _ = librosa.load(filepath, sr=sample_rate)
         return y
 
     def _seed_random_generators(self):
@@ -146,20 +179,21 @@ class ExtendedTechniqueClassifier:
         train_files = [f for f in files if f not in test_files]
         return train_files, test_files, False
 
-    def _valid_window_starts(self, y):
+    def _valid_window_starts(self, y, sample_rate):
+        oscofo = self._oscofo_for_sample_rate(sample_rate)
         starts = []
         idx = 0
         while idx <= len(y) - self.fft_size:
             window = np.asarray(y[idx : idx + self.fft_size], dtype=np.float32)
-            self.oscofo.process_block(window)
-            desc = self.oscofo.get_description()
+            oscofo.process_block(window)
+            desc = oscofo.get_description()
             if desc.db >= self.min_db:
                 starts.append(idx)
             idx += self.hop_size
         return starts
 
-    def _single_file_split_regions(self, y, filepath, label):
-        cache_key = (os.path.abspath(filepath), label, len(y))
+    def _single_file_split_regions(self, y, filepath, label, sample_rate):
+        cache_key = (os.path.abspath(filepath), label, int(sample_rate), len(y))
         if cache_key in self._single_file_split_cache:
             return self._single_file_split_cache[cache_key]
 
@@ -174,7 +208,7 @@ class ExtendedTechniqueClassifier:
             self._single_file_split_cache[cache_key] = regions
             return regions
 
-        valid_starts = self._valid_window_starts(y)
+        valid_starts = self._valid_window_starts(y, sample_rate)
         if len(valid_starts) < 2:
             self.print(
                 f"Class {label}: skipping temporal test split for "
@@ -196,22 +230,25 @@ class ExtendedTechniqueClassifier:
         self._single_file_split_cache[cache_key] = regions
         return regions
 
-    def _single_file_temporal_region(self, y, role, filepath, label):
+    def _single_file_temporal_region(self, y, role, filepath, label, sample_rate):
         if role not in ("train", "test"):
             return y
 
-        train_region, test_region = self._single_file_split_regions(y, filepath, label)
+        train_region, test_region = self._single_file_split_regions(
+            y, filepath, label, sample_rate
+        )
         if role == "train":
             return train_region
         return test_region
 
-    def _count_valid_windows(self, y):
+    def _count_valid_windows(self, y, sample_rate):
+        oscofo = self._oscofo_for_sample_rate(sample_rate)
         count = 0
         idx = 0
         while idx <= len(y) - self.fft_size:
             window = np.asarray(y[idx : idx + self.fft_size], dtype=np.float32)
-            self.oscofo.process_block(window)
-            desc = self.oscofo.get_description()
+            oscofo.process_block(window)
+            desc = oscofo.get_description()
             if desc.db >= self.min_db:
                 count += 1
             idx += self.hop_size
@@ -379,12 +416,13 @@ class ExtendedTechniqueClassifier:
             self.on_progress(self.processed_count)
         return True
 
-    def _first_non_silent_description(self, y):
+    def _first_non_silent_description(self, y, sample_rate):
+        oscofo = self._oscofo_for_sample_rate(sample_rate)
         idx = 0
         while idx <= len(y) - self.fft_size:
             window = np.asarray(y[idx : idx + self.fft_size], dtype=np.float32)
-            self.oscofo.process_block(window)
-            desc = self.oscofo.get_description()
+            oscofo.process_block(window)
+            desc = oscofo.get_description()
             if desc.db >= self.min_db:
                 return desc
             idx += self.hop_size
@@ -407,10 +445,14 @@ class ExtendedTechniqueClassifier:
         window_split_role=None,
         augment=False,
         max_samples=None,
+        sample_rate=None,
     ):
-        y = self._load_audio(filepath)
-        y = self._single_file_temporal_region(y, window_split_role, filepath, label)
-        sr = self.sample_rate
+        sr = self.sample_rate if sample_rate is None else int(sample_rate)
+        oscofo = self._oscofo_for_sample_rate(sr)
+        y = self._load_audio(filepath, sr)
+        y = self._single_file_temporal_region(
+            y, window_split_role, filepath, label, sr
+        )
         signal = self._augmentation_variant(y, sr) if augment else y
         appended_count = 0
 
@@ -421,8 +463,8 @@ class ExtendedTechniqueClassifier:
         while idx <= len(signal) - self.fft_size:
             self.processed_count += 1
             window = np.asarray(signal[idx : idx + self.fft_size], dtype=np.float32)
-            self.oscofo.process_block(window)
-            desc = self.oscofo.get_description()
+            oscofo.process_block(window)
+            desc = oscofo.get_description()
 
             if desc.db < self.min_db:
                 idx += self.hop_size
@@ -440,7 +482,7 @@ class ExtendedTechniqueClassifier:
             and appended_count == 0
             and len(y) >= self.fft_size
         ):
-            fallback_desc = self._first_non_silent_description(y)
+            fallback_desc = self._first_non_silent_description(y, sr)
             if fallback_desc is not None and self._append_sample_from_description(
                 fallback_desc, label, target_list
             ):
@@ -482,16 +524,18 @@ class ExtendedTechniqueClassifier:
             self.print(f"Class {label} raw files: {len(all_files)}")
             class_raw_frames = 0
             for file in all_files:
-                y = self._load_audio(file)
-                length = len(y)
-                if self.min_y is None or length < self.min_y:
-                    self.min_y = length
-                if self.max_y is None or length > self.max_y:
-                    self.max_y = length
+                file_raw_frames[file] = {}
+                for sample_rate in self.training_sample_rates:
+                    y = self._load_audio(file, sample_rate)
+                    length = len(y)
+                    if self.min_y is None or length < self.min_y:
+                        self.min_y = length
+                    if self.max_y is None or length > self.max_y:
+                        self.max_y = length
 
-                valid_frames = self._count_valid_windows(y)
-                file_raw_frames[file] = valid_frames
-                class_raw_frames += valid_frames
+                    valid_frames = self._count_valid_windows(y, sample_rate)
+                    file_raw_frames[file][sample_rate] = valid_frames
+                    class_raw_frames += valid_frames
 
             self.print(f"Class {label} raw non-silent frames: {class_raw_frames}")
 
@@ -512,20 +556,25 @@ class ExtendedTechniqueClassifier:
             test_files_by_class[label] = test_files
             shared_single_file_split_by_class[label] = shared_single_file_split
             if shared_single_file_split and train_files:
-                y = self._load_audio(train_files[0])
-                train_region, test_region = self._single_file_split_regions(
-                    y, train_files[0], label
-                )
-                raw_train_frames_by_class[label] = self._count_valid_windows(
-                    train_region
-                )
-                raw_test_frames_by_class[label] = self._count_valid_windows(test_region)
+                train_frames = 0
+                test_frames = 0
+                for sample_rate in self.training_sample_rates:
+                    y = self._load_audio(train_files[0], sample_rate)
+                    train_region, test_region = self._single_file_split_regions(
+                        y, train_files[0], label, sample_rate
+                    )
+                    train_frames += self._count_valid_windows(
+                        train_region, sample_rate
+                    )
+                    test_frames += self._count_valid_windows(test_region, sample_rate)
+                raw_train_frames_by_class[label] = train_frames
+                raw_test_frames_by_class[label] = test_frames
             else:
                 raw_train_frames_by_class[label] = sum(
-                    file_raw_frames.get(f, 0) for f in train_files
+                    sum(file_raw_frames.get(f, {}).values()) for f in train_files
                 )
                 raw_test_frames_by_class[label] = sum(
-                    file_raw_frames.get(f, 0) for f in test_files
+                    sum(file_raw_frames.get(f, {}).values()) for f in test_files
                 )
 
         for label in self.folders.keys():
@@ -552,22 +601,26 @@ class ExtendedTechniqueClassifier:
             shared_split = shared_single_file_split_by_class.get(label, False)
 
             for f in test_files:
-                generated_test_by_class[label] += self._process_file(
-                    f,
-                    label,
-                    test_data,
-                    "testdata",
-                    window_split_role=("test" if shared_split else None),
-                )
+                for sample_rate in self.training_sample_rates:
+                    generated_test_by_class[label] += self._process_file(
+                        f,
+                        label,
+                        test_data,
+                        "testdata",
+                        window_split_role=("test" if shared_split else None),
+                        sample_rate=sample_rate,
+                    )
 
             for f in train_files:
-                generated_train_by_class[label] += self._process_file(
-                    f,
-                    label,
-                    original_train_data,
-                    "traindata",
-                    window_split_role=("train" if shared_split else None),
-                )
+                for sample_rate in self.training_sample_rates:
+                    generated_train_by_class[label] += self._process_file(
+                        f,
+                        label,
+                        original_train_data,
+                        "traindata",
+                        window_split_role=("train" if shared_split else None),
+                        sample_rate=sample_rate,
+                    )
 
         train_samples_target = self._augmentation_target(generated_train_by_class)
         if train_samples_target > 0:
@@ -597,14 +650,20 @@ class ExtendedTechniqueClassifier:
                 )
                 continue
 
-            self.print(f"Augmenting {label} class: target additional samples={needed}")
+            self.print(
+                f"Augmenting {label} class: target additional samples={needed}"
+            )
             attempts = 0
             file_index = 0
             while (
-                original_count + augmented_train_by_class[label] < train_samples_target
+                original_count + augmented_train_by_class[label]
+                < train_samples_target
                 and attempts < max_attempts
             ):
                 f = train_files[file_index % len(train_files)]
+                sample_rate = self.training_sample_rates[
+                    attempts % len(self.training_sample_rates)
+                ]
                 remaining = (
                     train_samples_target
                     - original_count
@@ -618,6 +677,7 @@ class ExtendedTechniqueClassifier:
                     window_split_role=("train" if shared_split else None),
                     augment=True,
                     max_samples=remaining,
+                    sample_rate=sample_rate,
                 )
                 augmented_train_by_class[label] += added
                 attempts += 1
@@ -771,6 +831,7 @@ class ExtendedTechniqueClassifier:
             "cache_version": self.DATASET_CACHE_VERSION,
             "descriptors": list(self.descriptors),
             "sample_rate": int(self.sample_rate),
+            "training_sample_rates": [int(sr) for sr in self.training_sample_rates],
             "fft_size": int(self.fft_size),
             "hop_size": int(self.hop_size),
             "trainfolder": (
