@@ -1,0 +1,191 @@
+////////////////////////////////////////////////////////////
+// CONFIGURATION
+////////////////////////////////////////////////////////////
+
+// Audio
+FFTSIZE 2048
+HOPSIZE 512
+
+// Tempo model
+BPM 60
+BPM 120
+PHASECOUPLING 0.5
+SYNCSTRENGTH 0.8
+
+// Pitch
+TRANSPOSE 0
+TRANSPOSE -12
+TRANSPOSE 12
+PITCHTEMPLATESIGMA 0.08
+
+// AI
+ONNXMODEL "models/flute.onnx"
+ONNXMODEL ./models/flute.onnx
+
+ONNXDESCRIPTORS
+    mfcc
+    logmel
+    loudness
+    rms
+    power
+    chroma
+    zcr
+    hfr
+    centroid
+    spread
+    flatness
+    flux
+    irregularity
+    kurtosis
+    harmonicity
+    yin
+
+// onset detector
+ONSETFUNCTION pow
+ONSETFUNCTION pd
+ONSETFUNCTION wpd
+ONSETFUNCTION sf
+ONSETFUNCTION cd
+ONSETFUNCTION rcd
+ONSETFUNCTION hfc
+ONSETFUNCTION mkl
+
+
+// ╭───────────────────────────────────────╮
+// │               LUA BLOCK               │
+// ╰───────────────────────────────────────╯
+LUA {
+    print("Hello")
+
+    function hello()
+        print("Hello World")
+    end
+
+}
+
+
+// ╭───────────────────────────────────────╮
+// │               EVENTS                  │
+// ╰───────────────────────────────────────╯
+
+// NOTE
+NOTE C4 1
+NOTE F#5 0.5
+NOTE Bb3 2
+
+// NOTE with attribute
+NOTE C4 1 @percussive
+NOTE G3 0.25
+
+// REST
+REST 1
+REST 0.5
+
+
+// CHORD
+CHORD (C4 E4 G4) 2
+CHORD (C4 Eb4 G4 Bb4) 1
+
+
+// TRILL
+TRILL (C4 D4) 4
+TRILL (F#5 G5) 2
+
+
+// PTECH (single technique)
+PTECH aeolian C4 2
+
+PTECH whistle D5 1
+
+PTECH key_click C3 0.25
+
+
+// PTECH (multiple techniques)
+PTECH [aeolian, sing] C4 2
+PTECH [jet_whistle, sing] G4 1
+PTECH [key_click, tongue_ram] C5 0.5
+
+
+// UTECH (single)
+UTECH aeolian 2
+UTECH whistle 0.5
+
+// UTECH (multiple)
+UTECH [aeolian, sing] 2
+UTECH [tongue_ram, key_click] 1
+
+// ACTIONS
+NOTE C4 1
+    sendto synth
+
+// with arguments
+NOTE C4 1
+    sendto synth [440]
+NOTE C4 1
+    sendto synth [440 0.5]
+NOTE C4 1
+    sendto synth [play C4 120]
+
+// multiple commands
+NOTE C4 1
+    sendto synth,
+    sendto lights
+
+NOTE C4 1
+    sendto synth [440]
+    sendto light [red]
+
+// Lua action
+NOTE C4 1
+    luacall(print("hello"))
+
+NOTE C4 1
+    luacall(myFunction())
+
+NOTE C4 1
+    luacall(score.advance(1))
+
+
+// DELAYED ACTIONS
+NOTE C4 1
+    delay 250 ms sendto synth
+
+// seconds
+NOTE C4 1
+    delay 0.5 sec sendto synth
+
+// tempo-relative
+NOTE C4 1
+    delay 0.25 tempo sendto synth
+
+
+NOTE C4 1
+    delay 200 ms sendto synth [440], sendto light [red], luacall(print("Delayed"))
+
+// COMPLETE EXAMPLES
+NOTE C4 1
+    sendto synth
+NOTE E4 1
+    delay 100 ms sendto synth [440]
+NOTE G4 1
+    delay 0.5 tempo sendto synth [440], sendto light [green], luacall(print("Beat"))
+PTECH [aeolian, sing] C4 2
+    sendto electronics [aeolian]
+UTECH whistle 1
+    luacall(processTechnique())
+CHORD (C4 E4 G4) 2
+    sendto synth [major]
+TRILL (C4 D4) 4
+    delay 50 ms sendto visualizer [trill]
+
+
+// ╭───────────────────────────────────────╮
+// │               COMMENTS                │
+// ╰───────────────────────────────────────╯
+
+// Single line comment
+
+/*
+Multi-line
+comment
+*/
