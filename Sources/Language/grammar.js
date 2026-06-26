@@ -73,7 +73,7 @@ module.exports = grammar({
                     "FFTSIZE",
                     "HOPSIZE",
 
-                    // Tempo
+                    // Time Model
                     "PHASECOUPLING",
                     "SYNCSTRENGTH",
                     "BPM",
@@ -82,7 +82,7 @@ module.exports = grammar({
                     "PITCHTEMPLATESIGMA",
                     "TRANSPOSE",
 
-                    // Listening model
+                    // AI extended technique model
                     "ONNXMODEL",
                     "ONNXDESCRIPTORS",
                     "ONSETFUNCTION",
@@ -123,15 +123,26 @@ module.exports = grammar({
         ptech_event: ($) =>
             seq(
                 "PTECH",
-                field("technique", $.identifier),
+                choice(
+                    // Single technique
+                    field("technique", $.identifier),
+
+                    // Multiple techniques
+                    field("techniques", seq("[", $.identifier, repeat(seq(",", $.identifier)), "]")),
+                ),
                 field("pitch", $.pitch),
                 field("duration", $.number),
-                //
             ),
         utech_event: ($) =>
             seq(
                 "UTECH",
-                field("technique", $.identifier),
+                choice(
+                    // Single technique
+                    field("technique", $.identifier),
+                    // Multiple techniques
+                    field("techniques", seq("[", $.identifier, repeat(seq(",", $.identifier)), "]")),
+                ),
+
                 field("duration", $.number),
                 //
             ),

@@ -384,11 +384,26 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
 
     Event.Type = PTECH;
 
-    // Pitch
-    AudioState SubState;
-    SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
-    SubState.Type = LABEL;
-    Event.AudioStates.push_back(SubState);
+    // AI Label(s)
+    TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
+    if (!ts_node_is_null(TechniquesNode)) {
+        uint32_t count = ts_node_named_child_count(TechniquesNode);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode TechniqueNode = ts_node_named_child(TechniquesNode, i);
+            if (std::string(ts_node_type(TechniqueNode)) != "identifier") {
+                continue;
+            }
+            AudioState SubState;
+            SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
+            SubState.Type = LABEL;
+            Event.AudioStates.push_back(SubState);
+        }
+    } else {
+        AudioState SubState;
+        SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+        SubState.Type = LABEL;
+        Event.AudioStates.push_back(SubState);
+    }
 
     // Pitch
     AudioState Pitch;
@@ -431,10 +446,25 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     // }
 
     Event.Type = UTECH;
-    AudioState SubState;
-    SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
-    SubState.Type = LABEL;
-    Event.AudioStates.push_back(SubState);
+    TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
+    if (!ts_node_is_null(TechniquesNode)) {
+        uint32_t count = ts_node_named_child_count(TechniquesNode);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode TechniqueNode = ts_node_named_child(TechniquesNode, i);
+            if (std::string(ts_node_type(TechniqueNode)) != "identifier") {
+                continue;
+            }
+            AudioState SubState;
+            SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
+            SubState.Type = LABEL;
+            Event.AudioStates.push_back(SubState);
+        }
+    } else {
+        AudioState SubState;
+        SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
+        SubState.Type = LABEL;
+        Event.AudioStates.push_back(SubState);
+    }
 
     // Silence
     AudioState Silence;
