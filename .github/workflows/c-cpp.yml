@@ -13,6 +13,8 @@ on:
                 type: boolean
 permissions:
     contents: write
+env:
+    LIBNAME: openscofo~
 jobs:
     build:
         runs-on: ${{ matrix.os }}
@@ -266,6 +268,93 @@ jobs:
                     throw 'Max Windows external was not staged.'
                   }
 
+            - name: Stage Pure Data package payload (Linux/macOS)
+              if: runner.os == 'Linux' || runner.os == 'macOS'
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  package_root="pd-package/${LIBNAME}"
+                  mkdir -p "$package_root"
+
+                  if [[ -d "build/${LIBNAME}" ]]; then
+                    cp -R "build/${LIBNAME}/." "$package_root/"
+                  elif [[ -d "${LIBNAME}" ]]; then
+                    cp -R "${LIBNAME}/." "$package_root/"
+                  fi
+
+                  cp Sources/Wrappers/PureData/openscofo~-help.pd "$package_root/"
+                  cp README.md "$package_root/"
+                  cp LICENSE "$package_root/"
+                  cp Documentation/assets/icon.png "$package_root/"
+                  cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/"
+                  cp Resources/Pieces/miniatura1.scofo "$package_root/"
+                  cp Resources/Pieces/miniatura1.wav "$package_root/"
+
+                  shopt -s nullglob
+                  found_binary=0
+                  for binary in build/Sources/Wrappers/PureData/openscofo~*; do
+                    if [[ -f "$binary" && "$binary" != *.pd ]]; then
+                      cp "$binary" "$package_root/"
+                      found_binary=1
+                    fi
+                  done
+
+                  for binary in "$package_root"/openscofo~*; do
+                    if [[ -f "$binary" && "$binary" != *.pd ]]; then
+                      found_binary=1
+                    fi
+                  done
+
+                  if [[ "$found_binary" != "1" ]]; then
+                    echo "ERROR: No Pure Data external binary was staged."
+                    find build -path '*PureData*' -type f || true
+                    exit 1
+                  fi
+
+                  find "$package_root" -maxdepth 1 -type f -print | sort
+
+            - name: Stage Pure Data package payload (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $ErrorActionPreference = 'Stop'
+
+                  $packageRoot = "pd-package/$env:LIBNAME"
+                  New-Item -ItemType Directory -Force $packageRoot | Out-Null
+
+                  if (Test-Path "build/$env:LIBNAME") {
+                    Copy-Item "build/$env:LIBNAME/*" $packageRoot -Recurse -Force
+                  } elseif (Test-Path $env:LIBNAME) {
+                    Copy-Item "$env:LIBNAME/*" $packageRoot -Recurse -Force
+                  }
+
+                  Copy-Item 'Sources/Wrappers/PureData/openscofo~-help.pd' $packageRoot -Force
+                  Copy-Item 'README.md' $packageRoot -Force
+                  Copy-Item 'LICENSE' $packageRoot -Force
+                  Copy-Item 'Documentation/assets/icon.png' $packageRoot -Force
+                  Copy-Item 'Tests/miniaturas/Extras/ai-flute-model.onnx' $packageRoot -Force
+                  Copy-Item 'Resources/Pieces/miniatura1.scofo' $packageRoot -Force
+                  Copy-Item 'Resources/Pieces/miniatura1.wav' $packageRoot -Force
+
+                  $pdBinaries = @()
+                  if (Test-Path 'build/Sources/Wrappers/PureData') {
+                    $pdBinaries += Get-ChildItem 'build/Sources/Wrappers/PureData' -File -Filter 'openscofo~*'
+                  }
+                  $pdBinaries = $pdBinaries | Where-Object { $_.Extension -ne '.pd' } | Sort-Object FullName -Unique
+
+                  foreach ($binary in $pdBinaries) {
+                    Copy-Item $binary.FullName $packageRoot -Force
+                  }
+
+                  $stagedBinaries = Get-ChildItem $packageRoot -File -Filter 'openscofo~*' | Where-Object { $_.Extension -ne '.pd' }
+                  if (-not $stagedBinaries) {
+                    Get-ChildItem build -Recurse -File | Where-Object { $_.FullName -match 'PureData' }
+                    throw 'No Pure Data external binary was staged.'
+                  }
+
+                  Get-ChildItem $packageRoot -File | Sort-Object Name
+
             # -----------------------
             # Upload artifacts
             # -----------------------
@@ -290,6 +379,13 @@ jobs:
               with:
                   name: MaxPackagePart-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
                   path: max-package
+                  if-no-files-found: error
+
+            - name: Upload Pure Data Package Payload
+              uses: actions/upload-artifact@v6
+              with:
+                  name: PdPackagePart-${{steps.wheel_version.outputs.name}}-${{steps.wheel_version.outputs.version}}-${{ runner.os }}
+                  path: pd-package
                   if-no-files-found: error
 
             - name: Upload Emscripten
@@ -334,18 +430,27 @@ jobs:
               run: |
                   set -euo pipefail
 
-                  artifact_name="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'Installer-*' -printf '%f\n' | sort | head -n 1)"
+                  mapfile -t wheels < <(find artifacts -type f -name '*.whl' | sort)
 
-                  if [[ -z "$artifact_name" ]]; then
-                    echo "ERROR: No Installer artifact found"
+                  if [[ "${#wheels[@]}" == "0" ]]; then
+                    echo "ERROR: No Python wheel artifacts found"
                     exit 1
                   fi
 
-                  metadata="${artifact_name#Installer-}"
-                  metadata="${metadata%-Linux}"
-                  metadata="${metadata%-macOS}"
-                  metadata="${metadata%-Windows}"
-                  release_version="${metadata##*-}"
+                  release_version=""
+                  for wheel in "${wheels[@]}"; do
+                    wheel_name="$(basename "$wheel")"
+                    wheel_stem="${wheel_name%.whl}"
+                    version="${wheel_stem#*-}"
+                    version="${version%%-*}"
+
+                    if [[ -z "$release_version" ]]; then
+                      release_version="$version"
+                    elif [[ "$version" != "$release_version" ]]; then
+                      echo "ERROR: wheel version mismatch: $wheel_name has $version, expected $release_version"
+                      exit 1
+                    fi
+                  done
 
                   if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
                     release_tag="${GITHUB_REF_NAME}"
@@ -359,7 +464,7 @@ jobs:
                     release_tag="v${release_version}"
                   fi
 
-                  echo "Extracted RELEASE_VERSION=$release_version from $artifact_name"
+                  echo "Extracted RELEASE_VERSION=$release_version from Python wheel artifacts"
                   echo "Using RELEASE_TAG=$release_tag"
                   echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
                   echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
@@ -377,6 +482,9 @@ jobs:
                     [ -d "$artifact_dir" ] || continue
                     name="$(basename "$artifact_dir")"
                     if [[ "$name" == MaxPackagePart-* ]]; then
+                      continue
+                    fi
+                    if [[ "$name" == PdPackagePart-* ]]; then
                       continue
                     fi
                     (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
@@ -414,6 +522,70 @@ jobs:
                   (cd max_release && zip -r "../release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip" OpenScofo)
 
                   ls -lh "release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip"
+
+            - name: Package and upload Pure Data release to Deken
+              shell: bash
+              env:
+                  DEKEN_USERNAME: charlesneimog
+                  DEKEN_PASSWORD: ${{ secrets.DEKEN_PASSWORD }}
+              run: |
+                  set -euo pipefail
+
+                  mkdir -p "deken_release/${LIBNAME}"
+
+                  found_pd_part=0
+                  for pd_part in artifacts/PdPackagePart-*; do
+                    [ -d "$pd_part" ] || continue
+                    if [[ ! -d "$pd_part/${LIBNAME}" ]]; then
+                      echo "ERROR: Pure Data artifact does not contain ${LIBNAME}: $pd_part"
+                      find "$pd_part" -maxdepth 3 -type f -print
+                      exit 1
+                    fi
+
+                    cp -R "$pd_part/${LIBNAME}/." "deken_release/${LIBNAME}/"
+                    found_pd_part=1
+                  done
+
+                  if [[ "$found_pd_part" != "1" ]]; then
+                    echo "ERROR: No Pure Data package payload artifacts found."
+                    find artifacts -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+                    exit 1
+                  fi
+
+                  shopt -s nullglob
+                  staged_binaries=(deken_release/"${LIBNAME}"/openscofo~*)
+                  found_binary=0
+                  for binary in "${staged_binaries[@]}"; do
+                    if [[ -f "$binary" && "$binary" != *.pd ]]; then
+                      found_binary=1
+                    fi
+                  done
+
+                  if [[ "$found_binary" != "1" ]]; then
+                    echo "ERROR: No Pure Data external binary found in merged Deken payload."
+                    find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
+                    exit 1
+                  fi
+
+                  find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
+
+                  (
+                    cd deken_release
+                    docker run --rm \
+                      --user "$(id -u)" \
+                      --volume "$(pwd):/deken" \
+                      registry.git.iem.at/pd/deken \
+                      deken package --version "${RELEASE_VERSION}" "${LIBNAME}"
+
+                    ls -lh ./*.dek
+
+                    docker run --rm \
+                      --user "$(id -u)" \
+                      --volume "$(pwd):/deken" \
+                      -e DEKEN_USERNAME -e DEKEN_PASSWORD \
+                      registry.git.iem.at/pd/deken \
+                      deken upload -v "${RELEASE_VERSION}" ./*.dek
+                  )
 
             - name: Generate release notes
               shell: bash
