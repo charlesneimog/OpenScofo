@@ -56,15 +56,21 @@ endif()
 # ╭──────────────────────────────────────╮
 # │               PD CMAKE               │
 # ╰──────────────────────────────────────╯
-set(PDCMAKE_FILE ${CMAKE_BINARY_DIR}/pd.cmake)
-set(PDCMAKE_VERSION "v0.2.12")
+set(PDCMAKE_FILE "${CMAKE_BINARY_DIR}/pd.cmake")
+set(PDCMAKE_VERSION "v2.0.17")
+
 if(NOT EXISTS "${PDCMAKE_FILE}")
     file(DOWNLOAD
-         https://raw.githubusercontent.com/charlesneimog/pd.cmake/refs/heads/flags-test/pd.cmake
-         ${PDCMAKE_FILE})
+         "https://github.com/pure-data/pd.cmake/releases/download/${PDCMAKE_VERSION}/pd.cmake"
+         "${PDCMAKE_FILE}" STATUS PDCMAKE_DOWNLOAD_STATUS SHOW_PROGRESS)
+    list(GET PDCMAKE_DOWNLOAD_STATUS 0 PDCMAKE_DOWNLOAD_CODE)
+    list(GET PDCMAKE_DOWNLOAD_STATUS 1 PDCMAKE_DOWNLOAD_MESSAGE)
+    if(NOT PDCMAKE_DOWNLOAD_CODE EQUAL 0)
+        message(FATAL_ERROR "Failed to download pd.cmake: ${PDCMAKE_DOWNLOAD_MESSAGE}")
+    endif()
 endif()
-include(${PDCMAKE_FILE})
 
+include("${PDCMAKE_FILE}")
 # ╭──────────────────────────────────────╮
 # │             CPM Package              │
 # ╰──────────────────────────────────────╯
