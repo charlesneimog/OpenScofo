@@ -241,17 +241,22 @@ jobs:
                   cp Sources/Wrappers/Max/package/package-info.json "$package_root/"
                   cp Sources/Wrappers/Max/docs/openscofo~.maxref.xml "$package_root/docs/"
                   cp Sources/Wrappers/Max/openscofo~.maxhelp "$package_root/help/"
+                  cp Sources/Wrappers/Max/score-max.svg "$package_root/help/"
+                  cp Sources/Wrappers/Max/score_renderer.js "$package_root/help/"
                   cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/help/"
                   cp Tests/assets/canticos.txt "$package_root/help/"
                   cp Tests/assets/canticos.wav "$package_root/help/"
                   cp Tests/miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
-                  cp Tests/miniaturas/Extras/miniatura1.scofo "$package_root/help/"
+                  cp Sources/Wrappers/Max/miniatura1-max.scofo "$package_root/help/miniatura1.scofo"
                   cp -R max/openscofo~.mxo "$package_root/externals/"
 
                   test -f "$package_root/docs/openscofo~.maxref.xml"
                   test -f "$package_root/help/openscofo~.maxhelp"
+                  test -f "$package_root/help/score-max.svg"
+                  test -f "$package_root/help/score_renderer.js"
                   test -f "$package_root/help/canticos.wav"
                   test -f "$package_root/help/ai-flute-model.onnx"
+                  test -f "$package_root/help/miniatura1.scofo"
                   test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
 
             - name: Stage Max package payload (Windows)
@@ -519,9 +524,9 @@ jobs:
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
                   test -f max_release/OpenScofo/externals/openscofo~.mxe64
 
-                  (cd max_release && zip -r "../release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip" OpenScofo)
+                  (cd max_release && zip -r "../release_assets/Max-openscofo-${RELEASE_VERSION}.zip" OpenScofo)
 
-                  ls -lh "release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip"
+                  ls -lh "release_assets/Max-openscofo-${RELEASE_VERSION}.zip"
 
             - name: Package and upload Pure Data release to Deken
               shell: bash
