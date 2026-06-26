@@ -35,10 +35,17 @@
 ; ================================
 (pitch) @string
 [
-  (utech_event
-    technique: (identifier) @string)
   (ptech_event
     technique: (identifier) @string)
+
+  (ptech_event
+    techniques: (identifier) @string)
+
+  (utech_event
+    technique: (identifier) @string)
+
+  (utech_event
+    techniques: (identifier) @string)
 ]
 
 [

@@ -70,6 +70,7 @@ module.exports = grammar({
             token(
                 choice(
                     // Audio
+                    "SR",
                     "FFTSIZE",
                     "HOPSIZE",
 
@@ -123,31 +124,19 @@ module.exports = grammar({
         ptech_event: ($) =>
             seq(
                 "PTECH",
-                choice(
-                    // Single technique
-                    field("technique", $.identifier),
-
-                    // Multiple techniques
-                    field("techniques", seq("[", $.identifier, repeat(seq(",", $.identifier)), "]")),
-                ),
+                choice(field("technique", $.identifier), field("techniques", $.technique_group)),
                 field("pitch", $.pitch),
                 field("duration", $.number),
             ),
+
         utech_event: ($) =>
             seq(
                 "UTECH",
-                choice(
-                    // Single technique
-                    field("technique", $.identifier),
-                    // Multiple techniques
-                    field("techniques", seq("[", $.identifier, repeat(seq(",", $.identifier)), "]")),
-                ),
-
+                choice(field("technique", $.identifier), field("techniques", $.technique_group)),
                 field("duration", $.number),
-                //
             ),
 
-        lua_event: ($) => seq("LUAEVENT", field("luacall", $.lua_call, field("duration", $.number))),
+        lua_event: ($) => seq("LUAEVENT", field("luacall", $.lua_call), field("duration", $.number)),
 
         // TODO: Add events attribute
         attribute: (_) => seq("@", field("type", choice("percussive", "other"))),
@@ -163,6 +152,9 @@ module.exports = grammar({
         pitch_name: (_) => token(/[A-Ga-g]/),
         alteration: (_) => token(choice("#", "b")),
         octave: (_) => token(/(1[0-2]|[0-9])/),
+
+        // technique
+        technique_group: ($) => seq("[", repeat1(field("technique", $.identifier)), "]"),
 
         //╭─────────────────────────────────────╮
         //│               ACTIONS               │
@@ -195,5 +187,6 @@ module.exports = grammar({
         comment: (_) => token(choice(seq("//", /(\\+(.|\r?\n)|[^\\\n])*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),
         time_unit: (_) => token(choice("tempo", "sec", "ms")),
     },
+    //extras: ($) => [/\s|\\\r?\n|'/, $.comment],
     extras: ($) => [/\s|\\\r?\n|'/, $.comment],
 });
