@@ -383,26 +383,40 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
 
     Event.Type = PTECH;
-
-    // AI Label(s)
+    bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
     if (!ts_node_is_null(TechniquesNode)) {
         uint32_t count = ts_node_named_child_count(TechniquesNode);
+
         for (uint32_t i = 0; i < count; ++i) {
             TSNode TechniqueNode = ts_node_named_child(TechniquesNode, i);
+
             if (std::string(ts_node_type(TechniqueNode)) != "identifier") {
                 continue;
             }
+
             AudioState SubState;
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
             Event.AudioStates.push_back(SubState);
+            HasTechnique = true;
         }
     } else {
-        AudioState SubState;
-        SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
-        SubState.Type = LABEL;
-        Event.AudioStates.push_back(SubState);
+        std::string Label = GetChildStringFromField(ScoreStr, Node, "technique");
+
+        if (!Label.empty()) {
+            AudioState SubState;
+            SubState.Label = Label;
+            SubState.Type = LABEL;
+            Event.AudioStates.push_back(SubState);
+            HasTechnique = true;
+        }
+    }
+
+    if (!HasTechnique) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("PTECH event without technique on line {}", Init.row + 1);
+        return {};
     }
 
     // Pitch
@@ -440,12 +454,8 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
-    // TODO:
-    // if (m_TimbreONNXModel.empty()) {
-    //     spdlog::error("The ONNXMODEL must be defined to enable UTECH and PTECH events.");
-    // }
-
     Event.Type = UTECH;
+    bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
     if (!ts_node_is_null(TechniquesNode)) {
         uint32_t count = ts_node_named_child_count(TechniquesNode);
@@ -458,12 +468,23 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
             Event.AudioStates.push_back(SubState);
+            HasTechnique = true;
         }
     } else {
-        AudioState SubState;
-        SubState.Label = GetChildStringFromField(ScoreStr, Node, "technique");
-        SubState.Type = LABEL;
-        Event.AudioStates.push_back(SubState);
+        std::string Label = GetChildStringFromField(ScoreStr, Node, "technique");
+        if (!Label.empty()) {
+            AudioState SubState;
+            SubState.Label = Label;
+            SubState.Type = LABEL;
+            Event.AudioStates.push_back(SubState);
+            HasTechnique = true;
+        }
+    }
+
+    if (!HasTechnique) {
+        TSPoint Init = ts_node_start_point(Node);
+        spdlog::error("UTECH event without technique on line {}", Init.row + 1);
+        return {};
     }
 
     // Silence
