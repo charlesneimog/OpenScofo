@@ -1,0 +1,106 @@
+BPM 100
+
+ONNXMODEL ai-flute-model.onnx
+ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+
+// Measure number 1
+UTECH jet_whistle 1
+REST 0.5	
+NOTE Bb4 1.5 // tied
+    sendto pitchshift [1 3.81 0.4]
+	delay 0.33 tempo sendto pitchshift [2 7.02 0.4]
+	delay 0.66 tempo sendto pitchshift [3 9.69 0.4]
+	delay 1 tempo sendto pitchshift [4 -9.69 0.4]
+NOTE A4 0.5
+REST 0.5
+    sendto pitchshift [1 3.81 0]
+	sendto pitchshift [2 7.02 0]
+	sendto pitchshift [3 9.69 0]
+	sendto pitchshift [4 -9.69 0]
+
+// Measure number 2
+UTECH jet_whistle 1
+REST 0.5
+NOTE Bb4 1.5 // tied
+	sendto pitchshift [1 0.81 0.4]
+	delay 0.33 tempo sendto pitchshift [2 2.02 0.4]
+	delay 0.66 tempo sendto pitchshift [3 3.69 0.4]
+	delay 1 tempo sendto pitchshift [4 -3.69 0.4]
+NOTE A4 0.5
+REST 0.5
+    sendto pitchshift [1 3.81 0]
+	sendto pitchshift [2 7.02 0]
+	sendto pitchshift [3 9.69 0]
+	sendto pitchshift [4 -9.69 0]
+
+// Measure number 3
+PTECH pizzicato D4 0.5
+	sendto delay [150 1 0.5]
+PTECH pizzicato A4 0.5
+REST 0.5
+	sendto delay [150 0 0]
+
+PTECH pizzicato D4 0.5
+	sendto delay [123 1 0.5]
+PTECH pizzicato A4 0.5
+REST 0.5
+	sendto delay [113 0 0]
+PTECH pizzicato D4 0.5
+	sendto delay [133 1 0.5]
+PTECH pizzicato A4 0.5
+
+// Measure number 4
+REST 0.5
+	sendto delay [133 0 0]
+
+PTECH pizzicato D4 0.5
+	sendto delay [50 1 0.5]
+PTECH pizzicato A4 0.5
+REST 0.5
+	sendto delay [50 0 0]
+UTECH jet_whistle 1
+REST 1
+
+// Measure number 5
+PTECH pizzicato D4 0.5
+	sendto delay [66 1 0.5]
+PTECH pizzicato A4 0.5
+REST 0.5
+	sendto delay [66 1 0]
+PTECH pizzicato D4 0.5
+	sendto delay [88 1 0.5]
+PTECH pizzicato Bb4 0.5
+REST 0.5
+	sendto delay [88 1 0]
+PTECH pizzicato D4 0.5
+	sendto delay [100 1 0.5]
+PTECH pizzicato B4 0.5
+
+// Measure number 6
+REST 0.5
+	sendto delay [100 1 0]
+PTECH pizzicato D4 0.5
+	sendto delay [133 1 0.5]
+PTECH pizzicato Bb4 0.5
+REST 0.5
+	sendto delay [100 0 0]
+UTECH jet_whistle 1
+UTECH jet_whistle 1
+
+// Measure number 7
+UTECH jet_whistle 1
+REST 3
+
+// Measure number 8
+NOTE D4 2
+	sendto pitchshift [1 3.81 0.4]
+	delay 0.33 tempo sendto pitchshift [2 7.02 0.4]
+	delay 0.66 tempo sendto pitchshift [3 9.69 0.4]
+	delay 1 tempo sendto pitchshift [4 -9.69 0.4]
+
+REST 2
+	sendto pitchshift [1 3.81 0]
+	sendto pitchshift [2 7.02 0]
+	sendto pitchshift [3 9.69 0]
+	sendto pitchshift [4 -9.69 0]
+
