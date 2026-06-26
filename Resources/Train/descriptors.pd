@@ -1,4 +1,4 @@
-#N canvas 0 0 1860 1131 10;
+#N canvas 0 0 1299 1131 10;
 #X declare -lib xlab;
 #X declare -path ../../build/Sources/Wrappers/PureData;
 #X declare -lib xlab;
@@ -52,7 +52,7 @@
 #X connect 16 0 5 0;
 #X connect 17 0 13 0;
 #X restore 396 3 pd ARRAY;
-#N canvas 0 0 925 1131 oscofo 1;
+#N canvas 0 0 925 1131 oscofo 0;
 #X obj 8 6 inlet~;
 #X msg 104 64 set justdescription 1;
 #X obj 78 5 loadbang;
