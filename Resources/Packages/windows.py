@@ -143,16 +143,22 @@ def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Pa
 
     help_files = [
         max_root / "openscofo~.maxhelp",
+        max_root / "score-max.svg",
+        max_root / "score_renderer.js",
         repo_root / "Tests" / "miniaturas" / "Extras" / "ai-flute-model.onnx",
         repo_root / "Tests" / "assets" / "canticos.txt",
         repo_root / "Tests" / "assets" / "canticos.wav",
         repo_root / "Tests" / "miniaturas" / "Audios" / "miniatura1.mp3",
-        repo_root / "Tests" / "miniaturas" / "Extras" / "miniatura1.scofo",
     ]
     for src in help_files:
         if src.exists():
             copy_item(src, payload_root / "help" / src.name)
             copied += 1
+
+    max_score = max_root / "miniatura1-max.scofo"
+    if max_score.exists():
+        copy_item(max_score, payload_root / "help" / "miniatura1.scofo")
+        copied += 1
 
     binary = ensure_max_binary(repo_root, build_dir)
     if binary is not None:
@@ -194,11 +200,13 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/Max/package/package-info.json"),
                 Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
+                Path("Sources/Wrappers/Max/score-max.svg"),
+                Path("Sources/Wrappers/Max/score_renderer.js"),
                 Path("Tests/miniaturas/Extras/ai-flute-model.onnx"),
                 Path("Tests/assets/canticos.wav"),
                 Path("Tests/assets/canticos.txt"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
-                Path("Tests/miniaturas/Extras/miniatura1.scofo"),
+                Path("Sources/Wrappers/Max/miniatura1-max.scofo"),
             ],
             optional=[
                 Path("max/openscofo~.mxe64"),
