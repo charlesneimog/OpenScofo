@@ -439,7 +439,7 @@ static void oscofo_tickactions(void *xv) {
     std::vector<MaxAction>::iterator it = x->Actions.begin();
     while (it != x->Actions.end()) {
         MaxAction &curAction = *it;
-        if (currentTime <= curAction.time && curAction.time <= nextTime) {
+        if (curAction.time <= nextTime) {
             if (curAction.isLua) {
                 oscofo_luaexecute(x, curAction.LuaCode);
             } else {
