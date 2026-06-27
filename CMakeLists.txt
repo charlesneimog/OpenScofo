@@ -30,6 +30,7 @@ option(OPENSCOFO_ENABLE_SANITIZERS
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_USE_BESSEL "Use Bessel function to calculate Kappa" ON)
+option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -380,13 +381,16 @@ else() # Linux (GCC or Clang)
                >
                $<$<CONFIG:Release>:
                -O3
-               -march=native
                -ffast-math
                -DNDEBUG
                -flto=auto
                -ffunction-sections
                -fdata-sections
                >)
+
+    if(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS)
+        target_compile_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-march=native>)
+    endif()
 
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-flto=auto;-Wl,--gc-sections;-s >)
 endif()

@@ -1,4 +1,4 @@
-#N canvas 0 0 1485 1131 10;
+#N canvas 591 177 563 593 10;
 #X declare -lib py4pd;
 #X obj 3 5 cnv 15 301 42 empty empty py.o.train 20 20 2 37 #e0e0e0 #000000 0;
 #X obj 305 6 cnv 15 250 40 empty empty empty 12 13 0 18 #7c7c7c #e0e4dc 0;
@@ -28,7 +28,7 @@
 #X text 25 465 export <MODEL_PATH.onnx>;
 #X text 278 465 export the model to a file.;
 #X text 25 487 descriptors <descriptor1> <descriptors2>;
-#X text 278 487 Selection of the descriptors used to train the model. Check https://charlesneimog.github.io/OpenScofo/descriptors/., f 45;
+#X text 278 487 Selection of the descriptors used to train the model. Check https://charlesneimog.github.io/OpenScofo/descriptors/., f 44;
 #X obj 3 551 cnv 15 552 21 empty empty empty 20 12 0 14 #e0e0e0 #202020 0;
 #X text 278 354 Path to the trainfolder \, this must have sounds inside categories. tongue-ram for tongue-ram sounds \, pizz for pizz sounds \, etc., f 36;
 #N canvas 0 0 925 1131 config 0;
