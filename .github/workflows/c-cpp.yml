@@ -589,9 +589,7 @@ jobs:
                       --user "$(id -u)" \
                       --volume "$(pwd):/deken" \
                       registry.git.iem.at/pd/deken \
-                      deken package --version "${RELEASE_VERSION}" \
-                        --default-floatsize 32 \
-                        "${LIBNAME}"
+                      deken package --version "${RELEASE_VERSION}" "${LIBNAME}"
 
                     ls -lh ./*.dek
 
