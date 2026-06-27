@@ -606,8 +606,7 @@ extern "C" OPENSCOFO_PD_EXPORT void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)openscofo_new, (t_method)openscofo_free,
                              sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
-    post("[openscofo~] version %s (%s) (openscofo~ %s %s), by Charles K. Neimog", OPENSCOFO_VERSION,
-         OPENSCOFO_BUILD_TIME, __DATE__, __TIME__);
+    post("[openscofo~] version %s (%s), by Charles K. Neimog", OPENSCOFO_VERSION, OPENSCOFO_BUILD_TIME);
 
     // message methods
     class_addmethod(OpenScofoObj, (t_method)openscofo_score, gensym("score"), A_SYMBOL, 0);
