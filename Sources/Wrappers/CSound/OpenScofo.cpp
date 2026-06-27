@@ -29,7 +29,7 @@ namespace csnd {
 // ─────────────────────────────────────
 // Logging callback
 // ─────────────────────────────────────
-static void oscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
+static void openscofo_error_callback(const spdlog::details::log_msg &log, void *data) {
     Csound *csound = static_cast<Csound *>(data);
 
     if (log.level < spdlog::level::warn)
@@ -204,7 +204,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
         }
 
         oscofo = new OpenScofo::OpenScofo(m_SR, m_FFT, m_HOP);
-        oscofo->SetErrorCallback(oscofo_error_callback, static_cast<void *>(csound));
+        oscofo->SetErrorCallback(openscofo_error_callback, static_cast<void *>(csound));
 
         STRINGDAT &scorePath = inargs.str_data(1);
         const char *score = reinterpret_cast<const char *>(scorePath.data);
