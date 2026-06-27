@@ -21,7 +21,7 @@ jobs:
         env:
             SCCACHE_GHA_ENABLED: "true"
             SCCACHE_CACHE_SIZE: 2G
-            SCCACHE_GHA_VERSION: ${{ matrix.os }}-v4
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-v5
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             matrix:
@@ -40,6 +40,9 @@ jobs:
                   python-version: "3.12"
             - name: Setup sccache
               uses: mozilla-actions/sccache-action@v0.0.9
+            - name: Reset sccache stats
+              shell: bash
+              run: sccache --zero-stats
             - name: Setup Emscripten
               if: runner.os == 'Linux'
               uses: mymindstorm/setup-emsdk@v14
@@ -100,6 +103,7 @@ jobs:
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
@@ -118,6 +122,7 @@ jobs:
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
@@ -141,6 +146,7 @@ jobs:
                     "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
                     "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
                     "-Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF"
+                    "-Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF"
                     "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
                     "-Ccmake.define.OPENSCOFO_BUILD_ALL=ON"
                     "-Ccmake.args=-G Ninja"
@@ -148,8 +154,6 @@ jobs:
                   python -m build --wheel @buildArgs
             - name: Build Emscripten
               if: runner.os == 'Linux'
-              env:
-                  SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-wasm
               run: |
                   source $EMSDK/emsdk_env.sh
                   emcmake cmake . -B build-wasm \
@@ -157,8 +161,13 @@ jobs:
                     -DCMAKE_C_COMPILER_LAUNCHER=sccache \
                     -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -DOPENSCOFO_BUILD_TESTS=OFF \
+                    -DOPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -DOPENSCOFO_BUILD_ALL=ON
                   cmake --build build-wasm
+            - name: Show sccache stats
+              if: always()
+              shell: bash
+              run: sccache --show-stats
             - name: Repair Linux wheels
               if: runner.os == 'Linux'
               continue-on-error: true
@@ -241,17 +250,22 @@ jobs:
                   cp Sources/Wrappers/Max/package/package-info.json "$package_root/"
                   cp Sources/Wrappers/Max/docs/openscofo~.maxref.xml "$package_root/docs/"
                   cp Sources/Wrappers/Max/openscofo~.maxhelp "$package_root/help/"
+                  cp Sources/Wrappers/Max/score-max.svg "$package_root/help/"
+                  cp Sources/Wrappers/Max/score_renderer.js "$package_root/help/"
                   cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/help/"
                   cp Tests/assets/canticos.txt "$package_root/help/"
                   cp Tests/assets/canticos.wav "$package_root/help/"
                   cp Tests/miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
-                  cp Tests/miniaturas/Extras/miniatura1.scofo "$package_root/help/"
+                  cp Sources/Wrappers/Max/miniatura1-max.scofo "$package_root/help/miniatura1.scofo"
                   cp -R max/openscofo~.mxo "$package_root/externals/"
 
                   test -f "$package_root/docs/openscofo~.maxref.xml"
                   test -f "$package_root/help/openscofo~.maxhelp"
+                  test -f "$package_root/help/score-max.svg"
+                  test -f "$package_root/help/score_renderer.js"
                   test -f "$package_root/help/canticos.wav"
                   test -f "$package_root/help/ai-flute-model.onnx"
+                  test -f "$package_root/help/miniatura1.scofo"
                   test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
 
             - name: Stage Max package payload (Windows)
@@ -519,9 +533,9 @@ jobs:
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
                   test -f max_release/OpenScofo/externals/openscofo~.mxe64
 
-                  (cd max_release && zip -r "../release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip" OpenScofo)
+                  (cd max_release && zip -r "../release_assets/Max-openscofo-${RELEASE_VERSION}.zip" OpenScofo)
 
-                  ls -lh "release_assets/OpenScofo-Max-${RELEASE_VERSION}.zip"
+                  ls -lh "release_assets/Max-openscofo-${RELEASE_VERSION}.zip"
 
             - name: Package and upload Pure Data release to Deken
               shell: bash
