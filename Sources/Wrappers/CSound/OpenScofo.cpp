@@ -41,6 +41,7 @@ static void oscofo_error_callback(const spdlog::details::log_msg &log, void *dat
     case spdlog::level::critical:
     case spdlog::level::err:
         csound->init_error("[OpenScofo] " + text);
+        break;
     case spdlog::level::warn:
         csound->warning("[OpenScofo] " + text);
         break;
