@@ -17,12 +17,13 @@ Absolute time are clock time, and they don't change if the performer plays your 
 
 For example:
 
-```
+```openscofo
 NOTE C4 2 
     delay 2000 ms sendto e1 [1 2 3 4]
 ```
 
-!!! tip "The syntax highlight of the Editor make this easier to read!!!"
+!!! tip "Use syntax highlighting"
+    OpenScofo scores are significantly easier to read and write with syntax highlighting enabled. You can use the **[VS Code extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target="_blank"}**, the **[Neovim parser](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target="_blank"}**, or the **[OpenScofo Online Editor](https://charlesneimog.github.io/OpenScofo/Editor/){:target="_blank"}** directly in your web browser.
 
 Will send the list `1 2 3 4` to the receiver `e1` after 2 seconds. 
 
@@ -60,7 +61,7 @@ Lua function are executed immediately after the event detection of after some de
 
 !!! tip "Lua Functions definition"
     Lua Functions must be defined inside the `LUA {}`, for example: 
-    ``` lua
+    ```lua
     LUA {
         function myluafunc(s)
             pd.post(s)

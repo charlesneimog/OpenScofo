@@ -3,7 +3,7 @@
 `OpenScofo` for now supports four events, `NOTE`, `TRILL`, `CHORD`, `REST`, `TECH`, `LUAEVENT`.
 
 !!! tip "Check the MusicXML Importer"
-    `OpenScofo` has a [MusicXML importer](../../Editor), it is very accurate and tested on MuseScore and Sibelius (but should work for all major programs). 
+    `OpenScofo` has a [MusicXML importer](https://charlesneimog.github.io/OpenScofo/Editor/), it is very accurate and tested on MuseScore and Sibelius (but should work for all major programs). 
 
 
 ---
@@ -78,7 +78,7 @@ These events require an ONNX model to recognize the technique. Training the mode
 
 
 !!! tip "`<PITCH>` allows differentiation"
-When consecutive techniques occur, the pitch allows the model to distinguish them (e.g., consecutive `tongue-ram` on different notes).
+    When consecutive techniques occur, the pitch allows the model to distinguish them (e.g., consecutive `tongue-ram` on different notes).
 
 <score id="ptech_example" timeSig="4/4" notes="C4/h:x, D4/h:tongue-ram"></score>
 

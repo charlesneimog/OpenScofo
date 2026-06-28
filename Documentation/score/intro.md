@@ -22,7 +22,7 @@
 
 
 !!! tip "Language Parse for VSCode and Neovim"
-    There is a language parse for VSCode (search for OpenScofo [extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target = "_blank"}) and for Neovim.
+    There is a language parse for VSCode (search for OpenScofo [extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target = "_blank"}) and for [Neovim](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target + "_blank"}.
 
 After Configuration, the Score will look like this:
 
@@ -32,6 +32,12 @@ After Configuration, the Score will look like this:
 
 ## Filename, Extension, and Syntax Highlighting
 
-An `OpenScofo` score is a plain text file. While any text file can be used, the recommended file extension is `.scofo`.
+An `OpenScofo` score is a plain text file. Although any text file extension can be used, the recommended extension is `.scofo`.
 
-Syntax highlighting support is still under development, but parsers for `.scofo` files are already available for both VS Code and Neovim.
+To improve readability and editing, support for `.scofo` files is already available on multiple platforms:
+
+- **VS Code**: Install the [OpenScofo Language Parse extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target="_blank"}.
+- **Neovim**: See the [Neovim configuration](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target="_blank"}.
+- **Web browser**: Use the [OpenScofo Online Editor](https://charlesneimog.github.io/OpenScofo/Editor/){:target="_blank"} for editing and experimenting with `.scofo` files directly in your browser.
+
+Support for additional editors is under development.
