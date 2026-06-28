@@ -113,23 +113,18 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
     // ─────────────────────────────────────
     void DispatchInstrumentAction(const OpenScofo::ScoreAction &action) {
+        if (action.Args.size() < 2) {
+            csound->warning("[OpenScofo] Csound sendto receiver '" + action.Receiver +
+                            "' requires at least p2 and p3: sendto " + action.Receiver + " [p2 p3 ...].");
+            return;
+        }
+
         std::ostringstream message;
         message << 'i';
         AppendCsoundInstrument(message, action.Receiver);
 
-        size_t pfieldsAfterInstrument = action.Args.size();
-        if (action.Args.size() < 2) {
-            message << " 0 1";
-            pfieldsAfterInstrument += 2;
-        }
-
         for (const auto &arg : action.Args) {
             AppendCsoundPField(message, arg);
-        }
-
-        while (pfieldsAfterInstrument < 4) {
-            message << " 0";
-            ++pfieldsAfterInstrument;
         }
 
         csoundInputMessageAsync(csound->get_csound(), message.str().c_str());
