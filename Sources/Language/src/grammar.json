@@ -1,0 +1,1101 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
+  "name": "openscofo",
+  "word": "identifier",
+  "rules": {
+    "source_file": {
+      "type": "REPEAT",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "CONFIG"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "LUA"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "EVENT"
+          }
+        ]
+      }
+    },
+    "identifier": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[a-zA-Z_][a-zA-Z0-9_-]*"
+      }
+    },
+    "LUA": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "LUA"
+        },
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "lua_body"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
+    },
+    "lua_body": {
+      "type": "REPEAT1",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "[^{}`]+"
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "{"
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "lua_body"
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              },
+              {
+                "type": "STRING",
+                "value": "}"
+              }
+            ]
+          },
+          {
+            "type": "SYMBOL",
+            "name": "lua_comment"
+          }
+        ]
+      }
+    },
+    "lua_call": {
+      "type": "REPEAT1",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "[^()`]+"
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "("
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "lua_call"
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              },
+              {
+                "type": "STRING",
+                "value": ")"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "lua_comment": {
+      "type": "PATTERN",
+      "value": "--[^\\n]*"
+    },
+    "descriptor_list": {
+      "type": "REPEAT1",
+      "content": {
+        "type": "FIELD",
+        "name": "descriptor",
+        "content": {
+          "type": "SYMBOL",
+          "name": "descriptor"
+        }
+      }
+    },
+    "descriptor": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "mfcc"
+        },
+        {
+          "type": "STRING",
+          "value": "logmel"
+        },
+        {
+          "type": "STRING",
+          "value": "loudness"
+        },
+        {
+          "type": "STRING",
+          "value": "rms"
+        },
+        {
+          "type": "STRING",
+          "value": "power"
+        },
+        {
+          "type": "STRING",
+          "value": "chroma"
+        },
+        {
+          "type": "STRING",
+          "value": "zcr"
+        },
+        {
+          "type": "STRING",
+          "value": "hfr"
+        },
+        {
+          "type": "STRING",
+          "value": "centroid"
+        },
+        {
+          "type": "STRING",
+          "value": "spread"
+        },
+        {
+          "type": "STRING",
+          "value": "flatness"
+        },
+        {
+          "type": "STRING",
+          "value": "flux"
+        },
+        {
+          "type": "STRING",
+          "value": "irregularity"
+        },
+        {
+          "type": "STRING",
+          "value": "kurtosis"
+        },
+        {
+          "type": "STRING",
+          "value": "harmonicity"
+        },
+        {
+          "type": "STRING",
+          "value": "yin"
+        }
+      ]
+    },
+    "onset_function": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "pow"
+        },
+        {
+          "type": "STRING",
+          "value": "pd"
+        },
+        {
+          "type": "STRING",
+          "value": "wpd"
+        },
+        {
+          "type": "STRING",
+          "value": "sf"
+        },
+        {
+          "type": "STRING",
+          "value": "cd"
+        },
+        {
+          "type": "STRING",
+          "value": "rcd"
+        },
+        {
+          "type": "STRING",
+          "value": "hfc"
+        },
+        {
+          "type": "STRING",
+          "value": "mkl"
+        }
+      ]
+    },
+    "CONFIG": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "key",
+          "content": {
+            "type": "SYMBOL",
+            "name": "config_key"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "PREC",
+                "value": 2,
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "descriptor_list"
+                }
+              },
+              {
+                "type": "SYMBOL",
+                "name": "number"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "path"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "descriptor_list"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "onset_function"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "config_key": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "SR"
+          },
+          {
+            "type": "STRING",
+            "value": "FFTSIZE"
+          },
+          {
+            "type": "STRING",
+            "value": "HOPSIZE"
+          },
+          {
+            "type": "STRING",
+            "value": "PHASECOUPLING"
+          },
+          {
+            "type": "STRING",
+            "value": "SYNCSTRENGTH"
+          },
+          {
+            "type": "STRING",
+            "value": "BPM"
+          },
+          {
+            "type": "STRING",
+            "value": "PITCHTEMPLATESIGMA"
+          },
+          {
+            "type": "STRING",
+            "value": "TRANSPOSE"
+          },
+          {
+            "type": "STRING",
+            "value": "ONNXMODEL"
+          },
+          {
+            "type": "STRING",
+            "value": "ONNXDESCRIPTORS"
+          },
+          {
+            "type": "STRING",
+            "value": "ONSETFUNCTION"
+          }
+        ]
+      }
+    },
+    "EVENT": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "definition",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "note_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "rest_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "chord_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "trill_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "ptech_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "utech_event"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "lua_event"
+              }
+            ]
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "FIELD",
+            "name": "action",
+            "content": {
+              "type": "SYMBOL",
+              "name": "action"
+            }
+          }
+        }
+      ]
+    },
+    "note_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "NOTE"
+        },
+        {
+          "type": "FIELD",
+          "name": "pitch",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "attribute",
+              "content": {
+                "type": "SYMBOL",
+                "name": "attribute"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "rest_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "REST"
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "chord_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "CHORD"
+        },
+        {
+          "type": "FIELD",
+          "name": "pitches",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch_group"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "trill_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "TRILL"
+        },
+        {
+          "type": "FIELD",
+          "name": "pitches",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch_group"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "ptech_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "PTECH"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "technique",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "techniques",
+              "content": {
+                "type": "SYMBOL",
+                "name": "technique_group"
+              }
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "pitch",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "utech_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "UTECH"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "technique",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "techniques",
+              "content": {
+                "type": "SYMBOL",
+                "name": "technique_group"
+              }
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "lua_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "LUAEVENT"
+        },
+        {
+          "type": "FIELD",
+          "name": "luacall",
+          "content": {
+            "type": "SYMBOL",
+            "name": "lua_call"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "attribute": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "@"
+        },
+        {
+          "type": "FIELD",
+          "name": "type",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "percussive"
+              },
+              {
+                "type": "STRING",
+                "value": "other"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "pitch_group": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "FIELD",
+            "name": "pitch",
+            "content": {
+              "type": "SYMBOL",
+              "name": "pitch"
+            }
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "pitch": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "pitch_name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch_name"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "alteration",
+              "content": {
+                "type": "SYMBOL",
+                "name": "alteration"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "octave",
+          "content": {
+            "type": "SYMBOL",
+            "name": "octave"
+          }
+        }
+      ]
+    },
+    "pitch_name": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[A-Ga-g]"
+      }
+    },
+    "alteration": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "#"
+          },
+          {
+            "type": "STRING",
+            "value": "b"
+          }
+        ]
+      }
+    },
+    "octave": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "(1[0-2]|[0-9])"
+      }
+    },
+    "technique_group": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "FIELD",
+          "name": "technique",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              },
+              {
+                "type": "FIELD",
+                "name": "technique",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "identifier"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
+    },
+    "action": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "ACTION"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "timing",
+              "content": {
+                "type": "SYMBOL",
+                "name": "delay"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "command",
+          "content": {
+            "type": "SYMBOL",
+            "name": "exec"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": ","
+              },
+              {
+                "type": "FIELD",
+                "name": "command",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "exec"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "delay": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "delay"
+        },
+        {
+          "type": "FIELD",
+          "name": "amount",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "unit",
+          "content": {
+            "type": "SYMBOL",
+            "name": "time_unit"
+          }
+        }
+      ]
+    },
+    "exec": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "sendto"
+            },
+            {
+              "type": "FIELD",
+              "name": "receiver",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "args",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "pdargs"
+                  }
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "luacall"
+            },
+            {
+              "type": "STRING",
+              "value": "("
+            },
+            {
+              "type": "FIELD",
+              "name": "lua",
+              "content": {
+                "type": "SYMBOL",
+                "name": "lua_call"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": ")"
+            }
+          ]
+        }
+      ]
+    },
+    "pdargs": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "["
+        },
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pdarg"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "]"
+        }
+      ]
+    },
+    "pdarg": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "number"
+        }
+      ]
+    },
+    "number": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "-?[0-9]+"
+          },
+          {
+            "type": "PATTERN",
+            "value": "-?[0-9]+\\.[0-9]+"
+          }
+        ]
+      }
+    },
+    "path": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "\""
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^\"\\n]+"
+              },
+              {
+                "type": "STRING",
+                "value": "\""
+              }
+            ]
+          },
+          {
+            "type": "PATTERN",
+            "value": "[a-zA-Z0-9_.\\-\\\\/]+"
+          }
+        ]
+      }
+    },
+    "comment": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "//"
+              },
+              {
+                "type": "PATTERN",
+                "value": "(\\\\+(.|\\r?\\n)|[^\\\\\\n])*"
+              }
+            ]
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "/*"
+              },
+              {
+                "type": "PATTERN",
+                "value": "[^*]*\\*+([^/*][^*]*\\*+)*"
+              },
+              {
+                "type": "STRING",
+                "value": "/"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "time_unit": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "tempo"
+          },
+          {
+            "type": "STRING",
+            "value": "sec"
+          },
+          {
+            "type": "STRING",
+            "value": "ms"
+          }
+        ]
+      }
+    }
+  },
+  "extras": [
+    {
+      "type": "PATTERN",
+      "value": "\\s|\\\\\\r?\\n|'"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "comment"
+    }
+  ],
+  "conflicts": [],
+  "precedences": [],
+  "externals": [],
+  "inline": [],
+  "supertypes": [],
+  "reserved": {}
+}

@@ -6,6 +6,28 @@ and Lua injections inside `LUA { ... }` blocks.
 
 ## Installation
 
+Using `vim.pack`:
+
+```lua
+vim.pack.add({
+  {
+    src = "https://github.com/charlesneimog/OpenScofo",
+    name = "OpenScofo",
+    version = "main",
+  },
+  {
+    src = "https://github.com/nvim-treesitter/nvim-treesitter",
+    name = "nvim-treesitter",
+    version = "main",
+  },
+})
+
+vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site/pack/core/opt/OpenScofo/Sources/Language/nvim")
+
+require("nvim-treesitter").setup()
+require("openscofo").setup()
+```
+
 Using `lazy.nvim`:
 
 ```lua
@@ -21,13 +43,24 @@ Using `lazy.nvim`:
 }
 ```
 
-Then install the parser:
+By default, `require("openscofo").setup()` installs the parser automatically if
+it is missing. To disable automatic installation:
+
+```lua
+require("openscofo").setup({
+  auto_install = false,
+})
+```
+
+You can also install the parser manually:
 
 ```vim
 :TSInstall openscofo
 ```
 
 Open a `.scofo` file and Neovim should use the `openscofo` filetype.
+Tree-sitter highlighting starts automatically for `openscofo` buffers after the
+parser is installed.
 
 ## Development
 
