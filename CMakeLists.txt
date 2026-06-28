@@ -13,7 +13,7 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
-set(TREE_SITTER_VERSION "v0.26.9")
+set(TREE_SITTER_VERSION "v0.26.10")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
@@ -52,7 +52,9 @@ if(OPENSCOFO_BUILD_ALL)
     set(OPENSCOFO_BUILD_MAX_OBJECT ON)
     set(OPENSCOFO_BUILD_VAMP_PLUGIN ON)
     set(OPENSCOFO_BUILD_SC_PLUGIN ON)
-    set(OPENSCOFO_BUILD_CSOUND_PLUGIN ON)
+    if(NOT WIN32)
+        set(OPENSCOFO_BUILD_CSOUND_PLUGIN ON)
+    endif()
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -221,18 +223,6 @@ cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPT
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
-cpmaddpackage(
-    NAME
-    protobuf-c
-    GITHUB_REPOSITORY
-    protobuf-c/protobuf-c
-    GIT_TAG
-    v1.5.2
-    SOURCE_SUBDIR
-    build-cmake
-    OPTIONS
-    "BUILD_PROTOC OFF"
-    "BUILD_TESTS OFF")
 cpmaddpackage("gh:charlesneimog/libonnx#master")
 
 # ╭──────────────────────────────────────╮
