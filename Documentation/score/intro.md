@@ -20,6 +20,10 @@
 
 ---
 
+
+!!! tip "Language Parse for VSCode and Neovim"
+    There is a language parse for VSCode (search for OpenScofo [extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target = "_blank"}) and for Neovim.
+
 After Configuration, the Score will look like this:
 
 <p align="center">
