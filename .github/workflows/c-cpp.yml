@@ -667,5 +667,5 @@ jobs:
                   body_path: release_notes.md
                   files: |
                       release_assets/*.zip
-                  draft: false
+                  draft: true
                   prerelease: false
