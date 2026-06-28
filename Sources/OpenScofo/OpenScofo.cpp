@@ -875,10 +875,16 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
 
     m_CurrentScorePosition = 0;
     const std::vector<Descriptors> requestedDescriptors = m_Config.RequestedDescriptors;
+    int SR = m_Config.SR;
     auto [newConfig, newStates] = m_Score.Parse(ScorePath);
     newConfig.RequestedDescriptors = requestedDescriptors;
     m_Config = newConfig;
     m_States = newStates;
+
+    if (m_Config.SR != SR) {
+        spdlog::error("Sample rate mismatch: OpenScofo is running at {} Hz, but the score file requires {} Hz.",
+                      m_Config.SR, SR);
+    }
 
     auto requestScoreDescriptor = [&](Descriptors Descriptor) {
         if (std::find(newConfig.RequestedDescriptors.begin(), newConfig.RequestedDescriptors.end(), Descriptor) ==

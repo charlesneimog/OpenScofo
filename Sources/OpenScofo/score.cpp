@@ -716,6 +716,11 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             } else {
                 Config.PitchTemplateSigma = v;
             }
+        } else if (id == "SR") {
+            int sr = static_cast<int>(v);
+            if (sr > 0) {
+                Config.SR = sr;
+            }
         } else if (id == "FFTSIZE") {
             int fft = static_cast<int>(v);
             if (fft > 0 && (fft & (fft - 1)) == 0) {
