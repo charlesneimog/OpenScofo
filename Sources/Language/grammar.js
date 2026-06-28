@@ -154,7 +154,13 @@ module.exports = grammar({
         octave: (_) => token(/(1[0-2]|[0-9])/),
 
         // technique
-        technique_group: ($) => seq("[", repeat1(field("technique", $.identifier)), "]"),
+        technique_group: ($) =>
+            seq(
+                "[",
+                field("technique", $.identifier),
+                repeat(seq(optional(","), field("technique", $.identifier))),
+                "]",
+            ),
 
         //╭─────────────────────────────────────╮
         //│               ACTIONS               │
