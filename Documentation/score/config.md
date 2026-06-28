@@ -13,6 +13,17 @@ This approach allows development to focus on improving the core functionality of
 ## Audio Configuration
 ---
 
+### `SR`
+
+- `Default: same as the host`
+
+Defines the sample rate expected by the score. This setting is optional, but it is useful when an AI model has been trained for a specific sample rate (for example, `48000` Hz). In that case, you can specify:
+
+```text
+SR 48000
+```
+If OpenScofo is running in a host with a different sample rate (for example, `44100` Hz), a warning will be showed.
+
 ### `FFTSIZE`
 
 - `Default is 2048`
@@ -132,9 +143,3 @@ Defines the onset detection function (ODF), each emphasizing different signal ch
 * `rcd` is a rectified version of the complex-domain method that counts only increases in deviation, helping reduce false detections.
 * `hfc` (high frequency content) emphasizes changes in high-frequency spectral bins, which are often strong during percussive attacks.
 * `mkl` (modified Kullback–Leibler divergence) measures changes in the spectral distribution between frames and is effective for detecting structural spectral changes in pitched or harmonic material.
-
-??? question "More details for Onset Detection"
-
-
-
-
