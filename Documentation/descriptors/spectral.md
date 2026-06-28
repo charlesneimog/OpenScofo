@@ -4,7 +4,45 @@ Spectral descriptors describe aspects of tone color: brightness, noisiness, conc
 
 The equations below show how these descriptors are implemented in `OpenScofo`. They are included as a technical reference, but you do not need to read every formula to use the descriptors musically. Most of them are computed from the spectrum of a short audio frame after a Hann window and FFT.
 
-For the equations, $X[k]$ is one frequency bin of the FFT, $|X[k]|$ is its magnitude, $|X[k]|^2$ is its power, and $f_k$ is the frequency represented by that bin. $N$ is the FFT size and $K$ is the number of one-sided FFT bins.
+For the equations, $X[k] = X_R[k] + iX_I[k]$ is one frequency bin of the FFT, with real part $X_R[k]$ and imaginary part $X_I[k]$. Its raw magnitude is $M[k] = \sqrt{X_R[k]^2 + X_I[k]^2}$, its normalized magnitude is $A[k] = M[k] / N$, its power is $P[k] = X_R[k]^2 + X_I[k]^2$, and $f_k$ is the frequency represented by that bin. $N$ is the FFT size and $K$ is the number of one-sided FFT bins.
+
+## Variable Reference
+
+The table below maps the notation used in this page to the implementation in `Sources/OpenScofo/mir.cpp`.
+
+| Symbol | Meaning | Implementation |
+| --- | --- | --- |
+| $N$ | FFT size. | `m_Config.FFTSize` |
+| $K$ | Number of one-sided FFT bins, including DC and Nyquist. | `NHalf = FFTSize / 2 + 1` |
+| $k$ | FFT-bin index. | Loop variable `i` or `bin` |
+| $i$ | Generic index; in MFCC equations, the MFCC coefficient index. | Loop variable `i` or `k`, depending on the function |
+| $j$ | Auxiliary summation index. | Local loop variable when needed |
+| $m$ | Mel-band index. | Loop variable `m` |
+| $X[k]$ | Complex FFT value at bin $k$. | Read from `m_FullFFTOut` after `pffft_transform_ordered` |
+| $X_R[k]$ | Real part of $X[k]$. | Local variable `re` |
+| $X_I[k]$ | Imaginary part of $X[k]$. | Local variable `im` |
+| $P[k]$ | Raw power spectrum, $X_R[k]^2 + X_I[k]^2$. | Local variable `p`, stored in `Desc.Power[k]` |
+| $M[k]$ | Raw magnitude spectrum, $\sqrt{P[k]}$. | Local variable `mag`, stored in `Desc.Magnitude[k]` |
+| $A[k]$ | FFT-size-normalized magnitude, $M[k] / N$. | Local variable `norm`, stored in `Desc.SpectralMagnitudeNorm[k]` |
+| $A_{norm}[k]$ | Frame-normalized magnitude, $A[k] / \sum_j A[j]$. | Local variable `normSp`, stored in `Desc.SpectralMagnitudeFrameNorm[k]` |
+| $f_k$ | Frequency in Hz represented by bin $k$. | `i * binWidth`, where `binWidth = SR / FFTSize` |
+| $\epsilon$ | Small positive value used to avoid division by zero or logarithms of zero. | `1e-10` for log/power floors, `1e-12` for denominator guards |
+| $t$ | Analysis-frame index. | Current call to `GetSpectralDescriptions`; previous-frame values are stored in `m_PreviousSpectralPower` and `m_PrevCentroid` |
+| $\mu$ | Frequency centroid in Hz. | `Desc.SpectralCentroid` |
+| $\sigma$ | Spectral spread in Hz. | `Desc.SpectralSpreadHz` |
+| $\mu_k$ | Centroid over FFT-bin indices, used for `spread_variance`. | Local variable `EIndex` |
+| $r$ | Spectral rolloff cutoff ratio. | `m_Config.SpectralRolloffCutoff` |
+| $b$ | First bin whose cumulative power reaches the rolloff cutoff. | Local variable `rolloffBin` |
+| $p_k$ | Power-normalized probability for entropy. | Local variable `prob` |
+| $H_m[k]$ | Mel-filter weight for mel band $m$ and FFT bin $k$. | `m_MFCCFilter[m][k]` |
+| $E_m$ | Mel-band energy before logarithmic compression. | Local variable `MelEnergy`, stored in `m_MFCCEnergy[m]` |
+| $L_m$ | Log-mel value before the 80 dB floor is applied. | Local variable `LogMel` |
+| $LogMel[m]$ | Log-mel spectrum after applying the 80 dB floor. | `Desc.LogMelSpectrum[m]` |
+| $B$ | Number of mel bands. | `m_Config.MFCCMels` |
+| $D_{i,m}$ | DCT-II basis coefficient for MFCC coefficient $i$ and mel band $m$. | `m_DCTBasis[i][m]` |
+| $\alpha_i$ | DCT normalization factor. | Computed when `m_DCTBasis` is initialized |
+| $W_c[k]$ | Chroma-filter weight for pitch class $c$ and FFT bin $k$. | `m_ChromaFilter[c][k]` |
+| $c$ | Chroma pitch-class index. | Loop variable `chroma` |
 
 ---
 
@@ -42,11 +80,11 @@ Spectral irregularity quantifies how uneven or jagged a spectrum is between adja
 
 Jensen's algorithm, cited by Brent, divides squared adjacent-bin magnitude differences by the total spectral power.[^7] With $K = N/2 + 1$ one-sided FFT bins, this is:
 
-$$Irregularity = \frac{\sum_{k=0}^{K-2}\left(|X[k]| - |X[k+1]|\right)^2}{\sum_{k=0}^{K-1}|X[k]|^2}$$
+$$Irregularity = \frac{\sum_{k=0}^{K-2}\left(M[k] - M[k+1]\right)^2}{\sum_{k=0}^{K-1}M[k]^2}$$
 
 Krimphoff's strategy compares each interior bin against the average of itself and its two neighbors:
 
-$$Irregularity = \log_{10}\left(\sum_{k=1}^{K-2}\left||X[k]| - \frac{|X[k-1]| + |X[k]| + |X[k+1]|}{3}\right|\right)$$
+$$Irregularity = \log_{10}\left(\sum_{k=1}^{K-2}\left|M[k] - \frac{M[k-1] + M[k] + M[k+1]}{3}\right|\right)$$
 
 ---
 
@@ -218,11 +256,11 @@ MFCCs summarize the shape of a sound's spectrum on a perceptual, mel-based scale
 
 The current implementation applies an orthonormal DCT-II basis to the log-mel spectrum.
 
-$$MFCC[i] = \sum_{m=0}^{M-1}D_{i,m}LogMel[m]$$
+$$MFCC[i] = \sum_{m=0}^{B-1}D_{i,m}LogMel[m]$$
 
 where
 
-$$D_{i,m} = \alpha_i\cos\left(\frac{\pi}{M}(m+0.5)i\right), \quad \alpha_0=\sqrt{\frac{1}{M}}, \quad \alpha_i=\sqrt{\frac{2}{M}}\;\text{for}\;i>0$$
+$$D_{i,m} = \alpha_i\cos\left(\frac{\pi}{B}(m+0.5)i\right), \quad \alpha_0=\sqrt{\frac{1}{B}}, \quad \alpha_i=\sqrt{\frac{2}{B}}\;\text{for}\;i>0$$
 
 ---
 
