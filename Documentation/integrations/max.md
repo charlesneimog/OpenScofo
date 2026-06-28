@@ -78,13 +78,13 @@ Sets the amount of OpenScofo logging printed in the Max console:
 * `2`: debug
 * `3`: trace
 
-### `set justdescription`
+### `set description`
 
 Switches descriptor-only processing on or off:
 
 ```max
-set justdescription 1
-set justdescription 0
+set description 1
+set description 0
 ```
 
 This is useful when the object is created with descriptor arguments and you want analysis output without score-following behavior.
