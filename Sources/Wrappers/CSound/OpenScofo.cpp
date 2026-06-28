@@ -271,11 +271,10 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
 } // namespace csnd
 
-// Registration
+// Setup
 void csnd::on_load(Csound *csound) {
     auto msg = "\n[OpenScofo] version " + std::string(OPENSCOFO_VERSION) + " (" + std::string(OPENSCOFO_BUILD_TIME) +
-               "), by Charles K. Neimog\n\n";
-
+               "), by Charles K. Neimog\n";
     csound->message(msg.c_str());
     csnd::plugin<csnd::CSoundOpenScofo>(csound, "OpenScofoScore", "kkk", "aSii", csnd::thread::ik);
 }
