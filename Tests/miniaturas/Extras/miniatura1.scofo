@@ -1,3 +1,7 @@
+SR 48000
+FFTSIZE 2048 
+HOPSIZE 512
+
 ONNXMODEL ai-flute-model.onnx
 ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 
