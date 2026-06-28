@@ -3,7 +3,8 @@
 `OpenScofo` features a Csound opcode dedicated to real-time score following.
 
 !!! danger "This is a pre-alpha version!"
-    The Csound opcode is not ready yet!
+    The Csound opcodes are still under active development and are **not yet ready for production use**. Expect missing features, bugs, and breaking changes between releases. Please report any issues you encounter.
+
 
 ## Loading `OpenScofo`
 
