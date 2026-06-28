@@ -177,7 +177,7 @@ module.exports = grammar({
 
         exec: ($) =>
             choice(
-                seq("sendto", field("receiver", $.identifier), optional(field("args", $.pdargs))),
+                seq("sendto", field("receiver", choice($.identifier, $.number)), optional(field("args", $.pdargs))),
                 seq("luacall", "(", field("lua", $.lua_call), ")"),
             ),
 
