@@ -172,7 +172,7 @@ export function highlightTechFallback(startRow, endRow) {
                     {
                         inclusiveLeft: true,
                         inclusiveRight: true,
-                        css: this.getHighlights("oscofo", "variable.parameter"),
+                        css: this.getHighlights("oscofo", "tempo"),
                     },
                 );
             }

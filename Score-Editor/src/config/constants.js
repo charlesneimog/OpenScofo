@@ -12,29 +12,30 @@ export const SUGGESTIONS = {
 
 export const HIGHLIGHTS = {
     oscofo: {
-        keyword: "color: var(--red); font-weight: bold;",
+        keyword: "color: var(--purple); font-weight: bold;",
         "keyword.directive": "color: var(--purple); font-weight: bold;",
-        "type.builtin": "color: var(--red); font-weight: bold;",
-        string: "color: var(--blue); font-weight: bold;",
-        "variable.parameter": "color: var(--yellow); font-weight: bold;",
-        function: "color: var(--red); font-weight: normal;",
-        type: "color: var(--green); font-weight: normal;",
-        number: "color: var(--fg);",
-        comment: "color: var(--comment); opacity: 0.4; font-style: italic;",
-        "comment.documentation": "color: var(--comment); opacity: 0.6; font-style: italic;",
+        "type.builtin": "color: var(--purple); font-weight: bold;",
+        string: "color: var(--green); font-weight: bold;",
+        "variable.parameter": "color: var(--pink); font-weight: bold;",
+        tempo: "color: var(--red); font-weight: bold;",
+        function: "color: var(--blue); font-weight: normal;",
+        type: "color: var(--yellow); font-weight: normal;",
+        number: "color: var(--orange);",
+        comment: "color: var(--comment); opacity: 0.9; font-style: italic;",
+        "comment.documentation": "color: var(--comment); opacity: 0.9; font-style: italic;",
         error: "text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--red);",
     },
     lua: {
-        comment: "color: var(--comment); opacity: 0.4; font-style: italic; opacity: var(--lua-opacity);",
-        string: "color: var(--green); font-style: italic; font-weight: 100; opacity: var(--lua-opacity);",
+        comment: "color: var(--comment); font-style: italic; opacity: var(--lua-opacity);",
+        string: "color: var(--green); font-weight: 100; opacity: var(--lua-opacity);",
         "function.bracket": "color: var(--fg); font-weight: bold; opacity: var(--lua-opacity);",
-        "function.call.lua": "color: var(--cyan); font-weight: 100; opacity: var(--lua-opacity);",
-        "function.name": "color: var(--cyan); font-weight: 100; opacity: var(--lua-opacity);",
-        "keyword.repeat": "color: var(--cyan); font-weight: 100; opacity: var(--lua-opacity);",
-        "keyword.conditional": "color: var(--cyan); font-weight: 100; opacity: var(--lua-opacity);",
+        "function.call.lua": "color: var(--blue); font-weight: 100; opacity: var(--lua-opacity);",
+        "function.name": "color: var(--blue); font-weight: 100; opacity: var(--lua-opacity);",
+        "keyword.repeat": "color: var(--purple); font-weight: 100; opacity: var(--lua-opacity);",
+        "keyword.conditional": "color: var(--purple); font-weight: 100; opacity: var(--lua-opacity);",
         "keyword.return": "color: var(--purple); opacity: var(--lua-opacity);",
-        "keyword.function": "color: var(--red); opacity: var(--lua-opacity);",
-        variable: "color: var(--blue); opacity: var(--lua-opacity);",
+        "keyword.function": "color: var(--purple); opacity: var(--lua-opacity);",
+        variable: "color: var(--pink); opacity: var(--lua-opacity);",
     },
 };
 
@@ -98,13 +99,17 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
 
     [
       (note_event
-        duration: (number) @variable.parameter)
+        duration: (number) @tempo)
       (rest_event
-        duration: (number) @variable.parameter)
+        duration: (number) @tempo)
+      (chord_event
+        duration: (number) @tempo)
+      (trill_event
+        duration: (number) @tempo)
       (ptech_event
-        duration: (number) @variable.parameter)
+        duration: (number) @tempo)
       (utech_event
-        duration: (number) @variable.parameter)
+        duration: (number) @tempo)
     ]
 
     ; ================================
@@ -119,8 +124,8 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
     (delay "delay" @function)
 
     ; delay
-    (delay amount: (number) @variable.parameter)
-    (delay unit: (time_unit) @variable.parameter)
+    (delay amount: (number) @tempo)
+    (delay unit: (time_unit) @tempo)
 
     ; Errors
     (ERROR) @error
