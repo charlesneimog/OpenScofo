@@ -7,9 +7,10 @@ project(OpenScofo VERSION 0.2.9 LANGUAGES C CXX
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(TREE_SITTER_VERSION "v0.26.9")
@@ -220,17 +221,19 @@ cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPT
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
-
-cpmaddpackage(NAME libonnx GITHUB_REPOSITORY charlesneimog/libonnx GIT_TAG master DOWNLOAD_ONLY YES)
-if(libonnx_ADDED)
-    file(GLOB onnx_sources ${libonnx_SOURCE_DIR}/src/*.c ${libonnx_SOURCE_DIR}/src/default/*.c)
-    add_library(onnx_OpenScofo STATIC ${onnx_sources})
-    target_include_directories(onnx_OpenScofo PUBLIC ${libonnx_SOURCE_DIR}/src)
-    set_target_properties(onnx_OpenScofo PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON
-                                                    POSITION_INDEPENDENT_CODE ON)
-endif()
-
-set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
+cpmaddpackage(
+    NAME
+    protobuf-c
+    GITHUB_REPOSITORY
+    protobuf-c/protobuf-c
+    GIT_TAG
+    v1.5.2
+    SOURCE_SUBDIR
+    build-cmake
+    OPTIONS
+    "BUILD_PROTOC OFF"
+    "BUILD_TESTS OFF")
+cpmaddpackage("gh:charlesneimog/libonnx#master")
 
 # ╭──────────────────────────────────────╮
 # │                OpenScofo             │
@@ -253,7 +256,7 @@ target_link_libraries(
            spdlog
            # mir
            onsetsds
-           onnx_OpenScofo
+           onnx
            PFFFT::PFFFT)
 
 if(OPENSCOFO_USE_BESSEL)
