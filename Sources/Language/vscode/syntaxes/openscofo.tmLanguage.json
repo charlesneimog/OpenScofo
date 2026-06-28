@@ -2,9 +2,11 @@
     "scopeName": "source.openscofo",
     "patterns": [
         { "include": "#comments" },
+        { "include": "#lua-block" },
         { "include": "#config" },
         { "include": "#events" },
-        { "include": "#actions" }
+        { "include": "#actions" },
+        { "include": "#literals" }
     ],
 
     "repository": {
@@ -27,91 +29,226 @@
             ]
         },
 
-        "config": {
+        "literals": {
             "patterns": [
                 {
-                    "name": "keyword.control.openscofo",
-                    "match": "\\b(BPM|ONNXMODEL|ONNXDESCRIPTORS|FFTSIZE|HOPSIZE|ONSETFUNCTION)\\b"
+                    "name": "string.quoted.double.openscofo",
+                    "begin": "\"",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.string.begin.openscofo" }
+                    },
+                    "end": "\"",
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.string.end.openscofo" }
+                    },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.openscofo",
+                            "match": "\\\\."
+                        }
+                    ]
                 },
                 {
                     "name": "constant.numeric.openscofo",
-                    "match": "\\b(BPM\\s+)(-?\\d+(\\.\\d+)?)",
+                    "match": "(?<![\\w.-])-?\\d+(?:\\.\\d+)?\\b"
+                },
+                {
+                    "name": "constant.language.pitch.openscofo",
+                    "match": "\\b[A-Ga-g][b#]?(?:1[0-2]|[0-9])\\b"
+                }
+            ]
+        },
+
+        "lua-block": {
+            "name": "meta.embedded.block.lua.openscofo",
+            "begin": "\\b(LUA)\\s*(\\{)",
+            "beginCaptures": {
+                "1": { "name": "keyword.control.lua-block.openscofo" },
+                "2": { "name": "punctuation.section.block.begin.openscofo" }
+            },
+            "end": "\\}",
+            "endCaptures": {
+                "0": { "name": "punctuation.section.block.end.openscofo" }
+            },
+            "patterns": [
+                { "include": "#lua-braces" },
+                { "include": "source.lua" },
+                {
+                    "name": "comment.line.double-dash.lua.openscofo",
+                    "match": "--.*$"
+                }
+            ]
+        },
+
+        "lua-braces": {
+            "name": "meta.braces.lua.openscofo",
+            "begin": "\\{",
+            "beginCaptures": {
+                "0": { "name": "punctuation.section.block.begin.lua.openscofo" }
+            },
+            "end": "\\}",
+            "endCaptures": {
+                "0": { "name": "punctuation.section.block.end.lua.openscofo" }
+            },
+            "patterns": [
+                { "include": "#lua-braces" },
+                { "include": "source.lua" },
+                {
+                    "name": "comment.line.double-dash.lua.openscofo",
+                    "match": "--.*$"
+                }
+            ]
+        },
+
+        "config": {
+            "patterns": [
+                {
+                    "name": "meta.config.openscofo",
+                    "match": "^\\s*(SR|FFTSIZE|HOPSIZE|PHASECOUPLING|SYNCSTRENGTH|BPM|PITCHTEMPLATESIGMA|TRANSPOSE|ONNXMODEL|ONNXDESCRIPTORS|ONSETFUNCTION)\\b",
                     "captures": {
-                        "2": { "name": "constant.numeric" }
+                        "1": { "name": "keyword.other.config.openscofo" }
                     }
                 },
                 {
-                    "name": "string.quoted.openscofo",
-                    "match": "\"[^\"]+\""
-                }
+                    "name": "support.constant.descriptor.openscofo",
+                    "match": "\\b(mfcc|logmel|loudness|rms|power|chroma|zcr|hfr|centroid|spread|flatness|flux|irregularity|kurtosis|harmonicity|yin)\\b"
+                },
+                {
+                    "name": "support.constant.onset-function.openscofo",
+                    "match": "\\b(pow|pd|wpd|sf|cd|rcd|hfc|mkl)\\b"
+                },
+                {
+                    "name": "string.unquoted.path.openscofo",
+                    "match": "(?<=\\s)(?:\\.?\\.?/|~?/|[A-Za-z]:[\\\\/])[^\\s\"']+"
+                },
+                { "include": "#literals" }
             ]
         },
 
         "events": {
             "patterns": [
                 {
-                    "name": "entity.name.type.openscofo",
+                    "name": "entity.other.attribute-name.openscofo",
+                    "match": "@(?:percussive|other)\\b"
+                },
+
+                {
+                    "name": "meta.pitch-group.openscofo",
+                    "begin": "\\b(CHORD|TRILL)\\s*(\\()",
+                    "beginCaptures": {
+                        "1": { "name": "keyword.control.event.openscofo" },
+                        "2": { "name": "punctuation.definition.group.begin.openscofo" }
+                    },
+                    "end": "\\)",
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.group.end.openscofo" }
+                    },
+                    "patterns": [
+                        { "include": "#literals" }
+                    ]
+                },
+
+                {
+                    "name": "meta.technique-group.openscofo",
+                    "begin": "\\b(PTECH|UTECH)\\s*(\\[)",
+                    "beginCaptures": {
+                        "1": { "name": "keyword.control.event.openscofo" },
+                        "2": { "name": "punctuation.definition.list.begin.openscofo" }
+                    },
+                    "end": "\\]",
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.list.end.openscofo" }
+                    },
+                    "patterns": [
+                        {
+                            "name": "punctuation.separator.sequence.openscofo",
+                            "match": ","
+                        },
+                        {
+                            "name": "string.unquoted.technique.openscofo",
+                            "match": "\\b[a-zA-Z_][a-zA-Z0-9_-]*\\b"
+                        }
+                    ]
+                },
+
+                {
+                    "name": "meta.technique.single.openscofo",
+                    "match": "\\b(PTECH|UTECH)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+                    "captures": {
+                        "1": { "name": "keyword.control.event.openscofo" },
+                        "2": { "name": "string.unquoted.technique.openscofo" }
+                    }
+                },
+
+                {
+                    "name": "keyword.control.event.openscofo",
                     "match": "\\b(NOTE|REST|PTECH|UTECH|CHORD|TRILL|LUAEVENT)\\b"
                 },
 
-                {
-                    "name": "string.pitch.openscofo",
-                    "match": "\\b[A-Ga-g][b#]?\\d\\b"
-                },
-
-                {
-                    "name": "variable.parameter.openscofo",
-                    "match": "\\b(?:UTECH|PTECH)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
-                    "captures": {
-                        "1": { "name": "string" }
-                    }
-                },
-
-                {
-                    "name": "variable.parameter.openscofo",
-                    "match": "\\b(?:NOTE|REST|PTECH|UTECH)\\b[^\\n]*?\\s(-?\\d+(?:\\.\\d+)?)",
-                    "captures": {
-                        "1": { "name": "variable.parameter" }
-                    }
-                }
+                { "include": "#literals" }
             ]
         },
 
         "actions": {
             "patterns": [
                 {
-                    "name": "keyword.openscofo",
-                    "match": "\\b(sendto|luacall|delay)\\b"
+                    "name": "keyword.control.action.openscofo",
+                    "match": "\\bACTION\\b"
                 },
-
-                {
-                    "name": "variable.other.member.openscofo",
-                    "match": "sendto\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
-                    "captures": {
-                        "1": { "name": "variable.other.member" }
-                    }
-                },
-
                 {
                     "name": "meta.delay.openscofo",
-                    "match": "delay\\s+(-?\\d+(?:\\.\\d+)?)\\s+(tempo|sec|ms)",
+                    "match": "\\b(delay)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(tempo|sec|ms)\\b",
                     "captures": {
-                        "1": { "name": "variable.parameter" },
-                        "2": { "name": "storage.type" }
+                        "1": { "name": "keyword.control.delay.openscofo" },
+                        "2": { "name": "constant.numeric.delay.openscofo" },
+                        "3": { "name": "storage.type.time-unit.openscofo" }
                     }
                 },
 
                 {
-                    "name": "constant.numeric.openscofo",
+                    "name": "meta.sendto.openscofo",
+                    "match": "\\b(sendto)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+                    "captures": {
+                        "1": { "name": "support.function.sendto.openscofo" },
+                        "2": { "name": "variable.other.receiver.openscofo" }
+                    }
+                },
+
+                {
+                    "name": "support.function.luacall.openscofo",
+                    "match": "\\bluacall\\b"
+                },
+
+                {
+                    "name": "meta.pdargs.openscofo",
                     "begin": "\\[",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.arguments.begin.openscofo" }
+                    },
                     "end": "\\]",
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.arguments.end.openscofo" }
+                    },
                     "patterns": [
+                        { "include": "#literals" },
                         {
-                            "name": "constant.numeric",
-                            "match": "-?\\d+(\\.\\d+)?"
+                            "name": "variable.parameter.pdarg.openscofo",
+                            "match": "\\b[a-zA-Z_][a-zA-Z0-9_-]*\\b"
                         }
                     ]
-                }
+                },
+
+                {
+                    "name": "punctuation.separator.command.openscofo",
+                    "match": ","
+                },
+
+                {
+                    "name": "punctuation.section.parens.openscofo",
+                    "match": "[()]"
+                },
+
+                { "include": "#literals" }
             ]
         }
     }
