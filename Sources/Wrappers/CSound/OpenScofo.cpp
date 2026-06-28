@@ -9,7 +9,9 @@
 
 #include <OpenScofo.hpp>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -74,39 +76,63 @@ struct CSoundOpenScofo : Plugin<3, 4> {
     std::vector<ScheduledAction> m_ScheduledActions;
 
     // ─────────────────────────────────────
-    bool SetControlChannel(const std::string &name, MYFLT value) {
-        CSOUND *cs = csound->get_csound();
-        MYFLT *channel = nullptr;
-        const int result = cs->GetChannelPtr(cs, &channel, name.c_str(), CSOUND_CONTROL_CHANNEL | CSOUND_INPUT_CHANNEL);
-        if (result != CSOUND_SUCCESS || channel == nullptr) {
-            csound->warning("[OpenScofo] Failed to set Csound control channel '" + name + "'.");
+    static bool IsNumericString(const std::string &text) {
+        if (text.empty()) {
             return false;
         }
 
-        *channel = value;
-        return true;
+        char *end = nullptr;
+        std::strtod(text.c_str(), &end);
+        return end != text.c_str() && *end == '\0';
     }
 
     // ─────────────────────────────────────
-    bool ConvertActionArgs(const OpenScofo::ScoreAction &action, std::vector<double> &values) {
-        values.clear();
-        values.reserve(action.Args.size());
-
-        for (const auto &arg : action.Args) {
-            if (std::holds_alternative<float>(arg)) {
-                values.push_back(std::get<float>(arg));
-            } else if (std::holds_alternative<int>(arg)) {
-                values.push_back(static_cast<double>(std::get<int>(arg)));
-            } else if (std::holds_alternative<std::string>(arg)) {
-                auto msg = "[OpenScofo] Csound sendto receiver '" + action.Receiver +
-                           "' was not sent: string argument '" + std::get<std::string>(arg) +
-                           "' is not supported. Use numeric arguments only.";
-                csound->warning(msg);
-                return false;
+    static void AppendCsoundPField(std::ostringstream &message, const std::variant<float, int, std::string> &arg) {
+        if (std::holds_alternative<float>(arg)) {
+            message << ' ' << std::get<float>(arg);
+        } else if (std::holds_alternative<int>(arg)) {
+            message << ' ' << std::get<int>(arg);
+        } else if (std::holds_alternative<std::string>(arg)) {
+            const std::string &value = std::get<std::string>(arg);
+            if (IsNumericString(value)) {
+                message << ' ' << value;
+            } else {
+                message << " \"" << value << '"';
             }
         }
+    }
 
-        return true;
+    // ─────────────────────────────────────
+    static void AppendCsoundInstrument(std::ostringstream &message, const std::string &instrument) {
+        if (IsNumericString(instrument)) {
+            message << ' ' << instrument;
+        } else {
+            message << " \"" << instrument << '"';
+        }
+    }
+
+    // ─────────────────────────────────────
+    void DispatchInstrumentAction(const OpenScofo::ScoreAction &action) {
+        std::ostringstream message;
+        message << 'i';
+        AppendCsoundInstrument(message, action.Receiver);
+
+        size_t pfieldsAfterInstrument = action.Args.size();
+        if (action.Args.size() < 2) {
+            message << " 0 1";
+            pfieldsAfterInstrument += 2;
+        }
+
+        for (const auto &arg : action.Args) {
+            AppendCsoundPField(message, arg);
+        }
+
+        while (pfieldsAfterInstrument < 4) {
+            message << " 0";
+            ++pfieldsAfterInstrument;
+        }
+
+        csoundInputMessageAsync(csound->get_csound(), message.str().c_str());
     }
 
     // ─────────────────────────────────────
@@ -120,17 +146,7 @@ struct CSoundOpenScofo : Plugin<3, 4> {
             return;
         }
 
-        std::vector<double> values;
-        if (!ConvertActionArgs(action, values)) {
-            return;
-        }
-
-        const std::string base = "OpenScofo/" + action.Receiver;
-        SetControlChannel(base + "/count", static_cast<MYFLT>(values.size()));
-        for (size_t i = 0; i < values.size(); ++i) {
-            SetControlChannel(base + "/" + std::to_string(i), static_cast<MYFLT>(values[i]));
-        }
-        SetControlChannel(base + "/trigger", static_cast<MYFLT>(1.0));
+        DispatchInstrumentAction(action);
     }
 
     // ─────────────────────────────────────
