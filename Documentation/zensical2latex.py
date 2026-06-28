@@ -248,6 +248,19 @@ def convert_mermaid(source_lines: list[str]) -> str:
 def convert_code_block(language: str, source_lines: list[str]) -> str:
     if language.lower() == "mermaid":
         return convert_mermaid(source_lines)
+    if language.lower() == "openscofo":
+        options = (
+            "listing only, breakable, colback=gray!5, colframe=black!35, "
+            "boxrule=0.4pt, arc=1mm, left=1mm, right=1mm, top=1mm, bottom=1mm, "
+            r"listing options={basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,keepspaces=true}"
+        )
+        return "\n".join(
+            [
+                rf"\begin{{tcblisting}}{{{options}}}",
+                *(sanitize_code_line(line) for line in source_lines),
+                r"\end{tcblisting}",
+            ]
+        )
     return "\n".join([r"\begin{lstlisting}", *(sanitize_code_line(line) for line in source_lines), r"\end{lstlisting}"])
 
 
@@ -303,8 +316,8 @@ def convert_image(alt: str, target: str) -> str:
     else:
         body = rf"\includegraphics[width=0.8\linewidth]{{{latex_escape(target)}}}"
     if caption:
-        return "\n".join([r"\begin{figure}[htbp]", r"\centering", body, rf"\caption{{{caption}}}", r"\end{figure}"])
-    return "\n".join([r"\begin{figure}[htbp]", r"\centering", body, r"\end{figure}"])
+        return "\n".join([r"\begin{figure}[H]", r"\centering", body, rf"\caption{{{caption}}}", r"\end{figure}"])
+    return "\n".join([r"\begin{figure}[H]", r"\centering", body, r"\end{figure}"])
 
 
 def convert_composition_card(image_target: str, link_target: str) -> str:
@@ -812,14 +825,16 @@ def write_main(project: dict, entries: list[NavEntry], output_dir: Path) -> None
         r"\usepackage{microtype}",
         r"\usepackage{geometry}",
         r"\usepackage{graphicx}",
+        r"\usepackage{float}",
         r"\usepackage{xcolor}",
         r"\usepackage{amsmath}",
         r"\usepackage{amssymb}",
         r"\usepackage{hyperref}",
-        r"\hypersetup{hidelinks}",
+        r"\hypersetup{colorlinks=true, linkcolor=blue!55!black, urlcolor=blue!55!black, citecolor=blue!55!black}",
         r"\usepackage{tabularx}",
         r"\usepackage{listings}",
         r"\usepackage[most]{tcolorbox}",
+        r"\tcbuselibrary{listings,breakable}",
         r"\geometry{margin=1in}",
         r"\lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,keepspaces=true}",
         r"\begin{document}",
