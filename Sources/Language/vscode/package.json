@@ -1,9 +1,23 @@
 {
-    "name": "openscofo",
-    "displayName": "OpenScofo",
-    "description": "Syntax highlighting for OpenScofo language",
-    "version": "0.0.1",
-    "publisher": "your-name",
+    "name": "openscofo-language-parse",
+    "displayName": "OpenScofo Language Parse",
+    "description": "Syntax highlighting for OpenScofo Score Language",
+    "version": "0.0.2",
+    "publisher": "charlesneimog",
+    "license": "GPL-3.0-only",
+    "repository": "https://github.com/charlesneimog/OpenScofo",
+    "icon": "icon.png",
+    "files": [
+        "LICENSE",
+        "README.md",
+        "icon.png",
+        "language-configuration.json",
+        "syntaxes/**"
+    ],
+    "scripts": {
+        "package": "vsce package --no-dependencies",
+        "publish": "vsce publish --no-dependencies"
+    },
     "engines": {
         "vscode": "^1.80.0"
     },
