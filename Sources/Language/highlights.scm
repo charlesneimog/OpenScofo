@@ -39,13 +39,15 @@
     technique: (identifier) @string)
 
   (ptech_event
-    techniques: (identifier) @string)
+    techniques: (technique_group
+      technique: (identifier) @string))
 
   (utech_event
     technique: (identifier) @string)
 
   (utech_event
-    techniques: (identifier) @string)
+    techniques: (technique_group
+      technique: (identifier) @string))
 ]
 
 [
