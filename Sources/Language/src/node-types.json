@@ -1,0 +1,840 @@
+[
+  {
+    "type": "CONFIG",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "config_key",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "descriptor_list",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "onset_function",
+            "named": true
+          },
+          {
+            "type": "path",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "EVENT",
+    "named": true,
+    "fields": {
+      "action": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "action",
+            "named": true
+          }
+        ]
+      },
+      "definition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "chord_event",
+            "named": true
+          },
+          {
+            "type": "lua_event",
+            "named": true
+          },
+          {
+            "type": "note_event",
+            "named": true
+          },
+          {
+            "type": "ptech_event",
+            "named": true
+          },
+          {
+            "type": "rest_event",
+            "named": true
+          },
+          {
+            "type": "trill_event",
+            "named": true
+          },
+          {
+            "type": "utech_event",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "LUA",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "lua_body",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "action",
+    "named": true,
+    "fields": {
+      "command": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "exec",
+            "named": true
+          }
+        ]
+      },
+      "timing": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "delay",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "attribute",
+    "named": true,
+    "fields": {
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "other",
+            "named": false
+          },
+          {
+            "type": "percussive",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "chord_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "pitches": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch_group",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "delay",
+    "named": true,
+    "fields": {
+      "amount": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "unit": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "time_unit",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "descriptor",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "descriptor_list",
+    "named": true,
+    "fields": {
+      "descriptor": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "descriptor",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "exec",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "pdargs",
+            "named": true
+          }
+        ]
+      },
+      "lua": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "lua_call",
+            "named": true
+          }
+        ]
+      },
+      "receiver": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "lua_body",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "lua_body",
+          "named": true
+        },
+        {
+          "type": "lua_comment",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "lua_call",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "lua_call",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "lua_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "luacall": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "lua_call",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "note_event",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      },
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "pitch": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "onset_function",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "pdarg",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pdargs",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "pdarg",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pitch",
+    "named": true,
+    "fields": {
+      "alteration": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "alteration",
+            "named": true
+          }
+        ]
+      },
+      "octave": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "octave",
+            "named": true
+          }
+        ]
+      },
+      "pitch_name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "pitch_group",
+    "named": true,
+    "fields": {
+      "pitch": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "ptech_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "pitch": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch",
+            "named": true
+          }
+        ]
+      },
+      "technique": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "techniques": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "technique_group",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "rest_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "CONFIG",
+          "named": true
+        },
+        {
+          "type": "EVENT",
+          "named": true
+        },
+        {
+          "type": "LUA",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "technique_group",
+    "named": true,
+    "fields": {
+      "technique": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "trill_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "pitches": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch_group",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "utech_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "technique": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "techniques": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "technique_group",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "@",
+    "named": false
+  },
+  {
+    "type": "ACTION",
+    "named": false
+  },
+  {
+    "type": "CHORD",
+    "named": false
+  },
+  {
+    "type": "LUA",
+    "named": false
+  },
+  {
+    "type": "LUAEVENT",
+    "named": false
+  },
+  {
+    "type": "NOTE",
+    "named": false
+  },
+  {
+    "type": "PTECH",
+    "named": false
+  },
+  {
+    "type": "REST",
+    "named": false
+  },
+  {
+    "type": "TRILL",
+    "named": false
+  },
+  {
+    "type": "UTECH",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "alteration",
+    "named": true
+  },
+  {
+    "type": "cd",
+    "named": false
+  },
+  {
+    "type": "centroid",
+    "named": false
+  },
+  {
+    "type": "chroma",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "config_key",
+    "named": true
+  },
+  {
+    "type": "delay",
+    "named": false
+  },
+  {
+    "type": "flatness",
+    "named": false
+  },
+  {
+    "type": "flux",
+    "named": false
+  },
+  {
+    "type": "harmonicity",
+    "named": false
+  },
+  {
+    "type": "hfc",
+    "named": false
+  },
+  {
+    "type": "hfr",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "irregularity",
+    "named": false
+  },
+  {
+    "type": "kurtosis",
+    "named": false
+  },
+  {
+    "type": "logmel",
+    "named": false
+  },
+  {
+    "type": "loudness",
+    "named": false
+  },
+  {
+    "type": "lua_comment",
+    "named": true
+  },
+  {
+    "type": "luacall",
+    "named": false
+  },
+  {
+    "type": "mfcc",
+    "named": false
+  },
+  {
+    "type": "mkl",
+    "named": false
+  },
+  {
+    "type": "number",
+    "named": true
+  },
+  {
+    "type": "octave",
+    "named": true
+  },
+  {
+    "type": "other",
+    "named": false
+  },
+  {
+    "type": "path",
+    "named": true
+  },
+  {
+    "type": "pd",
+    "named": false
+  },
+  {
+    "type": "percussive",
+    "named": false
+  },
+  {
+    "type": "pitch_name",
+    "named": true
+  },
+  {
+    "type": "pow",
+    "named": false
+  },
+  {
+    "type": "power",
+    "named": false
+  },
+  {
+    "type": "rcd",
+    "named": false
+  },
+  {
+    "type": "rms",
+    "named": false
+  },
+  {
+    "type": "sendto",
+    "named": false
+  },
+  {
+    "type": "sf",
+    "named": false
+  },
+  {
+    "type": "spread",
+    "named": false
+  },
+  {
+    "type": "time_unit",
+    "named": true
+  },
+  {
+    "type": "wpd",
+    "named": false
+  },
+  {
+    "type": "yin",
+    "named": false
+  },
+  {
+    "type": "zcr",
+    "named": false
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]
