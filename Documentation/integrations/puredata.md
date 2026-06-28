@@ -31,7 +31,7 @@ onnx <label> <float>
 ## Basic Use
 
 <p align="center">
-    <img style="width: 30%; border-radius: 5px" src="../assets/pd-patch.png">
+    <img style="width: 80%; border-radius: 5px" src="../assets/pd-patch.png">
 </p>
 
 If the filename has no extension, `openscofo~` looks for a `.scofo` file. Relative paths are resolved from the current patch.
@@ -58,7 +58,7 @@ Enables or disables score following without reloading the score.
 
 Sets the amount of OpenScofo logging printed in the Pure Data console. The levels are `0` warning, `1` info, `2` debug, and `3` trace.
 
-### `set justdescription`
+### `set description`
 
 Switches descriptor-only processing on or off. This is useful when you create the object with descriptor arguments and want analysis output without score following.
 
