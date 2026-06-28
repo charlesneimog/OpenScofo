@@ -76,9 +76,11 @@ jobs:
             - name: Install dependencies (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
+              env:
+                  VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
               run: |
                   npm install -g tree-sitter-cli
-                  vcpkg install protobuf protobuf-c --triplet x64-windows
+                  vcpkg install protobuf protobuf-c --triplet x64-windows --x-install-root="${env:VCPKG_INSTALLATION_ROOT}\installed"
                   "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\tools\protobuf" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
                   "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\tools\protobuf-c" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
                   winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements

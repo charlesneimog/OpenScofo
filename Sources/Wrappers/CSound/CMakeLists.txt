@@ -20,6 +20,7 @@ target_include_directories(OpenScofoCSound SYSTEM PRIVATE ${csound_SOURCE_DIR}/i
 
 if(APPLE)
     set_target_properties(OpenScofoCSound PROPERTIES PREFIX "" SUFFIX ".dylib" OUTPUT_NAME "OpenScofo")
+    target_link_options(OpenScofoCSound PRIVATE LINKER:-undefined,dynamic_lookup)
 elseif(WIN32)
     set_target_properties(OpenScofoCSound PROPERTIES PREFIX "" SUFFIX ".dll" OUTPUT_NAME "OpenScofo")
 else()
