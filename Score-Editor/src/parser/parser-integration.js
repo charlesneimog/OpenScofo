@@ -42,11 +42,6 @@ export function handleCodeChange(_, changes) {
         }
     }
     const newTree = this.ScofoParser.parse(newText, this.tree);
-    let needParse = this.runFormatterAfterParse(newTree.rootNode);
-    if (needParse) {
-        this.handleCodeChange(_, changes);
-        return;
-    }
 
     this.checkErrors(newTree);
     if (this.tree) this.tree.delete();
@@ -94,10 +89,24 @@ export function runFormatterBeforeParser() {
     return;
 }
 
-export function runFormatterAfterParse(_) {
+export function formatScore() {
+    if (!this.ScofoParser) {
+        return;
+    }
+
+    const tree = this.ScofoParser.parse(this.codeEditor.getValue());
+    const changed = this.codeEditor.operation(() => this.runFormatterAfterParse(tree.rootNode));
+    tree.delete();
+
+    if (!changed) {
+        this.handleCodeChange();
+    }
+}
+
+export function runFormatterAfterParse(rootNode) {
     const source = this.codeEditor.getValue();
     const edits = [];
-    const shouldFormatStructure = _.hasError;
+    const shouldFormatStructure = rootNode.hasError;
 
     function ensureLineStart(instance, node, indentText) {
         const nodeStart = instance.codeEditor.indexFromPos({
@@ -145,7 +154,7 @@ export function runFormatterAfterParse(_) {
         }
     }
 
-    walk(_, (node) => {
+    walk(rootNode, (node) => {
         if (shouldFormatStructure && node.type === "EVENT") {
             ensureLineStart(this, node, "");
         }

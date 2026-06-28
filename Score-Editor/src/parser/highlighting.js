@@ -151,7 +151,7 @@ export function highlightTechFallback(startRow, endRow) {
                 {
                     inclusiveLeft: true,
                     inclusiveRight: true,
-                    css: this.getHighlights("oscofo", "eventKeyword"),
+                    css: this.getHighlights("oscofo", "type.builtin"),
                 },
             );
 
@@ -161,7 +161,7 @@ export function highlightTechFallback(startRow, endRow) {
                 {
                     inclusiveLeft: true,
                     inclusiveRight: true,
-                    css: this.getHighlights("oscofo", "techniqueId"),
+                    css: this.getHighlights("oscofo", "string"),
                 },
             );
 
@@ -172,7 +172,7 @@ export function highlightTechFallback(startRow, endRow) {
                     {
                         inclusiveLeft: true,
                         inclusiveRight: true,
-                        css: this.getHighlights("oscofo", "duration"),
+                        css: this.getHighlights("oscofo", "variable.parameter"),
                     },
                 );
             }

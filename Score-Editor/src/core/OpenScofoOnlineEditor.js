@@ -28,6 +28,7 @@ import {
     handleCodeChange,
     initParser,
     luaFormatter,
+    formatScore,
     runFormatterAfterParse,
     runFormatterBeforeParser,
     treeEditForEditorChange,
@@ -131,12 +132,14 @@ export class OpenScofoOnlineEditor {
         const uploadButtom = document.getElementById("upload-score");
         const loadButtom = document.getElementById("load-score");
         const audioButtom = document.getElementById("upload-wav");
+        const formatButton = document.getElementById("format-score");
 
-        if (downloadButton && uploadButtom && loadButtom && audioButtom) {
+        if (downloadButton && uploadButtom && loadButtom && audioButtom && formatButton) {
             downloadButton.addEventListener("click", () => this.downloadScore());
             uploadButtom.addEventListener("click", () => this.uploadScore());
             loadButtom.addEventListener("click", () => this.loadTxtScore());
             audioButtom.addEventListener("click", () => this.uploadWav());
+            formatButton.addEventListener("click", () => this.formatScore());
         } else {
             alert("Buttons not found");
         }
@@ -168,6 +171,7 @@ Object.assign(OpenScofoOnlineEditor.prototype, {
     handleCodeChange,
     treeEditForEditorChange,
     luaFormatter,
+    formatScore,
     luaHighlight,
     luaChildOfLuaBody,
     luaIndentBody,
@@ -186,4 +190,3 @@ Object.assign(OpenScofoOnlineEditor.prototype, {
     uploadScore,
     loadTxtScore,
 });
-

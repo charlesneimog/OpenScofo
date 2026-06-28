@@ -12,25 +12,17 @@ export const SUGGESTIONS = {
 
 export const HIGHLIGHTS = {
     oscofo: {
-        keyword: "color: var(--fg); font-weight: normal;",
-        eventKeyword: "color: var(--red); font-weight: bold;",
-        luaKeyword: "color: var(--purple); font-weight: bold;",
-        pitch: "color: var(--blue); font-weight: bold;",
-        duration: "color: var(--yellow); font-weight: bold;",
-        techniqueId: "color: var(--green); font-style: italic; font-weight: bold;",
-        attributeId: "color: var(--cyan); font-weight: bold;",
-        comment: "color: var(--comment); opacity: 0.4; font-style: italic;",
-        config: "color: var(--purple); font-weight: bold;",
-        error: "text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--red);",
-        action: "color: var(--red); font-weight: normal;",
-        actionKey: "color: var(--red); font-weight: normal;",
-        timeUnit: "color: var(--yellow); font-weight: bold;",
+        keyword: "color: var(--red); font-weight: bold;",
+        "keyword.directive": "color: var(--purple); font-weight: bold;",
+        "type.builtin": "color: var(--red); font-weight: bold;",
+        string: "color: var(--blue); font-weight: bold;",
+        "variable.parameter": "color: var(--yellow); font-weight: bold;",
+        function: "color: var(--red); font-weight: normal;",
+        type: "color: var(--green); font-weight: normal;",
         number: "color: var(--fg);",
-        exec: "color: var(--fg); font-weight: normal;",
-        receiver: "color: var(--green); font-weight: normal;",
-        pdargs: "color: var(--fg); font-weight: normal;",
-        pdarg: "color: var(--cyan); font-style: italic; font-weight: normal;",
-        timedAction: "color: var(--fg); font-weight: normal;",
+        comment: "color: var(--comment); opacity: 0.4; font-style: italic;",
+        "comment.documentation": "color: var(--comment); opacity: 0.6; font-style: italic;",
+        error: "text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--red);",
     },
     lua: {
         comment: "color: var(--comment); opacity: 0.4; font-style: italic; opacity: var(--lua-opacity);",
@@ -47,56 +39,88 @@ export const HIGHLIGHTS = {
 };
 
 export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
-    ; LUA
-    (LUA) @luaKeyword
+    ; ================================
+    ; COMMENTS
+    ; ================================
+    (comment) @comment
+
+    ((comment) @comment.documentation
+     (#match? @comment "^/\\\\*\\\\*"))
+
+    ; ================================
+    ; STRUCTURE
+    ; ================================
+    (CONFIG) @keyword.directive
+    (LUA) @keyword.directive
+    (EVENT) @keyword
+
+    ; Lua body is handled by the Lua parser/highlighter.
     (lua_body) @lua_body
     (lua_call) @lua_body
     (lua_comment) @comment
 
-    ; Event keywords
-    (note_event) @eventKeyword
-    (rest_event) @eventKeyword
-    (chord_event) @eventKeyword
-    (trill_event) @eventKeyword
-    (ptech_event) @eventKeyword
-    (utech_event) @eventKeyword
-
+    ; ================================
     ; Config
-    (config_key) @config
-    (number) @number
+    ; ================================
+    (CONFIG
+      value: (_) @number)
 
+    ; ================================
+    ; EVENTS (semantic types)
+    ; ================================
+    (note_event) @type.builtin
+    (rest_event) @type.builtin
+    (ptech_event) @type.builtin
+    (utech_event) @type.builtin
+    (chord_event) @type.builtin
+    (trill_event) @type.builtin
+    (lua_event) @type.builtin
+
+    ; ================================
     ; Musical data
-    (pitch) @pitch
-    (pitch_name) @pitch
-    (note_event duration: (number) @duration)
-    (rest_event duration: (number) @duration)
-    (chord_event duration: (number) @duration)
-    (trill_event duration: (number) @duration)
+    ; ================================
+    (pitch) @string
+    [
+      (ptech_event
+        technique: (identifier) @string)
 
-    (ptech_event duration: (number) @duration)
-    (ptech_event duration: (number) @duration)
-    (ptech_event technique: (identifier) @techniqueId)
+      (ptech_event
+        techniques: (technique_group
+          technique: (identifier) @string))
 
-    (utech_event duration: (number) @duration)
-    (utech_event duration: (number) @duration)
-    (utech_event technique: (identifier) @techniqueId)
-    (attribute) @attributeId
+      (utech_event
+        technique: (identifier) @string)
 
-    ; Actions
-    (action) @timedAction
-    (delay) @actionKey
-    (delay amount: (number) @duration)
-    (delay unit: (time_unit) @timeUnit)
-    (exec) @exec
-    (exec "sendto" @actionKey)
-    (exec "luacall" @actionKey)
-    (exec receiver: (identifier) @receiver)
-    (pdargs) @pdargs
-    (pdarg (identifier) @pdarg)
-    (pdarg (number) @pdarg)
+      (utech_event
+        techniques: (technique_group
+          technique: (identifier) @string))
+    ]
 
-    ; Numbers and comments
-    (comment) @comment
+    [
+      (note_event
+        duration: (number) @variable.parameter)
+      (rest_event
+        duration: (number) @variable.parameter)
+      (ptech_event
+        duration: (number) @variable.parameter)
+      (utech_event
+        duration: (number) @variable.parameter)
+    ]
+
+    ; ================================
+    ; ACTIONS (runtime layer)
+    ; ================================
+    (exec receiver: (identifier) @type)
+    (exec args: (pdargs) @number)
+
+    ; actions keywords
+    (exec "sendto" @function)
+    (exec "luacall" @function)
+    (delay "delay" @function)
+
+    ; delay
+    (delay amount: (number) @variable.parameter)
+    (delay unit: (time_unit) @variable.parameter)
 
     ; Errors
     (ERROR) @error
