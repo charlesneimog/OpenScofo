@@ -1,0 +1,138 @@
+SR 48000
+FFTSIZE 2048
+HOPSIZE 512
+
+ONNXMODEL ai-flute-model.onnx
+ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+
+BPM 100
+
+// Miniatura 1, Csound action version.
+// The musical score is the complete Miniatura 1 score; the original Pd/Max
+// action receivers are replaced by two simple Csound instruments:
+//   sendto 2 [p2 p3 freq amp]
+//   sendto namedPing [p2 p3 freq amp]
+
+// Measure number 1
+UTECH jet_whistle 1
+REST 0.5
+NOTE Bb4 1.5 // tied
+    sendto 2 [0 0.10 466.16 0.10]
+    delay 0.25 tempo sendto namedPing [0 0.09 932.33 0.07]
+    delay 0.5 tempo sendto 2 [0 0.08 587.33 0.08]
+    delay 0.75 tempo sendto namedPing [0 0.07 1244.51 0.05]
+NOTE A4 0.5
+REST 0.5
+    sendto namedPing [0 0.12 880 0.07]
+    delay 0.25 tempo sendto 2 [0 0.08 698.46 0.10]
+
+// Measure number 2
+UTECH jet_whistle 1
+REST 0.5
+NOTE Bb4 1.5 // tied
+    sendto 2 [0 0.10 466.16 0.10]
+    delay 0.25 tempo sendto 2 [0 0.08 587.33 0.08]
+    delay 0.5 tempo sendto namedPing [0 0.09 932.33 0.07]
+    delay 0.75 tempo sendto namedPing [0 0.07 1244.51 0.05]
+NOTE A4 0.5
+REST 0.5
+    // Space: let the flute carry this phrase almost alone.
+
+// Measure number 3
+PTECH pizzicato D4 0.5
+    sendto 2 [0 0.06 293.66 0.14]
+    delay 0.16 tempo sendto namedPing [0 0.05 587.33 0.07]
+    delay 0.33 tempo sendto 2 [0 0.05 440 0.10]
+PTECH pizzicato A4 0.5
+REST 0.5
+    delay 0.20 tempo sendto namedPing [0 0.06 880 0.06]
+
+PTECH pizzicato D4 0.5
+    sendto 2 [0 0.05 293.66 0.14]
+    delay 0.125 tempo sendto namedPing [0 0.05 659.25 0.07]
+    delay 0.25 tempo sendto 2 [0 0.05 523.25 0.10]
+    delay 0.375 tempo sendto namedPing [0 0.04 987.77 0.05]
+PTECH pizzicato A4 0.5
+REST 0.5
+    sendto namedPing [0 0.08 493.88 0.07]
+PTECH pizzicato D4 0.5
+    sendto 2 [0 0.06 293.66 0.15]
+    delay 0.20 tempo sendto namedPing [0 0.05 1174.66 0.06]
+    delay 0.40 tempo sendto 2 [0 0.05 246.94 0.10]
+
+PTECH pizzicato A4 0.5
+
+// Measure number 4
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato A4 0.5
+REST 0.5
+UTECH jet_whistle 1
+    // Space: a single halo around the flute noise.
+    sendto namedPing [0 0.30 1046.5 0.04]
+REST 1
+    sendto 2 [0 0.20 246.94 0.11]
+    delay 0.25 tempo sendto namedPing [0 0.08 1174.66 0.05]
+    delay 0.50 tempo sendto 2 [0 0.10 349.23 0.10]
+    delay 0.75 tempo sendto namedPing [0 0.08 220 0.06]
+
+// Measure number 5
+PTECH pizzicato D4 0.5
+PTECH pizzicato A4 0.5
+    sendto 2 [0 0.06 293.66 0.13]
+    delay 0.125 tempo sendto namedPing [0 0.05 880 0.06]
+    delay 0.25 tempo sendto 2 [0 0.05 369.99 0.10]
+    delay 0.375 tempo sendto namedPing [0 0.05 1108.73 0.05]
+REST 0.5
+PTECH pizzicato D4 0.5
+    sendto 2 [0 0.06 293.66 0.13]
+    delay 0.20 tempo sendto namedPing [0 0.07 740 0.06]
+    delay 0.40 tempo sendto 2 [0 0.06 554.37 0.09]
+PTECH pizzicato Bb4 0.5
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato B4 0.5
+
+// Measure number 6
+REST 0.5
+PTECH pizzicato D4 0.5
+PTECH pizzicato Bb4 0.5
+    // Space: just one quiet answer, then let the flute breathe.
+    delay 0.25 tempo sendto namedPing [0 0.16 622.25 0.05]
+REST 0.5
+UTECH jet_whistle 1
+    delay 0.5 tempo sendto namedPing [0 0.10 261 0.06]
+UTECH jet_whistle 1
+    delay 0.5 tempo sendto namedPing [0 0.10 291 0.06]
+
+// Measure number 7
+UTECH jet_whistle 1
+    delay 0.5 tempo sendto namedPing [0 0.10 231 0.06]
+REST 3
+
+// Measure number 8
+NOTE D4 2
+    sendto 2 [0 0.10 293.66 0.12]
+    sendto namedPing [0 0.12 587.33 0.07]
+    delay 0.125 tempo sendto 2 [0 0.08 369.99 0.10]
+    delay 0.25 tempo sendto namedPing [0 0.08 739.99 0.06]
+    delay 0.375 tempo sendto 2 [0 0.08 440 0.10]
+    delay 0.5 tempo sendto namedPing [0 0.10 880 0.06]
+    delay 0.625 tempo sendto 2 [0 0.08 220 0.10]
+    delay 0.75 tempo sendto namedPing [0 0.08 1174.66 0.05]
+    delay 0.875 tempo sendto 2 [0 0.08 329.63 0.09]
+    delay 1 tempo sendto namedPing [0 0.14 1318.51 0.06]
+    delay 1.25 tempo sendto 2 [0 0.12 246.94 0.10]
+    delay 1.5 tempo sendto namedPing [0 0.10 987.77 0.05]
+
+REST 2
+    sendto 2 [0 0.08 293.66 0.08]
+    delay 0.16 tempo sendto namedPing [0 0.08 587.33 0.05]
+    delay 0.32 tempo sendto 2 [0 0.08 349.23 0.08]
+    delay 0.48 tempo sendto namedPing [0 0.08 698.46 0.05]
+    delay 0.64 tempo sendto 2 [0 0.08 392 0.08]
+    delay 0.80 tempo sendto namedPing [0 0.08 783.99 0.05]
+    delay 1.00 tempo sendto 2 [0 0.10 440 0.09]
+    delay 1.20 tempo sendto namedPing [0 0.12 880 0.06]
+    delay 1.45 tempo sendto 2 [0 0.16 293.66 0.12]
+    delay 1.70 tempo sendto namedPing [0 0.20 1174.66 0.07]
