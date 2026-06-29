@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 
 namespace {
 
@@ -113,14 +114,17 @@ const std::vector<VampOutputSpec> &GetVampOutputSpecs() {
     return specs;
 }
 
+// ─────────────────────────────────────
 bool IsVectorOutput(VampOutputKind kind) {
     return kind != VampOutputKind::Scalar;
 }
 
+// ─────────────────────────────────────
 size_t GetSpectralBinCount(size_t blockSize) {
     return blockSize / 2 + 1;
 }
 
+// ─────────────────────────────────────
 size_t GetBinCount(const VampOutputSpec &spec, const OpenScofo::Configuration &config, size_t blockSize) {
     switch (spec.kind) {
     case VampOutputKind::Magnitude:
@@ -142,6 +146,7 @@ size_t GetBinCount(const VampOutputSpec &spec, const OpenScofo::Configuration &c
     return 1;
 }
 
+// ─────────────────────────────────────
 const std::vector<double> &GetVectorValue(const OpenScofo::Description &desc, VampOutputKind kind) {
     switch (kind) {
     case VampOutputKind::Magnitude:
@@ -170,10 +175,11 @@ const std::vector<double> &GetVectorValue(const OpenScofo::Description &desc, Va
 
 } // namespace
 
+// ─────────────────────────────────────
 VampOpenScofo::VampOpenScofo(float inputSampleRate)
     : Plugin(inputSampleRate), m_blockSize(0), m_stepSize(0), m_selectedScoreIndex(0), m_OpenScofo(nullptr) {
 
-    //
+    RefreshScorePathsFromEnv();
 }
 
 // ─────────────────────────────────────
@@ -248,15 +254,18 @@ Vamp::Plugin::ParameterList VampOpenScofo::getParameterDescriptors() const {
     ParameterList list;
 
     ParameterDescriptor scorePath;
-    scorePath.identifier = "score_path";
-    scorePath.name = "Score Path";
-    scorePath.description = "Select score index from Programs, or set OPENSCOFO_VAMP_SCORE_PATH to a full path.";
+    scorePath.identifier = "score";
+    scorePath.name = "Score";
+    scorePath.description = "Select an OpenScofo score from Documents or Downloads";
     scorePath.unit = "index";
     scorePath.minValue = 0;
     scorePath.maxValue = m_scorePaths.empty() ? 0 : float(m_scorePaths.size() - 1);
     scorePath.defaultValue = 0;
     scorePath.isQuantized = true;
     scorePath.quantizeStep = 1;
+    for (const std::string &path : m_scorePaths) {
+        scorePath.valueNames.push_back(path);
+    }
     list.push_back(scorePath);
 
     return list;
@@ -264,7 +273,7 @@ Vamp::Plugin::ParameterList VampOpenScofo::getParameterDescriptors() const {
 
 // ─────────────────────────────────────
 float VampOpenScofo::getParameter(std::string identifier) const {
-    if (identifier == "score_path") {
+    if (identifier == "score" || identifier == "score_index" || identifier == "score_path") {
         return float(m_selectedScoreIndex);
     }
 
@@ -273,7 +282,7 @@ float VampOpenScofo::getParameter(std::string identifier) const {
 
 // ─────────────────────────────────────
 void VampOpenScofo::setParameter(std::string identifier, float value) {
-    if (identifier != "score_path")
+    if (identifier != "score" && identifier != "score_index" && identifier != "score_path")
         return;
 
     if (m_scorePaths.empty()) {
@@ -292,34 +301,17 @@ void VampOpenScofo::setParameter(std::string identifier, float value) {
 
 // ─────────────────────────────────────
 Vamp::Plugin::ProgramList VampOpenScofo::getPrograms() const {
-    ProgramList list;
-    for (const std::string &path : m_scorePaths) {
-        list.push_back(path);
-    }
-    return list;
+    return {};
 }
 
 // ─────────────────────────────────────
 std::string VampOpenScofo::getCurrentProgram() const {
-    return m_currentProgram;
+    return {};
 }
 
 // ─────────────────────────────────────
 void VampOpenScofo::selectProgram(std::string name) {
-    if (name.empty())
-        return;
-
-    auto it = std::find(m_scorePaths.begin(), m_scorePaths.end(), name);
-    if (it == m_scorePaths.end()) {
-        m_scorePaths.push_back(name);
-        m_selectedScoreIndex = int(m_scorePaths.size() - 1);
-    } else {
-        m_selectedScoreIndex = int(std::distance(m_scorePaths.begin(), it));
-    }
-
-    if (m_OpenScofo && m_OpenScofo->LoadScore(name)) {
-        m_currentProgram = name;
-    }
+    (void)name;
 }
 
 // ─────────────────────────────────────
@@ -335,15 +327,18 @@ bool VampOpenScofo::initialise(size_t channels, size_t stepSize, size_t blockSiz
 
     m_blockSize = blockSize;
     m_stepSize = stepSize;
+    m_lastScoreEventIndex = -1;
 
     delete m_OpenScofo;
-    m_OpenScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_blockSize);
+    m_OpenScofo = new OpenScofo::OpenScofo(m_inputSampleRate, m_blockSize, m_stepSize);
+
     std::vector<OpenScofo::Descriptors> descriptors;
     for (const auto &spec : GetVampOutputSpecs()) {
         if (spec.descriptor != OpenScofo::Descriptors::INVALID) {
             descriptors.push_back(spec.descriptor);
         }
     }
+
     m_OpenScofo->SetRequestedDescriptors(descriptors);
 
     if (!m_scorePaths.empty()) {
@@ -355,10 +350,51 @@ bool VampOpenScofo::initialise(size_t channels, size_t stepSize, size_t blockSiz
 
 // ─────────────────────────────────────
 void VampOpenScofo::reset() {
+    m_lastScoreEventIndex = -1;
 }
 
 // ─────────────────────────────────────
 void VampOpenScofo::RefreshScorePathsFromEnv() {
+    m_scorePaths.clear();
+
+    auto addScofoFilesFromDir = [&](const std::filesystem::path &dir) {
+        if (!std::filesystem::exists(dir)) {
+            return;
+        }
+
+        if (!std::filesystem::is_directory(dir)) {
+            return;
+        }
+
+        for (const auto &entry : std::filesystem::directory_iterator(dir)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+
+            const auto &path = entry.path();
+
+            if (path.extension() == ".scofo") {
+                m_scorePaths.push_back(path.string());
+            }
+        }
+    };
+
+#if defined(_WIN32)
+    const char *home = std::getenv("USERPROFILE");
+#else
+    const char *home = std::getenv("HOME");
+#endif
+
+    if (home) {
+        addScofoFilesFromDir(std::filesystem::path(home) / "Documents");
+        addScofoFilesFromDir(std::filesystem::path(home) / "Downloads");
+    }
+
+    std::sort(m_scorePaths.begin(), m_scorePaths.end());
+
+    if (!m_scorePaths.empty()) {
+        m_selectedScoreIndex = 0;
+    }
 }
 
 // ─────────────────────────────────────
@@ -370,43 +406,76 @@ bool VampOpenScofo::LoadScoreAtIndex(int index) {
         return false;
 
     const std::string &scorePath = m_scorePaths[size_t(index)];
-    if (!m_OpenScofo->LoadScore(scorePath))
+    if (!m_OpenScofo->LoadScore(scorePath)) {
         return false;
+    }
 
-    m_currentProgram = scorePath;
+    m_lastScoreEventIndex = -1;
     return true;
 }
 
 // ─────────────────────────────────────
-Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers, Vamp::RealTime) {
+Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers, Vamp::RealTime timestamp) {
     FeatureSet fs;
 
-    bool ok = m_OpenScofo->ProcessBlock(inputBuffers[0], m_blockSize);
-    if (!ok) {
+    if (!m_OpenScofo || !inputBuffers || !inputBuffers[0]) {
+        return fs;
     }
-    OpenScofo::Description Desc = m_OpenScofo->GetDescription();
 
-    auto pushScalar = [&](int idx, float value) {
+    if (m_stepSize == 0 || m_stepSize > m_blockSize) {
+        return fs;
+    }
+
+    const float *newSamples = inputBuffers[0] + (m_blockSize - m_stepSize);
+    const int previousScoreIndex = m_lastScoreEventIndex;
+
+    if (!m_OpenScofo->ProcessBlock(newSamples, m_stepSize)) {
+        return fs;
+    }
+
+    OpenScofo::Description desc = m_OpenScofo->GetDescription();
+    const int currentScoreIndex = m_OpenScofo->GetCurrentScorePosition();
+
+    if (currentScoreIndex != previousScoreIndex && currentScoreIndex != 0) {
+        Feature f;
+        f.hasTimestamp = true;
+
+        const Vamp::RealTime offset = Vamp::RealTime::frame2RealTime(m_blockSize / 2, int(m_inputSampleRate));
+
+        f.timestamp = timestamp + offset;
+        f.label = "Score event " + std::to_string(currentScoreIndex);
+
+        fs[m_scoreMark].push_back(f);
+    }
+
+    if (currentScoreIndex != previousScoreIndex) {
+        m_lastScoreEventIndex = currentScoreIndex;
+    }
+
+    auto pushScalar = [&](int outputIndex, float value) {
         Feature f;
         f.values.push_back(value);
-        fs[idx].push_back(f);
+        fs[outputIndex].push_back(f);
     };
-    auto pushVector = [&](int idx, const std::vector<double> &vec) {
+
+    auto pushVector = [&](int outputIndex, const std::vector<double> &vec) {
         Feature f;
         f.values.reserve(vec.size());
+
         for (double v : vec) {
             f.values.push_back(static_cast<float>(v));
         }
 
-        fs[idx].push_back(f);
+        fs[outputIndex].push_back(f);
     };
 
-    int i = 0;
+    int outputIndex = m_descriptorOffset;
+
     for (const auto &spec : GetVampOutputSpecs()) {
         if (IsVectorOutput(spec.kind)) {
-            pushVector(i++, GetVectorValue(Desc, spec.kind));
+            pushVector(outputIndex++, GetVectorValue(desc, spec.kind));
         } else {
-            pushScalar(i++, static_cast<float>(m_OpenScofo->GetDescriptionFloat(Desc, spec.descriptor)));
+            pushScalar(outputIndex++, static_cast<float>(m_OpenScofo->GetDescriptionFloat(desc, spec.descriptor)));
         }
     }
 
@@ -416,6 +485,18 @@ Vamp::Plugin::FeatureSet VampOpenScofo::process(const float *const *inputBuffers
 // ─────────────────────────────────────
 Vamp::Plugin::OutputList VampOpenScofo::getOutputDescriptors() const {
     OutputList list;
+
+    {
+        OutputDescriptor d;
+        d.identifier = "score_marks";
+        d.name = "Score Marks";
+        d.description = "Marks emitted when OpenScofo detects a new score event index.";
+        d.hasFixedBinCount = true;
+        d.binCount = 0;
+        d.sampleType = OutputDescriptor::VariableSampleRate;
+        d.sampleRate = 0;
+        list.push_back(d);
+    }
 
     OpenScofo::Configuration config;
     if (m_OpenScofo) {

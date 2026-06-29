@@ -51,8 +51,11 @@ class VampOpenScofo : public Vamp::Plugin {
     size_t m_stepSize;
     std::vector<double> m_buffer;
     std::vector<std::string> m_scorePaths;
-    std::string m_currentProgram;
     int m_selectedScoreIndex;
+
+    int m_scoreMark = 0;
+    int m_descriptorOffset = 1;
+    int m_lastScoreEventIndex = -1;
 
     OpenScofo::OpenScofo *m_OpenScofo;
 };
