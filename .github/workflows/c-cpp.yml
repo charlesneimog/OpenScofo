@@ -19,8 +19,8 @@ jobs:
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             matrix:
-                # os: [ubuntu-latest, macos-latest, windows-latest]
-                os: [ubuntu-22.04]
+                os: [ubuntu-22.04, macos-latest, windows-latest]
+                #os: [ubuntu-22.04]
                 precision: [32]
         steps:
             - name: Checkout
@@ -54,7 +54,6 @@ jobs:
                   sudo apt install libboost-all-dev libgtest-dev protobuf-compiler protobuf-c-compiler -y
                   cargo install tree-sitter-cli --locked
                   pip install build scikit-build-core cibuildwheel twine nanobind
-
             # -----------------------
             # macOS dependencies
             # -----------------------
@@ -83,7 +82,6 @@ jobs:
                   }
                   python -m pip install --upgrade pip
                   python -m pip install build scikit-build-core cibuildwheel twine nanobind
-
             # -----------------------
             - name: Build (MacOS)
               if: runner.os == 'macOS'
@@ -93,7 +91,6 @@ jobs:
               run: |
                   python -m build --wheel \
                     -Cbuild-dir=build \
-                    -Cwheel.py-api= \
                     -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
@@ -106,14 +103,12 @@ jobs:
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
                     -Ccmake.args="-G Ninja"
-
             # -----------------------
             - name: Build (Linux)
               if: runner.os == 'Linux'
               run: |
                   python -m build --wheel \
                     -Cbuild-dir=build \
-                    -Cwheel.py-api= \
                     -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
@@ -125,7 +120,6 @@ jobs:
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
                     -Ccmake.args="-G Ninja"
-
             # -----------------------
             # Configure (Windows)
             # -----------------------
@@ -154,7 +148,6 @@ jobs:
               if: runner.os == 'Linux'
               run: |
                   set -euo pipefail
-
                   python -m pip install auditwheel
                   rm -rf wheelhouse
                   mkdir -p wheelhouse
@@ -184,36 +177,29 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-
                   wheel="$(find dist -maxdepth 1 -type f -name '*.whl' | sort | head -n 1)"
-
                   if [[ -z "$wheel" ]]; then
                     echo "ERROR: No wheel found in dist/"
                     exit 1
                   fi
-
                   wheel_name="$(basename "$wheel")"
                   wheel_stem="${wheel_name%.whl}"
                   dist_name="${wheel_stem%%-*}"
                   version="${wheel_stem#*-}"
                   version="${version%%-*}"
-
                   echo "Extracted WHEEL_NAME=$dist_name and WHEEL_VERSION=$version from $wheel_name"
                   echo "WHEEL_NAME=$dist_name" >> "$GITHUB_ENV"
                   echo "WHEEL_VERSION=$version" >> "$GITHUB_ENV"
                   echo "name=$dist_name" >> "$GITHUB_OUTPUT"
                   echo "version=$version" >> "$GITHUB_OUTPUT"
-
             - name: Generate macOS Component Installer
               if: runner.os == 'macOS'
               run: |
                   python Resources/Packages/macos.py --version "$WHEEL_VERSION"
-
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
               run: |
                   python Resources/Packages/linux.py --version "$WHEEL_VERSION"
-
             - name: Generate Windows Component Installer
               if: runner.os == 'Windows'
               shell: pwsh
@@ -221,7 +207,6 @@ jobs:
                   cmake --install build --prefix install
                   $candle = (Get-Command candle.exe -ErrorAction SilentlyContinue)
                   $light = (Get-Command light.exe -ErrorAction SilentlyContinue)
-
                   if (-not $candle -or -not $light) {
                     $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
                     $candlePath = Join-Path $wixBin 'candle.exe'
@@ -230,23 +215,19 @@ jobs:
                     $candlePath = $candle.Source
                     $lightPath = $light.Source
                   }
-
                   python Resources/Packages/windows.py `
                     --version $env:WHEEL_VERSION `
                     --arch x64 `
                     --output "OpenScofo-$($env:WHEEL_VERSION)-Win64.msi" `
                     --candle "$candlePath" `
                     --light "$lightPath"
-
             - name: Stage Max package payload (macOS)
               if: runner.os == 'macOS'
               shell: bash
               run: |
                   set -euo pipefail
-
                   package_root="max-package/OpenScofo"
                   mkdir -p "$package_root/docs" "$package_root/help" "$package_root/externals"
-
                   cp Sources/Wrappers/Max/package/License.md "$package_root/"
                   cp Sources/Wrappers/Max/package/Readme.md "$package_root/"
                   cp Sources/Wrappers/Max/package/icon.png "$package_root/"
@@ -261,7 +242,6 @@ jobs:
                   cp Tests/miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
                   cp Sources/Wrappers/Max/miniatura1-max.scofo "$package_root/help/miniatura1.scofo"
                   cp -R max/openscofo~.mxo "$package_root/externals/"
-
                   test -f "$package_root/docs/openscofo~.maxref.xml"
                   test -f "$package_root/help/openscofo~.maxhelp"
                   test -f "$package_root/help/score-max.svg"
@@ -270,36 +250,29 @@ jobs:
                   test -f "$package_root/help/ai-flute-model.onnx"
                   test -f "$package_root/help/miniatura1.scofo"
                   test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
-
             - name: Stage Max package payload (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
                   $ErrorActionPreference = 'Stop'
-
                   $packageRoot = 'max-package/OpenScofo'
                   New-Item -ItemType Directory -Force "$packageRoot/externals" | Out-Null
                   Copy-Item 'max/openscofo~.mxe64' "$packageRoot/externals/openscofo~.mxe64"
-
                   if (-not (Test-Path "$packageRoot/externals/openscofo~.mxe64")) {
                     throw 'Max Windows external was not staged.'
                   }
-
             - name: Stage Pure Data package payload (Linux/macOS)
               if: runner.os == 'Linux' || runner.os == 'macOS'
               shell: bash
               run: |
                   set -euo pipefail
-
                   package_root="pd-package/${LIBNAME}"
                   mkdir -p "$package_root"
-
                   if [[ -d "build/${LIBNAME}" ]]; then
                     cp -R "build/${LIBNAME}/." "$package_root/"
                   elif [[ -d "${LIBNAME}" ]]; then
                     cp -R "${LIBNAME}/." "$package_root/"
                   fi
-
                   cp Sources/Wrappers/PureData/openscofo~-help.pd "$package_root/"
                   cp README.md "$package_root/"
                   cp LICENSE "$package_root/"
@@ -307,7 +280,6 @@ jobs:
                   cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/"
                   cp Resources/Pieces/miniatura1.scofo "$package_root/"
                   cp Resources/Pieces/miniatura1.wav "$package_root/"
-
                   shopt -s nullglob
                   found_binary=0
                   for binary in build/Sources/Wrappers/PureData/openscofo~*; do
@@ -316,36 +288,29 @@ jobs:
                       found_binary=1
                     fi
                   done
-
                   for binary in "$package_root"/openscofo~*; do
                     if [[ -f "$binary" && "$binary" != *.pd ]]; then
                       found_binary=1
                     fi
                   done
-
                   if [[ "$found_binary" != "1" ]]; then
                     echo "ERROR: No Pure Data external binary was staged."
                     find build -path '*PureData*' -type f || true
                     exit 1
                   fi
-
                   find "$package_root" -maxdepth 1 -type f -print | sort
-
             - name: Stage Pure Data package payload (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
                   $ErrorActionPreference = 'Stop'
-
                   $packageRoot = "pd-package/$env:LIBNAME"
                   New-Item -ItemType Directory -Force $packageRoot | Out-Null
-
                   if (Test-Path "build/$env:LIBNAME") {
                     Copy-Item "build/$env:LIBNAME/*" $packageRoot -Recurse -Force
                   } elseif (Test-Path $env:LIBNAME) {
                     Copy-Item "$env:LIBNAME/*" $packageRoot -Recurse -Force
                   }
-
                   Copy-Item 'Sources/Wrappers/PureData/openscofo~-help.pd' $packageRoot -Force
                   Copy-Item 'README.md' $packageRoot -Force
                   Copy-Item 'LICENSE' $packageRoot -Force
@@ -353,25 +318,20 @@ jobs:
                   Copy-Item 'Tests/miniaturas/Extras/ai-flute-model.onnx' $packageRoot -Force
                   Copy-Item 'Resources/Pieces/miniatura1.scofo' $packageRoot -Force
                   Copy-Item 'Resources/Pieces/miniatura1.wav' $packageRoot -Force
-
                   $pdBinaries = @()
                   if (Test-Path 'build/Sources/Wrappers/PureData') {
                     $pdBinaries += Get-ChildItem 'build/Sources/Wrappers/PureData' -File -Filter 'openscofo~*'
                   }
                   $pdBinaries = $pdBinaries | Where-Object { $_.Extension -ne '.pd' } | Sort-Object FullName -Unique
-
                   foreach ($binary in $pdBinaries) {
                     Copy-Item $binary.FullName $packageRoot -Force
                   }
-
                   $stagedBinaries = Get-ChildItem $packageRoot -File -Filter 'openscofo~*' | Where-Object { $_.Extension -ne '.pd' }
                   if (-not $stagedBinaries) {
                     Get-ChildItem build -Recurse -File | Where-Object { $_.FullName -match 'PureData' }
                     throw 'No Pure Data external binary was staged.'
                   }
-
                   Get-ChildItem $packageRoot -File | Sort-Object Name
-
             # -----------------------
             # Upload artifacts
             # -----------------------
@@ -383,7 +343,6 @@ jobs:
                       *.pkg
                       *.msi
                       *.sh
-
             - name: Upload Python Wheel
               uses: actions/upload-artifact@v6
               with:
@@ -424,7 +383,6 @@ jobs:
                   TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
               run: |
                   python -m twine upload --skip-existing dist/*.whl
-
     publish-release:
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         needs: [build]
@@ -448,21 +406,17 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-
                   mapfile -t wheels < <(find artifacts -type f -name '*.whl' | sort)
-
                   if [[ "${#wheels[@]}" == "0" ]]; then
                     echo "ERROR: No Python wheel artifacts found"
                     exit 1
                   fi
-
                   release_version=""
                   for wheel in "${wheels[@]}"; do
                     wheel_name="$(basename "$wheel")"
                     wheel_stem="${wheel_name%.whl}"
                     version="${wheel_stem#*-}"
                     version="${version%%-*}"
-
                     if [[ -z "$release_version" ]]; then
                       release_version="$version"
                     elif [[ "$version" != "$release_version" ]]; then
@@ -470,11 +424,9 @@ jobs:
                       exit 1
                     fi
                   done
-
                   if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
                     release_tag="${GITHUB_REF_NAME}"
                     tag_version="${release_tag#v}"
-
                     if [[ "$tag_version" != "$release_version" ]]; then
                       echo "ERROR: tag $release_tag does not match built version $release_version"
                       exit 1
@@ -482,21 +434,17 @@ jobs:
                   else
                     release_tag="v${release_version}"
                   fi
-
                   echo "Extracted RELEASE_VERSION=$release_version from Python wheel artifacts"
                   echo "Using RELEASE_TAG=$release_tag"
                   echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
                   echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
                   echo "version=$release_version" >> "$GITHUB_OUTPUT"
                   echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
-
             - name: Create per-artifact zip archives
               shell: bash
               run: |
                   set -euo pipefail
-
                   mkdir -p release_assets
-
                   for artifact_dir in artifacts/*; do
                     [ -d "$artifact_dir" ] || continue
                     name="$(basename "$artifact_dir")"
@@ -508,40 +456,31 @@ jobs:
                     fi
                     (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
                   done
-
                   ls -1 release_assets
-
             - name: Create Max-only package zip
               shell: bash
               run: |
                   set -euo pipefail
-
                   mac_part="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'MaxPackagePart-*-macOS' | sort | head -n 1)"
                   win_part="$(find artifacts -mindepth 1 -maxdepth 1 -type d -name 'MaxPackagePart-*-Windows' | sort | head -n 1)"
-
                   if [[ -z "$mac_part" || -z "$win_part" ]]; then
                     echo "ERROR: Missing Max package payload artifacts."
                     echo "mac_part=$mac_part"
                     echo "win_part=$win_part"
                     exit 1
                   fi
-
                   mkdir -p max_release
                   cp -R "$mac_part/OpenScofo" max_release/
                   mkdir -p max_release/OpenScofo/externals
                   cp "$win_part/OpenScofo/externals/openscofo~.mxe64" max_release/OpenScofo/externals/
-
                   test -f max_release/OpenScofo/docs/openscofo~.maxref.xml
                   test -f max_release/OpenScofo/help/openscofo~.maxhelp
                   test -f max_release/OpenScofo/help/canticos.wav
                   test -f max_release/OpenScofo/help/ai-flute-model.onnx
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
                   test -f max_release/OpenScofo/externals/openscofo~.mxe64
-
                   (cd max_release && zip -r "../release_assets/Max-openscofo-${RELEASE_VERSION}.zip" OpenScofo)
-
                   ls -lh "release_assets/Max-openscofo-${RELEASE_VERSION}.zip"
-
             - name: Package and upload Pure Data release to Deken
               shell: bash
               env:
@@ -549,9 +488,7 @@ jobs:
                   DEKEN_PASSWORD: ${{ secrets.DEKEN_PASSWORD }}
               run: |
                   set -euo pipefail
-
                   mkdir -p "deken_release/${LIBNAME}"
-
                   found_pd_part=0
                   for pd_part in artifacts/PdPackagePart-*; do
                     [ -d "$pd_part" ] || continue
@@ -560,17 +497,14 @@ jobs:
                       find "$pd_part" -maxdepth 3 -type f -print
                       exit 1
                     fi
-
                     cp -R "$pd_part/${LIBNAME}/." "deken_release/${LIBNAME}/"
                     found_pd_part=1
                   done
-
                   if [[ "$found_pd_part" != "1" ]]; then
                     echo "ERROR: No Pure Data package payload artifacts found."
                     find artifacts -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
                     exit 1
                   fi
-
                   shopt -s nullglob
                   staged_binaries=(deken_release/"${LIBNAME}"/openscofo~*)
                   found_binary=0
@@ -579,15 +513,12 @@ jobs:
                       found_binary=1
                     fi
                   done
-
                   if [[ "$found_binary" != "1" ]]; then
                     echo "ERROR: No Pure Data external binary found in merged Deken payload."
                     find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
                     exit 1
                   fi
-
                   find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
-
                   (
                     cd deken_release
                     docker run --rm \
@@ -595,9 +526,7 @@ jobs:
                       --volume "$(pwd):/deken" \
                       registry.git.iem.at/pd/deken \
                       deken package --version "${RELEASE_VERSION}" "${LIBNAME}"
-
                     ls -lh ./*.dek
-
                     docker run --rm \
                       --user "$(id -u)" \
                       --volume "$(pwd):/deken" \
@@ -605,29 +534,23 @@ jobs:
                       registry.git.iem.at/pd/deken \
                       deken upload -v "${RELEASE_VERSION}" ./*.dek
                   )
-
             - name: Generate release notes
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
-
                   current_tag="${RELEASE_TAG}"
                   previous_tag=""
                   previous_target=""
-
                   release_info="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
                     --jq "(map(select(.tag_name != \"${current_tag}\")) | .[0]) // {} | [.tag_name // \"\", .target_commitish // \"\"] | @tsv" \
                     || true)"
-
                   if [[ -n "$release_info" && "$release_info" != "null" ]]; then
                     previous_tag="$(printf '%s' "$release_info" | cut -f1)"
                     previous_target="$(printf '%s' "$release_info" | cut -f2)"
                   fi
-
                   git fetch --tags --force
-
                   previous_ref=""
                   if [[ -n "$previous_tag" ]] && git rev-parse --verify --quiet "${previous_tag}^{commit}" >/dev/null; then
                     previous_ref="$previous_tag"
@@ -636,7 +559,6 @@ jobs:
                   else
                     previous_ref="$(git describe --tags --abbrev=0 --exclude "$current_tag" 2>/dev/null || true)"
                   fi
-
                   {
                     echo "## Changes"
                     echo
@@ -648,7 +570,6 @@ jobs:
                       range="${GITHUB_SHA}"
                     fi
                     echo
-
                     if [[ "$(git rev-list --count "$range")" == "0" ]]; then
                       echo "No commits found since the previous release."
                     else
@@ -657,25 +578,20 @@ jobs:
                         "$range"
                     fi
                   } > release_notes.md
-
                   cat release_notes.md
-
             - name: Create / Update GitHub Release
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
-
                   release_tag="${{ steps.release_metadata.outputs.tag }}"
                   shopt -s nullglob
                   release_files=(release_assets/*.zip)
-
                   if [[ "${#release_files[@]}" == "0" ]]; then
                     echo "ERROR: No release assets found in release_assets/"
                     exit 1
                   fi
-
                   if gh release view "$release_tag" >/dev/null 2>&1; then
                     gh release edit "$release_tag" \
                       --title "$release_tag" \
