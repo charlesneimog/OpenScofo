@@ -92,12 +92,6 @@ include(${CPM_FILE})
 # ╰──────────────────────────────────────╯
 cpmaddpackage("gh:tree-sitter/tree-sitter#${TREE_SITTER_VERSION}")
 
-find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
-if(NOT TREE_SITTER_EXECUTABLE)
-    message(
-        FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
-endif()
-
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
 set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
@@ -105,33 +99,46 @@ set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
 set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/OpenScofo Language/tree-sitter.json")
 set(GRAMMAR_JSON_BUILD "${GRAMMAR_BUILD_DIR}/tree-sitter.json")
 
-set(PARSER_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
+set(PARSER_GENERATED_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
+set(PARSER_COMMITTED_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 
 set(OPENSCOFO_ONLINE_EDITOR_WASM
     "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
 
-add_custom_command(
-    OUTPUT "${PARSER_OUTPUT}"
-    BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/tree-sitter-${GRAMMAR_NAME}.wasm"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}/src"
-    COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JS_SRC}" "${GRAMMAR_JS_BUILD}"
-    COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JSON_SRC}" "${GRAMMAR_JSON_BUILD}"
-    COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} generate
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    DEPENDS "${GRAMMAR_JS_SRC}"
-    COMMENT "Generating Tree-sitter parser and WASM..."
-    VERBATIM)
+if(UPDATE_OPENSCOFO_LANGUAGE)
+    find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
+    if(NOT TREE_SITTER_EXECUTABLE)
+        message(
+            FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
+    endif()
 
-# Target custom
-add_custom_target(generate_tree_sitter_parser DEPENDS "${PARSER_OUTPUT}")
+    add_custom_command(
+        OUTPUT "${PARSER_GENERATED_OUTPUT}"
+        BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/tree-sitter-${GRAMMAR_NAME}.wasm"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}/src"
+        COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JS_SRC}" "${GRAMMAR_JS_BUILD}"
+        COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JSON_SRC}" "${GRAMMAR_JSON_BUILD}"
+        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} generate
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+        DEPENDS "${GRAMMAR_JS_SRC}"
+        COMMENT "Generating Tree-sitter parser and WASM..."
+        VERBATIM)
+
+    add_custom_target(generate_tree_sitter_parser DEPENDS "${PARSER_GENERATED_OUTPUT}")
+    set(PARSER_OUTPUT "${PARSER_GENERATED_OUTPUT}")
+else()
+    set(PARSER_OUTPUT "${PARSER_COMMITTED_OUTPUT}")
+endif()
 
 # Biblioteca
 add_library(score_parser STATIC "${PARSER_OUTPUT}")
 set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_dependencies(score_parser generate_tree_sitter_parser)
+if(UPDATE_OPENSCOFO_LANGUAGE)
+    add_dependencies(score_parser generate_tree_sitter_parser)
+endif()
 
 # Custom command to generate the WASM file if it doesn't exist
 if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OPENSCOFO_LANGUAGE})
