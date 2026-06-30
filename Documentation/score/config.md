@@ -6,9 +6,6 @@ Instead of writing separate methods for each platform — such as Pd, Max, Super
 
 This approach allows development to focus on improving the core functionality of `OpenScofo`, rather than maintaining platform-specific integration layers.
 
-!!! tip "Always try on `OpenScofo` Editor"
-    Always try the examples on [OpenScofo Online Score Editor](https://charlesneimog.github.io/OpenScofo/Editor){:target="_blank"}, with color highlight. Writing scores is easier there.
-
 ---
 ## Audio Configuration
 ---
@@ -23,6 +20,8 @@ Defines the sample rate expected by the score. This setting is optional, but it 
 SR 48000
 ```
 If OpenScofo is running in a host with a different sample rate (for example, `44100` Hz), a warning will be showed.
+
+About AI models check [How to use AI models?](../descriptors/ai.md).
 
 ### `FFTSIZE`
 
@@ -40,7 +39,7 @@ FFTSIZE 2048
 
 ### `HOPSIZE`
 
-- `Default is 1024`
+- `Default is 512`
 - `Must be a power of 2.`
 
 Define the Hop Size used in decoding.
@@ -103,14 +102,15 @@ PITCHTEMPLATESIGMA 0.8
 ---
 ### `ONNXMODEL`
 
-Defines a path to a `.onnx` model trained with `py.train-onnx` for identification of extended techniques. These paths are relative to the score file, so `ONNXMODEL "flute.onnx"` expected a file `flute.onnx` side by side of the score file loaded.
+Defines a path to a `.onnx` model trained with `py.o.train` for identification of extended techniques. These paths are relative to the score file, so `ONNXMODEL "flute.onnx"` expected a file `flute.onnx` side by side of the score file loaded.
 
 ```
 ONNXMODEL "flute.onnx"
 ```
 
-!!! tip "Train models the object `py.train-onnx`."
-    The entire model of `OpenScofo` is designed to be used with models trained by the Pd Object `py.train-onnx`. Check it on Resources
+!!! tip "Train models the object `py.o.train`."
+    The entire model of `OpenScofo` is designed to be used with models trained by the Pd Object `py.o.train`. More details about AI models check [How to use AI models?](../descriptors/ai.md)
+
 
 ---
 ### `ONNXDESCRIPTORS`
@@ -123,7 +123,8 @@ ONNXDESCRIPTORS mfcc zcr centroid spread
 ```
 
 !!! warning "Order matters!"
-    Use descriptors in the same order as your training. For example, using `zcr mfcc` when the model was trained with `mfcc zcr` will **change the result**.
+    Use descriptors in the same order as your training. For example, using `zcr mfcc` when the model was trained with `mfcc zcr` will **change the result**. More details about AI models check [How to use AI models?](../descriptors/ai.md).
+
 
 To detect Flute extended techniques, like tongue-ram, pizz, key-click, jet-whistle, etc... A good list would be `mfcc logmel zcr centroid flatness hfr`.
 
@@ -143,3 +144,6 @@ Defines the onset detection function (ODF), each emphasizing different signal ch
 * `rcd` is a rectified version of the complex-domain method that counts only increases in deviation, helping reduce false detections.
 * `hfc` (high frequency content) emphasizes changes in high-frequency spectral bins, which are often strong during percussive attacks.
 * `mkl` (modified Kullback–Leibler divergence) measures changes in the spectral distribution between frames and is effective for detecting structural spectral changes in pitched or harmonic material.
+
+!!! warning "Change this only if you know what you are doing"
+    This parameter is a core component of the extended-techniques model. It determines when the listener model should rely on the pitch model and when it should switch to the extended-techniques model. Changing it can significantly affect score-following performance.

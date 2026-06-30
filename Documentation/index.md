@@ -18,14 +18,13 @@ hide:
   ![Image title](./assets/logo-dark.svg#only-dark){ width="15%" }
 </p>
 
-<h4 align="center"><i>Score-follower for contemporary music.</i></h4>
+<h4 latex="false" align="center"><i>Score-follower for contemporary music.</i></h4>
 
 ---
 
-`OpenScofo` is an open-source score-following system specifically designed for contemporary music. Its development builds upon the research conducted by Arshia Cont and the `Antescofo` team at IRCAM. Current efforts in the development of `OpenScofo` focus on extending its capabilities to accommodate extended instrumental techniques. It should be noted that the software remains in an alpha stage of development.
+`OpenScofo` is an open-source score-following system designed for research in contemporary music. Its initial development was based on the research of Arshia Cont and the `Antescofo` team at IRCAM, particularly the paper *A Coupled Duration-Focused Architecture for Real-Time Music-to-Score Alignment*. Current development focuses on extending the system to support extended techniques commonly found in contemporary music. `OpenScofo` is currently in beta, and its API and features may change as development continues.
 
-`OpenScofo` was initially developed as a highly minimal score-following system, designed to be fully compatible with the execution of Pure Data patches within web browsers via [pd4web](https://charlesneimog.github.io/pd4web/). Leveraging `pd4web` is expected to reduce the complexity of live-electronics setups, thereby enabling a broader range of performers to engage with, and gain experiential insight into, live-electronics compositions.
-
+`OpenScofo` was initially developed to provide a minimal score-following system for the [pd4web](https://charlesneimog.github.io/pd4web/){:target="_blank"} ecosystem, enabling Pure Data patches to run directly in web browsers. By simplifying the deployment of live-electronics systems, it reduces the technical complexity of performances and makes interactive compositions more accessible to a broader range of performers.
 
 -------------------------
 ## <h3 align="center"> **Compositions** </h3>

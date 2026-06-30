@@ -52,7 +52,7 @@ The octave in a pitch name defines its position on the keyboard. `OpenScofo` fol
 
 On `OpenScofo` you represent `<DURATION>` using **number of tempos** relative to the Time Unit. Fractions like `(1/2)`, `(1/1)`, `(1/8)` are not supported.
 
-Because that `OpenScofo` uses time representation relative to the value of `BPM` define previously. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
+`OpenScofo` uses time representation relative to the value of `BPM`. For example, if in your score you have the `BPM` set as **:material-music-note-quarter: = 60** this means that
 
 - :material-music-note-half: duration value is `2`;
 - :material-music-note-quarter: duration value is `1`;
@@ -66,6 +66,9 @@ if in your score you have the `BPM` set as **:material-music-note-eighth: = 60**
 - :material-music-note-quarter: duration value is `2`;
 - :material-music-note-eighth: is `1`,
 - :material-music-note-sixteenth: is `0.5`
+
+!!! warning "Tied notes are not supported"
+    `OpenScofo` does not currently support tied notes. Instead, represent the combined duration as a single value. For example, if **:material-music-note-quarter: = 60**, a dotted quarter note should be written as `1.5`.
 
 ---
 ## Comments

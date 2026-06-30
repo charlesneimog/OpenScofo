@@ -1,10 +1,9 @@
 # Events
 
-`OpenScofo` for now supports four events, `NOTE`, `TRILL`, `CHORD`, `REST`, `TECH`, `LUAEVENT`.
+`OpenScofo` currently supports six event types: `NOTE`, `TRILL`, `CHORD`, `REST`, `PTECH`, and `UTECH`. Two additional event types, `LUAEVENT` and `TIMEDEVENT`, are planned but have not yet been implemented.
 
 !!! tip "Check the MusicXML Importer"
-    `OpenScofo` has a [MusicXML importer](https://charlesneimog.github.io/OpenScofo/Editor/), it is very accurate and tested on MuseScore and Sibelius (but should work for all major programs). 
-
+    `OpenScofo` has a [MusicXML importer](https://charlesneimog.github.io/OpenScofo/Editor/), it is very accurate and tested on MuseScore (but should work for all major programs). 
 
 ---
 ## `NOTE`
@@ -61,24 +60,20 @@ NOTE C5 0.25
 ---
 ## `PTECH` 
 
-!!! warning "Experimental"
-    Part of ongoing research at the University of São Paulo. These events represent extended techniques **with pitch**, like `tongue-ran`, `key-click`, etc...
 
-`PTECH` events must be defined as:
+`PTECH` describe events that are non tradicional events but yet have pitches on it, for example: `tongue-ram`, `key-click`. Events must be defined as:
 
-```
+```text
 PTECH <LABEL> <PITCH> <DURATION>
 ```
 
-* `<LABEL>`: Name of the technique (e.g., `pizz`, `tongue-ram`).
-* `<PITCH>`: The pitch of the note (e.g., `C4`, `D#5`). Required for pitched techniques.
-* `<DURATION>`: Duration in beats (integer or float).
+- `<LABEL>`: Name of the technique, such as `pizz` or `tongue-ram`. This label must match one of the labels used during model training. See [How to use AI models?](../descriptors/ai.md).
+- `<PITCH>`: Pitch of the note, such as `C4` or `D#5`. Required for pitched techniques.
+- `<DURATION>`: Duration in beats, written as an integer or floating-point value.
 
-These events require an ONNX model to recognize the technique. Training the model involves placing audio examples in labeled folders and running the `py.train-onnx` object, generating a `.onnx` file to load using `TIMBREMODEL`. Check the [`xlab`](https://github.com/charlesneimog/pd-xlab){:target="_blank"} library for Pure Data.
+!!! tip "`PTECH` events require an ONNX model"
+    `PTECH` require an ONNX model capable of recognizing the corresponding playing techniques. See [How to use AI models?](../descriptors/ai.md).
 
-
-!!! tip "`<PITCH>` allows differentiation"
-    When consecutive techniques occur, the pitch allows the model to distinguish them (e.g., consecutive `tongue-ram` on different notes).
 
 <score id="ptech_example" timeSig="4/4" notes="C4/h:x, D4/h:tongue-ram"></score>
 
@@ -90,10 +85,9 @@ PTECH tongue-ram D4 2
 ---
 ## `UTECH` 
 
-<score id="utech_example" timeSig="4/4" notes="C4/h:x, C4/h:tongue-ram"></score>
+`UTECH` describe events that are non tradicional events and do not have pitches on it, for example: `jet-whistle`, `sounds-behind-the-bridge`. Events must be defined as:
 
-!!! warning "Experimental"
-    These events represent extended techniques **without pitch**. They are rendered as glyphs or symbols instead of traditional notes.
+<score id="utech_example" timeSig="4/4" notes="C4/h:x, C4/h:tongue-ram"></score>
 
 `UTECH` events must be defined as:
 
@@ -110,6 +104,9 @@ UTECH events are ideal for percussive or unpitched extended techniques.
 UTECH slap 2
 UTECH jet-whistle 1
 ```
+
+!!! tip "`UTECH` events require an ONNX model"
+    `UTECH` require an ONNX model capable of recognizing the corresponding playing techniques. See [How to use AI models?](../descriptors/ai.md).
 
 ---
 ## `TIMEDEVENT`
