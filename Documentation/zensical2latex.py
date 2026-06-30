@@ -157,6 +157,20 @@ def strip_front_matter(markdown: str) -> str:
     return markdown
 
 
+def remove_latex_false_html(markdown: str) -> str:
+    latex_false_attr = r"\blatex\s*=\s*(?:\"false\"|'false'|false)(?=\s|/|>)"
+    tag_name = r"[A-Za-z][A-Za-z0-9:-]*"
+    block_pattern = re.compile(
+        rf"<(?P<tag>{tag_name})\b(?=[^>]*{latex_false_attr})[^>]*>.*?</(?P=tag)\s*>",
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    previous = None
+    while previous != markdown:
+        previous = markdown
+        markdown = block_pattern.sub("", markdown)
+    return re.sub(rf"<{tag_name}\b(?=[^>]*{latex_false_attr})[^>]*?/?>", "", markdown, flags=re.IGNORECASE)
+
+
 def path_for_latex(path: Path) -> str:
     if CURRENT_OUTPUT_DIR is None:
         return path.as_posix()
@@ -681,7 +695,7 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str) -> st
         is_index = markdown_path.resolve().relative_to((CURRENT_DOCS_DIR or markdown_path.parent).resolve()) == Path("index.md")
     except ValueError:
         is_index = False
-    markdown = strip_front_matter(markdown_path.read_text(encoding="utf-8"))
+    markdown = remove_latex_false_html(strip_front_matter(markdown_path.read_text(encoding="utf-8")))
     if is_index:
         markdown = re.sub(r"^\s*!\[[^\]]*\]\([^)]*#only-(?:light|dark)\)\{[^}]*\}\s*$", "", markdown, flags=re.MULTILINE)
 
