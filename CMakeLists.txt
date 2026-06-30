@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
-project(OpenScofo VERSION 0.2.9 LANGUAGES C CXX
+project(OpenScofo VERSION 0.2.10 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
@@ -110,7 +110,8 @@ if(UPDATE_OPENSCOFO_LANGUAGE)
     find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
     if(NOT TREE_SITTER_EXECUTABLE)
         message(
-            FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
+            FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli"
+        )
     endif()
 
     add_custom_command(
