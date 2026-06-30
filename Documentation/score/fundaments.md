@@ -1,15 +1,15 @@
 # Fundaments
 
-Before we begin, let’s establish some fundaments of the `OpenScofo` score structure.
+Before we begin to see how to define things, let’s establish some fundaments of the `OpenScofo` score structure.
 
 ---
 ## Score Structure
 
-The `OpenScofo` **Score** serves as the foundation for creating an interactive piece with `OpenScofo`. It is the framework through which all interactions are built, organizing the components of your interactive score into four primary sections:
+The `OpenScofo` **Score** is the foundation of every interactive piece created with `OpenScofo`. It defines the musical events and the associated interactive behavior, organizing the score into four primary sections:
 
 * **Comments** – Optional textual notes or explanations in your score.
 * **Config** – Global configuration settings such as tempo, FFT size, or machine learning models, etc.
-* **Events** – The musical events (notes, chords, rests, trills, techniques, or Lua-triggered events) that drive the performance.
+* **Events and Actions** – The musical events (notes, chords, rests, trills, techniques, or Lua-triggered events) that drive the performance.
 * **Lua** – Embedded Lua code for custom computations or interactions.
 
 <div markdown  style="text-align:center;">
@@ -19,7 +19,7 @@ flowchart TB
     subgraph SCORE_CONTENT[" "]
         COMMENTS[Comments]
         CONFIG[Config]
-        EVENTS[Events]
+        EVENTS[Events and Actions]
         LUA[Lua]
     end
     SCORE --> SCORE_CONTENT
@@ -34,16 +34,16 @@ All **musical events** are organized under the **Events** node. OpenScofo suppor
 
 * **Note Event** – Single pitched notes.
 * **Chord Event** – Multiple pitches played simultaneously.
-* **Trill Event** – Rapid alternation between two or more pitches.
+* **Trill Event** – Alternation between two or more pitches (Trill).
 * **Rest Event** – Silence for a given duration.
-* **Tech Event** – Techniques or extended articulations.
+* **Tech Event** – Techniques or Extended articulations.
 
 Each event can have **Actions**, which are commands executed when the event occurs. These actions can be execute immediately when the event is detected or after a specified delay.
 
 Both types of actions support two command modes:
 
-* **Lua** – Execute Lua functions for custom behavior.
 * **Send** – Send messages to external receivers (e.g., Pd, Max, or other targets).
+* **Lua** – Execute Lua functions for custom behavior.
 
 <div markdown  style="text-align:center;">
 ```mermaid
