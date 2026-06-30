@@ -537,7 +537,7 @@ jobs:
             - name: Generate release notes
               shell: bash
               env:
-                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
                   current_tag="${RELEASE_TAG}"
@@ -579,10 +579,23 @@ jobs:
                     fi
                   } > release_notes.md
                   cat release_notes.md
-            - name: Create / Update GitHub Release
+            - name: Create GitHub Release
+              id: create_release
+              uses: comnoco/create-release-action@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.release_metadata.outputs.tag }}
+                  release_name: ${{ steps.release_metadata.outputs.tag }}
+                  body_path: release_notes.md
+                  draft: true
+                  prerelease: false
+                  commitish: ${{ github.sha }}
+
+            - name: Upload GitHub Release Assets
               shell: bash
               env:
-                  GH_TOKEN: ${{ github.token }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
                   release_tag="${{ steps.release_metadata.outputs.tag }}"
@@ -592,19 +605,4 @@ jobs:
                     echo "ERROR: No release assets found in release_assets/"
                     exit 1
                   fi
-                  if gh release view "$release_tag" >/dev/null 2>&1; then
-                    gh release edit "$release_tag" \
-                      --title "$release_tag" \
-                      --target "${GITHUB_SHA}" \
-                      --notes-file release_notes.md \
-                      --draft=true \
-                      --prerelease=false
-                    gh release upload "$release_tag" "${release_files[@]}" --clobber
-                  else
-                    gh release create "$release_tag" "${release_files[@]}" \
-                      --title "$release_tag" \
-                      --target "${GITHUB_SHA}" \
-                      --notes-file release_notes.md \
-                      --draft \
-                      --verify-tag
-                  fi
+                  gh release upload "$release_tag" "${release_files[@]}" --clobber
