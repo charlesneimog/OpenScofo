@@ -21,10 +21,9 @@
 #include <fstream>
 
 #include <pffft/pffft.h>
-#include <onnx.h>
 
-#define CURRENT_ONNX_OPSET 24
 #include "log.hpp"
+#include "onnx.hpp"
 #include "states.hpp"
 namespace OpenScofo {
 
@@ -83,8 +82,6 @@ class MIR {
 
     // FFT
     void FFTInit();
-    void ONNXExec(Description &Desc);
-
     // Get Signal
     void InitITURFilters(void);
     void GetSignalPower(const std::vector<double> &In, Description &Desc);
@@ -123,16 +120,7 @@ class MIR {
     std::vector<double> m_ZCRScratch;
 
     // Machine Learning
-    bool m_ONNXModelLoaded = false;
-    fs::path m_ONNXModelPath;
-    struct onnx_context_t *m_ONNXContext = nullptr;
-    std::vector<std::string> m_ONNXLabels;
-    std::vector<Descriptors> m_ONNXDescriptors;
-    std::vector<float> m_ONNXDescriptorsArray;
-    std::vector<std::function<void(const Description &, float *&)>> m_Writers;
-    struct onnx_tensor_t *m_InputTensor = nullptr;
-    struct onnx_tensor_t *m_OutputTensor = nullptr;
-    int m_ONNXDescriptorsSize = 0;
+    ONNXModel m_ONNXModel;
 
     // Env
     const std::array<double, 3> m_48kB1 = {1.53512485958697, -2.69169618940638, 1.19839281085285};

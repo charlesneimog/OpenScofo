@@ -238,6 +238,7 @@ cpmaddpackage("gh:charlesneimog/libonnx#master")
 # ╰──────────────────────────────────────╯
 list(APPEND ScofoSrc Sources/OpenScofo/forward.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/mir.cpp)
+list(APPEND ScofoSrc Sources/OpenScofo/onnx.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)

@@ -222,7 +222,7 @@ struct Configuration {
     float FFTSize = 2048;
     float HOPSize = 512;
 
-    double TunningA4 = 440.0;
+    double TuningA4 = 440.0;
 
     // Pitch Template
     float PitchTemplateSigma = 0.5;

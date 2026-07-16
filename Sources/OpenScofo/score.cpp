@@ -660,6 +660,42 @@ std::string GetChildStringFromType(const std::string &source, TSNode parent, con
 }
 
 // ─────────────────────────────────────
+static bool GetConfigNumber(const std::string &id, const std::string &valueType, const std::string &value, TSPoint pos,
+                            double &out) {
+    if (valueType != "number") {
+        spdlog::error("Invalid numeric value for {} on line {}.", id, pos.row + 1);
+        return false;
+    }
+
+    out = std::stod(value);
+    return true;
+}
+
+// ─────────────────────────────────────
+static bool GetConfigBool(const std::string &id, const std::string &valueType, std::string value, TSPoint pos,
+                          bool &out) {
+    if (valueType != "identifier" && valueType != "number") {
+        spdlog::error("Invalid boolean value for {} on line {}.", id, pos.row + 1);
+        return false;
+    }
+
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (value == "true" || value == "on" || value == "yes" || value == "1") {
+        out = true;
+        return true;
+    }
+    if (value == "false" || value == "off" || value == "no" || value == "0") {
+        out = false;
+        return true;
+    }
+
+    spdlog::error("Invalid boolean value for {} on line {}.", id, pos.row + 1);
+    return false;
+}
+
+// ─────────────────────────────────────
 void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &Config) {
     TSNode keyNode = GetField(node, "key");
     TSNode valueNode = GetField(node, "value");
@@ -674,14 +710,16 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
     std::string valueType = ts_node_type(valueNode);
     std::string value = GetCodeStr(ScoreStr, valueNode);
 
-    if (id == "BPM" || id == "TRANSPOSE" || id == "PHASECOUPLING" || id == "SYNCSTRENGTH" ||
-        id == "PITCHTEMPLATESIGMA" || id == "FFTSIZE" || id == "HOPSIZE") {
-        if (valueType != "number") {
-            spdlog::error("Invalid numeric value for {} on line {}.", id, pos.row + 1);
+    if (id == "BPM" || id == "TRANSPOSE" || id == "SR" || id == "FFTSIZE" || id == "HOPSIZE" || id == "TUNINGA4" ||
+        id == "PHASECOUPLING" || id == "SYNCSTRENGTH" || id == "PITCHTEMPLATESIGMA" || id == "PITCHTEMPLATEHARMONICS" ||
+        id == "MFCCMELS" || id == "MFCCCOUNT" || id == "MEDSPAN" || id == "DBTRESHOLD" || id == "DBTHRESHOLD" ||
+        id == "SPECTRALROLLOFFCUTOFF" || id == "YINTHRESHOLD" || id == "YINMINFREQUENCY" || id == "YINMAXFREQUENCY" ||
+        id == "CHROMASIZE" || id == "CHROMACENTEROCTAVE" || id == "CHROMAOCTAVEWIDTH" || id == "ZCRTHRESHOLD") {
+        double v = 0.0;
+        if (!GetConfigNumber(id, valueType, value, pos, v)) {
             return;
         }
 
-        float v = std::stof(value);
         if (id == "BPM") {
             m_CurrentBPM = v;
             if (m_CurrentBPM < 1) {
@@ -716,10 +754,19 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             } else {
                 Config.PitchTemplateSigma = v;
             }
+        } else if (id == "PITCHTEMPLATEHARMONICS") {
+            int harmonics = static_cast<int>(v);
+            if (harmonics > 0) {
+                Config.PitchTemplateHarmonics = harmonics;
+            } else {
+                spdlog::error("PITCHTEMPLATEHARMONICS must be bigger than 0 on line {}.", pos.row + 1);
+            }
         } else if (id == "SR") {
             int sr = static_cast<int>(v);
             if (sr > 0) {
                 Config.SR = sr;
+            } else {
+                spdlog::error("SR must be bigger than 0 on line {}.", pos.row + 1);
             }
         } else if (id == "FFTSIZE") {
             int fft = static_cast<int>(v);
@@ -735,9 +782,126 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             } else {
                 spdlog::error("HOPSIZE must be a power of two.");
             }
+        } else if (id == "TUNINGA4") {
+            if (v > 0) {
+                Config.TuningA4 = v;
+                m_Tunning = v;
+            } else {
+                spdlog::error("{} must be bigger than 0 on line {}.", id, pos.row + 1);
+            }
+        } else if (id == "MFCCMELS") {
+            int mels = static_cast<int>(v);
+            if (mels > 0) {
+                Config.MFCCMels = mels;
+            } else {
+                spdlog::error("MFCCMELS must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "MFCCCOUNT") {
+            int count = static_cast<int>(v);
+            if (count > 0) {
+                Config.MFCCCount = count;
+            } else {
+                spdlog::error("MFCCCOUNT must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "MEDSPAN") {
+            int medSpan = static_cast<int>(v);
+            if (medSpan > 0) {
+                Config.MedSpan = medSpan;
+            } else {
+                spdlog::error("MEDSPAN must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "DBTRESHOLD" || id == "DBTHRESHOLD") {
+            Config.dBTreshold = v;
+        } else if (id == "SPECTRALROLLOFFCUTOFF") {
+            if (v >= 0 && v <= 1) {
+                Config.SpectralRolloffCutoff = v;
+            } else {
+                spdlog::error("SPECTRALROLLOFFCUTOFF must be between 0 and 1 on line {}.", pos.row + 1);
+            }
+        } else if (id == "YINTHRESHOLD") {
+            if (v >= 0 && v <= 1) {
+                Config.YINThreshold = v;
+            } else {
+                spdlog::error("YINTHRESHOLD must be between 0 and 1 on line {}.", pos.row + 1);
+            }
+        } else if (id == "YINMINFREQUENCY") {
+            if (v > 0) {
+                Config.YINMinFrequency = v;
+            } else {
+                spdlog::error("YINMINFREQUENCY must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "YINMAXFREQUENCY") {
+            if (v > 0) {
+                Config.YINMaxFrequency = v;
+            } else {
+                spdlog::error("YINMAXFREQUENCY must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "CHROMASIZE") {
+            int size = static_cast<int>(v);
+            if (size > 0) {
+                Config.ChromaSize = size;
+            } else {
+                spdlog::error("CHROMASIZE must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "CHROMACENTEROCTAVE") {
+            Config.ChromaCenterOctave = v;
+        } else if (id == "CHROMAOCTAVEWIDTH") {
+            if (v > 0) {
+                Config.ChromaOctaveWidth = v;
+            } else {
+                spdlog::error("CHROMAOCTAVEWIDTH must be bigger than 0 on line {}.", pos.row + 1);
+            }
+        } else if (id == "ZCRTHRESHOLD") {
+            if (v >= 0) {
+                Config.ZCRThreshold = v;
+            } else {
+                spdlog::error("ZCRTHRESHOLD must be non-negative on line {}.", pos.row + 1);
+            }
         } else {
             spdlog::error("Unrecognized variable " + id);
             return;
+        }
+        return;
+    }
+
+    if (id == "ZCRCENTER" || id == "ZCRPAD" || id == "ZCRZEROPOS") {
+        bool v = false;
+        if (!GetConfigBool(id, valueType, value, pos, v)) {
+            return;
+        }
+
+        if (id == "ZCRCENTER") {
+            Config.ZCRCenter = v;
+        } else if (id == "ZCRPAD") {
+            Config.ZCRPad = v;
+        } else if (id == "ZCRZEROPOS") {
+            Config.ZCRZeroPos = v;
+        }
+        return;
+    }
+
+    if (id == "ONSETFUNCTION") {
+        if (valueType != "onset_function" && valueType != "identifier") {
+            spdlog::error("Invalid onset function value for {} on line {}.", id, pos.row + 1);
+            return;
+        }
+
+        if (value == "pow") {
+            Config.OnsetType = ODS_ODF_POWER;
+        } else if (value == "sf" || value == "hfc") {
+            Config.OnsetType = ODS_ODF_MAGSUM;
+        } else if (value == "cd") {
+            Config.OnsetType = ODS_ODF_COMPLEX;
+        } else if (value == "rcd") {
+            Config.OnsetType = ODS_ODF_RCOMPLEX;
+        } else if (value == "pd") {
+            Config.OnsetType = ODS_ODF_PHASE;
+        } else if (value == "wpd") {
+            Config.OnsetType = ODS_ODF_WPHASE;
+        } else if (value == "mkl") {
+            Config.OnsetType = ODS_ODF_MKL;
+        } else {
+            spdlog::error("Invalid onset function {} on line {}.", value, pos.row + 1);
         }
         return;
     }

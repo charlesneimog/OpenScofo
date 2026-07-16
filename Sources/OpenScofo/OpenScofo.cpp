@@ -918,9 +918,6 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
         spdlog::warn("ONNX Model ready");
     }
 
-    // Parse Config
-    m_Forward.SetPitchTemplateSigma(newConfig.PitchTemplateSigma);
-
     // Add States
     m_Forward.SetScoreStates(m_States);
     m_Mode = SCOREFOLLOWER;

@@ -43,12 +43,6 @@ MIR::~MIR() {
         delete m_ODS;
     }
 
-    if (m_ONNXContext) {
-        onnx_context_free(m_ONNXContext);
-        m_ONNXContext = nullptr;
-    }
-    m_ONNXModelLoaded = false;
-
     /// save values
 }
 
@@ -83,6 +77,7 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
     }
 
     FFTInit();
+
     if (m_NeedOnset) {
         OnsetInit();
     }
@@ -124,7 +119,7 @@ void MIR::UpdateDescriptorFlags() {
         return;
     }
 
-    for (const Descriptors d : m_ONNXDescriptors) {
+    for (const Descriptors d : m_ONNXModel.GetDescriptors()) {
         switch (d) {
         case MFCC:
         case LOGMEL:
@@ -198,75 +193,10 @@ void MIR::FFTInit() {
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
 void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
-    auto u8 = path.u8string();
-    std::string path_utf8(u8.begin(), u8.end());
-
-    if (m_ONNXModelLoaded && m_ONNXModelPath == path && m_ONNXDescriptors == Descriptors) {
-        spdlog::debug("ONNX model already loaded, reusing existing context");
-        return;
-    }
-    m_ONNXModelPath = path;
-
-    if (m_ONNXContext) {
-        onnx_context_free(m_ONNXContext);
-        m_ONNXContext = nullptr;
-    }
-    m_ONNXModelLoaded = false;
-    m_ONNXLabels.clear();
-    m_Writers.clear();
-    m_InputTensor = nullptr;
-    m_OutputTensor = nullptr;
-
-    m_ONNXContext = onnx_context_alloc_from_file(path_utf8.c_str(), nullptr, 0);
-    if (m_ONNXContext == nullptr) {
-        spdlog::error("Failed to load ONNX model: {}.", path.string());
+    if (!m_ONNXModel.Load(path, std::move(Descriptors), m_Config)) {
         return;
     }
 
-    if (m_ONNXContext && m_ONNXContext->g != nullptr) {
-        struct onnx_graph_t *g = m_ONNXContext->g;
-        for (int i = 0; i < g->nlen; i++) {
-            struct onnx_node_t *n = &g->nodes[i];
-            if (n->opset > CURRENT_ONNX_OPSET) {
-                spdlog::error("Unsupported opset => {} {}.", n->proto->op_type, n->opset);
-                return;
-            }
-        }
-    }
-
-    // Get labels
-    m_ONNXLabels.clear();
-    bool TreeEnsembleClassifierFound = false;
-    struct onnx_graph_t *g = m_ONNXContext->g;
-    for (int i = 0; i < g->nlen; i++) {
-        struct onnx_node_t *n = &g->nodes[i];
-        if (!n || strcmp(n->proto->op_type, "TreeEnsembleClassifier") != 0)
-            continue;
-
-        TreeEnsembleClassifierFound = true;
-        for (size_t k = 0; k < n->proto->n_attribute; k++) {
-            Onnx__AttributeProto *attr = n->proto->attribute[k];
-            if (strcmp(attr->name, "classlabels_strings") == 0) {
-                for (size_t v = 0; v < attr->n_strings; v++) {
-                    ProtobufCBinaryData *str = &attr->strings[v];
-                    std::string label(reinterpret_cast<char *>(str->data), str->len);
-                    m_ONNXLabels.push_back(label);
-                }
-            }
-        }
-    }
-
-    if (!TreeEnsembleClassifierFound) {
-        spdlog::error(
-            "TreeEnsembleClassifier not found in model, please use PureData py.train to train models for OpenScofo");
-        return;
-    }
-    if (m_ONNXLabels.empty()) {
-        spdlog::error("TreeEnsembleClassifier labels not found in ONNX model");
-        return;
-    }
-
-    m_ONNXDescriptors = Descriptors;
     UpdateDescriptorFlags();
     if (m_NeedOnset) {
         OnsetInit();
@@ -283,253 +213,11 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     if (m_NeedYIN) {
         YINInit();
     }
-
-    // Count
-    m_ONNXDescriptorsSize = 0;
-    for (size_t i = 0; i < m_ONNXDescriptors.size(); i++) {
-        switch (m_ONNXDescriptors[i]) {
-        case MFCC:
-            m_ONNXDescriptorsSize += m_Config.MFCCCount;
-            break;
-        case CHROMA:
-            m_ONNXDescriptorsSize += m_Config.ChromaSize;
-            break;
-        case POWERARRAY:
-            m_ONNXDescriptorsSize += (m_Config.FFTSize / 2) + 1;
-            break;
-        case MAGNITUDE:
-            m_ONNXDescriptorsSize += (m_Config.FFTSize / 2) + 1;
-            break;
-        case LOGMEL:
-            m_ONNXDescriptorsSize += m_Config.MFCCMels;
-            break;
-        default:
-            m_ONNXDescriptorsSize++;
-        }
-
-        spdlog::debug("Descriptors ID: {}, {}", (int)m_ONNXDescriptors[i], m_ONNXDescriptorsSize);
-    }
-
-    spdlog::debug("ONNX Model array is {}", m_ONNXDescriptorsSize);
-    m_ONNXDescriptorsArray.resize(m_ONNXDescriptorsSize);
-
-    for (auto d : m_ONNXDescriptors) {
-        switch (d) {
-        case MFCC:
-            m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_Config.MFCCCount; ++i)
-                    *out++ = desc.MFCC[i];
-            });
-            break;
-        case CHROMA:
-            m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_Config.ChromaSize; ++i)
-                    *out++ = desc.Chroma[i];
-            });
-            break;
-        case POWERARRAY:
-            m_Writers.push_back([](const Description &desc, float *&out) {
-                for (int i = 0; i < (int)desc.Power.size(); ++i)
-                    *out++ = desc.Power[i];
-            });
-            break;
-        case LOGMEL:
-            m_Writers.push_back([this](const Description &desc, float *&out) {
-                for (int i = 0; i < m_Config.MFCCMels; ++i)
-                    *out++ = desc.LogMelSpectrum[i];
-            });
-            break;
-        case MAGNITUDE:
-            m_Writers.push_back([](const Description &desc, float *&out) {
-                for (double v : desc.Magnitude)
-                    *out++ = v;
-            });
-            break;
-        case LOUDNESS:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Loudness; });
-            break;
-        case RMS:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.RMS; });
-            break;
-        case ZCR:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ZeroCrossingRate; });
-            break;
-        case HFR:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.HighFreqRatio; });
-            break;
-        case CENTROID:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralCentroid; });
-            break;
-        case SPREADHZ:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSpreadHz; });
-            break;
-        case FLATNESS:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlatness; });
-            break;
-        case ENTROPY:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralEntropy; });
-            break;
-        case ROLLOFF:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralRolloff; });
-            break;
-        case FLUX:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralFlux; });
-            break;
-        case IRREGULARITY:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralIrregularity; });
-            break;
-        case HARMONICITY:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Harmonicity; });
-            break;
-        case YIN:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Pitch; });
-            break;
-        case SILENCEPROB:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SilenceProb; });
-            break;
-        case EXTENDEDTECHNIQUE:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.ExtendedTechProb; });
-            break;
-        case ODSONSET:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.Onset ? 1.0f : 0.0f; });
-            break;
-        case STDDEV:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.StdDev; });
-            break;
-        case SKEWNESS:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSkewness; });
-            break;
-        case SLOPE:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSlope; });
-            break;
-        case DB:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.dB; });
-            break;
-        case MAXAMP:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.MaxAmp; });
-            break;
-        case SPREADVARIANCE:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralSpreadVariance; });
-            break;
-        case CREST:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralCrest; });
-            break;
-        case KURTOSIS:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.SpectralKurtosis; });
-            break;
-        case CENTROIDVEL:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.CentroidVelocity; });
-            break;
-        case YINCONFIDENCE:
-            m_Writers.push_back([](const Description &desc, float *&out) { *out++ = desc.PitchConfidence; });
-            break;
-        case ONNX:
-            break;
-        case INVALID:
-            spdlog::error("Invalid descriptor");
-            break;
-        }
-    }
-
-    Onnx__GraphProto *graph = m_ONNXContext->model ? m_ONNXContext->model->graph : nullptr;
-    if (!graph) {
-        spdlog::error("ONNX graph not found");
-        return;
-    }
-
-    auto is_float_tensor = [](const struct onnx_tensor_t *t) {
-        return t && (t->type == ONNX_TENSOR_TYPE_FLOAT32 || t->type == ONNX_TENSOR_TYPE_FLOAT64);
-    };
-
-    m_InputTensor = nullptr;
-    for (size_t i = 0; i < graph->n_input; ++i) {
-        const char *name = graph->input[i] ? graph->input[i]->name : nullptr;
-        struct onnx_tensor_t *t = onnx_tensor_search(m_ONNXContext, name);
-        if (is_float_tensor(t) && t->ndata == (size_t)m_ONNXDescriptorsSize) {
-            m_InputTensor = t;
-            break;
-        }
-    }
-    if (m_InputTensor == nullptr) {
-        spdlog::error("ONNX input tensor with {} float values not found", m_ONNXDescriptorsSize);
-        return;
-    }
-
-    m_OutputTensor = nullptr;
-    for (size_t i = 0; i < graph->n_output; ++i) {
-        const char *name = graph->output[i] ? graph->output[i]->name : nullptr;
-        struct onnx_tensor_t *t = onnx_tensor_search(m_ONNXContext, name);
-        if (is_float_tensor(t) && t->ndata == m_ONNXLabels.size()) {
-            m_OutputTensor = t;
-            break;
-        }
-    }
-    if (m_OutputTensor == nullptr) {
-        spdlog::error("ONNX numeric probability output with {} values not found", m_ONNXLabels.size());
-        return;
-    }
-
-    if ((size_t)m_ONNXDescriptorsSize != m_InputTensor->ndata) {
-        spdlog::error("Tensor input expect {} values, selected descriptors give {}", m_InputTensor->ndata,
-                      m_ONNXDescriptorsSize);
-        return;
-    }
-
-    size_t LabelSize = m_ONNXLabels.size();
-    if (LabelSize != m_OutputTensor->ndata) {
-        spdlog::error("Tensor output has {} values, but labels provided are {}", m_OutputTensor->ndata, LabelSize);
-        return;
-    }
-
-    m_ONNXModelLoaded = true;
-    spdlog::debug("ONNX Model Loaded");
-}
-
-// ─────────────────────────────────────
-void MIR::ONNXExec(Description &Desc) {
-    if (!m_ONNXModelLoaded || !m_InputTensor || !m_OutputTensor) {
-        return;
-    }
-
-    float *out = m_ONNXDescriptorsArray.data();
-    for (auto &w : m_Writers) {
-        w(Desc, out);
-    }
-    if (out != m_ONNXDescriptorsArray.data() + m_ONNXDescriptorsSize) {
-        spdlog::error("ONNX descriptor writer produced {} values, expected {}", out - m_ONNXDescriptorsArray.data(),
-                      m_ONNXDescriptorsSize);
-        Desc.ONNX.clear();
-        return;
-    }
-
-    onnx_tensor_apply(m_InputTensor, m_ONNXDescriptorsArray.data(),
-                      m_ONNXDescriptorsArray.size() * sizeof(m_ONNXDescriptorsArray[0]));
-    onnx_run(m_ONNXContext);
-
-    Desc.ONNX.clear();
-    switch (m_OutputTensor->type) {
-    case ONNX_TENSOR_TYPE_FLOAT32: {
-        float *data = (float *)m_OutputTensor->datas;
-        for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = data[i];
-        }
-        break;
-    }
-    case ONNX_TENSOR_TYPE_FLOAT64: {
-        double *data = (double *)m_OutputTensor->datas;
-        for (size_t i = 0; i < m_ONNXLabels.size(); i++) {
-            Desc.ONNX[m_ONNXLabels[i]] = (float)data[i];
-        }
-        break;
-    }
-    default:
-        spdlog::error("Tensor output type not supported {}", (int)m_OutputTensor->type);
-    }
 }
 
 // ─────────────────────────────────────
 std::vector<std::string> MIR::GetONNXLabels() {
-    return m_ONNXLabels;
+    return m_ONNXModel.GetLabels();
 }
 
 // ╭─────────────────────────────────────╮
@@ -555,24 +243,6 @@ void MIR::OnsetInit() {
                   m_Config.SR);
     m_OnsetFFTFrame.assign(static_cast<size_t>(2 * (m_Config.FFTSize / 2 + 1)), 0.0f);
     m_OnsetInit = true;
-}
-
-// ─────────────────────────────────────
-inline void ReadPffftBin(const float *out, size_t fftSize, size_t bin, double &re, double &im) {
-    const size_t half = fftSize / 2;
-    if (bin == 0) {
-        re = static_cast<double>(out[0]);
-        im = 0.0;
-        return;
-    }
-    if (bin == half) {
-        re = static_cast<double>(out[1]);
-        im = 0.0;
-        return;
-    }
-    const size_t idx = 2 * bin;
-    re = static_cast<double>(out[idx]);
-    im = static_cast<double>(out[idx + 1]);
 }
 
 // ─────────────────────────────────────
@@ -1204,7 +874,7 @@ void MIR::MFCCExec(Description &Desc) {
 // │               Chroma                │
 // ╰─────────────────────────────────────╯
 double MIR::HzToOcts(double frequency, double tuning, int binsPerOctave) const {
-    const double a440 = m_Config.TunningA4 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
+    const double a440 = m_Config.TuningA4 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
     return std::log2(frequency / (a440 / 16.0));
 }
 
@@ -1420,8 +1090,8 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
         SpectralChromaExec(Desc);
     }
 
-    if (m_ONNXModelLoaded && m_NeedONNX) {
-        ONNXExec(Desc);
+    if (m_ONNXModel.IsLoaded() && m_NeedONNX) {
+        m_ONNXModel.Execute(Desc);
     } else {
         Desc.ONNX.clear();
     }
