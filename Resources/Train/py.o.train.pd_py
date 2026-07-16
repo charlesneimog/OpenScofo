@@ -1,6 +1,8 @@
 import io
+import json
 import sys
 import threading
+from importlib import metadata as importlib_metadata
 
 import OpenScofo
 import puredata as pd
@@ -140,11 +142,53 @@ class pytrain(pd.NewObject):
         else:
             raise Exception("You need to analyze first")
 
+    def write_onnx_metadata(self, file):
+        if not file.endswith(".onnx"):
+            return
+
+        try:
+            import onnx
+        except ImportError as exc:
+            raise RuntimeError(
+                "The Python 'onnx' package is required to write ONNX metadata."
+            ) from exc
+
+        model = onnx.load(file)
+        metadata = {
+            "openscofo.descriptors": json.dumps(list(self.descriptors)),
+            "openscofo.labels": json.dumps(
+                [str(label) for label in getattr(self.trainer.clf, "classes_", [])]
+            ),
+            "openscofo.sample_rate": str(int(self.sr)),
+            "openscofo.version": self.openscofo_version(),
+        }
+
+        existing = {prop.key: prop for prop in model.metadata_props}
+        for key, value in metadata.items():
+            prop = existing.get(key)
+            if prop is None:
+                prop = model.metadata_props.add()
+                prop.key = key
+            prop.value = value
+
+        onnx.save(model, file)
+
+    def openscofo_version(self):
+        version = getattr(OpenScofo, "__version__", None)
+        if version:
+            return str(version)
+
+        try:
+            return importlib_metadata.version("OpenScofo")
+        except importlib_metadata.PackageNotFoundError:
+            return "unknown"
+
     def in_0_export(self, args):
         if self.trainer is not None:
             file = self.get_current_dir() + "/" + args[0]
 
             self.trainer.export_model(file)
+            self.write_onnx_metadata(file)
             self.logpost(2, f"Reload this model in openscofo~: {file}")
         else:
             raise Exception("You need to analyze first")
