@@ -1,0 +1,113 @@
+BPM 120
+ONNXMODEL "flute.onnx"
+ONNXDESCRIPTORS mfcc logmel zcr centroid flatness hfr
+
+// Measure 1
+NOTE F5 0.5
+REST 0.5
+NOTE D4 0.5
+NOTE B4 0.5
+NOTE C4 0.5
+NOTE G5 0.5
+REST 0.5
+NOTE C4 0.5
+
+// Measure 2
+NOTE D4 0.5
+NOTE D4 1.5
+NOTE A5 0.5
+NOTE D5 1
+NOTE B5 0.5
+
+// Measure 3
+PTECH key_click E4 1.5
+PTECH key_click C4 0.5
+NOTE C#5 0.667
+NOTE E4 0.667
+NOTE D#4 0.667
+
+// Measure 4
+NOTE F5 0.5
+REST 1
+PTECH tongue_ram E3 0.5
+NOTE F4 0.667
+PTECH key_click F#4 0.667
+PTECH tongue_ram G#3 0.667
+
+// Measure 5
+NOTE C#5 0.5
+NOTE B5 1.5
+PTECH tongue_ram D#3 0.5
+REST 1
+NOTE B5 0.5
+
+// Measure 6
+NOTE B4 0.5
+NOTE C4 1.5
+PTECH key_click E4 0.5
+NOTE F#4 0.5
+REST 0.5
+NOTE D#5 0.5
+
+// Measure 7
+NOTE G#4 0.5
+PTECH key_click C4 1.5
+NOTE F5 0.5
+PTECH key_click A#4 1.5
+
+// Measure 8
+NOTE C#4 0.5
+REST 0.5
+PTECH tongue_ram F3 0.5
+NOTE A5 0.5
+NOTE D#4 0.5
+NOTE E5 1
+NOTE F#5 0.5
+
+// Measure 9
+NOTE F5 0.667
+NOTE E5 0.667
+PTECH tongue_ram C#3 0.667
+NOTE F5 0.5
+REST 0.5
+NOTE F#4 0.5
+NOTE G4 0.5
+
+// Measure 10
+NOTE A5 0.5
+REST 0.5
+NOTE B5 0.5
+NOTE G5 0.5
+PTECH key_click C#4 0.5
+REST 1
+NOTE C5 0.5
+
+// Measure 11
+PTECH key_click G#4 0.5
+REST 1
+NOTE D#5 0.5
+NOTE C5 0.5
+REST 1
+NOTE C4 0.5
+
+// Measure 12
+NOTE D5 0.5
+NOTE C4 1.5
+PTECH tongue_ram C3 1.5
+REST 0.5
+
+// Measure 13
+PTECH tongue_ram C3 0.5
+REST 1
+NOTE F#4 0.5
+PTECH key_click G#4 0.5
+NOTE A4 0.5
+REST 0.5
+PTECH key_click D#4 0.5
+
+// Measure 14
+PTECH tongue_ram E3 1.5
+REST 0.5
+PTECH tongue_ram D3 0.667
+REST 0.667
+NOTE G#4 0.667
