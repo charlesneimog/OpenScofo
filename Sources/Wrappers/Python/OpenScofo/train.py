@@ -10,8 +10,10 @@ See the LICENSE file for details.
 import math
 import os
 import random
+import json
 import librosa
 from collections.abc import Iterable
+from importlib import metadata as importlib_metadata
 from typing import List
 
 import numpy as np
@@ -1015,6 +1017,50 @@ class ExtendedTechniqueClassifier:
         }
         self.print("Train folder: " + self.trainfolder)
 
+    def _write_onnx_metadata(self, model_path: str):
+        """Add OpenScofo training metadata to an exported ONNX model."""
+        try:
+            import onnx
+        except ImportError as exc:
+            raise RuntimeError(
+                "The Python 'onnx' package is required to write ONNX metadata."
+            ) from exc
+
+        model = onnx.load(model_path)
+        metadata = {
+            "openscofo.descriptors": json.dumps(list(self.descriptors)),
+            "openscofo.labels": json.dumps(
+                [str(label) for label in getattr(self.clf, "classes_", [])]
+            ),
+            "openscofo.sample_rate": str(int(self.sample_rate)),
+            "openscofo.version": self._openscofo_version(),
+        }
+
+        existing = {prop.key: prop for prop in model.metadata_props}
+        for key, value in metadata.items():
+            prop = existing.get(key)
+            if prop is None:
+                prop = model.metadata_props.add()
+                prop.key = key
+            prop.value = value
+
+        onnx.save(model, model_path)
+
+    def _openscofo_version(self):
+        try:
+            from . import _OpenScofo
+
+            version = getattr(_OpenScofo, "__version__", None)
+            if version:
+                return str(version)
+        except ImportError:
+            pass
+
+        try:
+            return importlib_metadata.version("OpenScofo")
+        except importlib_metadata.PackageNotFoundError:
+            return "unknown"
+
     def export_model(self, model_path: str):
         """Export the trained CatBoost model to CatBoost or ONNX format."""
         if self.clf is None:
@@ -1031,6 +1077,7 @@ class ExtendedTechniqueClassifier:
 
         if path.endswith(".onnx"):
             self.clf.save_model(path, format="onnx")
+            self._write_onnx_metadata(path)
         else:
             self.clf.save_model(path)
         self.print(f"Model exported to {path}")
