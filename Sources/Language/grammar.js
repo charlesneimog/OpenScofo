@@ -73,6 +73,7 @@ module.exports = grammar({
                     "SR",
                     "FFTSIZE",
                     "HOPSIZE",
+                    "TUNINGA4",
 
                     // Time Model
                     "PHASECOUPLING",
@@ -81,12 +82,41 @@ module.exports = grammar({
 
                     // Pitch
                     "PITCHTEMPLATESIGMA",
+                    "PITCHTEMPLATEHARMONICS",
                     "TRANSPOSE",
 
                     // AI extended technique model
                     "ONNXMODEL",
+                    "TIMBREMODEL",
                     "ONNXDESCRIPTORS",
                     "ONSETFUNCTION",
+
+                    // MFCC
+                    "MFCCMELS",
+                    "MFCCCOUNT",
+
+                    // Onset
+                    "MEDSPAN",
+
+                    // Silence Threshold
+                    "DBTHRESHOLD",
+
+                    // YIN / spectral
+                    "SPECTRALROLLOFFCUTOFF",
+                    "YINTHRESHOLD",
+                    "YINMINFREQUENCY",
+                    "YINMAXFREQUENCY",
+
+                    // CHROMA
+                    "CHROMASIZE",
+                    "CHROMACENTEROCTAVE",
+                    "CHROMAOCTAVEWIDTH",
+
+                    // ZCR
+                    "ZCRCENTER",
+                    "ZCRPAD",
+                    "ZCRZEROPOS",
+                    "ZCRTHRESHOLD",
                 ),
             ),
 
@@ -187,7 +217,7 @@ module.exports = grammar({
         //╭─────────────────────────────────────╮
         //│                ATOMS                │
         //╰─────────────────────────────────────╯
-        number: (_) => token(choice(/-?[0-9]+/, /-?[0-9]+\.[0-9]+/)),
+        number: (_) => token(/-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/),
         path: (_) => token(choice(seq('"', /[^"\n]+/, '"'), /[a-zA-Z0-9_.\-\\/]+/)),
 
         comment: (_) => token(choice(seq("//", /(\\+(.|\r?\n)|[^\\\n])*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),

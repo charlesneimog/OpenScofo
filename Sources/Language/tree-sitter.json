@@ -1,0 +1,25 @@
+{
+  "grammars": [
+    {
+      "name": "openscofo",
+      "camelcase": "OpenScofo",
+      "scope": "source.openscofo",
+      "path": ".",
+      "file-types": [
+        "scofo"
+      ],
+      "injection-regex": "^openscofo$"
+    }
+  ],
+  "metadata": {
+    "version": "0.0.2",
+    "license": "GPL-3.0-or-later",
+    "description": "OpenScofo score language grammar",
+    "authors": [
+      {
+        "name": "Charles K. Neimog",
+        "email": "charlesneimog@outlook.com"
+      }
+    ]
+  }
+}
