@@ -72,6 +72,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_FFTSize = Config.FFTSize;
     m_HopSize = Config.HOPSize;
     m_BlockDur = (1.0 / m_Sr) * m_HopSize;
+    m_Tunning = Config.TuningA4;
     m_PitchTemplateSigma = Config.PitchTemplateSigma;
     m_Harmonics = Config.PitchTemplateHarmonics;
     m_SyncStrength = Config.SyncStrength;
