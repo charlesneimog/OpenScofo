@@ -1,194 +1,83 @@
+---
+icon: material/language-javascript
+tags:
+  - Host Integration
+  - JavaScript
+---
+
 # JavaScript
-
-<release interface="JavaScript">Loading Releases</release>
-
-Check the JavaScript module using the [OpenScofo descriptors](../descriptors/testing){target="_blank"}.
-
-
-This module exposes `OpenScofo` to JavaScript via Emscripten bindings. It enables browser-based score following, real-time processing, and offline analysis.
 
 ## Overview
 
-The bindings wrap the core C++ API and expose:
+Use the JavaScript/Emscripten bindings for browser-based score following, real-time processing, and offline descriptor analysis.
 
-- Core `OpenScofo` engine
-- Audio feature descriptors
-- Markov states and score tracking
-- Configuration parameters
-- Processing functions
+<release interface="JavaScript">Loading Releases</release>
 
-Errors from the internal logger are forwarded to JavaScript:
-- `error` / `critical` → thrown as exceptions
-- `info` / `debug` → printed to console
+## Installation
 
----
-
-## Module Usage
-
-After compiling with Emscripten, the module can be used as:
-
-```javascript
-const scofo = new OpenScofo.OpenScofo(sampleRate, blockSize, hopSize);
-```
-
----
-
-## Types
-
-### VectorDouble
-
-```js
-let v = new OpenScofo.VectorDouble();
-```
-
-Used for arrays of numeric data exchanged with the engine.
-
-## Description
-
-Audio descriptor container (per block).
-
-```js
-desc.mfcc
-desc.logmelspectrum
-desc.chroma
-desc.onset
-desc.silence
-desc.ext
-desc.max_amp
-desc.loudness
-desc.flux
-desc.irregularity
-desc.crest
-desc.centroid
-desc.magnitude
-desc.spreadhz
-desc.spread_variance
-desc.flatness
-desc.skewness
-desc.slope
-desc.kurtosis
-desc.centroid_velocity
-desc.hfr
-desc.harmonicity
-desc.zcr
-desc.stddev
-desc.pitch
-desc.pitch_confidence
-desc.db
-desc.rms
-desc.magnitude
-```
-
----
-
-## MarkovState
-
-Represents a state in the score-following model.
-
-```js
-state.position
-state.type
-state.markov
-state.forward
-state.bpm_expected
-state.bpm_observed
-state.onset_expected
-state.onset_observed
-state.phase_expected
-state.phase_observed
-state.ioi_phi_n
-state.ioi_hat_phi_n
-state.audio_states
-state.duration
-state.line
-```
-
----
-
-## OpenScofo Class
-
-### Constructor
-
-```js
-var oscofo = null;
-OpenScofo().then(async (mod) => {
-    wasmModule = mod;
-    oscofo = new mod.OpenScofo(48000, 2048, 512);
-});
-```
-
----
-
-### Score
-
-```js
-scofo.load_score(scoreText)
-```
-
----
-
-### Configuration
-
-```js
-scofo.set_db_threshold(value)
-scofo.set_tuning(a4)
-scofo.set_current_event(index)
-scofo.load_onnx_model(path)
-scofo.set_amplitude_decay(value)
-scofo.set_harmonics(count)
-scofo.set_pitch_template_sigma(value)
-```
-
----
-
-### Processing
-
-```js
-scofo.process_block(audioBuffer)
-```
-
-* `audioBuffer`: `VectorDouble` or compatible array
-* Processes one audio frame
-
----
-
-### Getters
-
-```js
-scofo.get_live_bpm()
-scofo.get_event_index()
-scofo.get_states()
-scofo.get_pitch_template()
-scofo.get_block_duration()
-scofo.get_audio_description()
-```
-
----
+Load the generated OpenScofo JavaScript/WASM module in your web project. See the [descriptor test page](../descriptors/testing){:target="_blank"} for a working browser example.
 
 ## Minimal Example
 
-```js
-const scofo = new OpenScofo.OpenScofo(44100, 1024, 512);
-
-scofo.load_score(scoreText);
-
-let buffer = new OpenScofo.VectorDouble();
-// fill buffer with audio samples
-
-scofo.process_block(buffer);
-
-let bpm = scofo.get_live_bpm();
-let state = scofo.get_event_index();
-let desc = scofo.get_audio_description();
+```javascript
+OpenScofo().then((mod) => {
+    const scofo = new mod.OpenScofo(48000, 2048, 512);
+    scofo.load_score(scoreText);
+});
 ```
 
----
+## Reference Table
 
-## Notes
+### API
 
-* Designed for real-time and browser contexts
-* Compatible with Web Audio pipelines
-* Can be used with AudioWorklets for low-latency processing
-* ONNX model loading requires proper file access setup in Emscripten
+| API | Purpose |
+| --- | --- |
+| `new mod.OpenScofo(sampleRate, blockSize, hopSize)` | create an engine |
+| `load_score(scoreText)` | load score text |
+| `process_block(audioBuffer)` | process one audio frame |
+| `set_db_threshold(value)` | set silence threshold |
+| `set_tuning(a4)` | set A4 tuning |
+| `set_current_event(index)` | force score event |
+| `load_onnx_model(path)` | load ONNX model |
+| `get_live_bpm()` | return estimated BPM |
+| `get_event_index()` | return current event index |
+| `get_states()` | return Markov states |
+| `get_audio_description()` | return descriptors |
 
-The API closely mirrors the C++ interface, enabling consistent behavior across environments.
+### Types
+
+| Type | Use |
+| --- | --- |
+| `VectorDouble` | numeric buffers passed to the engine |
+| `Description` | descriptor values for a block |
+| `MarkovState` | score-following state |
+
+## Score Actions
+
+Use the JavaScript API to inspect score action data after processing blocks. Host behavior is application-defined; see [Platform Integrations](index/#sendto-behavior).
+
+## Descriptors
+
+`Description` exposes values such as `mfcc`, `logmelspectrum`, `chroma`, `onset`, `silence`, `loudness`, `flux`, `centroid`, `flatness`, `zcr`, `pitch`, `pitch_confidence`, `db`, and `rms`.
+
+## Complete Example
+
+```javascript
+OpenScofo().then((mod) => {
+    const scofo = new mod.OpenScofo(44100, 1024, 512);
+    scofo.load_score(scoreText);
+
+    const buffer = new mod.VectorDouble();
+    // Fill buffer with audio samples.
+
+    scofo.process_block(buffer);
+
+    const bpm = scofo.get_live_bpm();
+    const event = scofo.get_event_index();
+    const desc = scofo.get_audio_description();
+});
+```
+
+## Remarks
+
+Errors from the internal logger are forwarded to JavaScript: `error` and `critical` become exceptions; `info` and `debug` print to the console. ONNX loading requires correct file access in the Emscripten environment.

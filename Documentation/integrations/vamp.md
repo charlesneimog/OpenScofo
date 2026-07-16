@@ -1,44 +1,54 @@
-# Vamp 
-
-**OpenScofo** is also available as a Vamp plugin for offline audio feature extraction. It is designed to be used in host applications like Sonic Visualiser or Audacity.
-
-!!! warning "Note on Score Following"
-    **Due to inherent limitations in the architecture of Vamp plugins**, which are strictly designed for offline analysis and do not support dynamic string-based file parsing from the host GUI during processing, **this plugin does NOT perform score following.** Instead, it acts as a comprehensive **audio descriptor extractor**, exposing all of OpenScofo's internal feature extraction capabilities directly to your Vamp host.
-
+---
+icon: custom/vamp
+tags:
+  - Host Integration
+  - Vamp
 ---
 
-## Features
+# Vamp
 
-The plugin analyzes incoming audio blocks (default size: 2048 samples, step size: 512 samples) and outputs a wide array of both vector and scalar descriptors. 
+## Overview
 
-### Vector Descriptors (Arrays)
-These output multiple values per step (e.g., bins or bands):
+Use the Vamp plugin for offline descriptor extraction in hosts such as Sonic Visualiser or Audacity.
 
-* **MFCC** (13 bins)
+## Installation
 
-* **LogMelSpectrum / Melogram** (40 bins)
+Place the compiled Vamp plugin library (`.so`, `.dylib`, or `.dll`) in your system Vamp plugin directory. Use the installer `OpenScofo` [installer](https://github.com/charlesneimog/OpenScofo/releases/) for this.
 
-* **Chroma** (12 bins)
+## Minimal Descriptors Example 
 
-### Scalar Descriptors (Single Values)
-These output a single continuous value per step:
+1. Open an audio file in Sonic Visualiser after install `OpenScofo`.
+2. Choose **Transform > Analysis by Plugin Name > Open Score Follower**.
+3. Select a descriptor, such as `MFCC`, `Pitch`, or `Spectral Centroid`.
 
-* **Amplitude & Energy:** Max Amplitude, Loudness, RMS, dB, Amplitude Standard Deviation.
+## Minimal Score Follower Example 
 
-* **Spectral Features:** Spectral Flux, Spectral Irregularity, Spectral Crest, Spectral Centroid, Spectral Spread (Hz), Spectral Spread Variance, Spectral Flatness, High Frequency Ratio.
+1. Put score files (`.scofo`) inside your `Documents` folder. 
+2. Open an audio recording of the piece in Sonic Visualiser after install `OpenScofo`.
+3. Choose **Transform > Analysis by Plugin Name > Open Score Follower -> Score Marks**.
+4. Select the piece score file, click on `OK`.
 
-* **Pitch & Tone:** Pitch, Pitch Confidence, Harmonicity, Zero Crossing Rate.
+## Reference Table
 
-* **Probabilities & Classifications:** Onset Probability, Silence Probability, Extended Technique Probability.
+### Messages / API
 
-* **Motion:** Centroid Velocity.
+Vamp is host-driven. Select descriptors from the host interface.
 
----
+## Score Actions
 
-## Usage (e.g., in Sonic Visualiser)
+Vamp does not supported actions. **Vamp is offline analysis only**.
 
-1.  Ensure the compiled Vamp plugin library (`.so`, `.dylib`, or `.dll`) is placed in your system's standard Vamp plugin directory.
-2.  Open your audio file in Sonic Visualiser.
-3.  Go to **Transform > Analysis by Plugin Name > Open Score Follower**.
-4.  Select the specific descriptor you wish to visualize (e.g., `MFCC`, `Pitch`, `Spectral Centroid`, etc).
-5.  The host will process the audio offline and draw the requested descriptor data over your waveform/spectrogram.
+## Descriptors
+
+| Type | Descriptors |
+| --- | --- |
+| Vector | `MFCC`, `LogMelSpectrum`, `Melogram`, `Chroma` |
+| Amplitude | max amplitude, loudness, RMS, dB, amplitude standard deviation |
+| Spectral | flux, irregularity, crest, centroid, spread, flatness, HFR, rolloff |
+| Pitch / time | pitch, pitch confidence, harmonicity, zero crossing rate |
+| Probability | onset, silence, extended technique |
+| Motion | centroid velocity |
+
+## Remarks
+
+Vamp plugins cannot dynamically parse score files from the host GUI during processing, so this integration exposes OpenScofo's descriptor extractor only.

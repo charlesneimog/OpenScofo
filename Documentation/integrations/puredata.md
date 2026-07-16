@@ -1,117 +1,93 @@
+---
+icon: custom/pd
+tags:
+  - Host Integration
+  - Pure Data
+---
+
 # Pure Data
 
-**OpenScofo** is available in Pure Data as the `openscofo~` external. It can follow an OpenScofo score from a mono audio signal, report the current score event and tempo, execute score actions through Pure Data receivers, and output audio descriptors for real-time or offline analysis.
+## Overview
 
-## Syntax
+Use `[openscofo~]` to follow a score from a mono signal, report event/BPM, deliver actions to Pd receivers, and optionally output descriptors.
 
-```puredata
-[openscofo~]
-[openscofo~ rms centroid mfcc]
-```
+| Object | Use |
+| --- | --- |
+| `[openscofo~]` | score following |
+| `[openscofo~ rms centroid mfcc]` | score following plus descriptor output |
 
-Create `openscofo~` with no arguments for score following only. Pass descriptor names as creation arguments when you also want descriptor output from the analyzed signal.
+## Installation
 
-## Inlets and Outlets
+Install the Pure Data external (**Open Pd -> Tools -> Find Externals**, search and install `openscofo~`) from the OpenScofo release matching your platform, then restart Pd if needed.
 
-`openscofo~` has one signal inlet.
+## Minimal Example
 
-* **Signal inlet**: mono audio stream analyzed by OpenScofo.
-* **Left outlet**: current score event index as a float.
-* **Middle outlet**: current tempo in BPM as a float.
-* **Right outlet**: descriptor messages, created only when descriptor names are passed as object arguments.
+After install `openscofo~`: 
 
-Descriptor messages use the descriptor id as the selector:
+- Create a new patch;
+- Create an `openscofo~` object;
+- Go to help of `openscofo~` object.
 
-```puredata
-mfcc <float...>
-centroid <float>
-onnx <label> <float>
-```
+--- 
 
-## Basic Use
-
-<p align="center">
-    <img style="width: 80%; border-radius: 5px" src="../assets/pd-patch.png">
+<p align="center" markdown>
+  ![OpenScofo logo](../assets/pd.png){ width="60%" }
 </p>
 
-If the filename has no extension, `openscofo~` looks for a `.scofo` file. Relative paths are resolved from the current patch.
+## Reference Table
 
-## Messages
+### Messages / API
 
-### `score`
+| Message | Purpose |
+| --- | --- |
+| `score <path>` | load a `.scofo` file |
+| `start` | reset to event `0` and start following |
+| `follow 1`, `follow 0` | enable or disable following |
+| `set verbosity <0..3>` | set console logging level |
+| `set description <0 or 1>` | enable descriptor-only processing |
+| `set onnxmodel <path> <descriptors...>` | load an ONNX model with descriptor order |
+| `get descriptors <array> <sample-rate> [start]` | analyze one FFT window from a Pd array |
 
-Loads a score file using `score <score_path>`.
+Outlets:
 
-After a successful load, `openscofo~` resets the current event to `0`, outputs the current BPM and event index, and reads the score configuration such as FFT size and hop size.
-
-### `start`
-
-Starts following the loaded score from event `0`.
-
-`start` clears pending actions, resets the follower to the beginning of the score, outputs the current BPM and event index, and enables following.
-
-### `follow`
-
-Enables or disables score following without reloading the score.
-
-### `set verbosity`
-
-Sets the amount of OpenScofo logging printed in the Pure Data console. The levels are `0` warning, `1` info, `2` debug, and `3` trace.
-
-### `set description`
-
-Switches descriptor-only processing on or off. This is useful when you create the object with descriptor arguments and want analysis output without score following.
-
-### `set onnxmodel`
-
-Loads an ONNX model and tells OpenScofo which descriptors were used to train it. The descriptor order must match the order used during model training.
-
-### `get description`
-
-Processes audio from a Pure Data array and outputs the requested descriptors once. `get descriptors <array-name> <sample-rate> <start-sample-index>`. The `<start-sample-index>` is optional argument is the start index inside the array. `openscofo~` reads one FFT window from that position, pads with zeroes if the array ends early, and sends descriptor messages through the descriptor outlet.
+| Outlet | Output |
+| --- | --- |
+| left | current score event index |
+| middle | current BPM |
+| right | descriptor messages, only when descriptors are requested |
 
 ## Score Actions
 
-OpenScofo score actions are delivered to Pure Data receivers. For example, this score fragment:
+```openscofo
+NOTE C4 1
+    sendto delay [1 C4]
+    delay 1 tempo sendto delay [0 C4]
+```
+
+Receive in Pd:
 
 ```text
-NOTE C4 1
-    sendto event-hit [1 C4]
-    delay 1 tempo sendto event-hit [0 C4]
+[r delay]
 ```
 
-can be received in Pure Data with:
-
-```puredata
-[r event-hit]
-```
-
-If a `sendto` action has no arguments, `openscofo~` sends a bang. If it has arguments, it sends them as a Pure Data list. Action arguments can be numbers or symbols.
-
-Lua actions in the score are executed by `openscofo~` when the external is built with Lua support. The Pure Data Lua module is available as `pd` inside score `LUA { ... }` blocks:
-
-```text
-LUA {
-    function hello()
-        pd.post("hello from OpenScofo")
-        pd.send_bang("event-hit")
-    end
-}
-
-NOTE C4 1
-    luacall(hello())
-```
-
-See [Score Actions](../score/actions.md) and [Lua for Interactive Actions](../score/lua.md) for the score-language side.
+No-argument `sendto` sends a bang; arguments are sent as a Pd list. For shared action syntax, see [Computer Actions](../score/actions/).
 
 ## Descriptors
 
-Request descriptors by passing their ids as creation arguments:
+Request descriptors as creation arguments:
 
-```puredata
+```text
 [openscofo~ rms db centroid mfcc chroma]
 ```
 
-When DSP is running, descriptors are output after each analyzed block. Vector descriptors such as `mfcc`, `chroma`, `logmel`, and `magnitude` output a list of floats. Scalar descriptors output one float.
+Vector descriptors such as `mfcc`, `chroma`, `logmel`, and `magnitude` output lists. Scalar descriptors output one float.
 
-The full descriptor reference is available in [Descriptors](../descriptors/index.md).
+## Complete Example
+
+![Pure Data patch](../assets/pd-patch.png)
+
+See [Your First Interactive Patch](../getting-started/first-interactive-patch/) for the smallest complete patch.
+
+## Remarks
+
+Lua actions run when the external is built with Lua support. Inside `LUA { ... }`, use the `pd` module; see [Lua](../score/lua/).

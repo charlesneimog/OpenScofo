@@ -170,10 +170,6 @@ function handleThemeChange(e) {
 function updatePages() {
     const path = window.location.pathname;
 
-    if (!path.endsWith("/score/events/")) {
-        return;
-    }
-
     setTimeout(() => {
         updateTheme(themeQuery.matches);
         renderScores();

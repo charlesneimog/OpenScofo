@@ -1,4 +1,11 @@
+---
+tags:
+  - Spectral Descriptors
+---
+
 # Spectral Descriptors
+
+Read this page when you need the technical definitions of timbre and spectrum descriptors used by the listening module.
 
 Spectral descriptors describe aspects of tone color: brightness, noisiness, concentration of energy, changes between moments, and the presence of pitch-class information. In musical terms, they help `OpenScofo` distinguish sounds such as sustained tones, noisy attacks, percussive gestures, bright spectra, dark spectra, and timbral changes over time.
 
@@ -279,6 +286,6 @@ where $W_c[k]$ is the chroma filter weight for pitch class $c$ and FFT bin $k$.
 [^2]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-9}$.
 [^3]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-5}$.
 [^4]: `Descriptor` compatible with [`librosa`](https://librosa.org/) in order of $10^{-3}$.
-[^5]: `Descriptor` full compatible with [`librosa`](https://librosa.org/).
+[^5]: `Descriptor` fully compatible with [`librosa`](https://librosa.org/).
 [^6]: `Descriptor` compatible with [`essentia`](https://essentia.upf.edu/) in order of $10^{-4}$.
 [^7]: Brent, W. “Physical and Perceptual Aspects of Percussive Timbre.” PhD thesis, UC San Diego, 2010. https://escholarship.org/uc/item/5bx4j1fj.

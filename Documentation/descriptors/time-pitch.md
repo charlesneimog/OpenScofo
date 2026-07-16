@@ -1,12 +1,15 @@
+---
+tags:
+  - Pitch Detection
+---
+
 # Time-Domain and Pitch Descriptors
 
-These descriptors are not spectral descriptors in the strict sense. They are computed from the waveform itself, or from pitch-period estimation over the audio frame, rather than from measurements such as spectral brightness, spread, or energy distribution across FFT bins.
+Use this page for waveform and pitch-related descriptor definitions. These descriptors complement spectral features with noisiness, estimated fundamental frequency, and pitch confidence.
 
-They are still useful for machine listening because they describe musical qualities that complement the spectral descriptors: noisiness in the waveform, estimated fundamental frequency, and the reliability of that pitch estimate.
+## Reference Table
 
-## Variable Reference
-
-The table below maps the notation used in this page to the implementation in `Sources/OpenScofo/mir.cpp`.
+### Variables
 
 | Symbol | Meaning | Implementation |
 | --- | --- | --- |
@@ -33,7 +36,7 @@ The table below maps the notation used in this page to the implementation in `So
 
 **ID**: `zcr` :custom-librosa:[^5]
 
-Zero Crossing Rate counts how often the waveform crosses the zero amplitude line, indicating the noisiness or percussiveness of a sound.
+Zero Crossing Rate counts how often the waveform crosses the zero-amplitude line, indicating noisiness or percussiveness.
 
 The current implementation optionally pads the frame when `ZCRCenter` is enabled, applies the threshold `ZCRThreshold`, and then counts sign changes. With the default `ZCRZeroPos = true`, zero is treated as non-negative through `std::signbit`.
 
@@ -55,4 +58,4 @@ $$Pitch = \frac{SR}{\tau_{refined}}$$
 
 $$Confidence = \max(0, \min(1, 1-d'(\hat{\tau})))$$
 
-[^5]: `Descriptor` full compatible with [`librosa`](https://librosa.org/).
+[^5]: `Descriptor` fully compatible with [`librosa`](https://librosa.org/).

@@ -1,204 +1,89 @@
+---
+icon: material/language-python
+tags:
+  - Host Integration
+  - Python
+---
+
 # Python
 
-!!! tip "Use pip to install"
-    ```bash
-    pip install OpenScofo
-    ```
+## Overview
 
+Use the Python bindings for development, validation, descriptor extraction, and research workflows.
 
-`OpenScofo` provides Python bindings (via `nanobind`) for development, validation, and research workflows.
+## Installation
 
-## Import and create an object
+```bash
+pip install OpenScofo
+```
 
-```py
+## Minimal Example
+
+```python
 from OpenScofo import OpenScofo
 
 scofo = OpenScofo(48000, 4096, 1024)
+scofo.load_score("score.scofo")
 ```
 
-Constructor arguments:
+## Reference Table
 
-- `sr` (float): sample rate.
-- `fft_size` (float): FFT/window size.
-- `hop` (float): hop size.
+### Constructor
 
-## `OpenScofo` methods
+| Argument | Meaning |
+| --- | --- |
+| `sr` | sample rate |
+| `fft_size` | FFT/window size |
+| `hop` | hop size |
 
-### Score
+### Core methods
 
-#### `load_score(path)`
+| Method | Purpose |
+| --- | --- |
+| `load_score(path)` | load a score file |
+| `process_block(audio)` | process one NumPy audio block |
+| `set_db_threshold(value)` | set silence threshold |
+| `set_tuning(value)` | set A4 tuning |
+| `set_current_event(event)` | force score position |
+| `set_harmonics(value)` | set pitch-template harmonics |
+| `set_pitch_template_sigma(value)` | set pitch tolerance |
+| `get_live_bpm()` | return estimated BPM |
+| `get_event_index()` | return current event index |
+| `get_states()` | return score states |
+| `get_pitch_template(freq)` | return pitch template |
+| `get_block_duration()` | return block duration in seconds |
+| `get_audio_description(audio)` | return descriptors for one block |
 
-- Input: score file path.
-- Output: `bool`.
+## Score Actions
 
-```py
-ok = scofo.load_score("myscore.txt")
-```
+Use the binding's score state/action APIs when you need host-side action handling. See the [C++ integration](cpp/) for the underlying action structure.
 
-### Processing
+## Descriptors
 
-#### `process_block(audio)`
-
-- Input: 1D NumPy array (`float64`) with one audio block.
-- Output: `bool` indicating processing success.
-
-```py
-import librosa
-
-y, _ = librosa.load(path, sr=48000)
-fftsize = 4096
-hopsize = 1024
-pos = 0
-while pos + fftsize <= len(y):
-    segment = y[pos: pos + fftsize]
-    ok = scofo.process_block(segment)
-    pos += hopsize
-```
-
-### Configuration
-
-#### `set_db_threshold(value)`
-
-```py
-scofo.set_db_threshold(-80)
-```
-
-#### `set_tuning(value)`
-
-```py
-scofo.set_tuning(442)
-```
-
-#### `set_current_event(event)`
-
-```py
-scofo.set_current_event(2)
-```
-
-#### `set_amplitude_decay(value)`
-
-Sets the amplitude decay for harmonic weighting.
-
-```py
-scofo.set_amplitude_decay(0.7)
-```
-
-#### `set_harmonics(value)`
-
-Sets the number of harmonics used to build pitch templates.
-
-```py
-scofo.set_harmonics(8)
-```
-
-#### `set_pitch_template_sigma(value)`
-
-Sets the sigma used for pitch template generation.
-
-```py
-scofo.set_pitch_template_sigma(1.2)
-```
-
-### Information
-
-#### `get_live_bpm()`
-
-```py
-bpm = scofo.get_live_bpm()
-```
-
-#### `get_event_index()`
-
-```py
-score_index = scofo.get_event_index()
-```
-
-#### `get_states()`
-
-```py
-states = scofo.get_states()
-```
-
-#### `get_pitch_template(freq)`
-
-```py
-template = scofo.get_pitch_template(440)
-```
-
-#### `get_cqt_template(freq)`
-
-```py
-cqt_template = scofo.get_cqt_template(440)
-```
-
-#### `get_block_duration()`
-
-```py
-seconds = scofo.get_block_duration()
-```
-
-#### `get_audio_description(audio)`
-
-```py
-y, _ = librosa.load(path, sr=48000)
-segment = y[0:4096]
+```python
 desc = scofo.get_audio_description(segment)
 ```
 
-## Exposed types
+Common `Description` attributes include `mfcc`, `chroma`, `onset`, `silence_prob`, `loudness`, `spectral_flux`, `spectral_flatness`, `harmonicity`, `db`, `rms`, and `power`.
 
-### `Description`
+## Complete Example
 
-Attributes:
+```python
+import librosa
+from OpenScofo import OpenScofo
 
-- `mfcc`
-- `chroma`
-- `onset`
-- `silence_prob`
-- `spectral_magniture`
-- `normalized_spectral_magniture`
-- `loudness`
-- `spectral_flux`
-- `spectral_flatness`
-- `harmonicity`
-- `db`
-- `rms`
-- `power`
+scofo = OpenScofo(48000, 4096, 1024)
+scofo.load_score("score.scofo")
 
-### `State`
+y, _ = librosa.load("audio.wav", sr=48000)
+fftsize = 4096
+hopsize = 1024
 
-Attributes:
+for pos in range(0, len(y) - fftsize, hopsize):
+    block = y[pos:pos + fftsize]
+    scofo.process_block(block)
+```
 
-- `position`
-- `type`
-- `markov`
-- `forward`
-- `bpm_expected`
-- `bpm_observed`
-- `onset_expected`
-- `onset_observed`
-- `phase_expected`
-- `phase_observed`
-- `ioi_phi_n`
-- `ioi_hat_phi_n`
-- `audio_states`
-- `duration`
-- `line`
+## Remarks
 
-### `AudioState`
-
-Attributes:
-
-- `frequency`
-- `index`
-
-### `EventType`
-
-Enum values:
-
-- `EventType.REST`
-- `EventType.NOTE`
-- `EventType.CHORD`
-- `EventType.TRILL`
-- `EventType.MULTI`
-
+Use Python for offline validation and training workflows. For real-time performance, prefer Pd, Max, Csound, SuperCollider, or an embedded C++ host.
