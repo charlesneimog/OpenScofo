@@ -327,6 +327,10 @@
           },
           {
             "type": "STRING",
+            "value": "TUNINGA4"
+          },
+          {
+            "type": "STRING",
             "value": "PHASECOUPLING"
           },
           {
@@ -343,6 +347,10 @@
           },
           {
             "type": "STRING",
+            "value": "PITCHTEMPLATEHARMONICS"
+          },
+          {
+            "type": "STRING",
             "value": "TRANSPOSE"
           },
           {
@@ -351,11 +359,79 @@
           },
           {
             "type": "STRING",
+            "value": "TIMBREMODEL"
+          },
+          {
+            "type": "STRING",
             "value": "ONNXDESCRIPTORS"
           },
           {
             "type": "STRING",
             "value": "ONSETFUNCTION"
+          },
+          {
+            "type": "STRING",
+            "value": "MFCCMELS"
+          },
+          {
+            "type": "STRING",
+            "value": "MFCCCOUNT"
+          },
+          {
+            "type": "STRING",
+            "value": "MEDSPAN"
+          },
+          {
+            "type": "STRING",
+            "value": "DBTRESHOLD"
+          },
+          {
+            "type": "STRING",
+            "value": "DBTHRESHOLD"
+          },
+          {
+            "type": "STRING",
+            "value": "SPECTRALROLLOFFCUTOFF"
+          },
+          {
+            "type": "STRING",
+            "value": "YINTHRESHOLD"
+          },
+          {
+            "type": "STRING",
+            "value": "YINMINFREQUENCY"
+          },
+          {
+            "type": "STRING",
+            "value": "YINMAXFREQUENCY"
+          },
+          {
+            "type": "STRING",
+            "value": "CHROMASIZE"
+          },
+          {
+            "type": "STRING",
+            "value": "CHROMACENTEROCTAVE"
+          },
+          {
+            "type": "STRING",
+            "value": "CHROMAOCTAVEWIDTH"
+          },
+          {
+            "type": "STRING",
+            "value": "ZCRCENTER"
+          },
+          {
+            "type": "STRING",
+            "value": "ZCRPAD"
+          },
+          {
+            "type": "STRING",
+            "value": "ZCRZEROPOS"
+          },
+          {
+            "type": "STRING",
+            "value": "ZCRTHRESHOLD"
           }
         ]
       }
@@ -896,8 +972,17 @@
               "type": "FIELD",
               "name": "receiver",
               "content": {
-                "type": "SYMBOL",
-                "name": "identifier"
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "number"
+                  }
+                ]
               }
             },
             {
@@ -981,17 +1066,8 @@
     "number": {
       "type": "TOKEN",
       "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "PATTERN",
-            "value": "-?[0-9]+"
-          },
-          {
-            "type": "PATTERN",
-            "value": "-?[0-9]+\\.[0-9]+"
-          }
-        ]
+        "type": "PATTERN",
+        "value": "-?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?"
       }
     },
     "path": {
