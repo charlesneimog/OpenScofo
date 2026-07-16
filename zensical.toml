@@ -20,36 +20,48 @@ extra_css = [
   "https://unpkg.com/katex@0/dist/katex.min.css",
 ]
 nav = [
-  "index.md",
-  { "Score" = [
+  { "Getting Started" = [
+    "index.md",
+    "getting-started/first-score.md",
+    "getting-started/first-interactive-patch.md",
+  ] },
+  { "Composing with OpenScofo" = [
+    "concepts/core-language-concepts.md",
+    "examples/index.md",
+  ] },
+  { "OpenScofo Language Reference" = [
     "score/intro.md",
-    "score/fundaments.md",
-    "score/conventions.md",
     "score/config.md",
     "score/events.md",
     "score/actions.md",
+    "score/conventions.md",
     "score/lua.md",
+    "score/advanced-config.md",
   ] },
-  { "Listening Module" = [
+  { "Platform Integrations" = [
+    "integrations/index.md",
+    "integrations/puredata.md",
+    "integrations/max.md",
+    "integrations/csound.md",
+    "integrations/supercollider.md",
+    "integrations/vamp.md",
+    "integrations/python.md",
+    "integrations/javascript.md",
+    "integrations/cpp.md",
+  ] },
+  { "Audio Analysis" = [
     "descriptors/index.md",
     "descriptors/amplitude.md",
     "descriptors/onset.md",
     "descriptors/time-pitch.md",
     "descriptors/spectral.md",
-    "descriptors/ai.md",
   ] },
-  { "Integrations / Download" = [
-    "integrations/index.md",
-    "integrations/puredata.md",
-    "integrations/max.md",
-    "integrations/vamp.md",
-    "integrations/supercollider.md",
-    "integrations/csound.md",
-    "integrations/python.md",
-    "integrations/javascript.md",
-    "integrations/cpp.md",
+  { "AI Models" = [
+    "ai/index.md",
+    "ai/train.md",
+    "ai/model-repository.md",
   ] },
-  { "OpenScofo Online Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
+  { "Score Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },
 ]
 
 
