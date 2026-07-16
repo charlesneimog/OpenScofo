@@ -1,42 +1,52 @@
-# OpenScofo Score Introduction
-
-`OpenScofo` uses a textual score where must be defined the musical `EVENTS` and its consequences, what is called `ACTIONS`. In addition to that, `OpenScofo` has also some `CONFIG` keywords and the possibility to use `LUA` language to create interactive `ACTIONS`. In this section is explained how to define all of these using the `OpenScofo` score language.
-
 ---
-<div class="grid cards" style="font-weigth:bold" markdown>
-
--   :fontawesome-solid-1: [__How to Configure the Score?__](config.md)
-
--   :fontawesome-solid-2: [__How to Set New Events?__](events.md)
-
-</div>
-
-<div class="grid cards" style="font-weigth:bold" markdown>
--   :fontawesome-solid-3: [__How to add Actions?__](actions.md)
-
--   :fontawesome-solid-4: [__How to use Lua?__](lua.md)
-
-</div>
-
+icon: octicons/book-16
+tags:
+  - Language Reference
 ---
 
-!!! tip "Language Parse for VSCode and Neovim"
-    There is a language parse for VSCode (search for OpenScofo [extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target = "_blank"}) and for [Neovim](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target + "_blank"}.
+# Language Reference
 
-After Configuration, the Score will look like this:
+An OpenScofo score is a plain-text `.scofo` file. It combines configuration, musical events, and computer actions.
 
-<p align="center">
-    <img style="width: 80%; border-radius: 5px" src="https://charlesneimog.github.io/OpenScofo/assets/oscofo-code.png">
-</p>
+```openscofo
+// Minimal score
+BPM 60
 
-## Filename, Extension, and Syntax Highlighting
+NOTE C4 1
+    sendto delay [1]
 
-An `OpenScofo` score is a plain text file. Although `.txt` file extension can be used, the recommended extension is `.scofo`.
+NOTE D4 1
+    delay 1 tempo sendto granular [open]
+```
 
-To improve readability and editing, support for `.scofo` (not for `.txt` files) files is already available on multiple IDEs:
+## File Structure
 
-- **VS Code**: Install the [OpenScofo Language Parse extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target="_blank"}.
-- **Neovim**: See the [Neovim configuration](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target="_blank"}.
-- **Web browser**: Use the [OpenScofo Online Editor](https://charlesneimog.github.io/OpenScofo/Editor/){:target="_blank"} for editing and experimenting with `.scofo` files directly in your browser.
+| Element | Purpose | Reference |
+| --- | --- | --- |
+| Comments | Human notes in the score | [Comments](#comments) |
+| Configuration | Tempo, sample rate, low-level settings | [Configuring a Score](config/) |
+| Events | What OpenScofo listens for | [Musical Events](events/) |
+| Actions | What the computer does | [Computer Actions](actions/) |
+| Lua | Optional custom logic | [Lua](lua/) |
 
-Support for additional editors is under Pull Requests.
+## File Extension and Editors
+
+Use `.scofo`.
+
+- VS Code: [OpenScofo Language Parse extension](https://marketplace.visualstudio.com/items?itemName=charlesneimog.openscofo-language-parse){:target="_blank"}
+- Neovim: [OpenScofo Neovim configuration](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target="_blank"}
+- Browser: [OpenScofo Online Editor](https://charlesneimog.github.io/OpenScofo/Editor/){:target="_blank"}
+
+![OpenScofo score editor](../assets/oscofo-code.png)
+
+## Comments
+
+```openscofo
+// one-line comment
+
+/*
+multi-line comment
+*/
+```
+
+See also: [Core Language Concepts](../concepts/core-language-concepts/).

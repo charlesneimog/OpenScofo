@@ -57,6 +57,7 @@ CURRENT_DOCS_DIR: Path | None = None
 CURRENT_OUTPUT_DIR: Path | None = None
 CURRENT_CHAPTER_LINKS: dict[Path, tuple[str, str]] = {}
 CURRENT_FOOTNOTES: dict[str, str] = {}
+GRID_CARD_COUNTER = 0
 
 
 @dataclass(frozen=True)
@@ -293,14 +294,27 @@ def download_remote_image(url: str) -> str | None:
 
 
 def resolve_local_markdown_link(target: str) -> tuple[str, str] | None:
-    if CURRENT_MARKDOWN_DIR is None:
+    if CURRENT_MARKDOWN_DIR is None or CURRENT_MARKDOWN_FILE is None:
         return None
     target = target.split("{", 1)[0].strip()
     target_path = target.split("#", 1)[0]
-    if not target_path or Path(target_path).suffix.lower() != ".md":
+    if not target_path:
+        return CURRENT_CHAPTER_LINKS.get(CURRENT_MARKDOWN_FILE.resolve())
+
+    candidate = (CURRENT_MARKDOWN_DIR / target_path).resolve()
+    candidates = [candidate]
+
+    suffix = Path(target_path).suffix.lower()
+    if suffix == "":
+        candidates.extend([candidate.with_suffix(".md"), candidate / "index.md"])
+    elif suffix != ".md":
         return None
-    resolved = (CURRENT_MARKDOWN_DIR / target_path).resolve()
-    return CURRENT_CHAPTER_LINKS.get(resolved)
+
+    for resolved in candidates:
+        chapter = CURRENT_CHAPTER_LINKS.get(resolved)
+        if chapter is not None:
+            return chapter
+    return None
 
 
 def convert_image(alt: str, target: str) -> str:
@@ -332,6 +346,28 @@ def convert_image(alt: str, target: str) -> str:
     if caption:
         return "\n".join([r"\begin{figure}[H]", r"\centering", body, rf"\caption{{{caption}}}", r"\end{figure}"])
     return "\n".join([r"\begin{figure}[H]", r"\centering", body, r"\end{figure}"])
+
+
+def convert_card_image(target: str) -> str:
+    target = target.split("#", 1)[0]
+    if not target:
+        return ""
+    resolved_path: Path | None = None
+    if not is_url(target) and CURRENT_MARKDOWN_DIR is not None and CURRENT_DOCS_DIR is not None:
+        resolved_path = (CURRENT_MARKDOWN_DIR / target).resolve()
+        try:
+            target = path_for_latex(resolved_path)
+        except ValueError:
+            target = target.lstrip("./")
+    if is_url(target):
+        downloaded = download_remote_image(target)
+        body = rf"\url{{{target}}}" if downloaded is None else rf"\includegraphics[width=\linewidth,height=0.32\textheight,keepaspectratio]{{{latex_escape(downloaded)}}}"
+    elif target.lower().endswith(".svg") and resolved_path is not None:
+        rendered = render_svg(resolved_path)
+        body = rf"\fbox{{SVG image: \texttt{{{latex_escape(target)}}}}}" if rendered is None else rf"\includegraphics[width=\linewidth,height=0.32\textheight,keepaspectratio]{{{latex_escape(rendered)}}}"
+    else:
+        body = rf"\includegraphics[width=\linewidth,height=0.32\textheight,keepaspectratio]{{{latex_escape(target)}}}"
+    return "\n".join([r"\begin{center}", body, r"\end{center}"])
 
 
 def convert_composition_card(image_target: str, link_target: str) -> str:
@@ -462,6 +498,10 @@ def sanitize_code_line(line: str) -> str:
     return "".join(replacements.get(char, char) for char in line)
 
 
+def match_code_fence(line: str) -> re.Match[str] | None:
+    return re.match(r"^```\s*([A-Za-z0-9_+-]*)[^\n`]*$", line)
+
+
 def convert_admonition(kind: str, title: str, body: list[str]) -> str:
     heading = title or kind.title()
     converted_body = convert_markdown_lines(body).strip()
@@ -475,6 +515,159 @@ def convert_admonition(kind: str, title: str, body: list[str]) -> str:
             "",
         ]
     )
+
+
+def strip_card_body_indent(lines: list[str]) -> list[str]:
+    stripped = [line[4:] if line.startswith("    ") else line[1:] if line.startswith("\t") else line for line in lines]
+    while stripped and not stripped[0].strip():
+        stripped.pop(0)
+    while stripped and not stripped[-1].strip():
+        stripped.pop()
+    return stripped
+
+
+def parse_grid_card_items(lines: list[str]) -> list[tuple[str, list[str]]]:
+    cards: list[tuple[str, list[str]]] = []
+    title: str | None = None
+    body: list[str] = []
+    in_code = False
+
+    def flush() -> None:
+        nonlocal title, body
+        if title is not None:
+            cards.append((title, strip_card_body_indent(body)))
+        title = None
+        body = []
+
+    for line in lines:
+        if re.match(r"^\s*```\s*", line):
+            in_code = not in_code
+        item = re.match(r"^-\s+(.+?)\s*$", line)
+        if item and not in_code:
+            flush()
+            title = strip_markdown_formatting(item.group(1))
+            continue
+        if title is not None:
+            body.append(line)
+    flush()
+    return cards
+
+
+def convert_card_body(lines: list[str]) -> str:
+    output: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index].rstrip()
+        if not line.strip():
+            index += 1
+            continue
+
+        fence = match_code_fence(line)
+        if fence:
+            language = fence.group(1)
+            code_lines: list[str] = []
+            index += 1
+            while index < len(lines) and not match_code_fence(lines[index]):
+                code_lines.append(lines[index].rstrip())
+                index += 1
+            if index < len(lines):
+                index += 1
+            output.append("\n".join([r"\begin{lstlisting}", *(sanitize_code_line(code_line) for code_line in code_lines), r"\end{lstlisting}"]))
+            continue
+
+        image = re.match(r"^!\[[^\]]*\]\(([^)]+)\)(?:\{[^}]*\})?\s*$", line)
+        if image:
+            output.append(convert_card_image(image.group(1)))
+            index += 1
+            continue
+
+        paragraph = [line.strip()]
+        index += 1
+        while index < len(lines) and lines[index].strip() and not match_code_fence(lines[index]) and not re.match(r"^!\[[^\]]*\]\(([^)]+)\)", lines[index].strip()):
+            paragraph.append(lines[index].strip())
+            index += 1
+        output.append(convert_inline(" ".join(paragraph)))
+
+    return "\n\n".join(output) if output else r"\vspace{0.1em}"
+
+
+def grid_card_column_count(card_count: int) -> int:
+    if card_count <= 1:
+        return 1
+    return 2
+
+
+def grid_card_width(columns: int) -> str:
+    if columns <= 1:
+        return r"\linewidth"
+    return r"0.492\linewidth"
+
+
+def convert_grid_cards(block_lines: list[str]) -> str:
+    global GRID_CARD_COUNTER
+    cards = parse_grid_card_items(block_lines)
+    if not cards:
+        return ""
+    columns = grid_card_column_count(len(cards))
+    card_width = grid_card_width(columns)
+    group = f"openscofo-card-grid-{GRID_CARD_COUNTER}"
+    GRID_CARD_COUNTER += 1
+    lines = [r"\par", r"\vspace{0.45em}", r"\noindent"]
+
+    for row_start in range(0, len(cards), columns):
+        row = cards[row_start : row_start + columns]
+        for index in range(columns):
+            if index:
+                lines.append(r"\hfill")
+            if index < len(row):
+                title, body = row[index]
+                lines.extend(
+                    [
+                        rf"\begin{{minipage}}[t]{{{card_width}}}",
+                        rf"\begin{{tcolorbox}}[enhanced, colback=white, colframe=black!12, boxrule=0.35pt, arc=1.5mm, left=3mm, right=3mm, top=3mm, bottom=3mm, equal height group={group}]",
+                        r"\raggedright",
+                        rf"\textbf{{{convert_inline(title)}}}\par",
+                        r"\vspace{0.6em}",
+                        convert_card_body(body),
+                        r"\end{tcolorbox}",
+                        r"\end{minipage}",
+                    ]
+                )
+            else:
+                lines.extend([rf"\begin{{minipage}}[t]{{{card_width}}}", r"\vspace{0pt}", r"\end{minipage}"])
+        lines.extend([r"\par", r"\vspace{0.35em}", r"\noindent"])
+    return RAW_LATEX_PREFIX + "\n".join(lines)
+
+
+def normalize_grid_cards(lines: list[str]) -> list[str]:
+    output: list[str] = []
+    index = 0
+    in_code = False
+    start_pattern = re.compile(r"<div\b(?=[^>]*\bgrid\b)(?=[^>]*\bcards\b)(?=[^>]*\bmarkdown\b)[^>]*>", re.IGNORECASE)
+
+    while index < len(lines):
+        line = lines[index]
+        if match_code_fence(line):
+            in_code = not in_code
+            output.append(line)
+            index += 1
+            continue
+
+        if not in_code and start_pattern.search(line):
+            index += 1
+            block: list[str] = []
+            while index < len(lines) and not re.search(r"</div\s*>", lines[index], re.IGNORECASE):
+                block.append(lines[index])
+                index += 1
+            if index < len(lines):
+                index += 1
+            output.append(convert_grid_cards(block))
+            continue
+
+        output.append(line)
+        index += 1
+
+    return output
 
 
 def split_table_row(line: str) -> list[str]:
@@ -500,26 +693,34 @@ def convert_markdown_table(rows: list[str]) -> str:
     if column_count == 0:
         return ""
 
-    if column_count == 1:
-        columns = "|X|"
-    else:
-        columns = "|" + "|".join(["l"] + ["X"] * (column_count - 1)) + "|"
+    column_width = f"{0.88 / column_count:.3f}\\linewidth"
+    columns = "|" + "|".join(
+        [rf">{{\raggedright\arraybackslash}}p{{{column_width}}}" for _ in range(column_count)]
+    ) + "|"
 
     def normalize_cells(cells: list[str]) -> list[str]:
         padded = cells[:column_count] + [""] * max(0, column_count - len(cells))
         return padded[:column_count]
 
+    header_line = " & ".join(rf"\textbf{{{convert_inline(cell)}}}" for cell in normalize_cells(header)) + r" \\"
     lines = [
-        RAW_LATEX_PREFIX + r"\begin{center}",
-        rf"\begin{{tabularx}}{{\linewidth}}{{{columns}}}",
+        RAW_LATEX_PREFIX + r"\begingroup",
+        r"\small",
+        r"\setlength{\tabcolsep}{3pt}",
+        rf"\begin{{longtable}}{{{columns}}}",
         r"\hline",
-        " & ".join(rf"\textbf{{{convert_inline(cell)}}}" for cell in normalize_cells(header)) + r" \\",
+        header_line,
         r"\hline",
+        r"\endfirsthead",
+        r"\hline",
+        header_line,
+        r"\hline",
+        r"\endhead",
     ]
     for row in body_rows:
         lines.append(" & ".join(convert_inline(cell) for cell in normalize_cells(row)) + r" \\")
         lines.append(r"\hline")
-    lines.extend([r"\end{tabularx}", r"\end{center}", ""])
+    lines.extend([r"\end{longtable}", r"\endgroup", ""])
     return "\n".join(lines)
 
 
@@ -530,7 +731,7 @@ def normalize_tables(lines: list[str]) -> list[str]:
 
     while index < len(lines):
         line = lines[index]
-        if re.match(r"^```\s*", line):
+        if match_code_fence(line):
             in_code = not in_code
             output.append(line)
             index += 1
@@ -577,6 +778,7 @@ def normalize_admonitions(lines: list[str]) -> list[str]:
 
 
 def convert_markdown_lines(lines: list[str]) -> str:
+    lines = normalize_grid_cards(lines)
     lines = normalize_admonitions(lines)
     lines = normalize_tables(lines)
     output: list[str] = []
@@ -607,7 +809,7 @@ def convert_markdown_lines(lines: list[str]) -> str:
                 in_style = False
             continue
 
-        fence = re.match(r"^```\s*([A-Za-z0-9_+-]*)\s*$", line)
+        fence = match_code_fence(line)
         if fence:
             close_lists()
             if not in_code:
@@ -845,7 +1047,8 @@ def write_main(project: dict, entries: list[NavEntry], output_dir: Path) -> None
         r"\usepackage{amssymb}",
         r"\usepackage{hyperref}",
         r"\hypersetup{colorlinks=true, linkcolor=blue!55!black, urlcolor=blue!55!black, citecolor=blue!55!black}",
-        r"\usepackage{tabularx}",
+        r"\usepackage{array}",
+        r"\usepackage{longtable}",
         r"\usepackage{listings}",
         r"\usepackage[most]{tcolorbox}",
         r"\tcbuselibrary{listings,breakable}",
@@ -895,11 +1098,12 @@ def copy_assets(docs_dir: Path, output_dir: Path) -> None:
 
 
 def build_latex_project(config: Path, output_dir: Path) -> None:
-    global CURRENT_CHAPTER_LINKS, CURRENT_DOCS_DIR, CURRENT_OUTPUT_DIR
+    global CURRENT_CHAPTER_LINKS, CURRENT_DOCS_DIR, CURRENT_OUTPUT_DIR, GRID_CARD_COUNTER
     project = load_project(config)
     docs_dir = (config.parent / project.get("docs_dir", "docs")).resolve()
     CURRENT_DOCS_DIR = docs_dir
     CURRENT_OUTPUT_DIR = output_dir
+    GRID_CARD_COUNTER = 0
     entries = flatten_nav(project.get("nav", []), docs_dir)
     pages = [entry for entry in entries if isinstance(entry, Page)]
     CURRENT_CHAPTER_LINKS = {

@@ -1,8 +1,17 @@
+---
+tags:
+  - Amplitude Descriptors
+---
+
 # Amplitude Descriptors
+
+Use this page for the technical definitions of loudness, RMS, dB, and related amplitude features.
 
 The equations below use $x[n]$ for the input audio samples in the current frame. In the implementation, this frame is passed to `MIR::GetDescription` as `In`, and amplitude descriptors are computed first by `MIR::GetSignalPower` in `Sources/OpenScofo/mir.cpp`.
 
-## Variable Reference
+## Reference Table
+
+### Variables
 
 | Symbol | Meaning | Implementation |
 | --- | --- | --- |
@@ -31,38 +40,38 @@ The equations below use $x[n]$ for the input audio samples in the current frame.
 
 **ID**: `rms` :custom-librosa:[^1] :custom-essentia:
 
-A measure of the amplitude (energy) of the current audio frame. It represents how loud the sound is within a short time window. Higher RMS values indicate louder sounds, while lower values indicate quieter sounds or silence.
+RMS measures frame energy. Higher values indicate louder sound; lower values indicate quiet sound or silence.
 
 `OpenScofo` implements the following equation:
 
 $$RMS = \sqrt{\frac{1}{N} \sum_{n=0}^{N-1} x[n]^2}$$
 
 
-Where root mean square of the amplitude representing the energy of the time-domain signal $x[n]$ of length $N$.
+This is the root mean square of the time-domain signal $x[n]$ of length $N$.
 
 ---
 
 ## dB
 
-**ID**: `db` 
+**ID**: `db`
 
-A logarithmic measure of sound level derived from the signal amplitude. Unlike RMS, which measures the raw energy of the signal, dB expresses this energy on a logarithmic scale that better reflects how humans perceive changes in loudness.
+dB is a logarithmic sound-level measure derived from RMS.
 
 The equation implemented is:
 
 $$L_{dB} = 20 \log_{10}(RMS)$$
 
 If $RMS = 0$, `OpenScofo` returns $-100$ instead of $-\infty$.
-        
-Note that neither `librosa` or `essentia` implemented `dB`, but as it uses `RMS`, once you convert `RMS` to `dB` it is compatible with both.
+
+`librosa` and `essentia` do not expose this exact `dB` descriptor, but converting compatible `RMS` values gives the same scale.
 
 ---
 
 ## Max Amplitude
 
-**ID**: `maxamp` 
+**ID**: `maxamp`
 
-Maximum normalized spectral amplitude detected in the current frame of audio. It is computed during the spectral pass from the FFT-size-normalized magnitude spectrum:
+Maximum normalized spectral amplitude in the current frame:
 
 $$MaxAmp = \max_k A[k]$$
 
@@ -70,32 +79,26 @@ $$MaxAmp = \max_k A[k]$$
 
 ## Loudness
 
-**ID**: `loudness` 
+**ID**: `loudness`
 
-An estimate of perceived sound intensity based on psychoacoustic models of human hearing. Unlike dB, it applies perceptual models and filters derived from psychoacoustic studies to approximate how humans actually perceive loudness.
-
-Equation used is:
+Loudness estimates perceived sound intensity after perceptual filtering.
 
 $$L = -0.691 + 10 \log_{10}\left(\frac{1}{N}\sum_{n=0}^{N-1} y[n]^2\right)$$
 
-where \(y[n]\) denotes the audio samples after applying the filtering stage defined in the [`ITU‑R BS.1770`](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf){:target="_blank"} recommendation.  
+Here \(y[n]\) is the audio after the filtering stage defined by [`ITU‑R BS.1770`](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf){:target="_blank"}.
 
-The term \(N\) represents the number of samples in the analyzed frame. This formulation corresponds to the energy-based loudness estimate used in the loudness measurement procedure defined by the standard.
+The term \(N\) is the number of samples in the analyzed frame.
 
-The `loudness` descriptor implemented in `essentia` is based on a simplified perceptual model derived from signal energy with a power-law compression. While computationally inexpensive, it does not incorporate perceptual frequency weighting or the measurement procedure defined in modern broadcast loudness standards.
-
-`OpenScofo` instead implements loudness estimation following the methodology described in [`ITU‑R BS.1770`](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf){:target="_blank"}. This approach applies perceptual filtering prior to the energy calculation and expresses the result in a logarithmic scale, which aligns with the methodology adopted in contemporary loudness measurement practices for audio production and broadcasting.
-
-As reference, `OpenScofo` implements the code implemented in [klangfreund/LUFSMeter](https://github.com/klangfreund/LUFSMeter).
+`OpenScofo` follows the ITU-R BS.1770 method rather than Essentia's simplified loudness descriptor. The implementation is based on [klangfreund/LUFSMeter](https://github.com/klangfreund/LUFSMeter).
 
 
 ---
 
 ## Silence Probability
 
-**ID**: `silence` 
+**ID**: `silence`
 
-Probability that the current frame corresponds to silence, derived from Loudness ($L$) via a logistic function where $\alpha = 0.25$ and $L_0 = -60.0$:
+Probability that the current frame is silence, derived from loudness ($L$) with $\alpha = 0.25$ and $L_0 = -60.0$:
 
 $$P_{silence} = \frac{1}{1 + e^{\alpha (L - L_0)}}$$
 

@@ -1,22 +1,54 @@
-# Integrations
+---
+icon: material/hub
+tags:
+  - Platform Integrations
+---
 
-`OpenScofo` is designed to operate across multiple environments, covering both real-time interaction and offline analysis workflows. It can be embedded in audio programming systems, used as a library in general-purpose languages, or deployed in browser-based contexts.
+# Platform Integrations
 
-The following integrations are available:
+OpenScofo runs in real-time hosts, offline analysis tools, browser contexts, and language bindings.
 
-* [**Pure Data**](puredata.md) 
-* [**Max/MSP**](max.md) 
-* [**Vamp**](vamp.md) 
-* [**SuperCollider**](supercollider.md) 
-* [**Csound**](csound.md) 
-* [**Python**](python.md) 
-* [**JavaScript**](javascript.md) 
-* [**C++**](cpp.md) 
+```openscofo
+BPM 60
+
+NOTE C4 1
+    sendto delay [1]
+```
+
+## Reference Table
+
+| Environment | Use |
+| --- | --- |
+| [Pure Data](puredata/) | live electronics patches |
+| [Max/MSP](max/) | live electronics and media patches |
+| [Csound](csound/) | instrument scheduling |
+| [SuperCollider](supercollider/) | synths, patterns, OSC-style cues |
+| [Vamp](vamp/) | offline descriptor analysis |
+| [Python](python/) | training and scripting |
+| [JavaScript](javascript/) | browser contexts |
+| [C++](cpp/) | embedding and development |
+
+## `sendto` Behavior
+
+The score language is shared, but `sendto` is host-dependent.
+
+| Host | Behavior | Example |
+| --- | --- | --- |
+| Pure Data | sends to `[r receiver]` | `sendto delay [1]` -> `[r delay]` |
+| Max | sends to `[receive receiver]` | `sendto delay [1]` -> `[receive delay]` |
+| Csound | schedules an instrument event | `sendto 2 [0 0.25 440]` -> `i 2 0 0.25 440` |
+| SuperCollider | sends to `/<namespace>/receiver` | `sendto delay [1]` -> `~oscofo.listen("delay", ...)` |
+| Python / JavaScript / C++ | exposes score actions through API data | inspect the returned action object |
+
+## Releases
+
+Release are available using [Github](https://github.com/charlesneimog/OpenScofo/releases).
+
+* Installer automatic install all the enviroments (Pd, Max, Csound, etc...); 
+* Emscripten is the binary for Web;
+* Python is the wheel (is better to install using `pip`);
 
 
-Each section provides setup instructions and usage details specific to the target environment.
+<release latex="false" interface="All"><i>Loading Releases</i></release>
 
-## Download
-
-<release interface="All"><i>Loading Releases</i></release>
-
+See also: [Your First Interactive Patch](../getting-started/first-interactive-patch/), [Computer Actions](../score/actions/).

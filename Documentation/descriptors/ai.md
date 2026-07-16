@@ -1,30 +1,32 @@
-# AI Model
+---
+tags:
+  - AI Descriptors
+---
 
-The AI model is designed for musicians working with expanded instrumental vocabularies, including extended techniques and non-traditional sounds. It can recognize not only conventional pitched material, but also gestural, percussive, and embodied sound sources such as body percussion, breath, vocal noises, and mouth sounds. The goal is to support performance contexts where sound extends beyond standard pitched instruments.
+# AI Model Reference
 
-The model operates with **audio descriptors** provided by `OpenScofo` (see previous sections). These include amplitude, onset, time-domain, pitch, and spectral descriptors. To enable real-time detection, it must first be trained on labeled examples of the techniques and sound categories you want to recognize during performance.
+Use this page to train or configure a model for extended techniques and other labeled sound categories.
+
+For the composer-facing entry point, start with [AI Models](../ai/).
+
+OpenScofo models recognize labeled sounds from audio descriptors: extended techniques, breath, key clicks, body percussion, vocal noises, or other non-standard performance gestures. Train the model on the same labels and descriptor order you will use in the score.
 
 ---
 
-## Training Overview
+## Reference Table
 
-Training consists of three steps:
-
-1. **Collect audio samples**
-2. **Organize them into labeled folders**
-3. **Extract features and train the model**
+| Step | Requirement |
+| --- | --- |
+| Collect samples | short, isolated, representative `.wav` or `.aif` files |
+| Organize labels | one folder per technique or sound class |
+| Choose descriptors | use the same descriptor order in training and inference |
+| Train | export an ONNX model for `ONNXMODEL` |
 
 ---
 
-### 1. Dataset Structure
+## Dataset Structure
 
-Audio files should be organized using a clear directory hierarchy:
-
-* The **top-level folder** can have any descriptive name (e.g., `dataset`, `training_data`, `extended_techniques_dataset`).
-* Each **subfolder corresponds to a technique or sound label** (e.g., `tongue-ram`, `jet-whistle`, `breath_noise`, `clapping`, `finger_snapping`).
-* Each subfolder contains short (few seconds) audio examples (`.wav` or `.aif`) representing that specific class. These should be **isolated, representative samples**, not long continuous recordings (e.g., avoid 30-minute takes of a single technique such as tongue-ram).
-
-Example structure
+Each subfolder is a class label:
 
 ```python
 Flute/
@@ -54,11 +56,11 @@ Flute/
 
 ---
 
-### 2. Feature Extraction
+## Feature Extraction
 
-After preparing the dataset, select the audio descriptors used for training.
+After preparing the dataset, choose the descriptors used for training.
 
-Commonly used feature set in my pieces:
+Common feature set:
 
 * MFCC
 * Log-mel spectrogram features
@@ -69,11 +71,11 @@ Commonly used feature set in my pieces:
 * Zero-crossing rate
 * Irregularity
 
-You may adjust this set depending on the target instrument and recording conditions, but consistency between training and inference is required.
+Adjust the set for the instrument and recording conditions, but keep training and inference consistent.
 
 ---
 
-### 3. Training Procedure
+## Training Procedure
 
 Once the dataset and feature set are defined:
 
@@ -84,31 +86,31 @@ Once the dataset and feature set are defined:
 
 ---
 
-### Practical Note
+## Remarks
 
 * The quality of classification depends more on **dataset quality and consistency** than on model complexity.
-* Balanced representation across techniques is strongly recommended to avoid bias. For example, 80 samples of `tongue-ram` and just one `jet-whistle` is very bad.
+* Balance labels when possible. A dataset with 80 `tongue-ram` samples and one `jet-whistle` sample is biased.
 
 
-## Training 
+## Training Tools
 
 For now you can use Pure Data or Python to train these models.
 
 ### Pure Data
 
-For Pure Data you can use the `py4pd` object + `py.o.train`. With these objects, you can easily train your model. To install it, you need to follow the steps:
+Use `py4pd` with `py.o.train`:
 
-1. Install last version of Python. You can check this link to install: [https://www.python.org/downloads/](https://www.python.org/downloads/).
-2. Open Pure Data, Go to Tools, Find External, search for `py4pd` and install it;
-3. Them add `declare -lib py4pd`  and create the object `py.o.train`.
-4. Open the help patch of `py.o.train`. Read and explore it.
+1. Install the latest Python from [python.org](https://www.python.org/downloads/).
+2. In Pure Data, choose **Tools > Find Externals**, search for `py4pd`, and install it.
+3. Add `declare -lib py4pd` and create `py.o.train`.
+4. Open the `py.o.train` help patch.
 
 <img src="../assets/py.o.train.png" style="display:block; margin: 0 auto; width:80%;">
 
 
 ### Python
 
-On Python, the `OpenScofo` module provide a class to allow this training. You can use it with the following script.
+In Python, use `OpenScofo.ExtendedTechniqueClassifier`:
 
 ``` python
 import OpenScofo
@@ -146,11 +148,11 @@ trainer.export_model("flute-v5.onnx")
 
 ## Score Example
 
-Here one score example using a trained model.
+Example score using a trained model:
 
 <img src="../assets/score-extended-techniques.png" style="display:block; margin: 0 auto; width:80%;">
 
-This will be the score for OpenScofo:
+OpenScofo score:
 
 ```
 /* Generated by OpenScofo online editor */
@@ -165,11 +167,11 @@ ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 
 // Measure number 1
 UTECH jet_whistle 1
-REST 0.5	
+REST 0.5
 NOTE Bb4 1.5 // tied
 NOTE A4 0.5
 REST 0.5
-	
+
 
 // Measure number 2
 UTECH jet_whistle 1
@@ -195,8 +197,8 @@ PTECH pizzicato A4 0.5
 REST 0.5
 UTECH jet_whistle 1
 REST 1
-	
-	
+
+
 
 // Measure number 5
 PTECH pizzicato D4 0.5
@@ -224,4 +226,4 @@ REST 2
 // Measure number 8
 NOTE D4 2
 REST 2
-``` 
+```

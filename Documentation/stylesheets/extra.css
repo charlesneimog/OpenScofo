@@ -252,3 +252,8 @@ score svg {
     fill: black;
     stroke: black;
 }
+
+/* mdTables */
+.md-typeset__table {
+    margin: auto;
+}
