@@ -252,7 +252,7 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("hop_size", &OpenScofo::Configuration::HOPSize)
 
         // Tuning
-        .def_rw("tuning_a4", &OpenScofo::Configuration::TunningA4)
+        .def_rw("tuning_a4", &OpenScofo::Configuration::TuningA4)
 
         // Pitch template
         .def_rw("pitch_template_sigma", &OpenScofo::Configuration::PitchTemplateSigma)
