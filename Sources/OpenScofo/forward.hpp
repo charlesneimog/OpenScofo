@@ -101,8 +101,8 @@ class OnlineForward {
     double GetBestEvent();
     int GetMaxJIndex(int StateIndex);
 
-    void Markov(MarkovState &StateJ, int j, int bufferIndex);
-    void SemiMarkov(MarkovState &StateJ, int j, int bufferIndex);
+    void Markov(MarkovState &StateJ, int j);
+    void SemiMarkov(MarkovState &StateJ, int j);
 
     int GetAlphaT();
 
@@ -114,7 +114,8 @@ class OnlineForward {
     void NotifyAudioStateChange(int StateIndex);
 
   private:
-    // Test things
+    int m_CircularBufferIndex;
+
     int m_WinEnd;
     int m_WinStart;
     int m_EventWindowSize;
@@ -158,6 +159,7 @@ class OnlineForward {
     static constexpr int A2TableSize = A2TablePrecision * A2TableMaxKappa + 1;
     std::array<double, A2TableSize> m_A2Table = {};
     bool m_A2TableInitialized = false;
+
     // Cache for the distributions
     std::unordered_map<int, std::vector<double>> m_OccupancyPMFCache;
     std::unordered_map<int, std::vector<double>> m_SurvivorCache;
