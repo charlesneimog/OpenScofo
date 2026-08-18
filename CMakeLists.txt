@@ -233,6 +233,8 @@ cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 cpmaddpackage("gh:charlesneimog/libonnx#master")
 
+target_compile_definitions(spdlog PUBLIC SPDLOG_NO_EXCEPTIONS)
+
 # ╭──────────────────────────────────────╮
 # │                OpenScofo             │
 # ╰──────────────────────────────────────╯
@@ -284,6 +286,7 @@ if(EMSCRIPTEN)
                -ffunction-sections
                -fdata-sections
                >)
+    target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 
 elseif(MSVC)
     target_compile_options(
@@ -324,6 +327,7 @@ elseif(WIN32)
                -ffunction-sections
                -fdata-sections
                >)
+    target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 
 elseif(APPLE)
     find_package(Boost REQUIRED)
@@ -362,6 +366,7 @@ elseif(APPLE)
     target_link_options(
         OpenScofo PUBLIC
         "$<$<BOOL:${OPENSCOFO_ENABLE_SANITIZERS}>:-fsanitize=address;-fsanitize=undefined>")
+    target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 
 else() # Linux (GCC or Clang)
     target_compile_options(
@@ -395,6 +400,7 @@ else() # Linux (GCC or Clang)
     endif()
 
     target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-flto=auto;-Wl,--gc-sections;-s >)
+    target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 endif()
 
 # ╭──────────────────────────────────────╮

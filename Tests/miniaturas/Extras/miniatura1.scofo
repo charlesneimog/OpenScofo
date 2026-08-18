@@ -3,7 +3,7 @@ FFTSIZE 2048
 HOPSIZE 512
 
 ONNXMODEL ai-flute-model.onnx
-ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+//ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 
 BPM 100
 

@@ -14,7 +14,8 @@ std::vector<double> load_audio_as_wave(const char *path, int &sr, int &ch) {
     AudioFile<double> audioFile;
 
     if (!audioFile.load(path)) {
-        throw std::runtime_error("audio load failed");
+        std::fputs("Audio load failed", stderr);
+        std::abort();
     }
 
     sr = audioFile.getSampleRate();

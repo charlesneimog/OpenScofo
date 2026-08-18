@@ -115,20 +115,14 @@ struct ScOpenScofo : public SCUnit {
 
         std::string scorePath(path);
         m_LoadThread = std::thread([this, scorePath]() {
-            try {
-                std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
-                if (m_OpenScofo) {
-                    bool ok = m_OpenScofo->LoadScore(scorePath);
-                    if (ok) {
-                        m_LastEventIndex = -1;
-                        m_LastActionStateIndex = -1;
-                        m_ScheduledActions.clear();
-                    }
+            std::lock_guard<std::mutex> lock(m_OpenScofoMutex);
+            if (m_OpenScofo) {
+                bool ok = m_OpenScofo->LoadScore(scorePath);
+                if (ok) {
+                    m_LastEventIndex = -1;
+                    m_LastActionStateIndex = -1;
+                    m_ScheduledActions.clear();
                 }
-            } catch (const std::exception &e) {
-                Print("[OpenScofo][ERR] SuperCollider score load failed: %s\n", e.what());
-            } catch (...) {
-                Print("[OpenScofo][ERR] SuperCollider score load failed with an unknown exception.\n");
             }
             m_LoadInProgress = false;
         });
@@ -228,41 +222,37 @@ struct ScOpenScofo : public SCUnit {
         OpenScofo::Description desc = m_OpenScofo->GetDescription();
         const std::string replyAddress = DescriptorAddress(m_OpenScofo->GetDescriptionId(descriptor));
 
-        try {
-            switch (descriptor) {
-            case OpenScofo::Descriptors::MFCC:
-            case OpenScofo::Descriptors::CHROMA:
-            case OpenScofo::Descriptors::LOGMEL:
-            case OpenScofo::Descriptors::MAGNITUDE:
-            case OpenScofo::Descriptors::POWERARRAY: {
-                std::vector<double> values = m_OpenScofo->GetDescriptionArray(desc, descriptor);
-                std::vector<float> replyValues;
-                replyValues.reserve(values.size());
-                for (double value : values) {
-                    replyValues.push_back(static_cast<float>(value));
-                }
-                if (!replyValues.empty()) {
-                    SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), static_cast<int>(replyValues.size()),
-                                  replyValues.data());
-                }
-                break;
+        switch (descriptor) {
+        case OpenScofo::Descriptors::MFCC:
+        case OpenScofo::Descriptors::CHROMA:
+        case OpenScofo::Descriptors::LOGMEL:
+        case OpenScofo::Descriptors::MAGNITUDE:
+        case OpenScofo::Descriptors::POWERARRAY: {
+            std::vector<double> values = m_OpenScofo->GetDescriptionArray(desc, descriptor);
+            std::vector<float> replyValues;
+            replyValues.reserve(values.size());
+            for (double value : values) {
+                replyValues.push_back(static_cast<float>(value));
             }
-            case OpenScofo::Descriptors::ONNX:
-                for (const auto &onnxDesc : desc.ONNX) {
-                    std::string onnxAddress = replyAddress + "/";
-                    onnxAddress += onnxDesc.first;
-                    float value = static_cast<float>(onnxDesc.second);
-                    SendNodeReply(&mParent->mNode, 0, onnxAddress.c_str(), 1, &value);
-                }
-                break;
-            default: {
-                float value = static_cast<float>(m_OpenScofo->GetDescriptionFloat(desc, descriptor));
-                SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), 1, &value);
-                break;
+            if (!replyValues.empty()) {
+                SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), static_cast<int>(replyValues.size()),
+                              replyValues.data());
             }
+            break;
+        }
+        case OpenScofo::Descriptors::ONNX:
+            for (const auto &onnxDesc : desc.ONNX) {
+                std::string onnxAddress = replyAddress + "/";
+                onnxAddress += onnxDesc.first;
+                float value = static_cast<float>(onnxDesc.second);
+                SendNodeReply(&mParent->mNode, 0, onnxAddress.c_str(), 1, &value);
             }
-        } catch (const std::exception &e) {
-            Print("[OpenScofo][ERR] Failed to send descriptor '%s': %s\n", descriptorId, e.what());
+            break;
+        default: {
+            float value = static_cast<float>(m_OpenScofo->GetDescriptionFloat(desc, descriptor));
+            SendNodeReply(&mParent->mNode, 0, replyAddress.c_str(), 1, &value);
+            break;
+        }
         }
     }
 

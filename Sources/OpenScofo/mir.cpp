@@ -701,6 +701,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     for (int i = 0; i < NHalf; ++i) {
         const double normSp = (Desc.SpectralMagnitudeNorm[i]) * invSum;
         Desc.SpectralMagnitudeFrameNorm[i] = normSp;
+        Desc.SpectralPowerFrameNorm[i] = Desc.Power[i] * invSpectralEnergy;
         const double diffMean = normSp - Mean;
         Variance += diffMean * diffMean;
         const double currentPower = Desc.Power[i];

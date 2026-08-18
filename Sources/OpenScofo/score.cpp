@@ -10,6 +10,7 @@
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
+#include <utility>
 #include <tree_sitter/api.h>
 
 namespace OpenScofo {
@@ -642,7 +643,7 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
 }
 
 // ─────────────────────────────────────
-std::string GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
+std::string Score::GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
     uint32_t count = ts_node_child_count(parent);
     for (uint32_t i = 0; i < count; ++i) {
         TSNode child = ts_node_child(parent, i);
@@ -660,7 +661,7 @@ std::string GetChildStringFromType(const std::string &source, TSNode parent, con
 }
 
 // ─────────────────────────────────────
-static bool GetConfigNumber(const std::string &id, const std::string &valueType, const std::string &value, TSPoint pos,
+bool Score::GetConfigNumber(const std::string &id, const std::string &valueType, const std::string &value, TSPoint pos,
                             double &out) {
     if (valueType != "number") {
         spdlog::error("Invalid numeric value for {} on line {}.", id, pos.row + 1);
@@ -672,7 +673,7 @@ static bool GetConfigNumber(const std::string &id, const std::string &valueType,
 }
 
 // ─────────────────────────────────────
-static bool GetConfigBool(const std::string &id, const std::string &valueType, std::string value, TSPoint pos,
+bool Score::GetConfigBool(const std::string &id, const std::string &valueType, std::string value, TSPoint pos,
                           bool &out) {
     if (valueType != "identifier" && valueType != "number") {
         spdlog::error("Invalid boolean value for {} on line {}.", id, pos.row + 1);
@@ -1062,7 +1063,7 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState
 }
 
 // ─────────────────────────────────────
-void FindErrors(TSNode &root, TSNode &node, const std::string &ScoreStr) {
+void Score::FindErrors(TSNode &root, TSNode &node, const std::string &ScoreStr) {
     if (!ts_node_is_null(node) && !ts_node_eq(root, node) && ts_node_has_error(node)) {
         TSPoint start = ts_node_start_point(node);
         uint32_t row = start.row + 1; // 1-based
@@ -1081,7 +1082,7 @@ void FindErrors(TSNode &root, TSNode &node, const std::string &ScoreStr) {
 }
 
 // ─────────────────────────────────────
-bool ScoreIsText(const std::string &path) {
+bool Score::ScoreIsText(const std::string &path) {
     std::ifstream file(path, std::ios::binary);
     if (!file)
         return false;

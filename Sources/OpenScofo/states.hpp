@@ -206,6 +206,7 @@ struct Description {
     std::vector<double> Magnitude;
     std::vector<double> SpectralMagnitudeNorm;
     std::vector<double> SpectralMagnitudeFrameNorm;
+    std::vector<double> SpectralPowerFrameNorm;
 
     std::vector<double> LogMelSpectrum;
     std::vector<double> ReverbSpectralPower;

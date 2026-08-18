@@ -95,6 +95,11 @@ Resources/Extended-Techniques-Random-Tests/*.txt
 Resources/Extended-Techniques-Random-Tests/*.svg
 Resources/Extended-Techniques-Random-Tests/*.xml
 
+Resources/Extended-Techniques/*.wav
+Resources/Extended-Techniques/*.txt
+Resources/Extended-Techniques/*.svg
+Resources/Extended-Techniques/*.xml
+
 site
 dist
 
