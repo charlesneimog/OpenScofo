@@ -123,3 +123,4 @@ dist
 /flamegraph.svg
 /Resources/Packages/out-linux
 /Resources/__pycache__
+/OpenScofo/OpenScofo

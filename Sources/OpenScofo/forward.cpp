@@ -132,8 +132,7 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
     const MarkovState &State = m_States[StateIndex];
     const int AudioStateIndex = State.BestAudioStateIndex;
 
-    if (State.Type != CHORD &&
-        (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.AudioStates.size()))) {
+    if (State.Type != CHORD && (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.AudioStates.size()))) {
         return;
     }
 
@@ -515,8 +514,7 @@ void OnlineForward::ResetDecoding() {
 }
 
 // ─────────────────────────────────────
-// CUVILLIER 2016 (Check chapter 3 and 4)
-// TODO: Review
+// CUVILLIER 2016, sections 6.1.3 and A.3.3.
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     if (ExpectedFrames < 1.0)
         ExpectedFrames = 1.0;
@@ -528,45 +526,42 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
         return; // Both exist, safe to return
     }
 
-    // If we get here, rebuild both caches for this key
-    // (even if one exists, rebuild to ensure consistency)
-
-    const int maxU = static_cast<int>(std::ceil(5.0 * ExpectedFrames));
-    constexpr double p = 0.5;
-    constexpr double one_minus_p = 0.5;
-    const double log_p = std::log(p);
-    const double log_1_p = std::log(one_minus_p);
-    const double r_prime = ExpectedFrames - 1.0;
+    // Use the value represented by the cache key so the cached distribution
+    // does not depend on which value in a quantization bucket was seen first.
+    const double lambda = static_cast<double>(key) / 10.0;
+    const int maxU = std::max(1, std::min(static_cast<int>(std::ceil(5.0 * lambda)), m_BufferSize - 1));
 
     std::vector<double> pmf(maxU + 1, 0.0);
     std::vector<double> survivor(maxU + 2, 0.0);
-
-    double current_log_pmf = r_prime * log_p;
-    double sum_raw = 0.0;
     std::vector<double> raw(maxU + 1, 0.0);
+    double sumRaw = 0.0;
 
+    // Cuvillier recommends D_l ~ Poisson(l) for discrete-time occupancy.
+    // Appendix A.3.2 transforms its mass at zero into initial and transition
+    // probabilities; the cached occupancy is therefore conditioned on U > 0.
     for (int u = 1; u <= maxU; ++u) {
-        raw[u] = std::exp(current_log_pmf);
-        sum_raw += raw[u];
-        if (r_prime > 0.0) {
-            current_log_pmf += std::log((u - 1) + r_prime) - std::log((double)u) + log_1_p;
-        } else {
-            current_log_pmf = -std::numeric_limits<double>::max();
-        }
+        const double logPmf = -lambda + static_cast<double>(u) * std::log(lambda) - std::lgamma(u + 1.0);
+        raw[u] = std::exp(logPmf);
+        sumRaw += raw[u];
     }
 
-    // Normalize over {1,...,maxU}
-    for (int u = 1; u <= maxU; ++u)
-        pmf[u] = raw[u] / sum_raw;
+    // For very large lambda the representable left tail may underflow. Fall
+    // back to the last available duration instead of producing NaNs.
+    if (sumRaw <= std::numeric_limits<double>::min()) {
+        pmf[maxU] = 1.0;
+    }
 
-    // Survivor: D̄(u) = Σ_{k=u}^{maxU} pmf[k]
+    for (int u = 1; u <= maxU; ++u)
+        if (sumRaw > std::numeric_limits<double>::min())
+            pmf[u] = raw[u] / sumRaw;
+
+    // D-bar_j(u) = P(U >= u).
     survivor[maxU + 1] = 0.0;
     survivor[maxU] = pmf[maxU];
     for (int u = maxU - 1; u >= 1; --u)
         survivor[u] = pmf[u] + survivor[u + 1];
     survivor[0] = 1.0;
 
-    // Always overwrite to ensure consistency
     m_OccupancyCache[key] = std::move(pmf);
     m_SurvivorCache[key] = std::move(survivor);
 }
@@ -959,12 +954,48 @@ void OnlineForward::GetInitialDistribution() {
         }
     }
 
+    // Cuvillier A.3.2, step 4: move the Poisson mass at zero into
+    // the initial distribution of the equivalent non-null HSMM.
+    std::vector<double> NonNullInitialProb(Size, 0.0);
+    for (int destination = 0; destination < Size; ++destination) {
+        const MarkovState &DestinationState = m_States[m_CurrentStateIndex + destination];
+        const double destinationExpectedFrames = std::max(1.0, (m_PsiN1 * DestinationState.Duration) / m_BlockDur);
+        const double destinationLambda = std::round(destinationExpectedFrames * 10.0) / 10.0;
+        const double destinationNonNull =
+            DestinationState.HSMMType == SEMIMARKOV ? -std::expm1(-destinationLambda) : 1.0;
+
+        double probability = 0.0;
+        for (int source = 0; source <= destination; ++source) {
+            double skipped = 1.0;
+            for (int k = source; k < destination; ++k) {
+                const MarkovState &SkippedState = m_States[m_CurrentStateIndex + k];
+                if (SkippedState.HSMMType == SEMIMARKOV) {
+                    const double expectedFrames = std::max(1.0, (m_PsiN1 * SkippedState.Duration) / m_BlockDur);
+                    const double lambda = std::round(expectedFrames * 10.0) / 10.0;
+                    skipped *= std::exp(-lambda);
+                } else {
+                    skipped = 0.0;
+                    break;
+                }
+            }
+            probability += InitialProb[source] * skipped;
+        }
+        NonNullInitialProb[destination] = destinationNonNull * probability;
+    }
+
+    const double nonNullSum = std::accumulate(NonNullInitialProb.begin(), NonNullInitialProb.end(), 0.0);
+    if (nonNullSum > std::numeric_limits<double>::min()) {
+        for (double &probability : NonNullInitialProb)
+            probability /= nonNullSum;
+    }
+
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
             continue;
         int idx = j - m_CurrentStateIndex;
         MarkovState &StateJ = m_States[j];
-        StateJ.InitProb = (idx < (int)InitialProb.size()) ? InitialProb[idx] : 0.0;
+        StateJ.InitProb =
+            (idx >= 0 && idx < static_cast<int>(NonNullInitialProb.size())) ? NonNullInitialProb[idx] : 0.0;
         if (j < m_CurrentStateIndex) {
             m_States[j].InitProb = 0.0;
         }
@@ -1072,20 +1103,20 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
 
     const auto &surv_cache = m_SurvivorCache[key];
     const auto &occ_cache = m_OccupancyCache[key];
-    int maxU = static_cast<int>(occ_cache.size()) - 1;
+    const int maxU = static_cast<int>(occ_cache.size()) - 1;
+    const int observedHistory = std::min(m_Tau, maxU);
 
-    for (int u = 1; u <= maxU; ++u) {
+    // Cuvillier A.3.3: sum transitions only over durations for which t-u is
+    // part of the observed history. Longer paths belong to the initial term.
+    for (int u = 1; u <= observedHistory; ++u) {
         const double Dju = surv_cache[u];
         const double dju = occ_cache[u];
 
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
 
         double TransSum = 0.0;
-        const int i = j - 1;
-
-        if (i >= m_WinStart && i <= m_WinEnd) {
-            TransSum = m_States[i].ExitProb[EntryBuf];
-        }
+        for (int i = m_WinStart; i < j; ++i)
+            TransSum += GetTransProbability(i, j) * m_States[i].ExitProb[EntryBuf];
 
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
@@ -1099,8 +1130,16 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
             ObsProd = 0.0;
         }
 
-        if (ObsProd < 1e-15)
+        if (ObsProd == 0.0)
             break;
+    }
+
+    // Right-censored initialization term from Cuvillier A.3.3:
+    // D-bar_j(t+1) b_j(o_0^t) pi(j), and d_j(t+1) respectively.
+    const int initialDuration = m_Tau + 1;
+    if (initialDuration <= maxU) {
+        FTildeJ += surv_cache[initialDuration] * ObsProd * StateJ.InitProb;
+        FTildeJo += occ_cache[initialDuration] * ObsProd * StateJ.InitProb;
     }
 
     StateJ.Forward[bufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());

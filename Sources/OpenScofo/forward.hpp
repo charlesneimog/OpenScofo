@@ -134,7 +134,7 @@ class OnlineForward {
     double m_FFTSize;
     double m_HopSize;
     double m_dBTreshold = -55;
-    int m_BufferSize = 500;
+    int m_BufferSize = 2000;
     bool m_IsSilence = false;
 
     // Pitch Template
