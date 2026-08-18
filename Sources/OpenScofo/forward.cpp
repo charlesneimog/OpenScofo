@@ -44,6 +44,10 @@ namespace OpenScofo {
 
     * LARGE, E. W.; PALMER, C. Perceiving Temporal Regularity in Music. Cognitive Science,
         [S.l.], v.26, n.1, p.1–37, 2002.
+
+    * BATSCHELET, E. Circular statistics in biology. London: Academic Press, 1981.
+
+
 */
 
 // ╭─────────────────────────────────────╮
@@ -511,116 +515,57 @@ void OnlineForward::ResetDecoding() {
 
 // ─────────────────────────────────────
 // CUVILLIER 2016, sections 6.1.3 and A.3.3.
-// void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
-//     if (ExpectedFrames < 1.0)
-//         ExpectedFrames = 1.0;
-//
-//     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
-//     if (m_OccupancyPMFCache.find(key) != m_OccupancyPMFCache.end() &&
-//         m_SurvivorCache.find(key) != m_SurvivorCache.end())
-//         return;
-//
-//     const double lambda = static_cast<double>(key) / 10.0;
-//     const int maxU = std::max(1, std::min(static_cast<int>(std::ceil(5.0 * lambda)), m_BufferSize - 1));
-//     std::vector<double> pmf(maxU + 1, 0.0);
-//     std::vector<double> survivor(maxU + 2, 0.0);
-//     std::vector<double> raw(maxU + 1, 0.0);
-//     double sumRaw = 0.0;
-//
-//     for (int u = 1; u <= maxU; ++u) {
-//         const double logPmf = -lambda + static_cast<double>(u) * std::log(lambda) - std::lgamma(u + 1.0);
-//         raw[u] = std::exp(logPmf);
-//         sumRaw += raw[u];
-//     }
-//     if (sumRaw <= std::numeric_limits<double>::min())
-//         pmf[maxU] = 1.0;
-//     for (int u = 1; u <= maxU; ++u)
-//         if (sumRaw > std::numeric_limits<double>::min())
-//             pmf[u] = raw[u] / sumRaw;
-//
-//     survivor[maxU + 1] = 0.0;
-//     survivor[maxU] = pmf[maxU];
-//     for (int u = maxU - 1; u >= 1; --u)
-//         survivor[u] = pmf[u] + survivor[u + 1];
-//     survivor[0] = 1.0;
-//
-//     m_OccupancyPMFCache[key] = std::move(pmf);
-//     m_SurvivorCache[key] = std::move(survivor);
-// }
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     ExpectedFrames = std::max(ExpectedFrames, 1.0);
-    const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
 
-    if (m_OccupancyPMFCache.find(key) != m_OccupancyPMFCache.end() &&
-        m_SurvivorCache.find(key) != m_SurvivorCache.end()) {
+    const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
+    if (m_OccupancyPMFCache.contains(key) && m_SurvivorCache.contains(key)) {
         return;
     }
 
-    // Quantized expected duration used by the cache.
-    const double mean = static_cast<double>(key) / 10.0;
-
-    // Negative Binomial dispersion.
-    //
-    // Variance = mean + mean^2 / r
-    //
-    // Larger r -> narrower distribution, approaching Poisson.
-    // Smaller r -> wider distribution and more tolerance to fermatas.
-    //
-    // r = 16 gives approximately 25% relative standard deviation
-    // for sufficiently long events.
-
-    // TODO: This need to be a SCORE PARAMETER
-    constexpr double r = 8.0;
+    const double mean = static_cast<double>(key) * 0.1;
+    constexpr double r = 64.0;
 
     const double p = r / (r + mean);
-    const double logP = std::log(p);
-    const double logOneMinusP = std::log1p(-p);
+    const double q = 1.0 - p;
+
     const double variance = mean + (mean * mean) / r;
     const double sigma = std::sqrt(variance);
 
-    // Keep enough of the right tail for expressive lengthening.
-    //
-    // mean + 8 sigma normally contains essentially all useful mass,
-    // while 5 * mean remains a generous upper bound for short events.
     const int requestedMaxU = static_cast<int>(std::ceil(std::max(5.0 * mean, mean + 8.0 * sigma)));
-
-    const int maxU = std::max(1, std::min(requestedMaxU, m_BufferSize - 1));
-
+    const int maxU = std::clamp(requestedMaxU, 1, m_BufferSize - 1);
     std::vector<double> pmf(static_cast<size_t>(maxU + 1), 0.0);
     std::vector<double> survivor(static_cast<size_t>(maxU + 2), 0.0);
-    std::vector<double> raw(static_cast<size_t>(maxU + 1), 0.0);
 
-    double sumRaw = 0.0;
-
-    // We deliberately use u >= 1 because a score event cannot have
-    // zero-frame occupancy. As in the previous Poisson implementation,
-    // the distribution is conditioned on positive duration by
-    // renormalizing below.
+    // Negative Binomial PMF
+    double probability = std::pow(p, r);
+    double sum = 0.0;
     for (int u = 1; u <= maxU; ++u) {
-        const double logPmf = std::lgamma(static_cast<double>(u) + r) - std::lgamma(r) -
-                              std::lgamma(static_cast<double>(u) + 1.0) + r * logP +
-                              static_cast<double>(u) * logOneMinusP;
-        raw[static_cast<size_t>(u)] = std::exp(logPmf);
-        sumRaw += raw[static_cast<size_t>(u)];
+        probability *= ((static_cast<double>(u - 1) + r) / static_cast<double>(u)) * q;
+        pmf[static_cast<size_t>(u)] = probability;
+        sum += probability;
     }
 
-    if (sumRaw <= std::numeric_limits<double>::min()) {
-        pmf[static_cast<size_t>(maxU)] = 1.0;
-    } else {
-        const double invSum = 1.0 / sumRaw;
+    // Normalize zero-truncated distribution
+    if (sum > std::numeric_limits<double>::min()) {
+        const double invSum = 1.0 / sum;
         for (int u = 1; u <= maxU; ++u) {
-            pmf[static_cast<size_t>(u)] = raw[static_cast<size_t>(u)] * invSum;
+            pmf[static_cast<size_t>(u)] *= invSum;
         }
+    } else {
+        pmf[static_cast<size_t>(maxU)] = 1.0;
     }
 
-    survivor[static_cast<size_t>(maxU + 1)] = 0.0;
-    survivor[static_cast<size_t>(maxU)] = pmf[static_cast<size_t>(maxU)];
-    for (int u = maxU - 1; u >= 1; --u) {
-        survivor[static_cast<size_t>(u)] = pmf[static_cast<size_t>(u)] + survivor[static_cast<size_t>(u + 1)];
+    // Survivor function
+    double cumulative = 0.0;
+    for (int u = maxU; u >= 1; --u) {
+        cumulative += pmf[static_cast<size_t>(u)];
+        survivor[static_cast<size_t>(u)] = cumulative;
     }
     survivor[0] = 1.0;
-    m_OccupancyPMFCache[key] = std::move(pmf);
-    m_SurvivorCache[key] = std::move(survivor);
+
+    m_OccupancyPMFCache.emplace(key, std::move(pmf));
+    m_SurvivorCache.emplace(key, std::move(survivor));
 }
 
 // ─────────────────────────────────────
@@ -640,6 +585,7 @@ double OnlineForward::CalculateA2(double kappa) {
 }
 
 // ─────────────────────────────────────
+// CONT (2010) and BATSCHELET (1981)
 void OnlineForward::InitializeA2Table() {
     if (m_A2TableInitialized) {
         return;
@@ -653,7 +599,7 @@ void OnlineForward::InitializeA2Table() {
 }
 
 // ─────────────────────────────────────
-// CONT 2010 (Section 7.1)
+// CONT 2010
 double OnlineForward::A2(double kappa) {
     InitializeA2Table();
 
@@ -671,7 +617,7 @@ double OnlineForward::A2(double kappa) {
 }
 
 // ─────────────────────────────────────
-// CONT 2010 (Section 7.1)
+// CONT 2010
 double OnlineForward::InverseA2(double SyncStrength) {
     InitializeA2Table();
 
@@ -851,8 +797,6 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
 void OnlineForward::GetAudioObservations() {
-    int bufferIndex = m_Tau % m_BufferSize;
-
     double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
@@ -959,7 +903,7 @@ void OnlineForward::GetAudioObservations() {
             break;
         }
 
-        state.BestObs[bufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
+        state.BestObs[m_CircularBufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
 
         if (state.Type != REST)
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
@@ -1139,14 +1083,14 @@ int OnlineForward::GetMaxUForJ(MarkovState &StateJ) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
-    double Bj = StateJ.BestObs[bufferIndex];
+void OnlineForward::Markov(MarkovState &StateJ, int j) {
+    double Bj = StateJ.BestObs[m_CircularBufferIndex];
     double Fj;
 
     if (m_Tau == 0) {
         Fj = Bj * StateJ.InitProb;
     } else {
-        int prevBuf = (bufferIndex - 1 + m_BufferSize) % m_BufferSize;
+        int prevBuf = (m_CircularBufferIndex - 1 + m_BufferSize) % m_BufferSize;
         double sumPrev = 0.0;
 
         // Stay in j (self-loop)
@@ -1163,14 +1107,14 @@ void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
     }
 
     // For Markov states Forward = ExitProb (they can exit at every step)
-    StateJ.Forward[bufferIndex] = Fj;
-    StateJ.ExitProb[bufferIndex] = Fj;
+    StateJ.Forward[m_CircularBufferIndex] = Fj;
+    StateJ.ExitProb[m_CircularBufferIndex] = Fj;
 }
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
-    double Bj = StateJ.BestObs[bufferIndex];
+void OnlineForward::SemiMarkov(MarkovState &StateJ, int j) {
+    double Bj = StateJ.BestObs[m_CircularBufferIndex];
 
     double FTildeJ = 0.0;
     double FTildeJo = 0.0;
@@ -1210,25 +1154,24 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
         FTildeJo += occ_cache[initialDuration] * ObsProd * StateJ.InitProb;
     }
 
-    StateJ.Forward[bufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());
-    StateJ.ExitProb[bufferIndex] = Bj * (FTildeJo + std::numeric_limits<double>::min());
+    StateJ.Forward[m_CircularBufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());
+    StateJ.ExitProb[m_CircularBufferIndex] = Bj * (FTildeJo + std::numeric_limits<double>::min());
 }
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
 int OnlineForward::GetAlphaT() {
-    int bIndex = m_Tau % m_BufferSize;
     spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
-                  m_WinEnd, bIndex, m_Tau, m_Kappa);
+                  m_WinEnd, m_CircularBufferIndex, m_Tau, m_Kappa);
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
         switch (StateJ.HSMMType) {
         case SEMIMARKOV:
-            SemiMarkov(StateJ, j, bIndex);
+            SemiMarkov(StateJ, j);
             break;
         case MARKOV:
-            Markov(StateJ, j, bIndex);
+            Markov(StateJ, j);
             break;
         }
     }
@@ -1236,21 +1179,21 @@ int OnlineForward::GetAlphaT() {
     // Calculate the Normalization Denominator
     double N = 0.0;
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        N += m_States[j].Forward[bIndex];
+        N += m_States[j].Forward[m_CircularBufferIndex];
     }
 
     if (N < std::numeric_limits<double>::min()) {
         N = std::numeric_limits<double>::min();
     }
 
-    m_Normalization[bIndex] = N;
+    m_Normalization[m_CircularBufferIndex] = N;
 
     // Apply Normalization
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        m_States[j].Forward[bIndex] /= N;
-        m_States[j].Forward[bIndex] += std::numeric_limits<double>::min();
-        m_States[j].ExitProb[bIndex] /= N;
-        m_States[j].ExitProb[bIndex] += std::numeric_limits<double>::min();
+        m_States[j].Forward[m_CircularBufferIndex] /= N;
+        m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+        m_States[j].ExitProb[m_CircularBufferIndex] /= N;
+        m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
     }
 
     // Find the Argmax (Best State)
@@ -1259,14 +1202,15 @@ int OnlineForward::GetAlphaT() {
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
-        double fwd = StateJ.Forward[bIndex];
+        double fwd = StateJ.Forward[m_CircularBufferIndex];
         if (fwd > maxVal && j >= m_CurrentStateIndex) {
             maxVal = fwd;
             BestStateIndex = j;
         }
 
         spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
-                      StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.ExitProb[bIndex]);
+                      StateJ.BestObs[m_CircularBufferIndex], StateJ.Forward[m_CircularBufferIndex],
+                      StateJ.ExitProb[m_CircularBufferIndex]);
     }
 
     if (m_IsSilence && BestStateIndex != m_CurrentStateIndex && m_States[BestStateIndex].Type != REST) {
@@ -1274,7 +1218,7 @@ int OnlineForward::GetAlphaT() {
     }
 
     MarkovState &BestState = m_States[BestStateIndex];
-    spdlog::debug("Best: State ({}) | Forward {:.5f}", BestState.Index, BestState.Forward[bIndex]);
+    spdlog::debug("Best: State ({}) | Forward {:.5f}", BestState.Index, BestState.Forward[m_CircularBufferIndex]);
 
     return BestStateIndex;
 }
@@ -1283,6 +1227,9 @@ int OnlineForward::GetAlphaT() {
 int OnlineForward::GetEvent(Description &Desc) {
     spdlog::debug("Starting inference");
     m_Desc = Desc;
+
+    m_CircularBufferIndex = m_Tau % m_BufferSize;
+
     if (m_CurrentStateIndex > (int)m_States.size()) {
         spdlog::debug("Score Finished");
         return m_States.back().ScorePos;
