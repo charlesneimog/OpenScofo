@@ -120,6 +120,9 @@ class OnlineForward {
     int m_EventWindowSize;
     std::vector<double> m_Normalization;
 
+    int m_BestAudioStateStateIndex;
+    int m_BestAudioStateIndex;
+
     // Config
     double m_MinEntropy = 0;
     AudioDescType m_CurrentAudioState;
@@ -156,7 +159,7 @@ class OnlineForward {
     std::array<double, A2TableSize> m_A2Table = {};
     bool m_A2TableInitialized = false;
     // Cache for the distributions
-    std::unordered_map<int, std::vector<double>> m_OccupancyCache;
+    std::unordered_map<int, std::vector<double>> m_OccupancyPMFCache;
     std::unordered_map<int, std::vector<double>> m_SurvivorCache;
 
     double m_LastTn = 0;

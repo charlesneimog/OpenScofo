@@ -83,7 +83,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_PitchTemplates.clear();
     m_PitchTemplatesPrecomputed.clear();
     m_PitchCQTTemplates.clear();
-    m_OccupancyCache.clear();
+    m_OccupancyPMFCache.clear();
     m_SurvivorCache.clear();
 
     m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
@@ -182,7 +182,7 @@ void OnlineForward::ResetCaches() {
     m_PitchTemplates.clear();
     m_PitchTemplatesPrecomputed.clear();
     m_PitchProbabilityCache.clear();
-    m_OccupancyCache.clear();
+    m_OccupancyPMFCache.clear();
     m_SurvivorCache.clear();
     m_KappaCache.clear();
 
@@ -190,7 +190,7 @@ void OnlineForward::ResetCaches() {
     m_PitchTemplates.rehash(0);
     m_PitchTemplatesPrecomputed.rehash(0);
     m_PitchProbabilityCache.rehash(0);
-    m_OccupancyCache.rehash(0);
+    m_OccupancyPMFCache.rehash(0);
     m_SurvivorCache.rehash(0);
     m_KappaCache.rehash(0);
 
@@ -212,12 +212,11 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
 
     spdlog::debug("BufferSize is {}", m_BufferSize);
 
-    m_Normalization.resize(m_BufferSize + 1, 1.0); // init to 1 so first-step division is safe
+    m_Normalization.assign(m_BufferSize, 1.0);
     for (MarkovState &State : m_States) {
-        State.Forward.resize(m_BufferSize + 1, 0.0);                                // F_j(t)
-        State.ExitProb.resize(m_BufferSize + 1, 0.0);                               // F_j^o(t)
-        State.BestObs.resize(m_BufferSize + 1, std::numeric_limits<double>::min()); // b_j(x_t), floor avoids /0
-        State.BestAudioStateIndex = -1;
+        State.Forward.assign(m_BufferSize, std::numeric_limits<double>::min());
+        State.ExitProb.assign(m_BufferSize, std::numeric_limits<double>::min());
+        State.BestObs.assign(m_BufferSize, std::numeric_limits<double>::min());
     }
 
     m_CurrentStateIndex = 0;
@@ -512,39 +511,115 @@ void OnlineForward::ResetDecoding() {
 
 // ─────────────────────────────────────
 // CUVILLIER 2016, sections 6.1.3 and A.3.3.
+// void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
+//     if (ExpectedFrames < 1.0)
+//         ExpectedFrames = 1.0;
+//
+//     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
+//     if (m_OccupancyPMFCache.find(key) != m_OccupancyPMFCache.end() &&
+//         m_SurvivorCache.find(key) != m_SurvivorCache.end())
+//         return;
+//
+//     const double lambda = static_cast<double>(key) / 10.0;
+//     const int maxU = std::max(1, std::min(static_cast<int>(std::ceil(5.0 * lambda)), m_BufferSize - 1));
+//     std::vector<double> pmf(maxU + 1, 0.0);
+//     std::vector<double> survivor(maxU + 2, 0.0);
+//     std::vector<double> raw(maxU + 1, 0.0);
+//     double sumRaw = 0.0;
+//
+//     for (int u = 1; u <= maxU; ++u) {
+//         const double logPmf = -lambda + static_cast<double>(u) * std::log(lambda) - std::lgamma(u + 1.0);
+//         raw[u] = std::exp(logPmf);
+//         sumRaw += raw[u];
+//     }
+//     if (sumRaw <= std::numeric_limits<double>::min())
+//         pmf[maxU] = 1.0;
+//     for (int u = 1; u <= maxU; ++u)
+//         if (sumRaw > std::numeric_limits<double>::min())
+//             pmf[u] = raw[u] / sumRaw;
+//
+//     survivor[maxU + 1] = 0.0;
+//     survivor[maxU] = pmf[maxU];
+//     for (int u = maxU - 1; u >= 1; --u)
+//         survivor[u] = pmf[u] + survivor[u + 1];
+//     survivor[0] = 1.0;
+//
+//     m_OccupancyPMFCache[key] = std::move(pmf);
+//     m_SurvivorCache[key] = std::move(survivor);
+// }
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
-    if (ExpectedFrames < 1.0)
-        ExpectedFrames = 1.0;
-
+    ExpectedFrames = std::max(ExpectedFrames, 1.0);
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
-    if (m_OccupancyCache.find(key) != m_OccupancyCache.end() && m_SurvivorCache.find(key) != m_SurvivorCache.end())
-        return;
 
-    const double lambda = static_cast<double>(key) / 10.0;
-    const int maxU = std::max(1, std::min(static_cast<int>(std::ceil(5.0 * lambda)), m_BufferSize - 1));
-    std::vector<double> pmf(maxU + 1, 0.0);
-    std::vector<double> survivor(maxU + 2, 0.0);
-    std::vector<double> raw(maxU + 1, 0.0);
+    if (m_OccupancyPMFCache.find(key) != m_OccupancyPMFCache.end() &&
+        m_SurvivorCache.find(key) != m_SurvivorCache.end()) {
+        return;
+    }
+
+    // Quantized expected duration used by the cache.
+    const double mean = static_cast<double>(key) / 10.0;
+
+    // Negative Binomial dispersion.
+    //
+    // Variance = mean + mean^2 / r
+    //
+    // Larger r -> narrower distribution, approaching Poisson.
+    // Smaller r -> wider distribution and more tolerance to fermatas.
+    //
+    // r = 16 gives approximately 25% relative standard deviation
+    // for sufficiently long events.
+
+    // TODO: This need to be a SCORE PARAMETER
+    constexpr double r = 8.0;
+
+    const double p = r / (r + mean);
+    const double logP = std::log(p);
+    const double logOneMinusP = std::log1p(-p);
+    const double variance = mean + (mean * mean) / r;
+    const double sigma = std::sqrt(variance);
+
+    // Keep enough of the right tail for expressive lengthening.
+    //
+    // mean + 8 sigma normally contains essentially all useful mass,
+    // while 5 * mean remains a generous upper bound for short events.
+    const int requestedMaxU = static_cast<int>(std::ceil(std::max(5.0 * mean, mean + 8.0 * sigma)));
+
+    const int maxU = std::max(1, std::min(requestedMaxU, m_BufferSize - 1));
+
+    std::vector<double> pmf(static_cast<size_t>(maxU + 1), 0.0);
+    std::vector<double> survivor(static_cast<size_t>(maxU + 2), 0.0);
+    std::vector<double> raw(static_cast<size_t>(maxU + 1), 0.0);
+
     double sumRaw = 0.0;
 
+    // We deliberately use u >= 1 because a score event cannot have
+    // zero-frame occupancy. As in the previous Poisson implementation,
+    // the distribution is conditioned on positive duration by
+    // renormalizing below.
     for (int u = 1; u <= maxU; ++u) {
-        const double logPmf = -lambda + static_cast<double>(u) * std::log(lambda) - std::lgamma(u + 1.0);
-        raw[u] = std::exp(logPmf);
-        sumRaw += raw[u];
+        const double logPmf = std::lgamma(static_cast<double>(u) + r) - std::lgamma(r) -
+                              std::lgamma(static_cast<double>(u) + 1.0) + r * logP +
+                              static_cast<double>(u) * logOneMinusP;
+        raw[static_cast<size_t>(u)] = std::exp(logPmf);
+        sumRaw += raw[static_cast<size_t>(u)];
     }
-    if (sumRaw <= std::numeric_limits<double>::min())
-        pmf[maxU] = 1.0;
-    for (int u = 1; u <= maxU; ++u)
-        if (sumRaw > std::numeric_limits<double>::min())
-            pmf[u] = raw[u] / sumRaw;
 
-    survivor[maxU + 1] = 0.0;
-    survivor[maxU] = pmf[maxU];
-    for (int u = maxU - 1; u >= 1; --u)
-        survivor[u] = pmf[u] + survivor[u + 1];
+    if (sumRaw <= std::numeric_limits<double>::min()) {
+        pmf[static_cast<size_t>(maxU)] = 1.0;
+    } else {
+        const double invSum = 1.0 / sumRaw;
+        for (int u = 1; u <= maxU; ++u) {
+            pmf[static_cast<size_t>(u)] = raw[static_cast<size_t>(u)] * invSum;
+        }
+    }
+
+    survivor[static_cast<size_t>(maxU + 1)] = 0.0;
+    survivor[static_cast<size_t>(maxU)] = pmf[static_cast<size_t>(maxU)];
+    for (int u = maxU - 1; u >= 1; --u) {
+        survivor[static_cast<size_t>(u)] = pmf[static_cast<size_t>(u)] + survivor[static_cast<size_t>(u + 1)];
+    }
     survivor[0] = 1.0;
-
-    m_OccupancyCache[key] = std::move(pmf);
+    m_OccupancyPMFCache[key] = std::move(pmf);
     m_SurvivorCache[key] = std::move(survivor);
 }
 
@@ -778,13 +853,18 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 void OnlineForward::GetAudioObservations() {
     int bufferIndex = m_Tau % m_BufferSize;
 
-    // Precompute global frame probabilities
     double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double techWeight = m_Desc.ExtendedTechProb;
     double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
+
     EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
     double maxSoundEvidence = 0.0;
     bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
+
+    // Global best AudioState across all semi-Markov states
+    double globalBestAudioStateEvidence = 0.0;
+    int globalBestStateIndex = -1;
+    int globalBestAudioStateIndex = -1;
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         MarkovState &state = m_States[j];
@@ -796,11 +876,9 @@ void OnlineForward::GetAudioObservations() {
 
         double sumPitch = 0.0;
         int pitchCount = 0;
-        double bestAudioStateEvidence = 0.0;
-        int bestAudioStateIndex = -1;
 
-        // Audio State
         for (size_t audioStateIndex = 0; audioStateIndex < state.AudioStates.size(); ++audioStateIndex) {
+
             const AudioState &as = state.AudioStates[audioStateIndex];
             double audioStateEvidence = 0.0;
 
@@ -808,23 +886,27 @@ void OnlineForward::GetAudioObservations() {
             case PITCH: {
                 double p = GetPitchProbability(as.Freq);
                 audioStateEvidence = p;
+
                 bestPitch = std::max(bestPitch, p);
                 sumPitch += p;
                 pitchCount++;
                 break;
             }
+
             case LABEL: {
                 double p = m_Desc.ONNX[as.Label];
                 audioStateEvidence = p;
+
                 bestTech = std::max(bestTech, p);
                 break;
             }
+
             case ONSET: {
-                // TODO: not really implemented
                 audioStateEvidence = m_Desc.Onset;
                 bestOnset = std::max(bestOnset, m_Desc.Onset);
                 break;
             }
+
             case SILENCE: {
                 if (allowSilence) {
                     audioStateEvidence = m_Desc.SilenceProb;
@@ -834,40 +916,44 @@ void OnlineForward::GetAudioObservations() {
             }
             }
 
-            if (audioStateEvidence > bestAudioStateEvidence) {
-                bestAudioStateEvidence = audioStateEvidence;
-                bestAudioStateIndex = static_cast<int>(audioStateIndex);
+            // Compare against every AudioState of every MarkovState
+            if (audioStateEvidence > globalBestAudioStateEvidence) {
+                globalBestAudioStateEvidence = audioStateEvidence;
+                globalBestStateIndex = j;
+                globalBestAudioStateIndex = static_cast<int>(audioStateIndex);
             }
         }
 
-        state.BestAudioStateIndex = state.Type == CHORD ? -1 : bestAudioStateIndex;
-
         double stateLikelihood = 0.0;
 
-        // Get Observation
         switch (state.Type) {
         case NOTE:
-        case TRILL: {
-            stateLikelihood = std::max({bestPitch * pitchWeight * soundProb, bestSilence});
+        case TRILL:
+            stateLikelihood = std::max(bestPitch * pitchWeight * soundProb, bestSilence);
             break;
-        }
+
         case PTECH: {
-            double TechObs = bestTech * techWeight * soundProb;
-            double PitchObs = bestPitch * pitchWeight * soundProb;
-            stateLikelihood = std::max({TechObs, PitchObs, bestSilence});
+            double techObs = bestTech * techWeight * soundProb;
+            double pitchObs = bestPitch * pitchWeight * soundProb;
+
+            stateLikelihood = std::max({techObs, pitchObs, bestSilence});
             break;
         }
+
         case UTECH:
-            stateLikelihood = std::max({bestTech * techWeight * soundProb, bestSilence});
+            stateLikelihood = std::max(bestTech * techWeight * soundProb, bestSilence);
             break;
+
         case CHORD:
             if (pitchCount > 0)
                 stateLikelihood = (sumPitch / pitchCount) * pitchWeight * soundProb;
             break;
+
         case FIRSTEVENT:
         case REST:
             stateLikelihood = m_Desc.SilenceProb;
             break;
+
         default:
             spdlog::error("Event type of line {} of score file is not implemented, please remove it", state.Line);
             break;
@@ -875,12 +961,15 @@ void OnlineForward::GetAudioObservations() {
 
         state.BestObs[bufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
 
-        if (state.Type != REST) {
+        if (state.Type != REST)
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
-        }
     }
 
     m_IsSilence = (m_Desc.SilenceProb > maxSoundEvidence);
+
+    // Save global winner
+    m_BestAudioStateStateIndex = globalBestStateIndex;
+    m_BestAudioStateIndex = globalBestAudioStateIndex;
 }
 
 // ─────────────────────────────────────
@@ -1013,7 +1102,7 @@ double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
 
-    const auto &cache = m_OccupancyCache[key];
+    const auto &cache = m_OccupancyPMFCache[key];
     if (u >= 0 && u < static_cast<int>(cache.size()))
         return cache[u];
     return 0.0;
@@ -1091,7 +1180,7 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
     const auto &surv_cache = m_SurvivorCache[key];
-    const auto &occ_cache = m_OccupancyCache[key];
+    const auto &occ_cache = m_OccupancyPMFCache[key];
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
 
@@ -1166,33 +1255,32 @@ int OnlineForward::GetAlphaT() {
 
     // Find the Argmax (Best State)
     double maxVal = std::numeric_limits<double>::min();
-    int bestStateIndex = m_CurrentStateIndex;
+    int BestStateIndex = m_CurrentStateIndex;
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
         double fwd = StateJ.Forward[bIndex];
         if (fwd > maxVal && j >= m_CurrentStateIndex) {
             maxVal = fwd;
-            bestStateIndex = j;
+            BestStateIndex = j;
         }
 
         spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
                       StateJ.BestObs[bIndex], StateJ.Forward[bIndex], StateJ.ExitProb[bIndex]);
     }
 
-    if (m_IsSilence && bestStateIndex != m_CurrentStateIndex && m_States[bestStateIndex].Type != REST) {
+    if (m_IsSilence && BestStateIndex != m_CurrentStateIndex && m_States[BestStateIndex].Type != REST) {
         return m_CurrentStateIndex;
     }
 
-    MarkovState &BestState = m_States[bestStateIndex];
+    MarkovState &BestState = m_States[BestStateIndex];
     spdlog::debug("Best: State ({}) | Forward {:.5f}", BestState.Index, BestState.Forward[bIndex]);
 
-    return bestStateIndex;
+    return BestStateIndex;
 }
 
 // ─────────────────────────────────────
 int OnlineForward::GetEvent(Description &Desc) {
-
     spdlog::debug("Starting inference");
     m_Desc = Desc;
     if (m_CurrentStateIndex > (int)m_States.size()) {
@@ -1218,7 +1306,6 @@ int OnlineForward::GetEvent(Description &Desc) {
     }
 
     NotifyAudioStateChange(BestState);
-
     return m_States[BestState].ScorePos;
 }
 
