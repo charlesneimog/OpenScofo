@@ -9,15 +9,20 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(BUILD_SHARED_LIBS OFF)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
+
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(TREE_SITTER_VERSION "v0.26.10")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
-
+# ╭──────────────────────────────────────╮
+# │               Options                │
+# ╰──────────────────────────────────────╯
 option(OPENSCOFO_BUILD_PD_OBJECT "Build PureData Object" OFF)
 option(OPENSCOFO_BUILD_PY_MODULE "Build Python Module" OFF)
 option(OPENSCOFO_BUILD_MAX_OBJECT "Build Max Object" OFF)
