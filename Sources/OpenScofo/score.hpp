@@ -49,8 +49,8 @@ class Score {
     static void FindErrors(TSNode &Root, TSNode &Node, const std::string &Score);
     static bool GetConfigNumber(const std::string &Id, const std::string &ValueType, const std::string &Value,
                                 TSPoint Position, double &Output);
-    static bool GetConfigBool(const std::string &Id, const std::string &ValueType, std::string Value,
-                              TSPoint Position, bool &Output);
+    static bool GetConfigBool(const std::string &Id, const std::string &ValueType, std::string Value, TSPoint Position,
+                              bool &Output);
 
     void NewEvent(const std::string &Score, TSNode Event, Configuration &Config);
     void NewConfig(const std::string &Score, TSNode Node, Configuration &Config);
@@ -63,8 +63,7 @@ class Score {
     std::string GetCodeStr(const std::string &Score, TSNode Node);
     double GetDurationFromNode(const std::string &Score, TSNode Node);
     std::string GetChildStringFromField(const std::string &Score, TSNode node, std::string id);
-    static std::string GetChildStringFromType(const std::string &Score, TSNode Parent,
-                                              const std::string &WantedType);
+    static std::string GetChildStringFromType(const std::string &Score, TSNode Parent, const std::string &WantedType);
 
     // Events
     MarkovState NewRestEvent(const std::string &Score, TSNode Node);
@@ -96,6 +95,9 @@ class Score {
     double m_PrevDuration;
     double m_Tunning = 440;
     bool m_ScoreLoaded = false;
+
+    // State configuration
+    double m_TimeTolerance = 16;
 
     // Errors
     bool m_HasErrors = false;
