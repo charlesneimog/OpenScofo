@@ -18,8 +18,10 @@
 
 namespace OpenScofo {
 
+// ─────────────────────────────────────
 using PitchTemplateArray = std::vector<double>;
 
+// ─────────────────────────────────────
 struct PitchTemplateEntry {
     size_t bin;
     double p;
@@ -35,7 +37,6 @@ class OnlineForward {
     void UpdateConfiguration(Configuration &Config);
     void SetScoreStates(States States);
     void UpdateAudioTemplate();
-    void UpdatePhaseValues();
     void ResetDecoding();
 
     // Set
