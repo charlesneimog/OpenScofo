@@ -434,6 +434,11 @@ struct ScOpenScofo : public SCUnit {
             return;
         }
 
+        OpenScofo::EventActions audioStateActions = m_OpenScofo->GetAudioStateChangeActions();
+        for (const auto &action : audioStateActions) {
+            DispatchAction(action);
+        }
+
         const int currentStateIndex = m_OpenScofo->GetCurrentStateIndex();
         if (currentStateIndex == m_LastActionStateIndex) {
             return;

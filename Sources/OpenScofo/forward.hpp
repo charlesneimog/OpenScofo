@@ -10,6 +10,7 @@
 #pragma once
 #include <array>
 #include <cstddef>
+#include <deque>
 #include <unordered_map>
 #include <vector>
 
@@ -57,6 +58,7 @@ class OnlineForward {
     int GetCurrentStateIndex();
     int GetTunning();
     EventActions GetCurrentEventActions();
+    EventActions GetAudioStateChangeActions();
     std::vector<MarkovState> &GetStates();
     MarkovState GetState(int Index);
     void AddState(MarkovState state);
@@ -108,6 +110,7 @@ class OnlineForward {
 
     // Get Audio Obs
     void GetAudioObservations();
+    void NotifyAudioStateChange(int StateIndex);
 
   private:
     // Test things
@@ -119,6 +122,12 @@ class OnlineForward {
     // Config
     double m_MinEntropy = 0;
     AudioDescType m_CurrentAudioState;
+    std::string m_AudioStateChangeReceiver;
+
+    // Audio-state change notifications
+    int m_LastNotifiedStateIndex = -1;
+    int m_LastNotifiedAudioStateIndex = -1;
+    std::deque<ScoreAction> m_PendingAudioStateActions;
 
     // Audio
     double m_Sr;

@@ -16,6 +16,33 @@ Actions run when an event is detected. Define them one line below the event.
 | `delay` | `delay <VALUE> <UNIT> <ACTION>` | `ms`, `sec`, or `tempo` | `delay 1 tempo sendto echo [1]` | Schedules an action. `tempo` is performer beat-relative. |
 | `luacall` | `luacall(<FUNCTION_CALL>)` | Lua function call | `luacall(cue("A"))` | Useful for small logic before sending. |
 
+## Audio state changes
+
+Declare a receiver once at score level to receive every followed audio-state change:
+
+```openscofo
+ONAUDIOSTATECHANGE audiostates
+```
+
+The forward model stores the best audio observation for every candidate event. After choosing the best event, it
+compares that event and its best observation with the previous result. A changed event always sends a notification;
+within the same event, a different best observation also sends one. Identical results do not send duplicates.
+
+The receiver uses the same host-specific delivery mechanism as `sendto`. Each message contains the current score
+position followed by the selected observation: its MIDI pitch, ONNX label, `silence`, or `onset`. Chords are reported
+as `chord` followed by every MIDI pitch in score order; their notification remains stable when the spectral balance
+between constituent notes changes.
+
+In Csound the listener is an instrument: notifications use `p2 = 0` and `p3 = 0`, and the payload shown below
+starts at `p4`. Other hosts receive the payload as a normal list.
+
+```text
+1 60
+2 chord 60 64 67
+3 pizz
+3 silence
+```
+
 ## Example
 
 <div class="grid cards" markdown>

@@ -91,6 +91,9 @@ module.exports = grammar({
                     "ONNXDESCRIPTORS",
                     "ONSETFUNCTION",
 
+                    // Listener notified whenever the followed audio state changes
+                    "ONAUDIOSTATECHANGE",
+
                     // MFCC
                     "MFCCMELS",
                     "MFCCCOUNT",

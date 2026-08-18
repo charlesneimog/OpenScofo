@@ -113,6 +113,18 @@ struct CSoundOpenScofo : Plugin<3, 4> {
 
     // ─────────────────────────────────────
     void DispatchInstrumentAction(const OpenScofo::ScoreAction &action) {
+        if (action.isAudioStateChange) {
+            std::ostringstream message;
+            message << 'i';
+            AppendCsoundInstrument(message, action.Receiver);
+            message << " 0 0";
+            for (const auto &arg : action.Args) {
+                AppendCsoundPField(message, arg);
+            }
+            csoundInputMessageAsync(csound->get_csound(), message.str().c_str());
+            return;
+        }
+
         if (action.Args.size() < 2) {
             csound->warning("[OpenScofo] Csound sendto receiver '" + action.Receiver +
                             "' requires at least p2 and p3: sendto " + action.Receiver + " [p2 p3 ...].");
@@ -173,6 +185,11 @@ struct CSoundOpenScofo : Plugin<3, 4> {
     void ProcessEventActionsIfChanged() {
         if (!oscofo || !oscofo->ScoreIsLoaded()) {
             return;
+        }
+
+        OpenScofo::EventActions audioStateActions = oscofo->GetAudioStateChangeActions();
+        for (const auto &action : audioStateActions) {
+            DispatchAction(action);
         }
 
         const int currentStateIndex = oscofo->GetCurrentStateIndex();

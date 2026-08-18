@@ -471,6 +471,13 @@ static void oscofo_ticknewevent(void *xv) {
     x->Event = x->OpenScofo->GetCurrentScorePosition();
     x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
 
+    OpenScofo::EventActions audioStateActions = x->OpenScofo->GetAudioStateChangeActions();
+    for (OpenScofo::ScoreAction &action : audioStateActions) {
+        t_atom *args = oscofo_convertargs(action);
+        oscofo_maxsend(x, action.Receiver, action.Args.size(), args);
+        delete[] args;
+    }
+
     if (prevStateIndex == x->StateIndex) {
         return;
     }
