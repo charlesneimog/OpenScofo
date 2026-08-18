@@ -104,6 +104,7 @@ enum HMMType { SEMIMARKOV, MARKOV };
 // ─────────────────────────────────────
 struct ScoreAction {
     bool isLua;
+    bool isAudioStateChange = false;
     std::string Lua;
     std::string Receiver;
     std::vector<std::variant<float, int, std::string>> Args;
@@ -128,6 +129,7 @@ struct MarkovState {
     int ScorePos;
     int MarkovIndex = -1;
     std::vector<AudioState> AudioStates;
+    int BestAudioStateIndex = -1;
 
     // States Actions
     HMMType HSMMType;
@@ -259,6 +261,9 @@ struct Configuration {
     // Temporal model
     float SyncStrength = 0.5;
     float PhaseCoupling = 0.5;
+
+    // Audio state listener
+    std::string AudioStateChangeReceiver;
 
     // ONNX
     fs::path TimbreONNXModel;

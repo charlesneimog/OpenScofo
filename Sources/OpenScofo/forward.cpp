@@ -78,6 +78,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_SyncStrength = Config.SyncStrength;
     m_PhaseCoupling = Config.PhaseCoupling;
     m_dBTreshold = Config.dBTreshold;
+    m_AudioStateChangeReceiver = Config.AudioStateChangeReceiver;
 
     m_PitchTemplates.clear();
     m_PitchTemplatesPrecomputed.clear();
@@ -107,6 +108,74 @@ int OnlineForward::GetCurrentStateIndex() {
 EventActions OnlineForward::GetCurrentEventActions() {
     MarkovState State = m_States[m_CurrentStateIndex];
     return State.Actions;
+}
+
+// ─────────────────────────────────────
+EventActions OnlineForward::GetAudioStateChangeActions() {
+    EventActions Actions;
+    Actions.reserve(m_PendingAudioStateActions.size());
+
+    while (!m_PendingAudioStateActions.empty()) {
+        Actions.push_back(std::move(m_PendingAudioStateActions.front()));
+        m_PendingAudioStateActions.pop_front();
+    }
+
+    return Actions;
+}
+
+// ─────────────────────────────────────
+void OnlineForward::NotifyAudioStateChange(int StateIndex) {
+    if (m_AudioStateChangeReceiver.empty() || StateIndex < 0 || StateIndex >= static_cast<int>(m_States.size())) {
+        return;
+    }
+
+    const MarkovState &State = m_States[StateIndex];
+    const int AudioStateIndex = State.BestAudioStateIndex;
+
+    if (State.Type != CHORD &&
+        (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.AudioStates.size()))) {
+        return;
+    }
+
+    if (StateIndex == m_LastNotifiedStateIndex && AudioStateIndex == m_LastNotifiedAudioStateIndex) {
+        return;
+    }
+
+    m_LastNotifiedStateIndex = StateIndex;
+    m_LastNotifiedAudioStateIndex = AudioStateIndex;
+
+    ScoreAction Action{};
+    Action.isAudioStateChange = true;
+    Action.Receiver = m_AudioStateChangeReceiver;
+    Action.AbsoluteTime = true;
+    Action.Args.emplace_back(State.ScorePos);
+
+    if (State.Type == CHORD) {
+        Action.Args.emplace_back(std::string("chord"));
+        for (const AudioState &AudioState : State.AudioStates) {
+            if (AudioState.Type == PITCH) {
+                Action.Args.emplace_back(static_cast<float>(AudioState.Freq));
+            }
+        }
+    } else {
+        const AudioState &AudioState = State.AudioStates[static_cast<size_t>(AudioStateIndex)];
+        switch (AudioState.Type) {
+        case PITCH:
+            Action.Args.emplace_back(static_cast<float>(AudioState.Freq));
+            break;
+        case SILENCE:
+            Action.Args.emplace_back(std::string("silence"));
+            break;
+        case LABEL:
+            Action.Args.emplace_back(AudioState.Label);
+            break;
+        case ONSET:
+            Action.Args.emplace_back(std::string("onset"));
+            break;
+        }
+    }
+
+    m_PendingAudioStateActions.push_back(std::move(Action));
 }
 
 // ─────────────────────────────────────
@@ -150,9 +219,13 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
         State.Forward.resize(m_BufferSize + 1, 0.0);                                // F_j(t)
         State.ExitProb.resize(m_BufferSize + 1, 0.0);                               // F_j^o(t)
         State.BestObs.resize(m_BufferSize + 1, std::numeric_limits<double>::min()); // b_j(x_t), floor avoids /0
+        State.BestAudioStateIndex = -1;
     }
 
     m_CurrentStateIndex = 0;
+    m_LastNotifiedStateIndex = -1;
+    m_LastNotifiedAudioStateIndex = -1;
+    m_PendingAudioStateActions.clear();
     m_Kappa = 10;
     m_BPM = m_States[0].BPMExpected;
     m_PsiN = 60.0f / m_States[0].BPMExpected;
@@ -421,6 +494,7 @@ void OnlineForward::ResetDecoding() {
         std::fill(State.Forward.begin(), State.Forward.end(), 0.0);
         std::fill(State.ExitProb.begin(), State.ExitProb.end(), 0.0);
         std::fill(State.BestObs.begin(), State.BestObs.end(), std::numeric_limits<double>::min());
+        State.BestAudioStateIndex = -1;
         State.OnsetObserved = 0;
         State.PhaseObserved = 0;
         State.IOIPhiN = 0;
@@ -432,6 +506,10 @@ void OnlineForward::ResetDecoding() {
 
     // Reset first state
     m_States[0].OnsetObserved = 0;
+
+    m_LastNotifiedStateIndex = -1;
+    m_LastNotifiedAudioStateIndex = -1;
+    m_PendingAudioStateActions.clear();
 
     spdlog::debug("OnlineForward decoding state fully reset");
 }
@@ -741,12 +819,18 @@ void OnlineForward::GetAudioObservations() {
 
         double sumPitch = 0.0;
         int pitchCount = 0;
+        double bestAudioStateEvidence = 0.0;
+        int bestAudioStateIndex = -1;
 
         // Audio State
-        for (const AudioState &as : state.AudioStates) {
+        for (size_t audioStateIndex = 0; audioStateIndex < state.AudioStates.size(); ++audioStateIndex) {
+            const AudioState &as = state.AudioStates[audioStateIndex];
+            double audioStateEvidence = 0.0;
+
             switch (as.Type) {
             case PITCH: {
                 double p = GetPitchProbability(as.Freq);
+                audioStateEvidence = p;
                 bestPitch = std::max(bestPitch, p);
                 sumPitch += p;
                 pitchCount++;
@@ -754,21 +838,32 @@ void OnlineForward::GetAudioObservations() {
             }
             case LABEL: {
                 double p = m_Desc.ONNX[as.Label];
+                audioStateEvidence = p;
                 bestTech = std::max(bestTech, p);
                 break;
             }
             case ONSET: {
                 // TODO: not really implemented
+                audioStateEvidence = m_Desc.Onset;
                 bestOnset = std::max(bestOnset, m_Desc.Onset);
                 break;
             }
             case SILENCE: {
-                if (allowSilence)
+                if (allowSilence) {
+                    audioStateEvidence = m_Desc.SilenceProb;
                     bestSilence = std::max(bestSilence, m_Desc.SilenceProb);
+                }
                 break;
             }
             }
+
+            if (audioStateEvidence > bestAudioStateEvidence) {
+                bestAudioStateEvidence = audioStateEvidence;
+                bestAudioStateIndex = static_cast<int>(audioStateIndex);
+            }
         }
+
+        state.BestAudioStateIndex = state.Type == CHORD ? -1 : bestAudioStateIndex;
 
         double stateLikelihood = 0.0;
 
@@ -1103,6 +1198,8 @@ int OnlineForward::GetEvent(Description &Desc) {
         spdlog::debug("New Event Index {:04d}, Score Position {:04d}", BestState, m_States[BestState].ScorePos);
         m_CurrentStateIndex = BestState;
     }
+
+    NotifyAudioStateChange(BestState);
 
     return m_States[BestState].ScorePos;
 }

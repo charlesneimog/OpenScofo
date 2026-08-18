@@ -449,6 +449,14 @@ EventActions OpenScofo::GetCurrentEventActions() {
 }
 
 // ─────────────────────────────────────
+EventActions OpenScofo::GetAudioStateChangeActions() {
+    if (ScoreIsLoaded()) {
+        return m_Forward.GetAudioStateChangeActions();
+    }
+    return {};
+}
+
+// ─────────────────────────────────────
 /**
  * @brief Compute pitch probability for a given frequency.
  *

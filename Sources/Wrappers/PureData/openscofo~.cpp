@@ -449,6 +449,14 @@ static void openscofo_ticknewevent(PdOpenScofo *x) {
     int PrevStateIndex = x->StateIndex;
     x->Event = x->OpenScofo->GetCurrentScorePosition();
     x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
+
+    OpenScofo::EventActions audioStateActions = x->OpenScofo->GetAudioStateChangeActions();
+    for (OpenScofo::ScoreAction &action : audioStateActions) {
+        t_atom *args = openscofo_convertargs(action);
+        openscofo_pdsend(x, action.Receiver, action.Args.size(), args);
+        delete[] args;
+    }
+
     if (PrevStateIndex == x->StateIndex) {
         return;
     }

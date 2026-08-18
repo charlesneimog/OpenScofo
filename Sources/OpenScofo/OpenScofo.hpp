@@ -76,6 +76,7 @@ class OpenScofo {
     int GetCurrentScorePosition();
     int GetCurrentStateIndex();
     EventActions GetCurrentEventActions();
+    EventActions GetAudioStateChangeActions();
 
     Descriptors GetDescriptorsEnum(const char *s);
     const char *GetDescriptionId(Descriptors d);

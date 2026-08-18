@@ -291,6 +291,7 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("phase_coupling", &OpenScofo::Configuration::PhaseCoupling)
 
         // ONNX
+        .def_rw("audio_state_change_receiver", &OpenScofo::Configuration::AudioStateChangeReceiver)
         .def_rw("timbre_onnx_model", &OpenScofo::Configuration::TimbreONNXModel)
         .def_rw("onnx_descriptors", &OpenScofo::Configuration::ONNXDescriptors)
         .def_rw("requested_descriptors", &OpenScofo::Configuration::RequestedDescriptors);
@@ -331,6 +332,7 @@ NB_MODULE(_OpenScofo, m) {
         .def("get_current_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .def("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)
         .def("get_current_event_actions", &OpenScofo::OpenScofo::GetCurrentEventActions)
+        .def("get_audio_state_change_actions", &OpenScofo::OpenScofo::GetAudioStateChangeActions)
         .def("get_lua_code", &OpenScofo::OpenScofo::GetLuaCode)
         .def("get_pitch_prob", &OpenScofo::OpenScofo::GetPitchProb)
         .def("get_states", &OpenScofo::OpenScofo::GetStates)

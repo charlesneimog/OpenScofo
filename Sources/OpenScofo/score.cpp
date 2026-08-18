@@ -924,6 +924,15 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
         return;
     }
 
+    if (id == "ONAUDIOSTATECHANGE") {
+        if (valueType != "identifier" && valueType != "number") {
+            spdlog::error("Invalid receiver for {} on line {}.", id, pos.row + 1);
+            return;
+        }
+        Config.AudioStateChangeReceiver = value;
+        return;
+    }
+
     if (id == "ONNXDESCRIPTORS") {
         Config.ONNXDescriptors.clear();
         uint32_t count = ts_node_named_child_count(valueNode);
