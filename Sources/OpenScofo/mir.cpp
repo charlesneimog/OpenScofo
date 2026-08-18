@@ -107,7 +107,8 @@ bool MIR::DescriptorRequested(Descriptors Descriptor) const {
 
 // ─────────────────────────────────────
 void MIR::UpdateDescriptorFlags() {
-    m_NeedYIN = DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE);
+    m_NeedYIN = DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE) ||
+                DescriptorRequested(EXTENDEDTECHNIQUE);
     m_NeedMFCC = DescriptorRequested(MFCC) || DescriptorRequested(LOGMEL);
     m_NeedChroma = DescriptorRequested(CHROMA);
     m_NeedZCR = DescriptorRequested(ZCR) || DescriptorRequested(EXTENDEDTECHNIQUE);
@@ -139,6 +140,7 @@ void MIR::UpdateDescriptorFlags() {
             m_NeedOnset = true;
             break;
         case EXTENDEDTECHNIQUE:
+            m_NeedYIN = true;
             m_NeedZCR = true;
             m_NeedOnset = true;
             m_NeedExtendedTech = true;
@@ -280,7 +282,10 @@ void MIR::OnsetExec(Description &Desc) {
 void MIR::ExtendedTechExec(Description &Desc) {
     Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
     Desc.ExtendedTechProb *= Desc.SpectralFlux;
-    Desc.ExtendedTechProb *= (1.0f - Desc.ZeroCrossingRate);
+    // Harmonic, confidently pitched frames should not be classified as an
+    // extended technique. This is the confidence term used by the original
+    // detector; ZCR is already represented by the spectral/noise features.
+    Desc.ExtendedTechProb *= (1.0f - Desc.PitchConfidence);
     Desc.ExtendedTechProb *= abs(m_ODS->odfvalpost);
     float steepness = 5.0f;
     Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
@@ -685,7 +690,8 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     ComputeScalarFeatures(Desc, acc, NHalf);
 
     // PASS 2: NORMALIZE, ENTROPY, ROLLOFF & PREFIX FUSION
-    const double invSum = 1.0 / acc.SumPower;
+    const double sumPowerEps = acc.SumPower + 1e-12;
+    const double invSum = 1.0 / sumPowerEps;
     const double Mean = 1.0 / static_cast<double>(NHalf);
     const double invSpectralEnergy = acc.spectralEnergySum > 0.0 ? (1.0 / acc.spectralEnergySum) : 0.0;
     const double rolloffCutoffEnergy = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * acc.linSumPower;
@@ -699,7 +705,7 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
     m_SpectralPrefix[0] = 0.0;
 
     for (int i = 0; i < NHalf; ++i) {
-        const double normSp = (Desc.SpectralMagnitudeNorm[i]) * invSum;
+        const double normSp = (Desc.SpectralMagnitudeNorm[i] + 1e-12) * invSum;
         Desc.SpectralMagnitudeFrameNorm[i] = normSp;
         Desc.SpectralPowerFrameNorm[i] = Desc.Power[i] * invSpectralEnergy;
         const double diffMean = normSp - Mean;

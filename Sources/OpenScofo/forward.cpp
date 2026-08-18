@@ -95,7 +95,6 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
 
     if (!m_States.empty()) {
         UpdateAudioTemplate();
-        UpdatePhaseValues();
     }
 }
 
@@ -238,7 +237,6 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_PhaseCoupling = m_States[0].PhaseCoupling;
 
     UpdateAudioTemplate();
-    UpdatePhaseValues();
 }
 
 // ─────────────────────────────────────
@@ -266,7 +264,10 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
         return;
     }
 
-    std::vector<double> templateBins(m_FFTSize / 2, 0.0);
+    // Keep a tiny positive floor across the template. Besides avoiding
+    // log(0), this is part of the original KL-divergence model: bins outside
+    // the harmonic peaks must not be treated as unmatched observed energy.
+    std::vector<double> templateBins(m_FFTSize / 2, 1e-24);
 
     const double sigmaLog = m_PitchTemplateSigma / 12.0;
     const double sigmaConst = std::pow(2.0, sigmaLog) - 1.0;
@@ -353,10 +354,6 @@ PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
     BuildPitchTemplate(Freq);
     double rootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
     return m_PitchTemplates[rootBinFreq];
-}
-
-// ─────────────────────────────────────
-void OnlineForward::UpdatePhaseValues() {
 }
 
 // ╭─────────────────────────────────────╮
@@ -520,42 +517,27 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
         ExpectedFrames = 1.0;
 
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
+    if (m_OccupancyCache.find(key) != m_OccupancyCache.end() && m_SurvivorCache.find(key) != m_SurvivorCache.end())
+        return;
 
-    // Check if BOTH caches have this key
-    if (m_OccupancyCache.find(key) != m_OccupancyCache.end() && m_SurvivorCache.find(key) != m_SurvivorCache.end()) {
-        return; // Both exist, safe to return
-    }
-
-    // Use the value represented by the cache key so the cached distribution
-    // does not depend on which value in a quantization bucket was seen first.
     const double lambda = static_cast<double>(key) / 10.0;
     const int maxU = std::max(1, std::min(static_cast<int>(std::ceil(5.0 * lambda)), m_BufferSize - 1));
-
     std::vector<double> pmf(maxU + 1, 0.0);
     std::vector<double> survivor(maxU + 2, 0.0);
     std::vector<double> raw(maxU + 1, 0.0);
     double sumRaw = 0.0;
 
-    // Cuvillier recommends D_l ~ Poisson(l) for discrete-time occupancy.
-    // Appendix A.3.2 transforms its mass at zero into initial and transition
-    // probabilities; the cached occupancy is therefore conditioned on U > 0.
     for (int u = 1; u <= maxU; ++u) {
         const double logPmf = -lambda + static_cast<double>(u) * std::log(lambda) - std::lgamma(u + 1.0);
         raw[u] = std::exp(logPmf);
         sumRaw += raw[u];
     }
-
-    // For very large lambda the representable left tail may underflow. Fall
-    // back to the last available duration instead of producing NaNs.
-    if (sumRaw <= std::numeric_limits<double>::min()) {
+    if (sumRaw <= std::numeric_limits<double>::min())
         pmf[maxU] = 1.0;
-    }
-
     for (int u = 1; u <= maxU; ++u)
         if (sumRaw > std::numeric_limits<double>::min())
             pmf[u] = raw[u] / sumRaw;
 
-    // D-bar_j(u) = P(U >= u).
     survivor[maxU + 1] = 0.0;
     survivor[maxU] = pmf[maxU];
     for (int u = maxU - 1; u >= 1; --u)
@@ -906,30 +888,46 @@ void OnlineForward::GetAudioObservations() {
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
 double OnlineForward::GetPitchProbability(double Freq) {
+    if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
+        return std::numeric_limits<double>::min();
+    }
+
     double KLDiv = 0.0;
-
     double RootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
-    auto it = m_PitchTemplatesPrecomputed.find(RootBinFreq);
-    if (it == m_PitchTemplatesPrecomputed.end())
-        return 0.0;
+    auto it = m_PitchTemplates.find(RootBinFreq);
+    if (it == m_PitchTemplates.end()) {
+        BuildPitchTemplate(Freq);
+        it = m_PitchTemplates.find(RootBinFreq);
+        if (it == m_PitchTemplates.end()) {
+            return std::numeric_limits<double>::min();
+        }
+    }
 
-    const auto &PitchTemplate = it->second;
-    const auto &QFrame = m_Desc.SpectralMagnitudeFrameNorm;
-    const size_t qSize = QFrame.size();
+    const PitchTemplateArray &PitchTemplate = it->second;
+    const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
+    const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
+    if (PitchTemplate.empty() || normSpectralPower.empty()) {
+        return std::numeric_limits<double>::min();
+    }
 
-    for (const auto &e : PitchTemplate) {
-        if (e.bin >= qSize)
-            break;
+    size_t bins = std::min(static_cast<size_t>(m_FFTSize / 2), PitchTemplate.size());
+    bins = std::min(bins, normSpectralPower.size());
+    if (bins == 0) {
+        return std::numeric_limits<double>::min();
+    }
 
-        double Q = QFrame[e.bin];
-
-        if (Q > 0.0) {
-            KLDiv += e.p_log_p - e.p * std::log(Q);
+    for (size_t i = 0; i < bins; ++i) {
+        double reverb = i < reverbSpectralPower.size() ? reverbSpectralPower[i] : 0.0;
+        double P = PitchTemplate[i] + reverb;
+        double Q = normSpectralPower[i];
+        if (P > 0.0 && Q > 0.0) {
+            KLDiv += P * std::log(P / Q);
+        } else if (P == 0.0 && Q >= 0.0) {
+            KLDiv += Q;
         }
     }
 
     KLDiv *= 1.0 / (1.0 + m_Desc.StdDev);
-
     return std::exp(-m_PitchScalingFactor * KLDiv);
 }
 
@@ -954,8 +952,6 @@ void OnlineForward::GetInitialDistribution() {
         }
     }
 
-    // Cuvillier A.3.2, step 4: move the Poisson mass at zero into
-    // the initial distribution of the equivalent non-null HSMM.
     std::vector<double> NonNullInitialProb(Size, 0.0);
     for (int destination = 0; destination < Size; ++destination) {
         const MarkovState &DestinationState = m_States[m_CurrentStateIndex + destination];
@@ -963,7 +959,6 @@ void OnlineForward::GetInitialDistribution() {
         const double destinationLambda = std::round(destinationExpectedFrames * 10.0) / 10.0;
         const double destinationNonNull =
             DestinationState.HSMMType == SEMIMARKOV ? -std::expm1(-destinationLambda) : 1.0;
-
         double probability = 0.0;
         for (int source = 0; source <= destination; ++source) {
             double skipped = 1.0;
@@ -982,12 +977,10 @@ void OnlineForward::GetInitialDistribution() {
         }
         NonNullInitialProb[destination] = destinationNonNull * probability;
     }
-
     const double nonNullSum = std::accumulate(NonNullInitialProb.begin(), NonNullInitialProb.end(), 0.0);
-    if (nonNullSum > std::numeric_limits<double>::min()) {
+    if (nonNullSum > std::numeric_limits<double>::min())
         for (double &probability : NonNullInitialProb)
             probability /= nonNullSum;
-    }
 
     for (int j = m_WinStart; j <= m_WinEnd; j++) {
         if (j < 0 || j >= (int)m_States.size())
@@ -1071,6 +1064,7 @@ void OnlineForward::Markov(MarkovState &StateJ, int j, int bufferIndex) {
         if (j >= m_CurrentStateIndex) {
             sumPrev += StateJ.Forward[prevBuf];
         }
+
         // Arrive from j-1
         if (j - 1 >= m_CurrentStateIndex && j - 1 >= 0) {
             double trans = GetTransProbability(j - 1, j);
@@ -1093,49 +1087,34 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j, int bufferIndex) {
     double FTildeJo = 0.0;
     double ObsProd = 1.0;
 
-    // Get max support from distribution cache
-    double ExpectedFrames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
-    if (ExpectedFrames < 1.0) {
-        ExpectedFrames = 1.0;
-    }
+    double ExpectedFrames = std::max(1.0, (m_PsiN1 * StateJ.Duration) / m_BlockDur);
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
-
     const auto &surv_cache = m_SurvivorCache[key];
     const auto &occ_cache = m_OccupancyCache[key];
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
 
-    // Cuvillier A.3.3: sum transitions only over durations for which t-u is
-    // part of the observed history. Longer paths belong to the initial term.
     for (int u = 1; u <= observedHistory; ++u) {
         const double Dju = surv_cache[u];
         const double dju = occ_cache[u];
-
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-
         double TransSum = 0.0;
         for (int i = m_WinStart; i < j; ++i)
             TransSum += GetTransProbability(i, j) * m_States[i].ExitProb[EntryBuf];
-
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
 
         const double prevObs = StateJ.BestObs[EntryBuf];
         const double prevNorm = m_Normalization[EntryBuf];
-
-        if (prevNorm > std::numeric_limits<double>::min()) {
+        if (prevNorm > std::numeric_limits<double>::min())
             ObsProd *= prevObs / prevNorm;
-        } else {
+        else
             ObsProd = 0.0;
-        }
-
         if (ObsProd == 0.0)
             break;
     }
 
-    // Right-censored initialization term from Cuvillier A.3.3:
-    // D-bar_j(t+1) b_j(o_0^t) pi(j), and d_j(t+1) respectively.
     const int initialDuration = m_Tau + 1;
     if (initialDuration <= maxU) {
         FTildeJ += surv_cache[initialDuration] * ObsProd * StateJ.InitProb;
