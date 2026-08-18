@@ -2,6 +2,7 @@
 
 BPM 80
 ONAUDIOSTATECHANGE audiostates
+TIMETOLERANCE 0.05
 
 // Measure number 1
 

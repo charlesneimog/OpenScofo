@@ -153,6 +153,7 @@ struct MarkovState {
     double IOIPhiN = 0;
     double IOIHatPhiN = 0;
     double Duration = 0.0;
+    double TimeTolerance = 16;
 
     // Configuration for each event
     double PhaseCoupling = 0.5;

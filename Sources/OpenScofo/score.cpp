@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cctype>
 #include <utility>
+#include <algorithm>
 #include <tree_sitter/api.h>
 
 namespace OpenScofo {
@@ -621,6 +622,9 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
         return;
     }
 
+    // Configuration by Event
+    Event.TimeTolerance = m_TimeTolerance;
+
     if (Event.AudioStates.empty()) {
         return;
     }
@@ -715,7 +719,8 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
         id == "PHASECOUPLING" || id == "SYNCSTRENGTH" || id == "PITCHTEMPLATESIGMA" || id == "PITCHTEMPLATEHARMONICS" ||
         id == "MFCCMELS" || id == "MFCCCOUNT" || id == "MEDSPAN" || id == "DBTRESHOLD" || id == "DBTHRESHOLD" ||
         id == "SPECTRALROLLOFFCUTOFF" || id == "YINTHRESHOLD" || id == "YINMINFREQUENCY" || id == "YINMAXFREQUENCY" ||
-        id == "CHROMASIZE" || id == "CHROMACENTEROCTAVE" || id == "CHROMAOCTAVEWIDTH" || id == "ZCRTHRESHOLD") {
+        id == "CHROMASIZE" || id == "CHROMACENTEROCTAVE" || id == "CHROMAOCTAVEWIDTH" || id == "ZCRTHRESHOLD" ||
+        id == "TIMETOLERANCE") {
         double v = 0.0;
         if (!GetConfigNumber(id, valueType, value, pos, v)) {
             return;
@@ -749,6 +754,10 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             } else {
                 Config.SyncStrength = v;
             }
+        } else if (id == "TIMETOLERANCE") {
+            double tolerance = std::clamp(v, 0.0, 1.0);
+            double r = 64.0 - tolerance * 60.0;
+            m_TimeTolerance = r;
         } else if (id == "PITCHTEMPLATESIGMA") {
             if (v < 0 || v > 1) {
                 spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);

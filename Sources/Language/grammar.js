@@ -79,6 +79,7 @@ module.exports = grammar({
                     "PHASECOUPLING",
                     "SYNCSTRENGTH",
                     "BPM",
+                    "TIMETOLERANCE",
 
                     // Pitch
                     "PITCHTEMPLATESIGMA",
