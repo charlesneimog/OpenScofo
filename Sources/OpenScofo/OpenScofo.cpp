@@ -95,6 +95,7 @@ void OpenScofo::UpdateConfiguration(Configuration &Config) {
     m_Desc.Power.resize(NHalf);
     m_Desc.SpectralMagnitudeNorm.resize(NHalf);
     m_Desc.SpectralMagnitudeFrameNorm.resize(NHalf);
+    m_Desc.SpectralPowerFrameNorm.resize(NHalf);
     m_Desc.ReverbSpectralPower.resize(NHalf);
     m_Desc.LogMelSpectrum.resize(m_Config.MFCCMels);
     m_Desc.MFCC.resize(m_Config.MFCCCount);
@@ -387,6 +388,7 @@ void OpenScofo::SetCurrentEvent(int Event) {
     std::fill(m_Desc.Power.begin(), m_Desc.Power.end(), 0.0);
     std::fill(m_Desc.SpectralMagnitudeNorm.begin(), m_Desc.SpectralMagnitudeNorm.end(), 0.0);
     std::fill(m_Desc.SpectralMagnitudeFrameNorm.begin(), m_Desc.SpectralMagnitudeFrameNorm.end(), 0.0);
+    std::fill(m_Desc.SpectralPowerFrameNorm.begin(), m_Desc.SpectralPowerFrameNorm.end(), 0.0);
     std::fill(m_Desc.ReverbSpectralPower.begin(), m_Desc.ReverbSpectralPower.end(), 0.0);
 
     if (Event == 0) {

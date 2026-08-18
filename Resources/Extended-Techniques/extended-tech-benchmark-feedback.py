@@ -44,7 +44,7 @@ FFT = 2048
 HOP = 256
 
 TEST_FILES = [
-    {"audio": "./score-1.wav", "score": "./score-1.txt"},
+            {"audio": "./score-1.wav", "score": "./score-1.txt"},
     {"audio": "./score-2.wav", "score": "./score-2.txt"},
     {"audio": "./score-3.wav", "score": "./score-3.txt"},
     {"audio": "./score-4.wav", "score": "./score-4.txt"},
@@ -64,6 +64,26 @@ TEST_FILES = [
     {"audio": "./score-18.wav", "score": "./score-18.txt"},
     {"audio": "./score-19.wav", "score": "./score-19.txt"},
     {"audio": "./score-20.wav", "score": "./score-20.txt"},
+    {"audio": "./score-21.wav", "score": "./score-21.txt"},
+    {"audio": "./score-22.wav", "score": "./score-22.txt"},
+    {"audio": "./score-23.wav", "score": "./score-23.txt"},
+    {"audio": "./score-24.wav", "score": "./score-24.txt"},
+    {"audio": "./score-25.wav", "score": "./score-25.txt"},
+    {"audio": "./score-26.wav", "score": "./score-26.txt"},
+    {"audio": "./score-27.wav", "score": "./score-27.txt"},
+    {"audio": "./score-28.wav", "score": "./score-28.txt"},
+    {"audio": "./score-29.wav", "score": "./score-29.txt"},
+    {"audio": "./score-30.wav", "score": "./score-30.txt"},
+    {"audio": "./score-31.wav", "score": "./score-31.txt"},
+    {"audio": "./score-32.wav", "score": "./score-32.txt"},
+    {"audio": "./score-33.wav", "score": "./score-33.txt"},
+    {"audio": "./score-34.wav", "score": "./score-34.txt"},
+    {"audio": "./score-35.wav", "score": "./score-35.txt"},
+    {"audio": "./score-36.wav", "score": "./score-36.txt"},
+    {"audio": "./score-37.wav", "score": "./score-37.txt"},
+    {"audio": "./score-38.wav", "score": "./score-38.txt"},
+    {"audio": "./score-39.wav", "score": "./score-39.txt"},
+    {"audio": "./score-40.wav", "score": "./score-40.txt"}
 ]
 
 COLOR_RED = "\033[91m"

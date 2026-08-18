@@ -18,15 +18,20 @@
 
 namespace nb = nanobind;
 
+template <typename F> static auto checked_call(F func) {
+    try {
+        auto result = func();
+        if (PyErr_Occurred()) throw nb::python_error();
+        return result;
+    } catch (...) { if (PyErr_Occurred()) throw nb::python_error(); throw; }
+}
 template <typename T> static bool process_python_block(OpenScofo::OpenScofo &self, const T *data, size_t size) {
     if (size == 0) {
         return true;
     }
 
     const size_t hop = static_cast<size_t>(self.GetHopSize());
-    if (hop == 0) {
-        throw nb::value_error("OpenScofo hop size cannot be zero");
-    }
+    assert(hop != 0);
 
     bool ok = true;
     size_t offset = 0;
@@ -313,7 +318,7 @@ NB_MODULE(_OpenScofo, m) {
              })
 
         // Score
-        .def("load_score", &OpenScofo::OpenScofo::LoadScore)
+        .def("load_score", [](OpenScofo::OpenScofo &self, const std::filesystem::path &path) { return checked_call([&] { return self.LoadScore(path); }); })
         .def("score_is_loaded", &OpenScofo::OpenScofo::ScoreIsLoaded)
 
         // Config
@@ -347,11 +352,11 @@ NB_MODULE(_OpenScofo, m) {
         // Process (template wrapper)
         .def("process_block",
              [](OpenScofo::OpenScofo &self, nb::ndarray<const float, nb::shape<-1>, nb::c_contig> audio) {
-                 return process_python_block<float>(self, audio.data(), audio.size());
+                 return checked_call([&] { return process_python_block<float>(self, audio.data(), audio.size()); });
              })
         .def("process_block",
              [](OpenScofo::OpenScofo &self, nb::ndarray<const double, nb::shape<-1>, nb::c_contig> audio) {
-                 return process_python_block<double>(self, audio.data(), audio.size());
+                 return checked_call([&] { return process_python_block<double>(self, audio.data(), audio.size()); });
              })
 
         // Logging
