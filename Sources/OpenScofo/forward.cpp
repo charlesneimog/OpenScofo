@@ -937,47 +937,70 @@ void OnlineForward::GetAudioObservations() {
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
 double OnlineForward::GetPitchProbability(double Freq) {
+    constexpr double minProb = std::numeric_limits<double>::min();
+
     if (Freq <= 0.0 || m_FFTSize <= 0.0 || m_Sr <= 0.0) {
-        return std::numeric_limits<double>::min();
+        return minProb;
     }
 
-    double KLDiv = 0.0;
-    double RootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
-    auto it = m_PitchTemplates.find(RootBinFreq);
+    const double binWidth = m_Sr / m_FFTSize;
+    const double rootBinFreq = std::round(Freq / binWidth);
+
+    auto it = m_PitchTemplates.find(rootBinFreq);
     if (it == m_PitchTemplates.end()) {
         BuildPitchTemplate(Freq);
-        it = m_PitchTemplates.find(RootBinFreq);
+        it = m_PitchTemplates.find(rootBinFreq);
+
         if (it == m_PitchTemplates.end()) {
-            return std::numeric_limits<double>::min();
+            return minProb;
         }
     }
 
-    const PitchTemplateArray &PitchTemplate = it->second;
-    const auto &reverbSpectralPower = m_Desc.ReverbSpectralPower;
-    const auto &normSpectralPower = m_Desc.SpectralMagnitudeFrameNorm;
-    if (PitchTemplate.empty() || normSpectralPower.empty()) {
-        return std::numeric_limits<double>::min();
-    }
+    const PitchTemplateArray &pitchTemplate = it->second;
+    const auto &reverb = m_Desc.ReverbSpectralPower;
+    const auto &spectrum = m_Desc.SpectralMagnitudeFrameNorm;
 
-    size_t bins = std::min(static_cast<size_t>(m_FFTSize / 2), PitchTemplate.size());
-    bins = std::min(bins, normSpectralPower.size());
+    const size_t bins = std::min({static_cast<size_t>(m_FFTSize / 2), pitchTemplate.size(), spectrum.size()});
+
     if (bins == 0) {
-        return std::numeric_limits<double>::min();
+        return minProb;
     }
 
-    for (size_t i = 0; i < bins; ++i) {
-        double reverb = i < reverbSpectralPower.size() ? reverbSpectralPower[i] : 0.0;
-        double P = PitchTemplate[i] + reverb;
-        double Q = normSpectralPower[i];
+    const double *templateData = pitchTemplate.data();
+    const double *spectrumData = spectrum.data();
+    const double *reverbData = reverb.data();
+
+    const size_t reverbBins = std::min(bins, reverb.size());
+
+    double klDiv = 0.0;
+
+    // Bins where reverb data exists.
+    size_t i = 0;
+    for (; i < reverbBins; ++i) {
+        const double P = templateData[i] + reverbData[i];
+        const double Q = spectrumData[i];
+
         if (P > 0.0 && Q > 0.0) {
-            KLDiv += P * std::log(P / Q);
+            klDiv += P * std::log(P / Q);
         } else if (P == 0.0 && Q >= 0.0) {
-            KLDiv += Q;
+            klDiv += Q;
         }
     }
 
-    KLDiv *= 1.0 / (1.0 + m_Desc.StdDev);
-    return std::exp(-m_PitchScalingFactor * KLDiv);
+    // Remaining bins: reverb = 0.
+    for (; i < bins; ++i) {
+        const double P = templateData[i];
+        const double Q = spectrumData[i];
+
+        if (P > 0.0 && Q > 0.0) {
+            klDiv += P * std::log(P / Q);
+        } else if (P == 0.0 && Q >= 0.0) {
+            klDiv += Q;
+        }
+    }
+
+    klDiv /= 1.0 + m_Desc.StdDev;
+    return std::exp(-m_PitchScalingFactor * klDiv);
 }
 
 // ─────────────────────────────────────
