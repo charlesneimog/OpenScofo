@@ -28,4 +28,10 @@ if(NOT APPLE)
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
     target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
                                                   -Wno-unused-variable)
+
+    #
+    add_executable(openscofo_perf_folder "${CMAKE_CURRENT_SOURCE_DIR}/performance-folder.cpp")
+    target_link_libraries(openscofo_perf_folder PRIVATE OpenScofo AudioFile)
+    target_compile_options(openscofo_perf_folder PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
+                                                         -Wno-unused-variable)
 endif()

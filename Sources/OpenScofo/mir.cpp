@@ -107,8 +107,8 @@ bool MIR::DescriptorRequested(Descriptors Descriptor) const {
 
 // ─────────────────────────────────────
 void MIR::UpdateDescriptorFlags() {
-    m_NeedYIN = DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE) ||
-                DescriptorRequested(EXTENDEDTECHNIQUE);
+    m_NeedYIN =
+        DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE) || DescriptorRequested(EXTENDEDTECHNIQUE);
     m_NeedMFCC = DescriptorRequested(MFCC) || DescriptorRequested(LOGMEL);
     m_NeedChroma = DescriptorRequested(CHROMA);
     m_NeedZCR = DescriptorRequested(ZCR) || DescriptorRequested(EXTENDEDTECHNIQUE);
@@ -399,67 +399,111 @@ void MIR::YINInit() {
 // ─────────────────────────────────────
 void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
-    const size_t minTau = m_Config.SR / m_Config.YINMaxFrequency;
-    const size_t maxTauByPitch = std::ceil(m_Config.SR / m_Config.YINMinFrequency);
+
+    if (frame < 2) {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+        return;
+    }
+
+    const size_t minTau = static_cast<size_t>(m_Config.SR / m_Config.YINMaxFrequency);
+
+    const size_t maxTauByPitch = static_cast<size_t>(std::ceil(m_Config.SR / m_Config.YINMinFrequency));
+
     const size_t maxTau = std::min({frame / 2, m_YINDifference.size() - 1, maxTauByPitch});
+
     if (maxTau <= minTau) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    double *Diff = m_YINDifference.data();
-    double *Cmnfg = m_YINCMNDF.data();
-    std::fill_n(Diff, maxTau + 1, 0.0);
-    std::fill_n(Cmnfg, maxTau + 1, 1.0);
+    double *const diff = m_YINDifference.data();
+    double *const cmndf = m_YINCMNDF.data();
+    const double *const data = In.data();
 
-    const double *data = In.data();
-    const size_t frameMinus1 = frame - 1;
+    std::fill_n(diff, maxTau + 1, 0.0);
 
-    // Walk the input once and update a contiguous lag window for each sample.
-    for (size_t i = 0; i < frameMinus1; ++i) {
-        const double x_i = data[i];
-        const size_t remaining = frameMinus1 - i;
-        const size_t limit = std::min(maxTau, remaining);
-        const double *lagPtr = data + i + 1;
-        for (size_t tau = minTau; tau <= limit; ++tau) {
-            const double delta = x_i - lagPtr[tau - 1];
-            Diff[tau] += delta * delta;
+    // ─────────────────────────────────────
+    // YIN difference function
+    //
+    // d(tau) = sum_i (x_i - x_{i+tau})²
+    //
+    // Keep tau as the inner loop because both diff[tau]
+    // and data[i + tau] are then accessed sequentially.
+    for (size_t i = 0; i + minTau < frame; ++i) {
+        const double x = data[i];
+
+        const size_t limit = std::min(maxTau, frame - i - 1);
+
+        double *d = diff + minTau;
+        const double *lag = data + i + minTau;
+        const double *const lagEnd = data + i + limit + 1;
+
+        while (lag < lagEnd) {
+            const double delta = x - *lag++;
+            *d++ += delta * delta;
         }
+    }
+
+    // ─────────────────────────────────────
+    // Cumulative mean normalized difference
+    //
+    // diff[1 ... minTau-1] is zero in the existing
+    // implementation, so those iterations can be skipped.
+    cmndf[0] = 1.0;
+
+    if (minTau > 1) {
+        std::fill(cmndf + 1, cmndf + minTau, 1.0);
     }
 
     double cumulative = 0.0;
-    Cmnfg[0] = 1.0;
-    for (size_t tau = 1; tau <= maxTau; ++tau) {
-        cumulative += Diff[tau];
+
+    for (size_t tau = minTau; tau <= maxTau; ++tau) {
+        cumulative += diff[tau];
+
         if (cumulative <= 0.0) {
-            Cmnfg[tau] = 1.0;
+            cmndf[tau] = 1.0;
         } else {
-            Cmnfg[tau] = (Diff[tau] * static_cast<double>(tau)) / cumulative;
+            cmndf[tau] = diff[tau] * static_cast<double>(tau) / cumulative;
         }
     }
 
+    // ─────────────────────────────────────
+    // First look for YIN's threshold crossing.
+    //
+    // If one exists, the original global-minimum scan is
+    // unnecessary because it is overwritten afterward.
     size_t tauEstimate = 0;
     double bestValue = std::numeric_limits<double>::infinity();
+
     for (size_t tau = minTau; tau <= maxTau; ++tau) {
-        const double value = Cmnfg[tau];
-        if (value < bestValue) {
-            bestValue = value;
+        const double value = cmndf[tau];
+
+        if (value < m_Config.YINThreshold) {
             tauEstimate = tau;
+            bestValue = value;
+
+            while (tau + 1 <= maxTau && cmndf[tau + 1] < bestValue) {
+                ++tau;
+                tauEstimate = tau;
+                bestValue = cmndf[tau];
+            }
+
+            break;
         }
     }
 
-    for (size_t tau = minTau; tau <= maxTau; ++tau) {
-        const double value = Cmnfg[tau];
-        if (value < m_Config.YINThreshold) {
-            double prevValue = value;
-            tauEstimate = tau;
-            while (tau + 1 <= maxTau && Cmnfg[tau + 1] < prevValue) {
-                prevValue = Cmnfg[++tau];
+    // No threshold crossing: fall back to the global minimum,
+    // exactly as the previous implementation did.
+    if (tauEstimate == 0) {
+        for (size_t tau = minTau; tau <= maxTau; ++tau) {
+            const double value = cmndf[tau];
+
+            if (value < bestValue) {
+                bestValue = value;
                 tauEstimate = tau;
             }
-            bestValue = prevValue;
-            break;
         }
     }
 
@@ -469,34 +513,44 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
         return;
     }
 
+    // ─────────────────────────────────────
+    // Parabolic interpolation
     double refinedTau = static_cast<double>(tauEstimate);
+
     if (tauEstimate > minTau && tauEstimate + 1 <= maxTau) {
-        const double left = Cmnfg[tauEstimate - 1];
-        const double center = Cmnfg[tauEstimate];
-        const double right = Cmnfg[tauEstimate + 1];
-        const double denominator = left - (2.0 * center) + right;
+
+        const double left = cmndf[tauEstimate - 1];
+        const double center = cmndf[tauEstimate];
+        const double right = cmndf[tauEstimate + 1];
+
+        const double denominator = left - 2.0 * center + right;
+
         if (std::abs(denominator) > 1e-12) {
             const double offset = 0.5 * (left - right) / denominator;
+
             refinedTau += std::clamp(offset, -1.0, 1.0);
         }
     }
 
-    const double Confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
-    if (refinedTau <= 0.0 || Confidence <= 0.0) {
+    const double confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
+
+    if (refinedTau <= 0.0 || confidence <= 0.0) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    const double Pitch = m_Config.SR / refinedTau;
-    if (Pitch < m_Config.YINMinFrequency || Pitch > m_Config.YINMaxFrequency) {
+    const double pitch = m_Config.SR / refinedTau;
+
+    if (pitch < m_Config.YINMinFrequency || pitch > m_Config.YINMaxFrequency) {
+
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    Desc.Pitch = Pitch;
-    Desc.PitchConfidence = Confidence;
+    Desc.Pitch = pitch;
+    Desc.PitchConfidence = confidence;
 }
 
 // ╭─────────────────────────────────────╮
