@@ -514,56 +514,72 @@ void OnlineForward::ResetDecoding() {
 }
 
 // ─────────────────────────────────────
-// CUVILLIER 2016, sections 6.1.3 and A.3.3.
+// CUVILLIER 2016 + robust right-tail extension.
+//
+// Main occupancy law:
+//     D_l ~ Poisson(l)
+//
+// A small exponential right tail is added after the expected duration.
+// This keeps normal rhythmic passages close to Cuvillier's Poisson model,
+// while allowing occasional unexpectedly long events (breaths, phrase
+// endings, expressive lengthening).
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     ExpectedFrames = std::max(ExpectedFrames, 1.0);
-
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     if (m_OccupancyPMFCache.contains(key) && m_SurvivorCache.contains(key)) {
         return;
     }
+    const double lambda = static_cast<double>(key) * 0.1;
 
-    const double mean = static_cast<double>(key) * 0.1;
-    constexpr double r = 64.0;
+    // TODO: This is a score parameter
+    constexpr double timeTolerance = 0.03;
 
-    const double p = r / (r + mean);
-    const double q = 1.0 - p;
+    const double tailScale = std::max(2.0, lambda);
+    const double sigma = std::sqrt(lambda);
+    const double poissonLimit = lambda + 8.0 * sigma;
+    const double tailLimit = lambda + 8.0 * tailScale;
 
-    const double variance = mean + (mean * mean) / r;
-    const double sigma = std::sqrt(variance);
-
-    const int requestedMaxU = static_cast<int>(std::ceil(std::max(5.0 * mean, mean + 8.0 * sigma)));
+    const int requestedMaxU = static_cast<int>(std::ceil(std::max({5.0 * lambda, poissonLimit, tailLimit})));
     const int maxU = std::clamp(requestedMaxU, 1, m_BufferSize - 1);
     std::vector<double> pmf(static_cast<size_t>(maxU + 1), 0.0);
     std::vector<double> survivor(static_cast<size_t>(maxU + 2), 0.0);
 
-    // Negative Binomial PMF
-    double probability = std::pow(p, r);
-    double sum = 0.0;
+    // Poisson PMF.
+    double poissonProbability = std::exp(-lambda);
+    double totalProbability = 0.0;
+
     for (int u = 1; u <= maxU; ++u) {
-        probability *= ((static_cast<double>(u - 1) + r) / static_cast<double>(u)) * q;
+        poissonProbability *= lambda / static_cast<double>(u);
+        double probability = poissonProbability;
+
+        // Heavy RIGHT tail.
+        if (static_cast<double>(u) > lambda && timeTolerance > 0.0) {
+            const double excess = static_cast<double>(u) - lambda;
+            const double tail = std::exp(-excess / tailScale);
+            probability = (1.0 - timeTolerance) * probability + timeTolerance * tail;
+        }
         pmf[static_cast<size_t>(u)] = probability;
-        sum += probability;
+        totalProbability += probability;
     }
 
-    // Normalize zero-truncated distribution
-    if (sum > std::numeric_limits<double>::min()) {
-        const double invSum = 1.0 / sum;
+    // Normalize.
+    if (totalProbability > std::numeric_limits<double>::min()) {
+        const double invTotal = 1.0 / totalProbability;
         for (int u = 1; u <= maxU; ++u) {
-            pmf[static_cast<size_t>(u)] *= invSum;
+            pmf[static_cast<size_t>(u)] *= invTotal;
         }
     } else {
         pmf[static_cast<size_t>(maxU)] = 1.0;
     }
 
-    // Survivor function
+    // Survivor:
+    // D(u) = P(U >= u)
     double cumulative = 0.0;
     for (int u = maxU; u >= 1; --u) {
         cumulative += pmf[static_cast<size_t>(u)];
         survivor[static_cast<size_t>(u)] = cumulative;
     }
     survivor[0] = 1.0;
-
     m_OccupancyPMFCache.emplace(key, std::move(pmf));
     m_SurvivorCache.emplace(key, std::move(survivor));
 }
@@ -1040,15 +1056,18 @@ double OnlineForward::GetTransProbability(int i, int j) {
 // TODO: Needs review
 double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
-    if (ExpectedFrames < 1.0)
+    if (ExpectedFrames < 1.0) {
         ExpectedFrames = 1.0;
+    }
 
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
 
     const auto &cache = m_OccupancyPMFCache[key];
-    if (u >= 0 && u < static_cast<int>(cache.size()))
+    if (u >= 0 && u < static_cast<int>(cache.size())) {
         return cache[u];
+    }
+
     return 0.0;
 }
 // ─────────────────────────────────────
@@ -1056,16 +1075,18 @@ double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
 // TODO: Needs review
 double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
-    if (ExpectedFrames < 1.0)
+    if (ExpectedFrames < 1.0) {
         ExpectedFrames = 1.0;
+    }
 
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
 
     const auto &cache = m_SurvivorCache[key];
     // survivor[u] defined for u = 0..maxU+1, returns 0 beyond
-    if (u >= 0 && u < static_cast<int>(cache.size()))
+    if (u >= 0 && u < static_cast<int>(cache.size())) {
         return cache[u];
+    }
     return 0.0;
 }
 
