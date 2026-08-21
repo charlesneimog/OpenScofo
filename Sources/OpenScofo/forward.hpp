@@ -28,6 +28,14 @@ struct PitchTemplateEntry {
     double p_log_p;
 };
 
+// ─────────────────────────────────────
+// Auxiliary hidden state associated with a score event. It deliberately has
+// no score position, duration, observation template, or event actions.
+struct HoldState {
+    std::vector<double> Forward;
+    std::vector<double> ExitProb;
+};
+
 // ╭─────────────────────────────────────╮
 // │     Markov Description Process      │
 // ╰─────────────────────────────────────╯
@@ -57,6 +65,8 @@ class OnlineForward {
     // Get Functions
     int GetCurrentBufferIndex();
     int GetCurrentStateIndex();
+    bool IsInHold() const;
+    int GetCurrentHoldIndex() const;
     int GetTunning();
     EventActions GetCurrentEventActions();
     EventActions GetAudioStateChangeActions();
@@ -93,9 +103,12 @@ class OnlineForward {
     void ResetCaches();
 
     // Markov and Probabilities
-    double GetTransProbability(int i, int j);
+    double GetTransProbability(int i, int j) const;
+    double GetEntryProbability(int i, int j, int BufferIndex) const;
     void GetInitialDistribution();
     int GetMaxUForJ(MarkovState &StateJ);
+    bool IsHoldEligible(int StateIndex) const;
+    void UpdateHoldStates();
 
     // Markov
     double GetBestEvent();
@@ -195,6 +208,7 @@ class OnlineForward {
 
     // Pitch
     std::vector<MarkovState> m_States;
+    std::vector<HoldState> m_HoldStates;
     double m_PitchScalingFactor = 0.5;
 
     std::unordered_map<double, PitchTemplateArray> m_PitchCQTTemplates;
@@ -204,6 +218,14 @@ class OnlineForward {
 
     // Markov
     bool m_EventDetected = false;
+
+    // OpenScofo extension: optional extra physical time after a score event.
+    // This is intentionally independent of the nominal duration distribution.
+    bool m_HoldEnabled = true;
+    double m_HoldEnterProbability = 0.03;
+    double m_HoldExitProbability = 0.05;
+    bool m_InHold = false;
+    int m_CurrentHoldIndex = -1;
 
     // Errors
     bool m_HasErrors = false;

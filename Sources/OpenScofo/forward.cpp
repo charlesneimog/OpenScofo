@@ -96,6 +96,13 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
         State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
     }
+    m_HoldStates.resize(m_States.size());
+    for (HoldState &Hold : m_HoldStates) {
+        Hold.Forward.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
+        Hold.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), 0.0);
+    }
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 
     if (!m_States.empty()) {
         UpdateAudioTemplate();
@@ -105,6 +112,16 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
 // ─────────────────────────────────────
 int OnlineForward::GetCurrentStateIndex() {
     return m_CurrentStateIndex;
+}
+
+// ─────────────────────────────────────
+bool OnlineForward::IsInHold() const {
+    return m_InHold;
+}
+
+// ─────────────────────────────────────
+int OnlineForward::GetCurrentHoldIndex() const {
+    return m_CurrentHoldIndex;
 }
 
 // ─────────────────────────────────────
@@ -222,6 +239,11 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
         State.ExitProb.assign(m_BufferSize, std::numeric_limits<double>::min());
         State.BestObs.assign(m_BufferSize, std::numeric_limits<double>::min());
     }
+    m_HoldStates.assign(m_States.size(), HoldState{});
+    for (HoldState &Hold : m_HoldStates) {
+        Hold.Forward.assign(m_BufferSize, 0.0);
+        Hold.ExitProb.assign(m_BufferSize, 0.0);
+    }
 
     m_CurrentStateIndex = 0;
     m_LastNotifiedStateIndex = -1;
@@ -235,6 +257,8 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
     m_Tau = 0;
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 
     m_SyncStrength = m_States[0].SyncStrength;
     m_PhaseCoupling = m_States[0].PhaseCoupling;
@@ -364,6 +388,9 @@ PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
 // ╰─────────────────────────────────────╯
 void OnlineForward::ClearStates() {
     m_States.clear();
+    m_HoldStates.clear();
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 }
 // ─────────────────────────────────────
 double OnlineForward::GetCurrentBPM() {
@@ -421,6 +448,12 @@ void OnlineForward::SetCurrentEvent(int Event) {
         ResetDecoding(); // Use full reset instead of InitTimeDecoding
     }
     m_CurrentStateIndex = Event;
+    for (HoldState &Hold : m_HoldStates) {
+        std::fill(Hold.Forward.begin(), Hold.Forward.end(), 0.0);
+        std::fill(Hold.ExitProb.begin(), Hold.ExitProb.end(), 0.0);
+    }
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 
     // TODO: CHECK THIS
     m_Tau = 0; // Already set in ResetDecoding, but keep for safety
@@ -434,6 +467,10 @@ int OnlineForward::GetStatesSize() {
 // ─────────────────────────────────────
 void OnlineForward::AddState(MarkovState State) {
     m_States.push_back(State);
+    HoldState Hold;
+    Hold.Forward.assign(static_cast<size_t>(m_BufferSize), 0.0);
+    Hold.ExitProb.assign(static_cast<size_t>(m_BufferSize), 0.0);
+    m_HoldStates.push_back(std::move(Hold));
 }
 
 // ─────────────────────────────────────
@@ -467,6 +504,12 @@ void OnlineForward::InitTimeDecoding(void) {
     m_SyncStr = 0;
     m_Kappa = 10;
     m_Tau = 0;
+    for (HoldState &Hold : m_HoldStates) {
+        std::fill(Hold.Forward.begin(), Hold.Forward.end(), 0.0);
+        std::fill(Hold.ExitProb.begin(), Hold.ExitProb.end(), 0.0);
+    }
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 }
 
 // ─────────────────────────────────────
@@ -500,6 +543,13 @@ void OnlineForward::ResetDecoding() {
         State.InitProb = 0.0;
     }
 
+    for (HoldState &Hold : m_HoldStates) {
+        std::fill(Hold.Forward.begin(), Hold.Forward.end(), 0.0);
+        std::fill(Hold.ExitProb.begin(), Hold.ExitProb.end(), 0.0);
+    }
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
+
     // Reset normalization buffer
     std::fill(m_Normalization.begin(), m_Normalization.end(), 1.0);
 
@@ -514,72 +564,109 @@ void OnlineForward::ResetDecoding() {
 }
 
 // ─────────────────────────────────────
-// CUVILLIER 2016 + robust right-tail extension.
+// CUVILLIER 2016
 //
-// Main occupancy law:
+// Poisson occupancy law:
+//
 //     D_l ~ Poisson(l)
 //
-// A small exponential right tail is added after the expected duration.
-// This keeps normal rhythmic passages close to Cuvillier's Poisson model,
-// while allowing occasional unexpectedly long events (breaths, phrase
-// endings, expressive lengthening).
+// where l is the expected duration in frames.
+//
+// The nominal score-event duration remains purely Poisson.
+// Unexpected extra physical time, such as breaths at phrase endings,
+// is modeled separately by the auxiliary HOLD state.
+//
+// See Cuvillier 2016:
+// - Section 3.3.4
+// - Section 4.6
+// - Section 6.1.3
+// - Appendix A.3.2 / A.3.3
+// ─────────────────────────────────────
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     ExpectedFrames = std::max(ExpectedFrames, 1.0);
+
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
+
     if (m_OccupancyPMFCache.contains(key) && m_SurvivorCache.contains(key)) {
         return;
     }
+
+    // Cuvillier 2016:
+    //
+    //     D_l ~ Poisson(l)
+    //
+    // mean     = lambda
+    // variance = lambda
     const double lambda = static_cast<double>(key) * 0.1;
 
-    // TODO: This is a score parameter
-    constexpr double timeTolerance = 0.03;
-
-    const double tailScale = std::max(2.0, lambda);
     const double sigma = std::sqrt(lambda);
-    const double poissonLimit = lambda + 8.0 * sigma;
-    const double tailLimit = lambda + 8.0 * tailScale;
 
-    const int requestedMaxU = static_cast<int>(std::ceil(std::max({5.0 * lambda, poissonLimit, tailLimit})));
+    // Numerical truncation only.
+    //
+    // lambda + 8 sigma contains effectively all relevant
+    // Poisson probability mass for the durations used here.
+    const int requestedMaxU = static_cast<int>(std::ceil(lambda + 8.0 * sigma));
+
     const int maxU = std::clamp(requestedMaxU, 1, m_BufferSize - 1);
+
     std::vector<double> pmf(static_cast<size_t>(maxU + 1), 0.0);
+
     std::vector<double> survivor(static_cast<size_t>(maxU + 2), 0.0);
 
-    // Poisson PMF.
-    double poissonProbability = std::exp(-lambda);
+    // Poisson recurrence:
+    //
+    // P(U = 0) = exp(-lambda)
+    //
+    // P(U = u) =
+    //     P(U = u - 1) * lambda / u
+    double probability = std::exp(-lambda);
+
     double totalProbability = 0.0;
 
     for (int u = 1; u <= maxU; ++u) {
-        poissonProbability *= lambda / static_cast<double>(u);
-        double probability = poissonProbability;
+        probability *= lambda / static_cast<double>(u);
 
-        // Heavy RIGHT tail.
-        if (static_cast<double>(u) > lambda && timeTolerance > 0.0) {
-            const double excess = static_cast<double>(u) - lambda;
-            const double tail = std::exp(-excess / tailScale);
-            probability = (1.0 - timeTolerance) * probability + timeTolerance * tail;
-        }
         pmf[static_cast<size_t>(u)] = probability;
+
         totalProbability += probability;
     }
 
-    // Normalize.
+    // OpenScofo's HSMM recursion uses positive occupancies.
+    //
+    // The u = 0 Poisson mass is handled separately by the
+    // null-duration transformation used by the transition /
+    // initialization model, so this cache represents:
+    //
+    //     P(U = u | U > 0)
+    //
+    // for u >= 1.
     if (totalProbability > std::numeric_limits<double>::min()) {
+
         const double invTotal = 1.0 / totalProbability;
+
         for (int u = 1; u <= maxU; ++u) {
+
             pmf[static_cast<size_t>(u)] *= invTotal;
         }
+
     } else {
         pmf[static_cast<size_t>(maxU)] = 1.0;
     }
 
     // Survivor:
-    // D(u) = P(U >= u)
+    //
+    //     S(u) = P(U >= u | U > 0)
     double cumulative = 0.0;
+
     for (int u = maxU; u >= 1; --u) {
+
         cumulative += pmf[static_cast<size_t>(u)];
+
         survivor[static_cast<size_t>(u)] = cumulative;
     }
+
     survivor[0] = 1.0;
+
     m_OccupancyPMFCache.emplace(key, std::move(pmf));
     m_SurvivorCache.emplace(key, std::move(survivor));
 }
@@ -726,8 +813,17 @@ void OnlineForward::GetDecodeWindow() {
 // ─────────────────────────────────────
 // CONT 2010 (Section 5, algorithm 1)
 double OnlineForward::UpdatePsiN(int StateIndex) {
-    m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
+
+    // OpenScofo extension (not a formula from Cont): HOLD consumes physical
+    // frames but not nominal musical-event time, so an inserted breath does
+    // not by itself slow the tempo agent.
+    if (m_InHold) {
+        m_PsiN1 = m_PsiN;
+        return m_PsiN;
+    }
+
+    m_TimeInPrevEvent += m_BlockDur;
 
     if (StateIndex == m_CurrentStateIndex) {
         m_PsiN1 = m_PsiN;
@@ -740,7 +836,7 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
     }
 
     m_CurrentStateOnset += m_TimeInPrevEvent;
-    if (StateIndex + 1 > (int)m_States.size()) {
+    if (StateIndex + 1 >= (int)m_States.size()) {
         return m_PsiN;
     }
 
@@ -1070,8 +1166,53 @@ void OnlineForward::GetInitialDistribution() {
 
 // ─────────────────────────────────────
 // CUVILLIER and CONT (2014) section 2.1.
-double OnlineForward::GetTransProbability(int i, int j) {
+double OnlineForward::GetTransProbability(int i, int j) const {
     return (i + 1 == j) ? 1.0 : 0.0;
+}
+
+// ─────────────────────────────────────
+double OnlineForward::GetEntryProbability(int i, int j, int BufferIndex) const {
+    const double transition = GetTransProbability(i, j);
+    if (transition == 0.0) {
+        return 0.0;
+    }
+
+    const bool holdEligible = IsHoldEligible(i);
+    const double directProbability = holdEligible ? 1.0 - m_HoldEnterProbability : 1.0;
+    const double directMass = directProbability * m_States[i].ExitProb[BufferIndex];
+    const double holdMass = holdEligible ? m_HoldStates[i].ExitProb[BufferIndex] : 0.0;
+    return transition * (directMass + holdMass);
+}
+
+// ─────────────────────────────────────
+bool OnlineForward::IsHoldEligible(int StateIndex) const {
+    if (!m_HoldEnabled || StateIndex < 0 || StateIndex + 1 >= static_cast<int>(m_States.size())) {
+        return false;
+    }
+
+    const EventType type = m_States[StateIndex].Type;
+    return type != FIRSTEVENT && type != REST && m_States[StateIndex + 1].Type != REST;
+}
+
+// ─────────────────────────────────────
+void OnlineForward::UpdateHoldStates() {
+    const double holdObservation = std::clamp(m_Desc.SilenceProb, 0.0, 1.0);
+    const int previousBuffer = (m_CircularBufferIndex - 1 + m_BufferSize) % m_BufferSize;
+
+    for (int j = m_WinStart; j <= m_WinEnd; ++j) {
+        HoldState &Hold = m_HoldStates[j];
+        if (m_Tau == 0 || !IsHoldEligible(j)) {
+            Hold.Forward[m_CircularBufferIndex] = 0.0;
+            Hold.ExitProb[m_CircularBufferIndex] = 0.0;
+            continue;
+        }
+
+        const double entryMass = m_HoldEnterProbability * m_States[j].ExitProb[previousBuffer];
+        const double stayMass = (1.0 - m_HoldExitProbability) * Hold.Forward[previousBuffer];
+        const double forward = holdObservation * (entryMass + stayMass);
+        Hold.Forward[m_CircularBufferIndex] = forward;
+        Hold.ExitProb[m_CircularBufferIndex] = m_HoldExitProbability * forward;
+    }
 }
 
 // ─────────────────────────────────────
@@ -1144,8 +1285,7 @@ void OnlineForward::Markov(MarkovState &StateJ, int j) {
 
         // Arrive from j-1
         if (j - 1 >= m_CurrentStateIndex && j - 1 >= 0) {
-            double trans = GetTransProbability(j - 1, j);
-            sumPrev += trans * m_States[j - 1].ExitProb[prevBuf];
+            sumPrev += GetEntryProbability(j - 1, j, prevBuf);
         }
         Fj = Bj * sumPrev;
     }
@@ -1178,7 +1318,7 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j) {
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double TransSum = 0.0;
         for (int i = m_WinStart; i < j; ++i)
-            TransSum += GetTransProbability(i, j) * m_States[i].ExitProb[EntryBuf];
+            TransSum += GetEntryProbability(i, j, EntryBuf);
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
 
@@ -1219,11 +1359,13 @@ int OnlineForward::GetAlphaT() {
             break;
         }
     }
+    UpdateHoldStates();
 
     // Calculate the Normalization Denominator
     double N = 0.0;
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         N += m_States[j].Forward[m_CircularBufferIndex];
+        N += m_HoldStates[j].Forward[m_CircularBufferIndex];
     }
 
     if (N < std::numeric_limits<double>::min()) {
@@ -1238,11 +1380,17 @@ int OnlineForward::GetAlphaT() {
         m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
         m_States[j].ExitProb[m_CircularBufferIndex] /= N;
         m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+
+        HoldState &Hold = m_HoldStates[j];
+        Hold.Forward[m_CircularBufferIndex] /= N;
+        Hold.ExitProb[m_CircularBufferIndex] /= N;
     }
 
     // Find the Argmax (Best State)
     double maxVal = std::numeric_limits<double>::min();
     int BestStateIndex = m_CurrentStateIndex;
+    m_InHold = false;
+    m_CurrentHoldIndex = -1;
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
@@ -1250,19 +1398,36 @@ int OnlineForward::GetAlphaT() {
         if (fwd > maxVal && j >= m_CurrentStateIndex) {
             maxVal = fwd;
             BestStateIndex = j;
+            m_InHold = false;
+            m_CurrentHoldIndex = -1;
         }
 
-        spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
-                      StateJ.BestObs[m_CircularBufferIndex], StateJ.Forward[m_CircularBufferIndex],
-                      StateJ.ExitProb[m_CircularBufferIndex]);
+        const HoldState &Hold = m_HoldStates[j];
+        const double holdForward = Hold.Forward[m_CircularBufferIndex];
+        if (holdForward > maxVal && j >= m_CurrentStateIndex) {
+            maxVal = holdForward;
+            BestStateIndex = j;
+            m_InHold = true;
+            m_CurrentHoldIndex = j;
+        }
+
+        spdlog::debug("State ({}) | Obs {:.5f}, Forward {:.5f}, Exit {:.5f} | Hold Forward {:.5f}, Exit {:.5f}",
+                      StateJ.Index, StateJ.BestObs[m_CircularBufferIndex], StateJ.Forward[m_CircularBufferIndex],
+                      StateJ.ExitProb[m_CircularBufferIndex], Hold.Forward[m_CircularBufferIndex],
+                      Hold.ExitProb[m_CircularBufferIndex]);
     }
 
-    if (m_IsSilence && BestStateIndex != m_CurrentStateIndex && m_States[BestStateIndex].Type != REST) {
+    // HOLD replaces the hard silence guard where it is available. Retain the
+    // legacy behavior for FIRSTEVENT, REST, the last event, and before a REST.
+    if (!IsHoldEligible(m_CurrentStateIndex) && m_IsSilence && BestStateIndex != m_CurrentStateIndex &&
+        m_States[BestStateIndex].Type != REST) {
+        m_InHold = false;
+        m_CurrentHoldIndex = -1;
         return m_CurrentStateIndex;
     }
 
     MarkovState &BestState = m_States[BestStateIndex];
-    spdlog::debug("Best: State ({}) | Forward {:.5f}", BestState.Index, BestState.Forward[m_CircularBufferIndex]);
+    spdlog::debug("Best: State ({}) | Forward {:.5f} | Hold selected {}", BestState.Index, maxVal, m_InHold);
 
     return BestStateIndex;
 }
@@ -1296,7 +1461,9 @@ int OnlineForward::GetEvent(Description &Desc) {
         m_CurrentStateIndex = BestState;
     }
 
-    NotifyAudioStateChange(BestState);
+    if (!m_InHold) {
+        NotifyAudioStateChange(BestState);
+    }
     return m_States[BestState].ScorePos;
 }
 
