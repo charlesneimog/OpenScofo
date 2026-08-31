@@ -54,6 +54,7 @@ class OpenScofo {
     template <OpenScofoPrecision T> bool ProcessBlock(const T *AudioBuffer, size_t n);
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
     void SetCurrentEvent(int Event);
+    bool SetCurrentSection(const std::string &Section);
     void SetConfiguration(Configuration &Config);
     void SetRequestedDescriptors(std::vector<Descriptors> Descriptors);
     void RequestDescriptor(Descriptors Descriptor);

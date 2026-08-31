@@ -14,6 +14,10 @@
           },
           {
             "type": "SYMBOL",
+            "name": "SECTION"
+          },
+          {
+            "type": "SYMBOL",
             "name": "LUA"
           },
           {
@@ -343,6 +347,10 @@
           },
           {
             "type": "STRING",
+            "value": "TIMETOLERANCE"
+          },
+          {
+            "type": "STRING",
             "value": "PITCHTEMPLATESIGMA"
           },
           {
@@ -432,9 +440,43 @@
           {
             "type": "STRING",
             "value": "ZCRTHRESHOLD"
+          },
+          {
+            "type": "STRING",
+            "value": "SECTIONRESTRICT"
           }
         ]
       }
+    },
+    "SECTION": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "SECTION"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "number"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "string"
+              }
+            ]
+          }
+        }
+      ]
     },
     "EVENT": {
       "type": "SEQ",
@@ -1068,6 +1110,13 @@
       "content": {
         "type": "PATTERN",
         "value": "-?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?"
+      }
+    },
+    "string": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "\"[^\"\\n]*\""
       }
     },
     "path": {

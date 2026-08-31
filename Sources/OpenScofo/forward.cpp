@@ -82,6 +82,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_SyncStrength = Config.SyncStrength;
     m_PhaseCoupling = Config.PhaseCoupling;
     m_dBTreshold = Config.dBTreshold;
+    m_SectionRestrict = Config.SectionRestrict;
     m_AudioStateChangeReceiver = Config.AudioStateChangeReceiver;
 
     m_PitchTemplates.clear();
@@ -224,20 +225,28 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     }
 
     m_CurrentStateIndex = 0;
+    if (m_SectionRestrict) {
+        auto FirstSectionState = std::find_if(m_States.begin(), m_States.end(),
+                                              [](const MarkovState &State) { return !State.Section.empty(); });
+        if (FirstSectionState != m_States.end()) {
+            m_CurrentStateIndex = static_cast<int>(std::distance(m_States.begin(), FirstSectionState));
+        }
+    }
+    const MarkovState &InitialState = m_States[static_cast<size_t>(m_CurrentStateIndex)];
     m_LastNotifiedStateIndex = -1;
     m_LastNotifiedAudioStateIndex = -1;
     m_PendingAudioStateActions.clear();
     m_Kappa = 10;
-    m_BPM = m_States[0].BPMExpected;
-    m_PsiN = 60.0f / m_States[0].BPMExpected;
-    m_PsiN1 = 60.0f / m_States[0].BPMExpected;
-    m_LastPsiN = 60.0f / m_States[0].BPMExpected;
-    m_BeatsAhead = m_States[0].BPMExpected / 60 * m_SecondsAhead;
+    m_BPM = InitialState.BPMExpected;
+    m_PsiN = 60.0f / InitialState.BPMExpected;
+    m_PsiN1 = 60.0f / InitialState.BPMExpected;
+    m_LastPsiN = 60.0f / InitialState.BPMExpected;
+    m_BeatsAhead = InitialState.BPMExpected / 60 * m_SecondsAhead;
     m_SyncStr = 0;
     m_Tau = 0;
 
-    m_SyncStrength = m_States[0].SyncStrength;
-    m_PhaseCoupling = m_States[0].PhaseCoupling;
+    m_SyncStrength = InitialState.SyncStrength;
+    m_PhaseCoupling = InitialState.PhaseCoupling;
 
     UpdateAudioTemplate();
 }
@@ -416,14 +425,26 @@ void OnlineForward::SetCurrentEvent(int Event) {
         return;
     }
 
-    if (Event == 0) {
-        spdlog::info("Initializing Time Decoding Algorithm");
-        ResetDecoding(); // Use full reset instead of InitTimeDecoding
+    if (Event < 0 || Event >= static_cast<int>(m_States.size())) {
+        spdlog::error("Event index {} is outside the score", Event);
+        return;
     }
     m_CurrentStateIndex = Event;
+    ResetDecoding();
+}
 
-    // TODO: CHECK THIS
-    m_Tau = 0; // Already set in ResetDecoding, but keep for safety
+// ─────────────────────────────────────
+bool OnlineForward::SetCurrentSection(const std::string &Section) {
+    auto State = std::find_if(m_States.begin(), m_States.end(),
+                              [&](const MarkovState &Candidate) { return Candidate.Section == Section; });
+    if (State == m_States.end()) {
+        spdlog::error("SECTION '{}' was not found in the loaded score", Section);
+        return false;
+    }
+
+    m_CurrentStateIndex = static_cast<int>(std::distance(m_States.begin(), State));
+    ResetDecoding();
+    return true;
 }
 
 // ─────────────────────────────────────
@@ -471,6 +492,13 @@ void OnlineForward::InitTimeDecoding(void) {
 
 // ─────────────────────────────────────
 void OnlineForward::ResetDecoding() {
+    if (m_States.empty()) {
+        return;
+    }
+
+    const int StartStateIndex = std::clamp(m_CurrentStateIndex, 0, static_cast<int>(m_States.size()) - 1);
+    MarkovState &StartState = m_States[static_cast<size_t>(StartStateIndex)];
+
     // Reset timing variables
     m_Tau = 0;
     m_TimeInPrevEvent = 0;
@@ -482,11 +510,14 @@ void OnlineForward::ResetDecoding() {
     m_Kappa = 10;
 
     // Reset BPM and period predictions
-    double PsiK = 60 / m_States[0].BPMExpected;
+    double PsiK = 60 / StartState.BPMExpected;
     m_LastPsiN = PsiK;
     m_PsiN = PsiK;
     m_PsiN1 = PsiK;
-    m_BPM = m_States[0].BPMExpected;
+    m_BPM = StartState.BPMExpected;
+    m_BeatsAhead = StartState.BPMExpected / 60.0 * m_SecondsAhead;
+    m_SyncStrength = StartState.SyncStrength;
+    m_PhaseCoupling = StartState.PhaseCoupling;
 
     // Reset all state probabilities
     for (MarkovState &State : m_States) {
@@ -504,7 +535,7 @@ void OnlineForward::ResetDecoding() {
     std::fill(m_Normalization.begin(), m_Normalization.end(), 1.0);
 
     // Reset first state
-    m_States[0].OnsetObserved = 0;
+    StartState.OnsetObserved = 0;
 
     m_LastNotifiedStateIndex = -1;
     m_LastNotifiedAudioStateIndex = -1;
@@ -711,6 +742,21 @@ States OnlineForward::GetStatesForProcessing() {
 // ─────────────────────────────────────
 // CONT 2010 (Last § of section 4)
 void OnlineForward::GetDecodeWindow() {
+    if (m_SectionRestrict) {
+        const std::string &Section = m_States[static_cast<size_t>(m_CurrentStateIndex)].Section;
+        m_WinStart = m_CurrentStateIndex;
+        while (m_WinStart > 0 && m_States[static_cast<size_t>(m_WinStart - 1)].Section == Section) {
+            --m_WinStart;
+        }
+
+        m_WinEnd = m_CurrentStateIndex;
+        while (m_WinEnd + 1 < static_cast<int>(m_States.size()) &&
+               m_States[static_cast<size_t>(m_WinEnd + 1)].Section == Section) {
+            ++m_WinEnd;
+        }
+        return;
+    }
+
     int half = m_EventWindowSize / 2;
     m_WinStart = std::max(0, static_cast<int>(m_CurrentStateIndex) - half);
     m_WinEnd = std::min(static_cast<int>(m_States.size()) - 1, static_cast<int>(m_CurrentStateIndex) + half);

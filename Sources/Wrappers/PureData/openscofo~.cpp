@@ -8,6 +8,8 @@
 */
 
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 extern "C" {
 #include <m_pd.h>
@@ -345,9 +347,31 @@ static void openscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
             break;
         }
 
-    } else if (method == "mfcc") {
     } else if (method == "section") {
-        pd_error(x, "[openscofo~] Section method not implemented");
+        if (argc != 2) {
+            pd_error(x, "[openscofo~] section requires one name");
+            return;
+        }
+
+        std::string Section;
+        if (argv[1].a_type == A_SYMBOL) {
+            Section = atom_getsymbol(argv + 1)->s_name;
+        } else if (argv[1].a_type == A_FLOAT) {
+            std::ostringstream Stream;
+            Stream << std::setprecision(15) << atom_getfloat(argv + 1);
+            Section = Stream.str();
+        } else {
+            pd_error(x, "[openscofo~] section name must be a symbol or number");
+            return;
+        }
+
+        if (x->OpenScofo->SetCurrentSection(Section)) {
+            x->Event = x->OpenScofo->GetCurrentScorePosition();
+            x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
+            outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
+            outlet_float(x->EventOut, x->Event);
+            logpost(x, 2, "[openscofo~] Section %s set!", Section.c_str());
+        }
     } else if (method == "justdescription" || method == "description") {
         int f = atom_getint(argv + 1);
         x->Description = f != 0;
@@ -355,6 +379,16 @@ static void openscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
     } else {
         pd_error(x, "[openscofo~] Unknown method");
     }
+}
+
+// ─────────────────────────────────────
+static void openscofo_section(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
+    t_atom Args[2];
+    SETSYMBOL(Args, gensym("section"));
+    if (argc == 1) {
+        Args[1] = argv[0];
+    }
+    openscofo_set(x, s, argc + 1, Args);
 }
 
 // ─────────────────────────────────────
@@ -620,6 +654,7 @@ extern "C" OPENSCOFO_PD_EXPORT void openscofo_tilde_setup(void) {
     class_addmethod(OpenScofoObj, (t_method)openscofo_score, gensym("score"), A_SYMBOL, 0);
     class_addmethod(OpenScofoObj, (t_method)openscofo_start, gensym("start"), A_NULL, 0);
     class_addmethod(OpenScofoObj, (t_method)openscofo_following, gensym("follow"), A_FLOAT, 0);
+    class_addmethod(OpenScofoObj, (t_method)openscofo_section, gensym("section"), A_GIMME, 0);
     class_addmethod(OpenScofoObj, (t_method)openscofo_set, gensym("set"), A_GIMME, 0);
     class_addmethod(OpenScofoObj, (t_method)openscofo_get, gensym("get"), A_GIMME, 0);
 

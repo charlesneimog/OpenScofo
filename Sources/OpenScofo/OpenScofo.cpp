@@ -380,7 +380,6 @@ std::string OpenScofo::LuaGetError() {
 void OpenScofo::SetCurrentEvent(int Event) {
     m_CurrentScorePosition = 0;
     m_BlockIndex = 0;
-    m_Forward.ResetDecoding();
     m_Forward.SetCurrentEvent(Event);
     std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
 
@@ -400,6 +399,32 @@ void OpenScofo::SetCurrentEvent(int Event) {
         m_CurrentScorePosition = m_States[Event].ScorePos;
         return;
     }
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Select a score section and reset decoding at its first state.
+ *
+ * @param Section Section identifier without quotes
+ * @return true when the section exists, false otherwise
+ */
+bool OpenScofo::SetCurrentSection(const std::string &Section) {
+    if (!m_Forward.SetCurrentSection(Section)) {
+        return false;
+    }
+
+    m_BlockIndex = 0;
+    std::fill(m_InBuffer.begin(), m_InBuffer.end(), 0.0);
+    std::fill(m_Desc.Magnitude.begin(), m_Desc.Magnitude.end(), 0.0);
+    std::fill(m_Desc.Power.begin(), m_Desc.Power.end(), 0.0);
+    std::fill(m_Desc.SpectralMagnitudeNorm.begin(), m_Desc.SpectralMagnitudeNorm.end(), 0.0);
+    std::fill(m_Desc.SpectralMagnitudeFrameNorm.begin(), m_Desc.SpectralMagnitudeFrameNorm.end(), 0.0);
+    std::fill(m_Desc.SpectralPowerFrameNorm.begin(), m_Desc.SpectralPowerFrameNorm.end(), 0.0);
+    std::fill(m_Desc.ReverbSpectralPower.begin(), m_Desc.ReverbSpectralPower.end(), 0.0);
+
+    const int StateIndex = m_Forward.GetCurrentStateIndex();
+    m_CurrentScorePosition = m_States[static_cast<size_t>(StateIndex)].ScorePos;
+    return true;
 }
 
 // ╭─────────────────────────────────────╮
@@ -930,6 +955,10 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
 
     // Add States
     m_Forward.SetScoreStates(m_States);
+    if (m_Config.SectionRestrict && !m_States.empty()) {
+        const int StateIndex = m_Forward.GetCurrentStateIndex();
+        m_CurrentScorePosition = m_States[static_cast<size_t>(StateIndex)].ScorePos;
+    }
     m_Mode = SCOREFOLLOWER;
 
     // verify the states.

@@ -8,6 +8,8 @@
 */
 
 #include <cstring>
+#include <iomanip>
+#include <sstream>
 
 #include <ext.h>
 #include <ext_buffer.h>
@@ -359,7 +361,29 @@ static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
         }
         x->OpenScofo->SetLogLevel(x->log);
     } else if (method == "section") {
-        object_error((t_object *)x, "Section method not implemented");
+        if (argc != 2) {
+            object_error((t_object *)x, "section requires one name");
+            return;
+        }
+
+        std::string section;
+        if (atom_gettype(argv + 1) == A_SYM) {
+            section = atom_getsym(argv + 1)->s_name;
+        } else if (atom_gettype(argv + 1) == A_LONG) {
+            section = std::to_string(atom_getlong(argv + 1));
+        } else if (atom_gettype(argv + 1) == A_FLOAT) {
+            std::ostringstream stream;
+            stream << std::setprecision(15) << atom_getfloat(argv + 1);
+            section = stream.str();
+        } else {
+            object_error((t_object *)x, "section name must be a symbol or number");
+            return;
+        }
+
+        if (x->OpenScofo->SetCurrentSection(section)) {
+            x->StateIndex = x->OpenScofo->GetCurrentStateIndex();
+            outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
+        }
     } else if (method == "justdescription" || method == "description") {
         if (argc < 2) {
             object_error((t_object *)x, "Wrong number of arguments");
@@ -370,6 +394,16 @@ static void oscofo_set(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
     } else {
         object_error((t_object *)x, "Unknown method");
     }
+}
+
+// ─────────────────────────────────────
+static void oscofo_section(MaxOpenScofo *x, t_symbol *s, long argc, t_atom *argv) {
+    t_atom args[2];
+    atom_setsym(args, gensym("section"));
+    if (argc == 1) {
+        args[1] = argv[0];
+    }
+    oscofo_set(x, s, argc + 1, args);
 }
 
 // ─────────────────────────────────────
@@ -695,6 +729,7 @@ int C74_EXPORT main() {
     class_addmethod(c, (method)oscofo_score, "score", A_SYM, 0);
     class_addmethod(c, (method)oscofo_start, "start", A_NOTHING, 0);
     class_addmethod(c, (method)oscofo_following, "follow", A_LONG, 0);
+    class_addmethod(c, (method)oscofo_section, "section", A_GIMME, 0);
     class_addmethod(c, (method)oscofo_set, "set", A_GIMME, 0);
     class_addmethod(c, (method)oscofo_get, "get", A_GIMME, 0);
 
