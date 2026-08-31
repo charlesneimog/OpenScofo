@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
-project(OpenScofo VERSION 0.2.11 LANGUAGES C CXX
+project(OpenScofo VERSION 0.3.0 LANGUAGES C CXX
         HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
         DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
@@ -37,9 +37,22 @@ option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_USE_BESSEL "Use Bessel function to calculate Kappa" ON)
 option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
+option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supported" ON)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
+if(OPENSCOFO_ENABLE_IPO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT OPENSCOFO_IPO_SUPPORTED OUTPUT OPENSCOFO_IPO_ERROR LANGUAGES C CXX)
+    if(OPENSCOFO_IPO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(
+            WARNING
+                "IPO/LTO disabled because the current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}"
+        )
+    endif()
+endif()
 
 if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS
