@@ -1,7 +1,16 @@
 export const PARSER_OPEN_SCOFO_WASM = "tree-sitter/tree-sitter-openscofo.wasm";
 export const PARSER_LUA_WASM = "tree-sitter/tree-sitter-lua.wasm";
 
-export const AUTOCOMPLETE_KEYWORDS = ["NOTE", "REST", "TRILL", "CHORD", "TECH", "BPM"];
+export const AUTOCOMPLETE_KEYWORDS = [
+    "NOTE",
+    "REST",
+    "TRILL",
+    "CHORD",
+    "TECH",
+    "BPM",
+    "SECTION",
+    "SECTIONRESTRICT",
+];
 
 export const SUGGESTIONS = {
     NOTE: "NOTE",
