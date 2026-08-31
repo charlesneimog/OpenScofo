@@ -1,9 +1,0 @@
-BPM 60
-
-NOTE C4 2
-
-UTECH jet-whistle 1
-
-PTECH tongue-ram C4 2
-PTECH tongue-ram D4 2
-PTECH tongue-ram E4 2

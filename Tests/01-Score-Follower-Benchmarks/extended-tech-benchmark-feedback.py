@@ -83,7 +83,17 @@ TEST_FILES = [
     {"audio": "./audios/score-37.wav", "score": "./audios/score-37.txt"},
     {"audio": "./audios/score-38.wav", "score": "./audios/score-38.txt"},
     {"audio": "./audios/score-39.wav", "score": "./audios/score-39.txt"},
-    {"audio": "./audios/score-40.wav", "score": "./audios/score-40.txt"}
+    {"audio": "./audios/score-40.wav", "score": "./audios/score-40.txt"},
+    {
+        "audio": "./real/canticos.wav",
+        "score": "./real/canticos.scofo",
+        "annotations": "./real/canticos.json",
+    },
+    {
+        "audio": "./real/bwv-1013.wav",
+        "score": "./real/bwv-1013.scofo",
+        "annotations": "./real/bwv-1013.json",
+    },
 ]
 
 COLOR_RED = "\033[91m"
@@ -289,6 +299,7 @@ class ScoreFollowerValidator:
                     "tolerance_ms": self.tolerance_ms,  # MIREX-COMPLIANT
                     "audio_file": piece["audio_file"],  # MIREX-COMPLIANT
                     "score_file": piece["score_file"],  # MIREX-COMPLIANT
+                    "annotations_file": piece.get("annotations_file"),
                     "metrics": piece["metrics"],  # MIREX-COMPLIANT
                 }
             )
@@ -306,6 +317,7 @@ class ScoreFollowerValidator:
                     {
                         "audio_file": piece["audio_file"],  # MIREX-COMPLIANT
                         "score_file": piece["score_file"],  # MIREX-COMPLIANT
+                        "annotations_file": piece.get("annotations_file"),
                     }
                     for piece in piece_results
                 ],
@@ -347,17 +359,89 @@ def write_result_file(
     output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
+def load_reference_annotations(
+    annotations_path: str,
+    score_positions: set[int],
+) -> Dict[int, float]:
+    """Load event timestamps recorded for a real performance."""
+    with open(annotations_path, "r", encoding="utf-8") as handle:
+        annotations = json.load(handle)
+
+    if not isinstance(annotations, dict):
+        raise ValueError(f"Annotation file is not a JSON object: {annotations_path}")
+
+    events = annotations.get("events")
+    if not isinstance(events, list):
+        raise ValueError(f"Annotation file has no 'events' list: {annotations_path}")
+
+    expected_times: Dict[int, float] = {}
+    previous_timestamp = -1.0
+
+    for index, event_data in enumerate(events, start=1):
+        if not isinstance(event_data, dict):
+            raise ValueError(
+                f"Annotation event {index} is not an object: {annotations_path}"
+            )
+
+        event = event_data.get("event")
+        timestamp = event_data.get("timestamp_seconds")
+
+        if isinstance(event, bool) or not isinstance(event, int) or event <= 0:
+            raise ValueError(
+                f"Annotation event {index} has an invalid event number: {event!r}"
+            )
+        if event in expected_times:
+            raise ValueError(
+                f"Annotation file contains duplicate event {event}: {annotations_path}"
+            )
+
+        try:
+            timestamp_seconds = float(timestamp)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Annotation event {event} has an invalid timestamp: {timestamp!r}"
+            ) from exc
+
+        if not np.isfinite(timestamp_seconds) or timestamp_seconds < 0.0:
+            raise ValueError(
+                f"Annotation event {event} has an invalid timestamp: {timestamp!r}"
+            )
+        if timestamp_seconds < previous_timestamp:
+            raise ValueError(
+                f"Annotation timestamps are not chronological at event {event}: "
+                f"{annotations_path}"
+            )
+
+        expected_times[event] = timestamp_seconds
+        previous_timestamp = timestamp_seconds
+
+    annotated_positions = set(expected_times)
+    missing_positions = sorted(score_positions - annotated_positions)
+    unexpected_positions = sorted(annotated_positions - score_positions)
+    if missing_positions or unexpected_positions:
+        raise ValueError(
+            "Annotation events do not match score positions "
+            f"(missing={missing_positions}, unexpected={unexpected_positions}): "
+            f"{annotations_path}"
+        )
+
+    return expected_times
+
+
 def process_audio_file(
     audio_path: str,
     score_path: str,
     tolerance_ms: float,
+    annotations_path: Optional[str] = None,
 ) -> Tuple[List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]]]:
     """
     Process one audio file with OpenScofo.
 
     Returns:
         detected_events: list[(score_pos, detected_time_seconds)]
-        expected_times: dict[score_pos] = reference_time_seconds
+        expected_times: dict[score_pos] = reference_time_seconds. For synthetic
+            cases these come from the score; for real performances they come
+            from annotations_path.
         score_context: dict[score_pos] = {"type": current, "prev_type": previous}
     """
     print(f"\n--- Processing {audio_path} ---")
@@ -377,6 +461,8 @@ def process_audio_file(
             continue
         try:
             pos = int(state.score_pos)
+            if pos <= 0:
+                continue
 
             # Extract robust state type for precise context analysis
             current_type_str = _get_enum_name(getattr(state, "type", "UNKNOWN"))
@@ -395,6 +481,12 @@ def process_audio_file(
         except (TypeError, ValueError):
             continue
 
+    if annotations_path is not None:
+        expected_times = load_reference_annotations(
+            annotations_path,
+            set(expected_times),
+        )
+
     n_samples = len(audio)
     prev_pos: Optional[int] = None
     detected_events: List[Tuple[int, float]] = []
@@ -409,7 +501,8 @@ def process_audio_file(
         scofo.process_block(frame)
         pos = int(scofo.get_current_score_position())
 
-        if pos < 0 or pos == prev_pos:
+        # Position zero is the follower's initialization state, not a score event.
+        if pos <= 0 or pos == prev_pos:
             continue
 
         detected_time = start / SR
@@ -705,19 +798,22 @@ def process_audio_file_worker(
     """
     audio_path = test_file["audio"]
     score_path = test_file["score"]
+    annotations_path = test_file.get("annotations")
 
     try:
         if not Path(audio_path).exists():
             return None, f"[WARN] Missing file: {audio_path}"
         if not Path(score_path).exists():
             return None, f"[WARN] Missing file: {score_path}"
+        if annotations_path is not None and not Path(annotations_path).exists():
+            return None, f"[WARN] Missing file: {annotations_path}"
 
         # Suppress worker process output to avoid interleaving
         import io
 
         with redirect_stdout(io.StringIO()):
             detected_events, expected_times, score_context = process_audio_file(
-                audio_path, score_path, tolerance_ms
+                audio_path, score_path, tolerance_ms, annotations_path
             )
 
         validator = ScoreFollowerValidator(  # MIREX-COMPLIANT
@@ -733,6 +829,7 @@ def process_audio_file_worker(
         piece_result = {
             "audio_file": audio_path,
             "score_file": score_path,
+            "annotations_file": annotations_path,
             "metrics": metrics,
             "detected_events": detected_events,
             "expected_times": expected_times,
@@ -740,6 +837,7 @@ def process_audio_file_worker(
 
         status_msg = (
             f"✓ {Path(audio_path).name}: "
+            f"reference={'annotations' if annotations_path else 'score'}  "
             f"ref={metrics['reference_events']}  "
             f"missed={metrics['missed_notes']}  "
             f"fp={metrics['false_positives']}  "

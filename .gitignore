@@ -125,3 +125,5 @@ dist
 /Resources/__pycache__
 /OpenScofo/OpenScofo
 /Resources/Extended-Techniques/audios
+/Tests/01-Score-Follower-Benchmarks/audios
+/Tests/01-Score-Follower-Benchmarks/__pycache__

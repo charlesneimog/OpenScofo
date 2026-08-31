@@ -1,5 +1,0 @@
-BPM 600
-
-PTECH pizz C4 0.01
-PTECH pizz D4 0.01
-REST 1

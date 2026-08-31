@@ -1,0 +1,170 @@
+{
+  "audio": "canticos.wav",
+  "duration_seconds": 56.971792,
+  "events": [
+    {
+      "event": 1,
+      "timestamp_seconds": 0.109749
+    },
+    {
+      "event": 2,
+      "timestamp_seconds": 5.320782
+    },
+    {
+      "event": 3,
+      "timestamp_seconds": 10.50274
+    },
+    {
+      "event": 4,
+      "timestamp_seconds": 15.646092
+    },
+    {
+      "event": 5,
+      "timestamp_seconds": 15.928031
+    },
+    {
+      "event": 6,
+      "timestamp_seconds": 16.159569
+    },
+    {
+      "event": 7,
+      "timestamp_seconds": 16.405089
+    },
+    {
+      "event": 8,
+      "timestamp_seconds": 17.679174
+    },
+    {
+      "event": 9,
+      "timestamp_seconds": 21.548701
+    },
+    {
+      "event": 10,
+      "timestamp_seconds": 21.760106
+    },
+    {
+      "event": 11,
+      "timestamp_seconds": 22.0252
+    },
+    {
+      "event": 12,
+      "timestamp_seconds": 22.310988
+    },
+    {
+      "event": 13,
+      "timestamp_seconds": 23.740484
+    },
+    {
+      "event": 14,
+      "timestamp_seconds": 23.965311
+    },
+    {
+      "event": 15,
+      "timestamp_seconds": 24.183427
+    },
+    {
+      "event": 16,
+      "timestamp_seconds": 24.448521
+    },
+    {
+      "event": 17,
+      "timestamp_seconds": 24.666637
+    },
+    {
+      "event": 18,
+      "timestamp_seconds": 27.10226
+    },
+    {
+      "event": 19,
+      "timestamp_seconds": 27.806941
+    },
+    {
+      "event": 20,
+      "timestamp_seconds": 28.598868
+    },
+    {
+      "event": 21,
+      "timestamp_seconds": 33.712841
+    },
+    {
+      "event": 22,
+      "timestamp_seconds": 35.890642
+    },
+    {
+      "event": 23,
+      "timestamp_seconds": 38.219445
+    },
+    {
+      "event": 24,
+      "timestamp_seconds": 41.419033
+    },
+    {
+      "event": 25,
+      "timestamp_seconds": 42.422365
+    },
+    {
+      "event": 26,
+      "timestamp_seconds": 43.418985
+    },
+    {
+      "event": 27,
+      "timestamp_seconds": 45.149367
+    },
+    {
+      "event": 28,
+      "timestamp_seconds": 45.669488
+    },
+    {
+      "event": 29,
+      "timestamp_seconds": 46.206388
+    },
+    {
+      "event": 30,
+      "timestamp_seconds": 47.001671
+    },
+    {
+      "event": 31,
+      "timestamp_seconds": 47.296966
+    },
+    {
+      "event": 32,
+      "timestamp_seconds": 47.528504
+    },
+    {
+      "event": 33,
+      "timestamp_seconds": 47.810937
+    },
+    {
+      "event": 34,
+      "timestamp_seconds": 49.174438
+    },
+    {
+      "event": 35,
+      "timestamp_seconds": 51.679412
+    },
+    {
+      "event": 36,
+      "timestamp_seconds": 54.50373
+    },
+    {
+      "event": 37,
+      "timestamp_seconds": 54.778891
+    },
+    {
+      "event": 38,
+      "timestamp_seconds": 55.033919
+    },
+    {
+      "event": 39,
+      "timestamp_seconds": 55.644643
+    },
+    {
+      "event": 40,
+      "timestamp_seconds": 55.882892
+    },
+    {
+      "event": 41,
+      "timestamp_seconds": 56.134564
+    }
+  ]
+}
