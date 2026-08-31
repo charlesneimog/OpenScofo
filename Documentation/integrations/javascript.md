@@ -38,6 +38,7 @@ OpenScofo().then((mod) => {
 | `set_db_threshold(value)` | set silence threshold |
 | `set_tuning(a4)` | set A4 tuning |
 | `set_current_event(index)` | force score event |
+| `set_current_section(section)` | reset to the first event of a named section |
 | `load_onnx_model(path)` | load ONNX model |
 | `get_live_bpm()` | return estimated BPM |
 | `get_event_index()` | return current event index |

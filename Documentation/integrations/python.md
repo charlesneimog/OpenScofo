@@ -45,6 +45,7 @@ scofo.load_score("score.scofo")
 | `set_db_threshold(value)` | set silence threshold |
 | `set_tuning(value)` | set A4 tuning |
 | `set_current_event(event)` | force score position |
+| `set_current_section(section)` | reset to the first event of a named section |
 | `set_harmonics(value)` | set pitch-template harmonics |
 | `set_pitch_template_sigma(value)` | set pitch tolerance |
 | `get_live_bpm()` | return estimated BPM |

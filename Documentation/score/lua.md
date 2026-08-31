@@ -34,6 +34,7 @@ local oscofo = require("OpenScofo")
 | `oscofo.set_db_threshold(value)` | Sets audio threshold. |
 | `oscofo.set_tuning(value)` | Sets tuning reference. |
 | `oscofo.set_current_event(event)` | Forces score position. |
+| `oscofo.set_current_section(section)` | Resets to the first event of a named section. |
 | `oscofo.set_harmonics(value)` | Sets pitch-template harmonics. |
 | `oscofo.set_pitch_template_sigma(value)` | Sets pitch tolerance. |
 | `oscofo.get_live_bpm()` | Returns estimated BPM. |

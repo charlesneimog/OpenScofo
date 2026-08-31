@@ -58,6 +58,7 @@ scofo.ProcessBlock(audio.data(), audio.size());
 | `ScoreIsLoaded()` | check score state |
 | `ProcessBlock(buffer, n)` | process one audio block |
 | `SetCurrentEvent(event)` | force score position |
+| `SetCurrentSection(section)` | reset to the first event of a named section |
 | `SetConfiguration(config)` | update configuration |
 
 ### State
