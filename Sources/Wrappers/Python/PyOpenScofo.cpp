@@ -215,6 +215,7 @@ NB_MODULE(_OpenScofo, m) {
         // Core
         .def_rw("index", &OpenScofo::MarkovState::Index)
         .def_rw("score_pos", &OpenScofo::MarkovState::ScorePos)
+        .def_rw("section", &OpenScofo::MarkovState::Section)
         .def_rw("markov_index", &OpenScofo::MarkovState::MarkovIndex)
         .def_rw("audio_states", &OpenScofo::MarkovState::AudioStates)
 
@@ -252,6 +253,7 @@ NB_MODULE(_OpenScofo, m) {
         .def(nb::init<>())
 
         // Audio parameters
+        .def_rw("section_restrict", &OpenScofo::Configuration::SectionRestrict)
         .def_rw("sr", &OpenScofo::Configuration::SR)
         .def_rw("fft_size", &OpenScofo::Configuration::FFTSize)
         .def_rw("hop_size", &OpenScofo::Configuration::HOPSize)
@@ -323,6 +325,7 @@ NB_MODULE(_OpenScofo, m) {
 
         // Config
         .def("set_current_event", &OpenScofo::OpenScofo::SetCurrentEvent)
+        .def("set_current_section", &OpenScofo::OpenScofo::SetCurrentSection)
 
         // ONNX
         .def("load_onnx_model", &OpenScofo::OpenScofo::LoadONNXModel)

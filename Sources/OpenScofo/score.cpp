@@ -511,7 +511,7 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     if (m_ScorePosition == 0) {
         spdlog::warn("OpenScofo cannot detect the start of a piece when the first events are REST. "
                      "It cannot distinguish between silence before the piece and the actual start of the piece. "
-                     "As a result, the current event (line {}) and its associated actions will not be added.",
+                     "As a result, the first event (line {}) and its associated actions will not be added.",
                      ts_node_start_point(Node).row + 1);
         return {};
     }
@@ -550,7 +550,11 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
 
 // ─────────────────────────────────────
 void Score::ProcessEventTime(MarkovState &Event) {
-    if (Event.Index != 0) {
+    Event.Section = m_CurrentSection;
+
+    const bool IsFirstStateInSection =
+        Event.Index == 0 || m_ScoreStates[static_cast<size_t>(Event.Index - 1)].Section != Event.Section;
+    if (!IsFirstStateInSection) {
         int index = Event.Index;
         MarkovState &prev = m_ScoreStates[index - 1];
 
@@ -577,6 +581,73 @@ void Score::ProcessEventTime(MarkovState &Event) {
 }
 
 // ─────────────────────────────────────
+void Score::NewSection(const std::string &ScoreStr, TSNode Node) {
+    TSNode NameNode = GetField(Node, "name");
+    TSPoint Position = ts_node_start_point(Node);
+    if (ts_node_is_null(NameNode)) {
+        spdlog::error("Invalid SECTION on line {}.", Position.row + 1);
+        return;
+    }
+
+    std::string Name = GetCodeStr(ScoreStr, NameNode);
+    if (Name.size() >= 2 && Name.front() == '"' && Name.back() == '"') {
+        Name = Name.substr(1, Name.size() - 2);
+    }
+    if (Name.empty()) {
+        spdlog::error("SECTION name cannot be empty on line {}.", Position.row + 1);
+        return;
+    }
+
+    const bool HasMusicalEvent = std::any_of(m_ScoreStates.begin(), m_ScoreStates.end(),
+                                             [](const MarkovState &State) { return State.Type != FIRSTEVENT; });
+
+    // BPM is commonly declared before the first SECTION. In that case its
+    // leading FIRSTEVENT is the boundary of the first section, not an
+    // unsectioned state.
+    if (!m_HasSection && !HasMusicalEvent) {
+        for (MarkovState &State : m_ScoreStates) {
+            if (State.Type == FIRSTEVENT && State.Section.empty()) {
+                State.Section = Name;
+            }
+        }
+    }
+
+    // At the first musical event this either refreshes an existing BPM-created
+    // FIRSTEVENT or inserts a boundary when the section inherits its BPM.
+    m_SectionStartPending = true;
+    m_HasSection = true;
+    m_CurrentSection = std::move(Name);
+}
+
+// ─────────────────────────────────────
+void Score::EnsureSectionStart(TSNode EventNode, Configuration &Config) {
+    if (!m_SectionStartPending) {
+        return;
+    }
+
+    MarkovState *SectionStart = nullptr;
+    if (!m_ScoreStates.empty() && m_ScoreStates.back().Type == FIRSTEVENT &&
+        m_ScoreStates.back().Section == m_CurrentSection) {
+        SectionStart = &m_ScoreStates.back();
+    } else {
+        MarkovState Begin = GetFirstEvent();
+        Begin.Line = static_cast<int>(ts_node_start_point(EventNode).row + 1);
+        Begin.TimeTolerance = m_TimeTolerance;
+        Begin.SyncStrength = Config.SyncStrength;
+        Begin.PhaseCoupling = Config.PhaseCoupling;
+        ProcessEventTime(Begin);
+        m_ScoreStates.emplace_back(std::move(Begin));
+        SectionStart = &m_ScoreStates.back();
+    }
+
+    SectionStart->BPMExpected = m_CurrentBPM;
+    SectionStart->TimeTolerance = m_TimeTolerance;
+    SectionStart->SyncStrength = Config.SyncStrength;
+    SectionStart->PhaseCoupling = Config.PhaseCoupling;
+    m_SectionStartPending = false;
+}
+
+// ─────────────────────────────────────
 std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode node, std::string id) {
     TSNode field = ts_node_child_by_field_name(node, id.c_str(), id.length());
     if (!ts_node_is_null(field)) {
@@ -596,6 +667,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 
 // ─────────────────────────────────────
 void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Config) {
+    EnsureSectionStart(Node, Config);
     MarkovState Event;
 
     TSNode definition = GetField(Node, "definition");
@@ -871,6 +943,22 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
             spdlog::error("Unrecognized variable " + id);
             return;
         }
+        return;
+    }
+
+    if (id == "SECTIONRESTRICT") {
+        if (valueType != "identifier") {
+            spdlog::error("{} must be ON or OFF on line {}.", id, pos.row + 1);
+            return;
+        }
+
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char Character) { return static_cast<char>(std::toupper(Character)); });
+        if (value != "ON" && value != "OFF") {
+            spdlog::error("{} must be ON or OFF on line {}.", id, pos.row + 1);
+            return;
+        }
+        Config.SectionRestrict = value == "ON";
         return;
     }
 
@@ -1157,6 +1245,9 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
     m_PrevDuration = 0;
     m_CurrentBPM = -1;
     m_Transpose = 0;
+    m_CurrentSection.clear();
+    m_HasSection = false;
+    m_SectionStartPending = false;
     m_ScorePosition = 0;
     std::string Line;
 
@@ -1182,6 +1273,8 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
             NewEvent(ScoreStr, Child, Config);
         } else if (type == "CONFIG") {
             NewConfig(ScoreStr, Child, Config);
+        } else if (type == "SECTION") {
+            NewSection(ScoreStr, Child);
         } else if (type == "LUA") {
             std::string lua_body = GetChildStringFromField(ScoreStr, Child, "lua_body");
             m_LuaCode += lua_body;

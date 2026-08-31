@@ -57,9 +57,15 @@
 			</description>
 		</method>
 
+		<method name='section'>
+			<description>
+				<p>Selects a named score section, silently resets decoding to its first event, and outputs the section's initial tempo. The event outlet is not updated, preventing the section selection from triggering an event. The name may be a symbol or number.</p>
+			</description>
+		</method>
+
 		<method name='set'>
 			<description>
-				<p>Sets runtime options. <at>set event index</at> sets the current score event. <at>set onnxmodel path descriptors...</at> loads an ONNX model and declares the descriptor order used when training it. <at>set verbosity level</at> sets console logging, where <at>0</at> is warnings, <at>1</at> is info, <at>2</at> is debug, and <at>3</at> is trace. <at>set description 1</at> or <at>set justdescription 1</at> enables description-only mode; use <at>0</at> to disable it.</p>
+				<p>Sets runtime options. <at>set event index</at> sets the current score event. <at>set section name</at> selects a score section. <at>set onnxmodel path descriptors...</at> loads an ONNX model and declares the descriptor order used when training it. <at>set verbosity level</at> sets console logging, where <at>0</at> is warnings, <at>1</at> is info, <at>2</at> is debug, and <at>3</at> is trace. <at>set description 1</at> or <at>set justdescription 1</at> enables description-only mode; use <at>0</at> to disable it.</p>
 			</description>
 		</method>
 

@@ -46,6 +46,7 @@ class OnlineForward {
     void SetTunning(double Tunning);
     void SetDescription(const Description &Desc);
     void SetCurrentEvent(int Event);
+    bool SetCurrentSection(const std::string &Section);
 
     // Get
     double GetCurrentBPM();
@@ -126,6 +127,7 @@ class OnlineForward {
 
     // Config
     double m_MinEntropy = 0;
+    bool m_SectionRestrict = false;
     AudioDescType m_CurrentAudioState;
     std::string m_AudioStateChangeReceiver;
 

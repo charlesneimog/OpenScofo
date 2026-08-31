@@ -9,7 +9,7 @@ module.exports = grammar({
     name: "openscofo",
     word: ($) => $.identifier,
     rules: {
-        source_file: ($) => repeat(choice($.CONFIG, $.LUA, $.EVENT)),
+        source_file: ($) => repeat(choice($.CONFIG, $.SECTION, $.LUA, $.EVENT)),
 
         //╭─────────────────────────────────────╮
         //│             IDENTIFIERS             │
@@ -121,8 +121,16 @@ module.exports = grammar({
                     "ZCRPAD",
                     "ZCRZEROPOS",
                     "ZCRTHRESHOLD",
+
+                    // Sections
+                    "SECTIONRESTRICT",
                 ),
             ),
+
+        //╭─────────────────────────────────────╮
+        //│               Sections              │
+        //╰─────────────────────────────────────╯
+        SECTION: ($) => seq("SECTION", field("name", choice($.number, $.identifier, $.string))),
 
         //╭─────────────────────────────────────╮
         //│                Events               │
@@ -222,6 +230,7 @@ module.exports = grammar({
         //│                ATOMS                │
         //╰─────────────────────────────────────╯
         number: (_) => token(/-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/),
+        string: (_) => token(/"[^"\n]*"/),
         path: (_) => token(choice(seq('"', /[^"\n]+/, '"'), /[a-zA-Z0-9_.\-\\/]+/)),
 
         comment: (_) => token(choice(seq("//", /(\\+(.|\r?\n)|[^\\\n])*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),

@@ -107,6 +107,30 @@
     }
   },
   {
+    "type": "SECTION",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "action",
     "named": true,
     "fields": {
@@ -534,6 +558,10 @@
         {
           "type": "LUA",
           "named": true
+        },
+        {
+          "type": "SECTION",
+          "named": true
         }
       ]
     }
@@ -658,6 +686,10 @@
   },
   {
     "type": "REST",
+    "named": false
+  },
+  {
+    "type": "SECTION",
     "named": false
   },
   {
@@ -816,6 +848,10 @@
   {
     "type": "spread",
     "named": false
+  },
+  {
+    "type": "string",
+    "named": true
   },
   {
     "type": "time_unit",

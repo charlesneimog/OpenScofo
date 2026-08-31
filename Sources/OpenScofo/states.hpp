@@ -127,6 +127,7 @@ struct AudioState {
 struct MarkovState {
     int Index;
     int ScorePos;
+    std::string Section;
     int MarkovIndex = -1;
     std::vector<AudioState> AudioStates;
     int BestAudioStateIndex = -1;
@@ -221,6 +222,9 @@ struct Description {
 
 // ─────────────────────────────────────
 struct Configuration {
+    // Score sections
+    bool SectionRestrict = false;
+
     // Audio Parameters
     float SR = 48000;
     float FFTSize = 2048;

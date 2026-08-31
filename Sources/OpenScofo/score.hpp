@@ -54,6 +54,8 @@ class Score {
 
     void NewEvent(const std::string &Score, TSNode Event, Configuration &Config);
     void NewConfig(const std::string &Score, TSNode Node, Configuration &Config);
+    void NewSection(const std::string &Score, TSNode Node);
+    void EnsureSectionStart(TSNode Event, Configuration &Config);
     void NewEventAction(const std::string &Score, TSNode Node, MarkovState &Event);
 
     void ProcessEventTime(MarkovState &Event);
@@ -82,6 +84,9 @@ class Score {
     std::string m_LuaCode;
     double m_CurrentBPM = 60;
     double m_Transpose = 0;
+    std::string m_CurrentSection;
+    bool m_HasSection = false;
+    bool m_SectionStartPending = false;
     int m_ScorePosition;
 
     // Paths

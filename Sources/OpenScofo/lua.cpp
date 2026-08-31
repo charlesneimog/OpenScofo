@@ -104,9 +104,11 @@ static void PushDescription(lua_State *L, const Description &desc) {
 
 // ─────────────────────────────────────
 static void PushMarkovState(lua_State *L, const MarkovState &state) {
-    lua_createtable(L, 0, 14);
+    lua_createtable(L, 0, 15);
     lua_pushinteger(L, state.ScorePos);
     lua_setfield(L, -2, "position");
+    lua_pushlstring(L, state.Section.data(), state.Section.size());
+    lua_setfield(L, -2, "section");
     lua_pushinteger(L, state.Type);
     lua_setfield(L, -2, "type");
     lua_pushinteger(L, state.HSMMType);
@@ -150,6 +152,15 @@ static int OpenScofoSetCurrentEvent(lua_State *L) {
         return luaL_error(L, "OpenScofo pointer is null");
     self->SetCurrentEvent(static_cast<int>(luaL_checkinteger(L, 1)));
     return 0;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoSetCurrentSection(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    lua_pushboolean(L, self->SetCurrentSection(luaL_checkstring(L, 1)));
+    return 1;
 }
 
 // ─────────────────────────────────────
@@ -201,6 +212,7 @@ static int OpenScofoGetCurrentDescription(lua_State *L) {
 // ─────────────────────────────────────
 static const luaL_Reg oscofo_funcs[] = {
     {"set_current_event", OpenScofoSetCurrentEvent},
+    {"set_current_section", OpenScofoSetCurrentSection},
     {"get_live_bpm", OpenScofoGetLiveBPM},
     {"get_event_index", OpenScofoGetEventIndex},
     {"get_states", OpenScofoGetStates},

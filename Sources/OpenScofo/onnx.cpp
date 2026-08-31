@@ -30,8 +30,8 @@ ONNXModel::~ONNXModel() {
 // ─────────────────────────────────────
 bool ONNXModel::Load(const std::filesystem::path &path, std::vector<Descriptors> descriptors,
                      const Configuration &configuration) {
-    if (m_ModelLoaded && m_ModelPath == path && m_Descriptors == descriptors) {
-        spdlog::debug("ONNX model already loaded, reusing existing context");
+    if (m_ModelLoaded && m_ModelPath == path) {
+        spdlog::warn("ONNX model already loaded");
         return true;
     }
 
