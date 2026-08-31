@@ -22,6 +22,23 @@ export function getPitch(note) {
     return pitch;
 }
 
+export function musicXmlDurationToQuarterNotes(rawDuration, divisions) {
+    if (!Number.isFinite(rawDuration) || !Number.isFinite(divisions) || divisions <= 0) {
+        return 0;
+    }
+
+    // MusicXML defines <divisions> as the number of duration units in one quarter note.
+    // Tuplet ratios are already reflected in the note's raw <duration> value.
+    return rawDuration / divisions;
+}
+
+export function formatOpenScofoNumber(value) {
+    if (!Number.isFinite(value)) return "0";
+
+    const truncated = Math.trunc((value + Number.EPSILON) * 1000) / 1000;
+    return String(Object.is(truncated, -0) ? 0 : truncated);
+}
+
 // ─────────────────────────────────────
 export function generateOpenScofoScore() {
     let score = "";
@@ -43,7 +60,7 @@ export function generateOpenScofoScore() {
     }
 
     let bpm = allNotes.length > 0 ? allNotes[0].bpm : 60;
-    score += `BPM ${bpm}\n\n`;
+    score += `BPM ${formatOpenScofoNumber(bpm)}\n\n`;
     let i = 0;
     let lastMeasureNumber = null;
 
@@ -69,12 +86,12 @@ export function generateOpenScofoScore() {
         // BPM change
         if (note.bpm !== bpm) {
             bpm = note.bpm;
-            score += `\nBPM ${bpm}\n`;
+            score += `\nBPM ${formatOpenScofoNumber(bpm)}\n`;
         }
 
         // REST
         if (note.isRest) {
-            score += `\nREST ${note.duration}`;
+            score += `\nREST ${formatOpenScofoNumber(note.duration)}`;
             i++;
             continue;
         }
@@ -124,16 +141,16 @@ export function generateOpenScofoScore() {
         // EXTENDED TECHNIQUE
         if (note.isExtendedTechnique) {
             const pitch = this.getPitch(note);
-            score += `\nPTECH ${note.notehead} ${pitch} ${duration}`;
+            score += `\nPTECH ${note.notehead} ${pitch} ${formatOpenScofoNumber(duration)}`;
             i = j;
             continue;
         }
 
         // OUTPUT
         if (pitches.length > 1) {
-            score += `\n${type} (${pitches.join(" ")}) ${duration}`;
+            score += `\n${type} (${pitches.join(" ")}) ${formatOpenScofoNumber(duration)}`;
         } else {
-            score += `\n${type} ${pitches[0]} ${duration}`;
+            score += `\n${type} ${pitches[0]} ${formatOpenScofoNumber(duration)}`;
         }
 
         if (note.isTied) {
@@ -190,7 +207,10 @@ export function parseScore(doc) {
         if (attributes) {
             const divisions = attributes.getElementsByTagName("divisions")[0];
             if (divisions) {
-                divisionsFactor = parseInt(divisions.textContent, 10);
+                const parsedDivisions = parseInt(divisions.textContent, 10);
+                if (Number.isFinite(parsedDivisions) && parsedDivisions > 0) {
+                    divisionsFactor = parsedDivisions;
+                }
             }
             const time = attributes.getElementsByTagName("time")[0];
             if (time) {
@@ -256,7 +276,7 @@ export function parseScore(doc) {
 
             const durationEl = note.getElementsByTagName("duration")[0];
             const rawDuration = durationEl ? parseFloat(durationEl.textContent) : 0;
-            const duration = rawDuration / (timeSignatureDenominator / divisionsFactor);
+            const duration = musicXmlDurationToQuarterNotes(rawDuration, divisionsFactor);
             const rest = note.getElementsByTagName("rest")[0];
             const noteheadString = notehead.length > 0 ? notehead[0].textContent : "";
             const isExtendedTechnique = notehead.length > 0;
