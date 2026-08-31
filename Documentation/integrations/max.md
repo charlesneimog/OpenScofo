@@ -33,6 +33,7 @@ Relative score paths are resolved from the current patch directory.
 | `score <path>` | load a `.scofo` file |
 | `start` | reset to event `0` and start following |
 | `follow 1`, `follow 0` | enable or disable following |
+| `section <name>` | silently reset following to a section; only the BPM outlet is updated |
 | `set event <index>` | force the current score event |
 | `set verbosity <0..3>` | set console logging level |
 | `set description <0 or 1>` | enable descriptor-only processing |

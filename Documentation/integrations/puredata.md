@@ -43,6 +43,7 @@ After install `openscofo~`:
 | `score <path>` | load a `.scofo` file |
 | `start` | reset to event `0` and start following |
 | `follow 1`, `follow 0` | enable or disable following |
+| `section <name>` | silently reset following to a section; only the BPM outlet is updated |
 | `set verbosity <0..3>` | set console logging level |
 | `set description <0 or 1>` | enable descriptor-only processing |
 | `set onnxmodel <path> <descriptors...>` | load an ONNX model with descriptor order |
