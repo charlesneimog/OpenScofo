@@ -142,6 +142,8 @@ const std::vector<Descriptors> &ONNXModel::GetDescriptors() const {
 void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Configuration &configuration,
                              std::vector<std::string> &metadataLabels) {
     const char *sampleRateMetadata = onnx_metadata_get(m_Context, "openscofo.sample_rate");
+    const char *fftSizeMetadata = onnx_metadata_get(m_Context, "openscofo.fft_size");
+    const char *hopSizeMetadata = onnx_metadata_get(m_Context, "openscofo.hop_size");
     const char *descriptorMetadata = onnx_metadata_get(m_Context, "openscofo.descriptors");
     const char *labelMetadata = onnx_metadata_get(m_Context, "openscofo.labels");
 
@@ -149,6 +151,18 @@ void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Config
     if (ParseIntMetadata(sampleRateMetadata, metadataSampleRate) && metadataSampleRate != configuration.SR) {
         spdlog::warn("ONNX model was trained at {} Hz, but OpenScofo is running at {} Hz.", metadataSampleRate,
                      configuration.SR);
+    }
+
+    int metadataFFTSize = 0;
+    if (ParseIntMetadata(fftSizeMetadata, metadataFFTSize) && metadataFFTSize != configuration.FFTSize) {
+        spdlog::warn("ONNX model was trained at FFT Size of {}, but OpenScofo is running FFT Size {}.", metadataFFTSize,
+                     configuration.FFTSize);
+    }
+
+    int metadataHopSize = 0;
+    if (ParseIntMetadata(hopSizeMetadata, metadataHopSize) && metadataHopSize != configuration.HOPSize) {
+        spdlog::warn("ONNX model was trained at Hop Size of {}, but OpenScofo is running Hop Size {}.", metadataHopSize,
+                     configuration.HOPSize);
     }
 
     std::vector<Descriptors> metadataDescriptors;
