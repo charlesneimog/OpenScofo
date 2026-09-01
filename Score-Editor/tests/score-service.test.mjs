@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
     formatOpenScofoNumber,
+    formatOpenScofoSectionName,
     generateOpenScofoScore,
+    getMusicXmlRehearsalLabels,
     musicXmlDurationToQuarterNotes,
 } from "../src/services/score-service.js";
 
@@ -58,4 +60,51 @@ test("generates corrected and truncated MusicXML durations", () => {
 test("rejects invalid MusicXML divisions", () => {
     assert.equal(musicXmlDurationToQuarterNotes(24, 0), 0);
     assert.equal(musicXmlDurationToQuarterNotes(24, Number.NaN), 0);
+});
+
+test("reads non-empty MusicXML rehearsal labels", () => {
+    const measure = {
+        getElementsByTagName(name) {
+            assert.equal(name, "rehearsal");
+            return [{ textContent: " B1 " }, { textContent: "  " }, { textContent: "Coda 2" }];
+        },
+    };
+
+    assert.deepEqual(getMusicXmlRehearsalLabels(measure), ["B1", "Coda 2"]);
+});
+
+test("formats rehearsal labels as valid OpenScofo section names", () => {
+    assert.equal(formatOpenScofoSectionName("B1"), "B1");
+    assert.equal(formatOpenScofoSectionName("Coda 2"), '"Coda 2"');
+    assert.equal(formatOpenScofoSectionName('The "Coda"'), '"The \'Coda\'"');
+});
+
+test("generates SECTION boundaries from MusicXML rehearsal marks", () => {
+    let score = "";
+    const context = {
+        musicxmlScore: {
+            useAIModel: false,
+            rehearsals: {
+                1: ["B1"],
+                2: ["Coda 2"],
+            },
+            measures: {
+                1: [{ bpm: 60, duration: 1, measureNumber: 1, step: "C", octave: 4 }],
+                2: [],
+            },
+        },
+        getPitch(note) {
+            return `${note.step}${note.octave}`;
+        },
+        codeEditor: {
+            setValue(value) {
+                score = value;
+            },
+        },
+    };
+
+    generateOpenScofoScore.call(context);
+
+    assert.match(score, /\/\/ Measure number 1\nSECTION B1\nNOTE C4 1/);
+    assert.match(score, /\/\/ Measure number 2\nSECTION "Coda 2"/);
 });

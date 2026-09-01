@@ -107,6 +107,7 @@ export function runFormatterAfterParse(rootNode) {
     const source = this.codeEditor.getValue();
     const edits = [];
     const shouldFormatStructure = rootNode.hasError;
+    let isInsideSection = false;
 
     function ensureLineStart(instance, node, indentText) {
         const nodeStart = instance.codeEditor.indexFromPos({
@@ -155,8 +156,12 @@ export function runFormatterAfterParse(rootNode) {
     }
 
     walk(rootNode, (node) => {
-        if (shouldFormatStructure && node.type === "EVENT") {
-            ensureLineStart(this, node, "");
+        if (node.type === "SECTION") {
+            isInsideSection = true;
+        }
+
+        if (node.type === "EVENT" && (shouldFormatStructure || isInsideSection)) {
+            ensureLineStart(this, node, isInsideSection ? "\t" : "");
         }
 
         if (node.type === "action") {

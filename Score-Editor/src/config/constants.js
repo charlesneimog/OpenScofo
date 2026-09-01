@@ -26,6 +26,7 @@ export const HIGHLIGHTS = {
         "type.builtin": "color: var(--purple); font-weight: bold;",
         string: "color: var(--green); font-weight: bold;",
         "variable.parameter": "color: var(--pink); font-weight: bold;",
+        label: "color: var(--blue); font-weight: bold;",
         tempo: "color: var(--red); font-weight: bold;",
         function: "color: var(--blue); font-weight: normal;",
         type: "color: var(--yellow); font-weight: normal;",
@@ -63,6 +64,9 @@ export const OPEN_SCOFO_HIGHLIGHT_QUERY = `
     (CONFIG) @keyword.directive
     (LUA) @keyword.directive
     (EVENT) @keyword
+    (SECTION
+      "SECTION" @keyword.directive
+      name: (_) @label)
 
     ; Lua body is handled by the Lua parser/highlighter.
     (lua_body) @lua_body
