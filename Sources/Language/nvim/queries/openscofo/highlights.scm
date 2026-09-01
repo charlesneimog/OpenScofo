@@ -12,6 +12,9 @@
 (CONFIG) @keyword.directive
 (LUA) @keyword.directive
 (EVENT) @keyword
+(SECTION
+  "SECTION" @keyword.directive
+  name: (_) @label)
 
 ; ================================
 ; CONFIG

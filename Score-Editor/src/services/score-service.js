@@ -39,6 +39,28 @@ export function formatOpenScofoNumber(value) {
     return String(Object.is(truncated, -0) ? 0 : truncated);
 }
 
+export function formatOpenScofoSectionName(value) {
+    const name = String(value ?? "")
+        .replace(/[\r\n]+/g, " ")
+        .trim();
+
+    const isIdentifier = /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(name);
+    const isNumber = /^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(name);
+    if (isIdentifier || isNumber) {
+        return name;
+    }
+
+    // OpenScofo strings do not support escaped quotes, so keep the generated
+    // score valid when a MusicXML rehearsal label contains one.
+    return `"${name.replace(/"/g, "'")}"`;
+}
+
+export function getMusicXmlRehearsalLabels(measure) {
+    return Array.from(measure.getElementsByTagName("rehearsal"), (rehearsal) => rehearsal.textContent.trim()).filter(
+        Boolean,
+    );
+}
+
 // ─────────────────────────────────────
 export function generateOpenScofoScore() {
     let score = "";
@@ -54,12 +76,20 @@ export function generateOpenScofoScore() {
     const allNotes = [];
     for (const measureNumber in measures) {
         const measure = measures[measureNumber];
+        const numericMeasureNumber = Number(measureNumber);
+        const markerMeasureNumber =
+            measure[0]?.measureNumber ??
+            (Number.isFinite(numericMeasureNumber) ? numericMeasureNumber : measureNumber);
+        const rehearsalLabels = this.musicxmlScore.rehearsals?.[measureNumber] ?? [];
+        for (const sectionName of rehearsalLabels) {
+            allNotes.push({ isSection: true, sectionName, measureNumber: markerMeasureNumber });
+        }
         for (const note of measure) {
             allNotes.push(note);
         }
     }
 
-    let bpm = allNotes.length > 0 ? allNotes[0].bpm : 60;
+    let bpm = allNotes.find((entry) => !entry.isSection)?.bpm ?? 60;
     score += `BPM ${formatOpenScofoNumber(bpm)}\n\n`;
     let i = 0;
     let lastMeasureNumber = null;
@@ -81,6 +111,13 @@ export function generateOpenScofoScore() {
         if (note.measureNumber !== lastMeasureNumber) {
             score += `\n\n// Measure number ${note.measureNumber}`;
             lastMeasureNumber = note.measureNumber;
+        }
+
+        // MusicXML rehearsal marks become OpenScofo section boundaries.
+        if (note.isSection) {
+            score += `\nSECTION ${formatOpenScofoSectionName(note.sectionName)}`;
+            i++;
+            continue;
         }
 
         // BPM change
@@ -176,6 +213,7 @@ export function parseScore(doc) {
 
     this.musicxmlScore = {
         measures: {},
+        rehearsals: {},
         useAIModel: false,
     };
 
@@ -203,6 +241,11 @@ export function parseScore(doc) {
     var measureNumber = 0;
     for (let measure of measures) {
         measureNumber++;
+        const rehearsalLabels = getMusicXmlRehearsalLabels(measure);
+        if (rehearsalLabels.length > 0) {
+            this.musicxmlScore.rehearsals[measureNumber] = rehearsalLabels;
+        }
+
         const attributes = measure.getElementsByTagName("attributes")[0];
         if (attributes) {
             const divisions = attributes.getElementsByTagName("divisions")[0];
