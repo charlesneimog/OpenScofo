@@ -38,9 +38,7 @@ class ExtendedTechniqueClassifier:
         self.print = print
 
         self.sample_rate = sample_rate
-        self.training_sample_rates = self._normalize_sample_rates(
-            training_sample_rates
-        )
+        self.training_sample_rates = self._normalize_sample_rates(training_sample_rates)
         self.fft_size = fft_size
         self.hop_size = hop_size
         self.base_path = base_path or os.getcwd()
@@ -452,9 +450,7 @@ class ExtendedTechniqueClassifier:
         sr = self.sample_rate if sample_rate is None else int(sample_rate)
         oscofo = self._oscofo_for_sample_rate(sr)
         y = self._load_audio(filepath, sr)
-        y = self._single_file_temporal_region(
-            y, window_split_role, filepath, label, sr
-        )
+        y = self._single_file_temporal_region(y, window_split_role, filepath, label, sr)
         signal = self._augmentation_variant(y, sr) if augment else y
         appended_count = 0
 
@@ -565,9 +561,7 @@ class ExtendedTechniqueClassifier:
                     train_region, test_region = self._single_file_split_regions(
                         y, train_files[0], label, sample_rate
                     )
-                    train_frames += self._count_valid_windows(
-                        train_region, sample_rate
-                    )
+                    train_frames += self._count_valid_windows(train_region, sample_rate)
                     test_frames += self._count_valid_windows(test_region, sample_rate)
                 raw_train_frames_by_class[label] = train_frames
                 raw_test_frames_by_class[label] = test_frames
@@ -652,14 +646,11 @@ class ExtendedTechniqueClassifier:
                 )
                 continue
 
-            self.print(
-                f"Augmenting {label} class: target additional samples={needed}"
-            )
+            self.print(f"Augmenting {label} class: target additional samples={needed}")
             attempts = 0
             file_index = 0
             while (
-                original_count + augmented_train_by_class[label]
-                < train_samples_target
+                original_count + augmented_train_by_class[label] < train_samples_target
                 and attempts < max_attempts
             ):
                 f = train_files[file_index % len(train_files)]
@@ -1033,6 +1024,8 @@ class ExtendedTechniqueClassifier:
                 [str(label) for label in getattr(self.clf, "classes_", [])]
             ),
             "openscofo.sample_rate": str(int(self.sample_rate)),
+            "openscofo.fft_size": str(int(self.fft_size)),
+            "openscofo.hop_size": str(int(self.hop_size)),
             "openscofo.version": self._openscofo_version(),
         }
 
