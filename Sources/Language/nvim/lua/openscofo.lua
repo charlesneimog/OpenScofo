@@ -1,108 +1,71 @@
 local M = {}
 
-local parser_url = "https://github.com/charlesneimog/OpenScofo"
+-- ─────────────────────────────────────
+local module_file = debug.getinfo(1, "S").source:sub(2)
+local language_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(module_file)))
 
-local parser_config = {
-  install_info = {
-    url = parser_url,
-    branch = "main",
-    location = "Sources/Language",
-    queries = "Sources/Language/nvim/queries/openscofo",
+-- ─────────────────────────────────────
+local function ensure_parser()
+	local parser = vim.fs.joinpath(language_root, "parser.so")
+	local source = vim.fs.joinpath(language_root, "src", "parser.c")
 
-    -- Used by older nvim-treesitter releases.
-    files = { "src/parser.c" },
-    requires_generate_from_grammar = false,
-  },
-  filetype = "openscofo",
-  tier = 3,
-}
+	local parser_stat = vim.uv.fs_stat(parser)
+	local source_stat = vim.uv.fs_stat(source)
 
-local function package_root()
-  local source = debug.getinfo(1, "S").source:sub(2)
-  return vim.fn.fnamemodify(source, ":p:h:h:h:h:h")
+	if parser_stat and source_stat and parser_stat.mtime.sec >= source_stat.mtime.sec then
+		return parser
+	end
+
+	local temporary = parser .. ".tmp"
+	local result = vim.system({
+		"cc",
+		"-shared",
+		"-fPIC",
+		"-Isrc",
+		"-o",
+		temporary,
+		"src/parser.c",
+	}, {
+		cwd = language_root,
+		text = true,
+	}):wait()
+
+	if result.code ~= 0 then
+		error("OpenScofo: could not compile parser:\n" .. (result.stderr or ""))
+	end
+
+	local ok, err = vim.uv.fs_rename(temporary, parser)
+	assert(ok, "OpenScofo: could not install parser: " .. (err or ""))
+
+	return parser
 end
 
-local function register_filetype()
-  vim.filetype.add({
-    extension = {
-      scofo = "openscofo",
-    },
-  })
+-- ─────────────────────────────────────
+function M.setup()
+	local parser_path = ensure_parser()
 
-  if vim.treesitter and vim.treesitter.language and vim.treesitter.language.register then
-    vim.treesitter.language.register("openscofo", { "openscofo" })
-  end
-end
+	local ok, err = vim.treesitter.language.add("openscofo", {
+		path = parser_path,
+	})
+	assert(ok, err)
 
-local function register_treesitter_parser()
-  local ok, parsers = pcall(require, "nvim-treesitter.parsers")
-  if not ok then
-    return
-  end
+	vim.treesitter.language.register("openscofo", "openscofo")
 
-  if type(parsers.get_parser_configs) == "function" then
-    parsers.get_parser_configs().openscofo = parser_config
-    return
-  end
+	vim.filetype.add({
+		extension = {
+			scofo = "openscofo",
+		},
+	})
 
-  local config = vim.deepcopy(parser_config)
-  config.install_info.path = package_root()
-  parsers.openscofo = config
-end
+	local group = vim.api.nvim_create_augroup("OpenScofoTreesitter", { clear = true })
 
-local function register_treesitter_autocmd()
-  local group = vim.api.nvim_create_augroup("OpenScofoTreesitter", { clear = true })
-
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "TSUpdate",
-    callback = register_treesitter_parser,
-  })
-
-  vim.api.nvim_create_autocmd("FileType", {
-    group = group,
-    pattern = "openscofo",
-    callback = function(args)
-      pcall(vim.treesitter.start, args.buf, "openscofo")
-    end,
-  })
-end
-
-local function parser_installed()
-  local ok, treesitter = pcall(require, "nvim-treesitter")
-  if ok and type(treesitter.get_installed) == "function" then
-    return vim.list_contains(treesitter.get_installed("parsers"), "openscofo")
-  end
-
-  return #vim.api.nvim_get_runtime_file("parser/openscofo.*", true) > 0
-end
-
-local function install_parser()
-  if parser_installed() then
-    return
-  end
-
-  local ok, treesitter = pcall(require, "nvim-treesitter")
-  if ok and type(treesitter.install) == "function" then
-    treesitter.install({ "openscofo" })
-    return
-  end
-
-  if vim.fn.exists(":TSInstall") == 2 then
-    vim.cmd("silent! TSInstall openscofo")
-  end
-end
-
-function M.setup(opts)
-  opts = opts or {}
-
-  register_filetype()
-  register_treesitter_parser()
-  register_treesitter_autocmd()
-
-  if opts.auto_install ~= false then
-    vim.schedule(install_parser)
-  end
+	vim.api.nvim_create_autocmd("FileType", {
+		group = group,
+		pattern = "openscofo",
+		callback = function(ev)
+			vim.treesitter.start(ev.buf, "openscofo")
+		end,
+	})
 end
 
 return M
