@@ -92,6 +92,9 @@ features = [
   "navigation.instant.progress",
 ]
 
+[project.plugins.minify]
+minify_html = true
+
 [project.extra]
 logo_dark_mode = "assets/favicon-dark.svg"
 logo_light_mode = "assets/favicon.svg"
