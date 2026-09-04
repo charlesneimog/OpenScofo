@@ -280,14 +280,14 @@ void MIR::OnsetExec(Description &Desc) {
 // │        Percussive Technique         │
 // ╰─────────────────────────────────────╯
 void MIR::ExtendedTechExec(Description &Desc) {
-    Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
-    Desc.ExtendedTechProb *= Desc.SpectralFlux;
+    // Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
+    Desc.ExtendedTechProb = Desc.SpectralFlux;
     // Harmonic, confidently pitched frames should not be classified as an
     // extended technique. This is the confidence term used by the original
     // detector; ZCR is already represented by the spectral/noise features.
     Desc.ExtendedTechProb *= (1.0f - Desc.PitchConfidence);
     Desc.ExtendedTechProb *= abs(m_ODS->odfvalpost);
-    float steepness = 5.0f;
+    float steepness = 10.0f;
     Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
 }
 
@@ -407,9 +407,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     }
 
     const size_t minTau = static_cast<size_t>(m_Config.SR / m_Config.YINMaxFrequency);
-
     const size_t maxTauByPitch = static_cast<size_t>(std::ceil(m_Config.SR / m_Config.YINMinFrequency));
-
     const size_t maxTau = std::min({frame / 2, m_YINDifference.size() - 1, maxTauByPitch});
 
     if (maxTau <= minTau) {
@@ -461,7 +459,6 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 
     for (size_t tau = minTau; tau <= maxTau; ++tau) {
         cumulative += diff[tau];
-
         if (cumulative <= 0.0) {
             cmndf[tau] = 1.0;
         } else {
