@@ -16,7 +16,6 @@ from catboost import CatBoostClassifier
 
 import OpenScofo
 
-
 # ----------------------------
 # Config
 # ----------------------------
@@ -253,9 +252,10 @@ def build_dataset(root, workers=None):
 # ----------------------------
 def init_model():
     return CatBoostClassifier(
-        iterations=ITERATIONS,
-        depth=6,
-        learning_rate=0.1,
+        iterations=1000,
+        depth=5,
+        learning_rate=0.05,
+        l2_leaf_reg=5,
         loss_function="MultiClass",
         random_seed=RANDOM_STATE,
         verbose=100,
