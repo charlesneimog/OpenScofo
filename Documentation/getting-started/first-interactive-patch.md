@@ -1,9 +1,3 @@
----
-tags:
-  - Getting Started
-  - Host Integration
----
-
 # Your First Interactive Patch
 
 This page shows how to build actions with `sendto` keyword. Score syntax is introduced in [Your First Score](first-score/).
