@@ -22,8 +22,9 @@ extra_css = [
 nav = [
   { "Getting Started" = [
     "index.md",
-    "getting-started/first-score.md",
-    "getting-started/first-interactive-patch.md",
+    "composition.md",
+    "what-can-i-build.md",
+    "where-does-it-run.md",
   ] },
   { "Composing with OpenScofo" = [
     "concepts/core-language-concepts.md",

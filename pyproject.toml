@@ -10,7 +10,7 @@ dependencies = [
     "scipy",
     "librosa",
     "catboost",
-    "onnx"
+    "onnx",
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
