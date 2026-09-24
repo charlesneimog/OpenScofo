@@ -3,14 +3,36 @@ name: Compile Binaries
 on:
     push:
         tags:
-            - "v*"
+            - "**"
     workflow_dispatch:
 permissions:
     contents: write
 env:
     LIBNAME: openscofo~
 jobs:
+    create-release:
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        runs-on: ubuntu-latest
+        concurrency:
+            group: release-${{ github.ref }}
+            cancel-in-progress: false
+        steps:
+            - name: Publish release for tag
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_REPO: ${{ github.repository }}
+                  RELEASE_TAG: ${{ github.ref_name }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+                    gh release edit "$RELEASE_TAG" --draft=false
+                  else
+                    gh release create "$RELEASE_TAG" --verify-tag \
+                      --title "$RELEASE_TAG" --generate-notes
+                  fi
     build:
+        if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
         runs-on: ${{ matrix.os }}
         env:
             SCCACHE_GHA_ENABLED: "true"
@@ -385,7 +407,7 @@ jobs:
                   python -m twine upload --skip-existing dist/*.whl
     publish-release:
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        needs: [build]
+        needs: [build, create-release]
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -579,18 +601,13 @@ jobs:
                     fi
                   } > release_notes.md
                   cat release_notes.md
-            - name: Create GitHub Release
-              id: create_release
-              uses: comnoco/create-release-action@v2
+            - name: Update GitHub Release notes
+              shell: bash
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ steps.release_metadata.outputs.tag }}
-                  release_name: ${{ steps.release_metadata.outputs.tag }}
-                  body_path: release_notes.md
-                  draft: true
-                  prerelease: false
-                  commitish: ${{ github.sha }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  gh release edit "$RELEASE_TAG" --notes-file release_notes.md --draft=false
 
             - name: Upload GitHub Release Assets
               shell: bash
