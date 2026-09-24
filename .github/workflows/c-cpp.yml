@@ -170,7 +170,9 @@ jobs:
               if: runner.os == 'Linux'
               run: |
                   set -euo pipefail
-                  python -m pip install auditwheel
+                  python -m pip install --upgrade auditwheel "patchelf>=0.14.5"
+                  hash -r
+                  patchelf --version
                   rm -rf wheelhouse
                   mkdir -p wheelhouse
                   auditwheel repair --plat manylinux_2_35_x86_64 dist/*-linux_x86_64.whl -w wheelhouse
