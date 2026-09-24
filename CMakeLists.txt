@@ -31,34 +31,22 @@ option(OPENSCOFO_BUILD_SC_PLUGIN "Build SuperCollider Plugin" OFF)
 option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OPENSCOFO_BUILD_ALL "Build All OpenScofo Tests and Wrappers" ON)
-option(OPENSCOFO_ENABLE_SANITIZERS
-       "Build OpenScofo with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
-option(UPDATE_OPENSCOFO_LANGUAGE "Update OpenScofo language grammar.js" ON)
-option(OPENSCOFO_USE_BESSEL "Use Bessel function to calculate Kappa" ON)
+option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
 option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supported" ON)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
-if(OPENSCOFO_ENABLE_IPO)
-    include(CheckIPOSupported)
-    check_ipo_supported(RESULT OPENSCOFO_IPO_SUPPORTED OUTPUT OPENSCOFO_IPO_ERROR LANGUAGES C CXX)
-    if(OPENSCOFO_IPO_SUPPORTED)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-    else()
-        message(
-            WARNING
-                "IPO/LTO disabled because the current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}"
-        )
-    endif()
-endif()
+# if(OPENSCOFO_ENABLE_IPO) include(CheckIPOSupported) check_ipo_supported(RESULT
+# OPENSCOFO_IPO_SUPPORTED OUTPUT OPENSCOFO_IPO_ERROR LANGUAGES C CXX) if(OPENSCOFO_IPO_SUPPORTED)
+# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) else() message( WARNING "IPO/LTO disabled because the
+# current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}" ) endif() endif()
 
 if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1"
-    )
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -flto -pthread -matomics -mbulk-memory -msimd128")
+        "${CMAKE_CXX_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128")
 elseif(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0601)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -124,7 +112,7 @@ set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 set(OPENSCOFO_ONLINE_EDITOR_WASM
     "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
 
-if(UPDATE_OPENSCOFO_LANGUAGE)
+if(OPENSCOFO_UPDATE_LANGUAGE)
     find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
     if(NOT TREE_SITTER_EXECUTABLE)
         message(
@@ -155,12 +143,12 @@ endif()
 add_library(score_parser STATIC "${PARSER_OUTPUT}")
 set_target_properties(score_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(UPDATE_OPENSCOFO_LANGUAGE)
+if(OPENSCOFO_UPDATE_LANGUAGE)
     add_dependencies(score_parser generate_tree_sitter_parser)
 endif()
 
 # Custom command to generate the WASM file if it doesn't exist
-if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${UPDATE_OPENSCOFO_LANGUAGE})
+if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
     add_custom_command(
         OUTPUT "${OPENSCOFO_ONLINE_EDITOR_WASM}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
@@ -245,12 +233,14 @@ set(MIPP_INCLUDE_DIRS "${MIPP_SOURCE_DIR}/include")
 if(WIN32)
     set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Do not link libm on Windows" FORCE)
 endif()
+
 cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPTIONS
               "CMAKE_POSITION_INDEPENDENT_CODE ON")
 cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
 cpmaddpackage("gh:gabime/spdlog@1.17.0")
 cpmaddpackage("gh:charlesneimog/libonnx#master")
 
+target_compile_options(PFFFT PRIVATE -Wno-cpp)
 target_compile_definitions(spdlog PUBLIC SPDLOG_NO_EXCEPTIONS)
 
 # ╭──────────────────────────────────────╮
@@ -263,6 +253,7 @@ list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
+set_property(TARGET OpenScofo PROPERTY INTERPROCEDURAL_OPTIMIZATION ${OPENSCOFO_ENABLE_IPO})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -277,10 +268,6 @@ target_link_libraries(
            onsetsds
            onnx
            PFFFT::PFFFT)
-
-if(OPENSCOFO_USE_BESSEL)
-    target_compile_definitions(OpenScofo PRIVATE OPENSCOFO_USE_BESSEL=1)
-endif()
 
 if(OPENSCOFO_BUILD_WITH_LUA)
     target_link_libraries(OpenScofo PUBLIC OpenScofo_Lua)
@@ -300,7 +287,6 @@ if(EMSCRIPTEN)
                -O3
                -ffast-math
                -DNDEBUG
-               -flto=auto
                -ffunction-sections
                -fdata-sections
                >)
@@ -319,10 +305,7 @@ elseif(MSVC)
                $<$<CONFIG:Release>:
                /O2
                /DNDEBUG
-               /GL
                >)
-
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: /LTCG >)
 
 elseif(WIN32)
     target_compile_options(
@@ -341,7 +324,6 @@ elseif(WIN32)
                $<$<CONFIG:Release>:
                -O3
                -DNDEBUG
-               -flto=auto
                -ffunction-sections
                -fdata-sections
                >)
@@ -363,10 +345,6 @@ elseif(APPLE)
                -fstack-protector-strong
                -ftrapv
                -fstrict-aliasing
-               $<$<BOOL:${OPENSCOFO_ENABLE_SANITIZERS}>:
-               -fsanitize=address
-               -fsanitize=undefined
-               >
                $<$<CONFIG:Debug>:
                -O0
                -g
@@ -375,17 +353,12 @@ elseif(APPLE)
                $<$<CONFIG:Release>:
                -O3
                -DNDEBUG
-               -flto
                -ffunction-sections
                -fdata-sections
                >)
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -flto -Wl,-dead_strip >)
-    target_link_options(
-        OpenScofo PUBLIC
-        "$<$<BOOL:${OPENSCOFO_ENABLE_SANITIZERS}>:-fsanitize=address;-fsanitize=undefined>")
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -Wl,-dead_strip >)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
-
 else() # Linux (GCC or Clang)
     target_compile_options(
         OpenScofo
@@ -408,7 +381,6 @@ else() # Linux (GCC or Clang)
                -O3
                -ffast-math
                -DNDEBUG
-               -flto=auto
                -ffunction-sections
                -fdata-sections
                >)
@@ -417,7 +389,7 @@ else() # Linux (GCC or Clang)
         target_compile_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-march=native>)
     endif()
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-flto=auto;-Wl,--gc-sections;-s >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-Wl,--gc-sections;-s >)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 endif()
 

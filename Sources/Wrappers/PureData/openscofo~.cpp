@@ -116,10 +116,9 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     sys_close(fd);
 
-    char fullpath[MAXPDSTRING];
-    snprintf(fullpath, MAXPDSTRING, "%s/%s", realdir, realname);
+    std::string fullpath = std::string(realdir) + "/" + realname;
     int state = canvas_suspend_dsp();
-    bool ok = x->OpenScofo->LoadScore(fullpath);
+    bool ok = x->OpenScofo->LoadScore(fullpath.c_str());
 
     if (!ok) {
         canvas_resume_dsp(state);
@@ -324,11 +323,11 @@ static void openscofo_set(PdOpenScofo *x, t_symbol *s, int argc, t_atom *argv) {
         }
 
         char dirbuf[MAXPDSTRING], *nameptr;
-        char fullpath[MAXPDSTRING];
         int fd = canvas_open(x->Canvas, atom_getsymbol(argv + 1)->s_name, "", dirbuf, &nameptr, MAXPDSTRING, 1);
         sys_close(fd);
-        snprintf(fullpath, MAXPDSTRING, "%s/%s", dirbuf, nameptr);
-        x->OpenScofo->LoadONNXModel(fullpath, Desc);
+
+        std::string fullpath = std::string(dirbuf) + "/" + nameptr;
+        x->OpenScofo->LoadONNXModel(fullpath.c_str(), Desc);
     } else if (method == "verbosity") {
         int f = atom_getint(argv + 1);
         switch (f) {

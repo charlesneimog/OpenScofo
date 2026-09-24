@@ -16,7 +16,7 @@
 
 ## Goal
 
-The aim of *OpenScofo* is to provide a straightforward and accessible tool for real-time score following. By keeping the software lightweight, it can run seamlessly on the web through the [pd4web](https://charlesneimog.github.io/pd4web/) platform, thanks to the ability to use PureData directly in web browsers. With _pd4web_ and _OpenScofo_ will be possible to use the software in rehearsals with just a single click, eliminating the need for external libraries, compatibility issues, or complex installations -- ultimately facilitating the sharing and performance of contemporary music.
+The aim of *OpenScofo* is to provide a straightforward and accessible tool for real-time score following. By keeping the software lightweight, it can run seamlessly on the web through the [pd4web](https://charlesneimog.github.io/pd4web/) platform, thanks to the ability to use Pure Data directly in web browsers. With _pd4web_ and _OpenScofo_ will be possible to use the software in rehearsals with just a single click, eliminating the need for external libraries, compatibility issues, or complex installations -- ultimately facilitating the sharing and performance of contemporary music.
 
 ## Collaboration and Contribution
 
@@ -30,6 +30,7 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 * **Rhythm Synchronization**: Integrates theories of rhythm synchronization developed by Edward Large and Mari Riess Jones (1999) and Edward Large and Caroline Palmer (2002), as presented for Cont (2010).
 * **Forward Algorithm**: For now, *OpenScofo* uses the equation presented by Arshia Cont (2010) and developed by Yann Guédon (2005).
 * **Score Language**: Based on the `scofo` (by Miller Puckette) and `antescofo~` (by Arshia Cont, Philippe Cuvillier, and others) language.
+* **libonnx**: A C library used to perform inference with ONNX models for real-time extended-technique detection.
 
 ## Building
 
@@ -45,14 +46,19 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 
 #### Build Options
 
-* `OPENSCOFO_BUILD_ALL` (ON/OFF): Build all OpenScofo modules, including Python, Pd, and Max. Default: ON.
+* `OPENSCOFO_BUILD_ALL` (ON/OFF): Build all OpenScofo modules, including Python, Pd, Max, Csound, SuperCollider, and Vamp. Default: ON.
 * `OPENSCOFO_BUILD_PD_OBJECT` (ON/OFF): Build the Pure Data (Pd) object. Default: OFF.
 * `OPENSCOFO_BUILD_PY_MODULE` (ON/OFF): Build the Python module. Default: OFF.
 * `OPENSCOFO_BUILD_MAX_OBJECT` (ON/OFF): Build the Max object. Default: OFF.
 * `OPENSCOFO_BUILD_CSOUND_PLUGIN` (ON/OFF): Build the Csound plugin. Default: OFF.
-* `OPENSCOFO_BUILD_TESTS` (ON/OFF): Build test suite. Default: OFF.
-* `OPENSCOFO_BUILD_WITH_LUA` (ON/OFF): Build Lua module embedded in OpenScofo. Default: ON.
-* `UPDATE_OPENSCOFO_LANGUAGE` (ON/OFF): Update OpenScofo language grammar (`grammar.js`). Default: ON.
+* `OPENSCOFO_BUILD_SC_PLUGIN` (ON/OFF): Build the SuperCollider plugin. Default: OFF.
+* `OPENSCOFO_BUILD_VAMP_PLUGIN` (ON/OFF): Build the Vamp plugin. Default: OFF.
+* `OPENSCOFO_BUILD_TESTS` (ON/OFF): Build the test suite. Default: ON.
+* `OPENSCOFO_BUILD_WITH_LUA` (ON/OFF): Build the Lua module embedded in OpenScofo. Default: ON.
+* `OPENSCOFO_UPDATE_LANGUAGE` (ON/OFF): Update the OpenScofo language grammar (`grammar.js`). Default: ON.
+* `OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS` (ON/OFF): Enable native CPU optimizations. Default: ON.
+* `OPENSCOFO_ENABLE_IPO` (ON/OFF): Enable interprocedural optimization (IPO/LTO) when supported. Default: ON.
+* `OPENSCOFO_ENABLE_SANITIZERS` (ON/OFF): Enable AddressSanitizer and UndefinedBehaviorSanitizer. Default: OFF.
 
 #### Building Steps
 
