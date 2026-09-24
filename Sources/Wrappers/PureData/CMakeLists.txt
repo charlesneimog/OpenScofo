@@ -22,6 +22,7 @@ pd_add_datafile(openscofo~ "${CMAKE_CURRENT_SOURCE_DIR}/pdlua.cpp")
 
 if(LINUX)
     target_link_options(openscofo_tilde PRIVATE -Wl,--exclude-libs,ALL)
+    target_compile_options(openscofo_tilde PRIVATE -Wno-cast-function-type)
 elseif(APPLE)
     target_compile_options(openscofo_tilde PRIVATE -fvisibility=hidden)
 endif()
