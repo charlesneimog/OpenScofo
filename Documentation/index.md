@@ -1,11 +1,3 @@
----
-hide:
-  - navigation
-  - toc
-tags:
-  - Overview
----
-
 <style>
   .md-typeset h1,
   .md-content__button {
@@ -34,8 +26,8 @@ OpenScofo exists so live electronics can stay aligned with a human performer. It
 - __OpenScofo Score__
 
     ```openscofo
-    NOTE C4 1
-    NOTE D4 1
+    UTECH jet-whistle 3
+    NOTE F5 2
         sendto activated_computer_processing [1]
     ```
 </div>
