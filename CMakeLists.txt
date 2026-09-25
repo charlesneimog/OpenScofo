@@ -20,6 +20,8 @@ set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
 set(TREE_SITTER_VERSION "v0.26.10")
 
+include(FetchContent)
+
 # ╭──────────────────────────────────────╮
 # │               Options                │
 # ╰──────────────────────────────────────╯
@@ -67,12 +69,13 @@ endif()
 # │               PD CMAKE               │
 # ╰──────────────────────────────────────╯
 set(PDCMAKE_FILE "${CMAKE_BINARY_DIR}/pd.cmake")
-set(PDCMAKE_VERSION "v2.0.17")
+set(PDCMAKE_VERSION "v2.0.19")
 
 if(NOT EXISTS "${PDCMAKE_FILE}")
-    file(DOWNLOAD
-         "https://github.com/pure-data/pd.cmake/releases/download/${PDCMAKE_VERSION}/pd.cmake"
-         "${PDCMAKE_FILE}" STATUS PDCMAKE_DOWNLOAD_STATUS SHOW_PROGRESS)
+    file(
+        DOWNLOAD
+        "https://raw.githubusercontent.com/pure-data/pd.cmake/refs/tags/${PDCMAKE_VERSION}/pd.cmake"
+        "${PDCMAKE_FILE}" STATUS PDCMAKE_DOWNLOAD_STATUS SHOW_PROGRESS)
     list(GET PDCMAKE_DOWNLOAD_STATUS 0 PDCMAKE_DOWNLOAD_CODE)
     list(GET PDCMAKE_DOWNLOAD_STATUS 1 PDCMAKE_DOWNLOAD_MESSAGE)
     if(NOT PDCMAKE_DOWNLOAD_CODE EQUAL 0)
@@ -96,7 +99,9 @@ include(${CPM_FILE})
 # ╭──────────────────────────────────────╮
 # │             Tree-Sitter              │
 # ╰──────────────────────────────────────╯
-cpmaddpackage("gh:tree-sitter/tree-sitter#${TREE_SITTER_VERSION}")
+FetchContent_Declare(tree-sitter GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter.git
+                     GIT_TAG ${TREE_SITTER_VERSION})
+FetchContent_MakeAvailable(tree-sitter)
 
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
 set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
@@ -201,44 +206,52 @@ endif()
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_WITH_LUA)
-    cpmaddpackage("gh:lua/lua@5.5.0")
-    if(lua_ADDED)
-        file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
-        add_library(OpenScofo_Lua STATIC "${lua_SOURCE_DIR}/onelua.c")
-        add_definitions("-DMAKE_LIB")
-        target_compile_definitions(OpenScofo_Lua PUBLIC MAKE_LIB)
-        target_include_directories(OpenScofo_Lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
-        set_target_properties(OpenScofo_Lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    FetchContent_Declare(lua GIT_REPOSITORY https://github.com/lua/lua.git GIT_TAG v5.5.0)
+    FetchContent_MakeAvailable(lua)
 
-        if(APPLE)
-            target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_MACOSX)
-        elseif(WIN32)
-            target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_WINDOWS)
-        elseif(UNIX)
-            target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_LINUX)
-        endif()
+    file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
+    add_library(OpenScofo_Lua STATIC "${lua_SOURCE_DIR}/onelua.c")
+    add_definitions("-DMAKE_LIB")
+    target_compile_definitions(OpenScofo_Lua PUBLIC MAKE_LIB)
+    target_include_directories(OpenScofo_Lua PUBLIC $<BUILD_INTERFACE:${lua_SOURCE_DIR}>)
+    set_target_properties(OpenScofo_Lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+    if(APPLE)
+        target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_MACOSX)
+    elseif(WIN32)
+        target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_WINDOWS)
+    elseif(UNIX)
+        target_compile_definitions(OpenScofo_Lua PRIVATE LUA_USE_LINUX)
     endif()
+
     add_definitions(-DOPENSCOFO_LUA)
 else()
     message(STATUS "Lua not included")
 endif()
 
-# ╭──────────────────────────────────────╮
-# │                FFTW3                 │
-# ╰──────────────────────────────────────╯
-cpmaddpackage(NAME MIPP GITHUB_REPOSITORY "aff3ct/MIPP" GIT_TAG "master" DOWNLOAD_ONLY YES)
-set(MIPP_INCLUDE_DIRS "${MIPP_SOURCE_DIR}/include")
+# MIPP
+FetchContent_Declare(MIPP GIT_REPOSITORY https://github.com/aff3ct/MIPP.git GIT_TAG master
+                     SOURCE_SUBDIR __do_not_add__)
+FetchContent_MakeAvailable(MIPP)
+set(MIPP_INCLUDE_DIRS "${mipp_SOURCE_DIR}/include")
 
-if(WIN32)
-    set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Do not link libm on Windows" FORCE)
-endif()
+# pffft
+FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG v1.1.0)
+FetchContent_MakeAvailable(pffft)
 
-cpmaddpackage(NAME pffft GITHUB_REPOSITORY "marton78/pffft" GIT_TAG "v1.1.0" OPTIONS
-              "CMAKE_POSITION_INDEPENDENT_CODE ON")
-cpmaddpackage("gh:charlesneimog/onsetsds_tilde#main")
-cpmaddpackage("gh:gabime/spdlog@1.17.0")
-cpmaddpackage("gh:charlesneimog/libonnx#master")
+# onsetsds
+FetchContent_Declare(
+    onsetsds_tilde GIT_REPOSITORY https://github.com/charlesneimog/onsetsds_tilde.git GIT_TAG main)
+FetchContent_MakeAvailable(onsetsds_tilde)
+
+# spdlog
+FetchContent_Declare(spdlog GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.17.0)
+FetchContent_MakeAvailable(spdlog)
+
+# libonnx
+FetchContent_Declare(libonnx GIT_REPOSITORY https://github.com/charlesneimog/libonnx.git
+                     GIT_TAG master)
+FetchContent_MakeAvailable(libonnx)
 
 target_compile_options(PFFFT PRIVATE -Wno-cpp)
 target_compile_definitions(spdlog PUBLIC SPDLOG_NO_EXCEPTIONS)
@@ -389,7 +402,8 @@ else() # Linux (GCC or Clang)
         target_compile_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-march=native>)
     endif()
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-Wl,--gc-sections;-s >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-Wl,--gc-sections;-s> -static-libgcc
+                        -static-libstdc++ -Wl,-Bstatic -lm -ldl -Wl,-Bdynamic)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 endif()
 

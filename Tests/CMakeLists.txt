@@ -23,7 +23,10 @@ if(NOT APPLE)
     target_compile_definitions(math_tests
                                PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
-    cpmaddpackage("gh:adamstark/AudioFile#master")
+    FetchContent_Declare(AudioFile GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
+                         GIT_TAG master)
+    FetchContent_MakeAvailable(AudioFile)
+
     add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
     target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow

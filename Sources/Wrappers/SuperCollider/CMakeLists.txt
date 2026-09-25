@@ -4,8 +4,9 @@ project(SCOpenScofo C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-cpmaddpackage(URI "gh:supercollider/supercollider#Version-3.14.1" NAME supercollider DOWNLOAD_ONLY
-              YES)
+FetchContent_Declare(supercollider GIT_REPOSITORY https://github.com/supercollider/supercollider.git
+                     GIT_TAG Version-3.14.1 SOURCE_SUBDIR __do_not_add__)
+FetchContent_MakeAvailable(supercollider)
 
 file(GLOB_RECURSE OPENSCOFO_SC_SOURCES "*.cpp" "*.h" "*.hpp")
 add_library(SCOpenScofo MODULE ${OPENSCOFO_SC_SOURCES})
