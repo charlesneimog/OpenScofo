@@ -31,6 +31,7 @@ local oscofo = require("OpenScofo")
 
 | Function | Description |
 | --- | --- |
+| `oscofo.activate_all_descriptors()` | Enables all descriptors before audio processing; ONNX requires a loaded model. |
 | `oscofo.set_db_threshold(value)` | Sets audio threshold. |
 | `oscofo.set_tuning(value)` | Sets tuning reference. |
 | `oscofo.set_current_event(event)` | Forces score position. |

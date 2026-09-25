@@ -42,6 +42,7 @@ scofo.load_score("score.scofo")
 | --- | --- |
 | `load_score(path)` | load a score file |
 | `process_block(audio)` | process one NumPy audio block |
+| `activate_all_descriptors()` | enable every descriptor; ONNX inference requires a loaded model |
 | `set_db_threshold(value)` | set silence threshold |
 | `set_tuning(value)` | set A4 tuning |
 | `set_current_event(event)` | force score position |
@@ -61,9 +62,15 @@ Use the binding's score state/action APIs when you need host-side action handlin
 
 ## Descriptors
 
+Call `activate_all_descriptors()` before processing audio to enable YIN, MFCC/log-mel, chroma, ZCR, onset, extended technique, and ONNX descriptors. This initializes the required buffers and increases processing cost. ONNX inference runs only after a model is loaded.
+
 ```python
-desc = scofo.get_audio_description(segment)
+scofo.activate_all_descriptors()
+scofo.process_block(segment)
+desc = scofo.get_description()
 ```
+
+To select a subset later, use `scofo.set_requested_descriptors([...])` with values from `OpenScofo.Descriptors`.
 
 Common `Description` attributes include `mfcc`, `chroma`, `onset`, `silence_prob`, `loudness`, `spectral_flux`, `spectral_flatness`, `harmonicity`, `db`, `rms`, and `power`.
 

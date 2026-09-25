@@ -77,6 +77,7 @@ scofo.ProcessBlock(audio.data(), audio.size());
 | --- | --- |
 | `SetRequestedDescriptors(list)` | compute selected descriptors |
 | `RequestDescriptor(descriptor)` | request one descriptor |
+| `ActivateAllDescriptors()` | enable all descriptors before processing; ONNX requires a loaded model |
 | `GetDescription()` | current descriptor container |
 | `GetDescriptionFloat(desc, descriptor)` | scalar descriptor |
 | `GetDescriptionArray(desc, descriptor)` | vector descriptor |
