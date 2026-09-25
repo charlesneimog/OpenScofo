@@ -210,7 +210,17 @@ static int OpenScofoGetCurrentDescription(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+static int OpenScofoActivateAllDescriptors(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    self->ActivateAllDescriptors();
+    return 0;
+}
+
+// ─────────────────────────────────────
 static const luaL_Reg oscofo_funcs[] = {
+    {"activate_all_descriptors", OpenScofoActivateAllDescriptors},
     {"set_current_event", OpenScofoSetCurrentEvent},
     {"set_current_section", OpenScofoSetCurrentSection},
     {"get_live_bpm", OpenScofoGetLiveBPM},

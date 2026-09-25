@@ -112,6 +112,7 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
     class_<OpenScofo::OpenScofo>("OpenScofo")
         .constructor<float, float, float>()
         .function("load_score", &OpenScofo::OpenScofo::LoadScore)
+        .function("activate_all_descriptors", &OpenScofo::OpenScofo::ActivateAllDescriptors)
         .function("set_current_section", &OpenScofo::OpenScofo::SetCurrentSection)
         .function("get_current_bpm", &OpenScofo::OpenScofo::GetCurrentBPM)
         .function("get_current_score_position", &OpenScofo::OpenScofo::GetCurrentScorePosition)

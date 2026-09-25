@@ -170,6 +170,14 @@ void OpenScofo::SetRequestedDescriptors(std::vector<Descriptors> Descriptors) {
 }
 
 // ─────────────────────────────────────
+void OpenScofo::ActivateAllDescriptors() {
+    SetRequestedDescriptors({ODSONSET, LOUDNESS, DB, MAXAMP, RMS, STDDEV, MAGNITUDE, POWERARRAY, SILENCEPROB,
+                             MFCC, CHROMA, LOGMEL, ZCR, HFR, CENTROID, SPREADHZ, SPREADVARIANCE, CREST,
+                             FLATNESS, ENTROPY, ROLLOFF, CENTROIDVEL, FLUX, SKEWNESS, SLOPE, KURTOSIS,
+                             IRREGULARITY, HARMONICITY, YIN, YINCONFIDENCE, EXTENDEDTECHNIQUE, ONNX});
+}
+
+// ─────────────────────────────────────
 void OpenScofo::RequestDescriptor(Descriptors Descriptor) {
     if (Descriptor == INVALID) {
         return;

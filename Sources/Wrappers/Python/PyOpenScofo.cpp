@@ -334,6 +334,8 @@ NB_MODULE(_OpenScofo, m) {
         .def("set_configuration", &OpenScofo::OpenScofo::SetConfiguration)
         .def("set_requested_descriptors", &OpenScofo::OpenScofo::SetRequestedDescriptors)
         .def("request_descriptor", &OpenScofo::OpenScofo::RequestDescriptor)
+        .def("activate_all_descriptors", &OpenScofo::OpenScofo::ActivateAllDescriptors,
+             "Enable all descriptors before processing audio. ONNX requires a loaded model.")
 
         // Getters
         .def("get_configuration", &OpenScofo::OpenScofo::GetConfiguration)

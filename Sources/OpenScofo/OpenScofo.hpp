@@ -58,6 +58,8 @@ class OpenScofo {
     void SetConfiguration(Configuration &Config);
     void SetRequestedDescriptors(std::vector<Descriptors> Descriptors);
     void RequestDescriptor(Descriptors Descriptor);
+    // Enable all descriptors before processing audio. ONNX requires a loaded model.
+    void ActivateAllDescriptors();
 
     // Get Functions
     double GetCurrentBPM();
