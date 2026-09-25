@@ -1,0 +1,266 @@
+{
+  "audio": "miniatura2.mp3",
+  "duration_seconds": 63.997333,
+  "events": [
+    {
+      "event": 1,
+      "timestamp_seconds": 5.335889
+    },
+    {
+      "event": 2,
+      "timestamp_seconds": 6.224442
+    },
+    {
+      "event": 3,
+      "timestamp_seconds": 7.013775
+    },
+    {
+      "event": 4,
+      "timestamp_seconds": 8.773775
+    },
+    {
+      "event": 5,
+      "timestamp_seconds": 9.551999
+    },
+    {
+      "event": 6,
+      "timestamp_seconds": 9.978666
+    },
+    {
+      "event": 7,
+      "timestamp_seconds": 10.383999
+    },
+    {
+      "event": 8,
+      "timestamp_seconds": 10.746666
+    },
+    {
+      "event": 9,
+      "timestamp_seconds": 12.833769
+    },
+    {
+      "event": 10,
+      "timestamp_seconds": 13.153769
+    },
+    {
+      "event": 11,
+      "timestamp_seconds": 13.580436
+    },
+    {
+      "event": 12,
+      "timestamp_seconds": 13.985769
+    },
+    {
+      "event": 13,
+      "timestamp_seconds": 15.927102
+    },
+    {
+      "event": 14,
+      "timestamp_seconds": 16.268435
+    },
+    {
+      "event": 15,
+      "timestamp_seconds": 16.652435
+    },
+    {
+      "event": 16,
+      "timestamp_seconds": 17.100435
+    },
+    {
+      "event": 17,
+      "timestamp_seconds": 18.439102
+    },
+    {
+      "event": 18,
+      "timestamp_seconds": 19.249768
+    },
+    {
+      "event": 19,
+      "timestamp_seconds": 19.573333
+    },
+    {
+      "event": 20,
+      "timestamp_seconds": 19.975102
+    },
+    {
+      "event": 21,
+      "timestamp_seconds": 20.423102
+    },
+    {
+      "event": 22,
+      "timestamp_seconds": 22.428435
+    },
+    {
+      "event": 23,
+      "timestamp_seconds": 22.812435
+    },
+    {
+      "event": 24,
+      "timestamp_seconds": 23.217768
+    },
+    {
+      "event": 25,
+      "timestamp_seconds": 23.665768
+    },
+    {
+      "event": 26,
+      "timestamp_seconds": 25.713768
+    },
+    {
+      "event": 27,
+      "timestamp_seconds": 26.076435
+    },
+    {
+      "event": 28,
+      "timestamp_seconds": 26.481768
+    },
+    {
+      "event": 29,
+      "timestamp_seconds": 26.951102
+    },
+    {
+      "event": 30,
+      "timestamp_seconds": 28.261333
+    },
+    {
+      "event": 31,
+      "timestamp_seconds": 31.503999
+    },
+    {
+      "event": 32,
+      "timestamp_seconds": 32.357332
+    },
+    {
+      "event": 33,
+      "timestamp_seconds": 32.762666
+    },
+    {
+      "event": 34,
+      "timestamp_seconds": 33.167999
+    },
+    {
+      "event": 35,
+      "timestamp_seconds": 33.647998
+    },
+    {
+      "event": 36,
+      "timestamp_seconds": 35.098665
+    },
+    {
+      "event": 37,
+      "timestamp_seconds": 35.973332
+    },
+    {
+      "event": 38,
+      "timestamp_seconds": 36.335998
+    },
+    {
+      "event": 39,
+      "timestamp_seconds": 36.719998
+    },
+    {
+      "event": 40,
+      "timestamp_seconds": 37.189331
+    },
+    {
+      "event": 41,
+      "timestamp_seconds": 38.693332
+    },
+    {
+      "event": 42,
+      "timestamp_seconds": 39.525332
+    },
+    {
+      "event": 43,
+      "timestamp_seconds": 39.887998
+    },
+    {
+      "event": 44,
+      "timestamp_seconds": 40.293332
+    },
+    {
+      "event": 45,
+      "timestamp_seconds": 40.805332
+    },
+    {
+      "event": 46,
+      "timestamp_seconds": 42.303998
+    },
+    {
+      "event": 47,
+      "timestamp_seconds": 43.178664
+    },
+    {
+      "event": 48,
+      "timestamp_seconds": 43.562664
+    },
+    {
+      "event": 49,
+      "timestamp_seconds": 43.946664
+    },
+    {
+      "event": 50,
+      "timestamp_seconds": 44.351998
+    },
+    {
+      "event": 51,
+      "timestamp_seconds": 45.797331
+    },
+    {
+      "event": 52,
+      "timestamp_seconds": 46.629331
+    },
+    {
+      "event": 53,
+      "timestamp_seconds": 47.013331
+    },
+    {
+      "event": 54,
+      "timestamp_seconds": 47.407998
+    },
+    {
+      "event": 55,
+      "timestamp_seconds": 47.813331
+    },
+    {
+      "event": 56,
+      "timestamp_seconds": 49.359997
+    },
+    {
+      "event": 57,
+      "timestamp_seconds": 50.277331
+    },
+    {
+      "event": 58,
+      "timestamp_seconds": 51.109331
+    },
+    {
+      "event": 59,
+      "timestamp_seconds": 51.578664
+    },
+    {
+      "event": 60,
+      "timestamp_seconds": 53.10933
+    },
+    {
+      "event": 61,
+      "timestamp_seconds": 54.047997
+    },
+    {
+      "event": 62,
+      "timestamp_seconds": 54.890663
+    },
+    {
+      "event": 63,
+      "timestamp_seconds": 56.975996
+    },
+    {
+      "event": 64,
+      "timestamp_seconds": 57.914663
+    },
+    {
+      "event": 65,
+      "timestamp_seconds": 58.847996
+    }
+  ]
+}

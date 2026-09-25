@@ -1,4 +1,4 @@
-#N canvas 0 0 1494 1136 10;
+#N canvas 0 0 932 1136 10;
 #X declare -path /home/neimog/Documents/Git/OpenScofo/build/Sources/Wrappers/PureData/;
 #X declare -path Audios;
 #X declare -path Extras;
@@ -151,8 +151,8 @@
 #X obj 305 358 *~ 1;
 #X obj 28 118 x.mar~;
 #X obj 305 467 saf/saf.binaural~ -m;
-#X msg 28 88 open miniatura1.mp3 \, 1;
 #X msg 46 237 score miniatura1.scofo \, start;
+#X msg 28 88 open miniatura1.mp3 \, 1;
 #X connect 1 0 25 0;
 #X connect 1 0 28 0;
 #X connect 2 0 27 0;
@@ -174,11 +174,11 @@
 #X connect 28 0 33 0;
 #X connect 33 0 2 0;
 #X connect 33 1 3 0;
-#X connect 36 0 41 0;
+#X connect 36 0 42 0;
 #X connect 37 0 28 1;
 #X connect 38 0 22 0;
 #X connect 39 0 1 0;
 #X connect 40 0 23 0;
-#X connect 41 0 39 0;
-#X connect 42 0 33 0;
+#X connect 41 0 33 0;
+#X connect 42 0 39 0;
 #X coords 0 568 1 567 200 125 0;
