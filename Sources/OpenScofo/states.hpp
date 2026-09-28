@@ -124,10 +124,12 @@ struct Observation {
 };
 
 // ─────────────────────────────────────
+enum MicroTopology { NO_MICROSTATES, UNORDERED, LEFT_RIGHT };
+
 struct MarkovMicroState {
     std::vector<Observation> Observations;
+
     double SelfTransitionProb = 0.0;
-    std::vector<double> Forward;
 };
 
 // ─────────────────────────────────────
@@ -144,6 +146,8 @@ struct ScoreState {
     HMMType HSMMType;
     EventType Type;
     EventActions Actions;
+
+    MicroTopology MicroTopologyType = NO_MICROSTATES;
 
     // Inference
     double InitProb;
