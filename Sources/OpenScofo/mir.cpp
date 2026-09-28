@@ -286,8 +286,8 @@ void MIR::ExtendedTechExec(Description &Desc) {
     // extended technique. This is the confidence term used by the original
     // detector; ZCR is already represented by the spectral/noise features.
     Desc.ExtendedTechProb *= (1.0f - Desc.PitchConfidence);
-    Desc.ExtendedTechProb *= abs(m_ODS->odfvalpost);
-    float steepness = 10.0f;
+    // Desc.ExtendedTechProb *= abs(m_ODS->odfvalpost);
+    float steepness = 5.0f;
     Desc.ExtendedTechProb = 1.0f / (1.0f + std::exp(-steepness * (Desc.ExtendedTechProb - 0.5f)));
 }
 
