@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.30)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
-project(OpenScofo VERSION 0.3.0 LANGUAGES C CXX
-        HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
-        DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
+project(
+    OpenScofo
+    VERSION 0.3.0
+    LANGUAGES C CXX
+    HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
+    DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,14 +43,13 @@ option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supp
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
-# if(OPENSCOFO_ENABLE_IPO) include(CheckIPOSupported) check_ipo_supported(RESULT
-# OPENSCOFO_IPO_SUPPORTED OUTPUT OPENSCOFO_IPO_ERROR LANGUAGES C CXX) if(OPENSCOFO_IPO_SUPPORTED)
-# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) else() message( WARNING "IPO/LTO disabled because the
-# current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}" ) endif() endif()
+# if(OPENSCOFO_ENABLE_IPO) include(CheckIPOSupported) check_ipo_supported(RESULT OPENSCOFO_IPO_SUPPORTED OUTPUT
+# OPENSCOFO_IPO_ERROR LANGUAGES C CXX) if(OPENSCOFO_IPO_SUPPORTED) set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) else()
+# message( WARNING "IPO/LTO disabled because the current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}" )
+# endif() endif()
 
 if(EMSCRIPTEN)
-    set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128")
 elseif(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0601)
@@ -73,12 +75,24 @@ set(PDCMAKE_VERSION "v2.0.19")
 
 if(NOT EXISTS "${PDCMAKE_FILE}")
     file(
-        DOWNLOAD
-        "https://raw.githubusercontent.com/pure-data/pd.cmake/refs/tags/${PDCMAKE_VERSION}/pd.cmake"
-        "${PDCMAKE_FILE}" STATUS PDCMAKE_DOWNLOAD_STATUS SHOW_PROGRESS)
-    list(GET PDCMAKE_DOWNLOAD_STATUS 0 PDCMAKE_DOWNLOAD_CODE)
-    list(GET PDCMAKE_DOWNLOAD_STATUS 1 PDCMAKE_DOWNLOAD_MESSAGE)
-    if(NOT PDCMAKE_DOWNLOAD_CODE EQUAL 0)
+        DOWNLOAD "https://raw.githubusercontent.com/pure-data/pd.cmake/refs/tags/${PDCMAKE_VERSION}/pd.cmake"
+        "${PDCMAKE_FILE}"
+        STATUS PDCMAKE_DOWNLOAD_STATUS
+        SHOW_PROGRESS)
+    list(
+        GET
+        PDCMAKE_DOWNLOAD_STATUS
+        0
+        PDCMAKE_DOWNLOAD_CODE)
+    list(
+        GET
+        PDCMAKE_DOWNLOAD_STATUS
+        1
+        PDCMAKE_DOWNLOAD_MESSAGE)
+    if(NOT
+       PDCMAKE_DOWNLOAD_CODE
+       EQUAL
+       0)
         message(FATAL_ERROR "Failed to download pd.cmake: ${PDCMAKE_DOWNLOAD_MESSAGE}")
     endif()
 endif()
@@ -90,17 +104,17 @@ include("${PDCMAKE_FILE}")
 set(CPM_FILE ${CMAKE_BINARY_DIR}/CPM.cmake)
 set(CPM_VERSION "0.42.1")
 if(NOT EXISTS "${CPM_FILE}")
-    file(DOWNLOAD
-         "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_VERSION}/CPM.cmake"
-         ${CPM_FILE})
+    file(DOWNLOAD "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_VERSION}/CPM.cmake" ${CPM_FILE})
 endif()
 include(${CPM_FILE})
 
 # ╭──────────────────────────────────────╮
 # │             Tree-Sitter              │
 # ╰──────────────────────────────────────╯
-FetchContent_Declare(tree-sitter GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter.git
-                     GIT_TAG ${TREE_SITTER_VERSION})
+FetchContent_Declare(
+    tree-sitter
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter.git
+    GIT_TAG ${TREE_SITTER_VERSION})
 FetchContent_MakeAvailable(tree-sitter)
 
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
@@ -114,15 +128,15 @@ set(PARSER_GENERATED_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
 set(PARSER_COMMITTED_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 
-set(OPENSCOFO_ONLINE_EDITOR_WASM
-    "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
+set(OPENSCOFO_ONLINE_EDITOR_WASM "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
 
 if(OPENSCOFO_UPDATE_LANGUAGE)
-    find_program(TREE_SITTER_EXECUTABLE NAMES tree-sitter DOC "tree-sitter CLI executable")
+    find_program(
+        TREE_SITTER_EXECUTABLE
+        NAMES tree-sitter
+        DOC "tree-sitter CLI executable")
     if(NOT TREE_SITTER_EXECUTABLE)
-        message(
-            FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli"
-        )
+        message(FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
     endif()
 
     add_custom_command(
@@ -156,8 +170,7 @@ endif()
 if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
     add_custom_command(
         OUTPUT "${OPENSCOFO_ONLINE_EDITOR_WASM}"
-        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build
-                --wasm
+        COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build --wasm
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
         DEPENDS "${GRAMMAR_JS_SRC}"
@@ -165,8 +178,7 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
         VERBATIM)
 
     set(TS_URL
-        "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/web-tree-sitter.tar.gz"
-    )
+        "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/web-tree-sitter.tar.gz")
 
     set(TS_ARCHIVE "${CMAKE_BINARY_DIR}/web-tree-sitter.tar.gz")
     set(TS_TEMP_DIR "${CMAKE_BINARY_DIR}/web-tree-sitter-temp")
@@ -178,25 +190,29 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
     # Download archive if missing
     if(NOT EXISTS "${TS_ARCHIVE}")
         file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" STATUS download_status)
-        list(GET download_status 0 status_code)
-        if(NOT status_code EQUAL 0)
+        list(
+            GET
+            download_status
+            0
+            status_code)
+        if(NOT
+           status_code
+           EQUAL
+           0)
             message(FATAL_ERROR "Failed to download web-tree-sitter archive")
         endif()
     endif()
 
     # Extract
-    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}"
-                    WORKING_DIRECTORY "${TS_TEMP_DIR}")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${TS_ARCHIVE}" WORKING_DIRECTORY "${TS_TEMP_DIR}")
 
     # Verify files exist
-    if(NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.js" OR NOT EXISTS
-                                                         "${TS_TEMP_DIR}/web-tree-sitter.wasm")
+    if(NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.js" OR NOT EXISTS "${TS_TEMP_DIR}/web-tree-sitter.wasm")
         message(FATAL_ERROR "web-tree-sitter extraction failed")
     endif()
 
     # Copy required runtime files
-    file(COPY "${TS_TEMP_DIR}/web-tree-sitter.js" "${TS_TEMP_DIR}/web-tree-sitter.wasm"
-         DESTINATION "${TS_DEST}")
+    file(COPY "${TS_TEMP_DIR}/web-tree-sitter.js" "${TS_TEMP_DIR}/web-tree-sitter.wasm" DESTINATION "${TS_DEST}")
 
     add_custom_target(build_online_editor_wasm ALL DEPENDS "${OPENSCOFO_ONLINE_EDITOR_WASM}")
 
@@ -206,7 +222,10 @@ endif()
 # │                 Lua                  │
 # ╰──────────────────────────────────────╯
 if(OPENSCOFO_BUILD_WITH_LUA)
-    FetchContent_Declare(lua GIT_REPOSITORY https://github.com/lua/lua.git GIT_TAG v5.5.0)
+    FetchContent_Declare(
+        lua
+        GIT_REPOSITORY https://github.com/lua/lua.git
+        GIT_TAG v5.5.0)
     FetchContent_MakeAvailable(lua)
 
     file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
@@ -230,27 +249,40 @@ else()
 endif()
 
 # MIPP
-FetchContent_Declare(MIPP GIT_REPOSITORY https://github.com/aff3ct/MIPP.git GIT_TAG master
-                     SOURCE_SUBDIR __do_not_add__)
+FetchContent_Declare(
+    MIPP
+    GIT_REPOSITORY https://github.com/aff3ct/MIPP.git
+    GIT_TAG master
+    SOURCE_SUBDIR __do_not_add__)
 FetchContent_MakeAvailable(MIPP)
 set(MIPP_INCLUDE_DIRS "${mipp_SOURCE_DIR}/include")
 
 # pffft
-FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG v1.1.0)
+FetchContent_Declare(
+    pffft
+    GIT_REPOSITORY https://github.com/marton78/pffft.git
+    GIT_TAG v1.1.0)
 FetchContent_MakeAvailable(pffft)
 
 # onsetsds
 FetchContent_Declare(
-    onsetsds_tilde GIT_REPOSITORY https://github.com/charlesneimog/onsetsds_tilde.git GIT_TAG main)
+    onsetsds_tilde
+    GIT_REPOSITORY https://github.com/charlesneimog/onsetsds_tilde.git
+    GIT_TAG main)
 FetchContent_MakeAvailable(onsetsds_tilde)
 
 # spdlog
-FetchContent_Declare(spdlog GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.17.0)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.17.0)
 FetchContent_MakeAvailable(spdlog)
 
 # libonnx
-FetchContent_Declare(libonnx GIT_REPOSITORY https://github.com/charlesneimog/libonnx.git
-                     GIT_TAG master)
+FetchContent_Declare(
+    libonnx
+    GIT_REPOSITORY https://github.com/charlesneimog/libonnx.git
+    GIT_TAG master)
 FetchContent_MakeAvailable(libonnx)
 
 target_compile_options(PFFFT PRIVATE -Wno-cpp)
@@ -298,7 +330,6 @@ if(EMSCRIPTEN)
                >
                $<$<CONFIG:Release>:
                -O3
-               -ffast-math
                -DNDEBUG
                -ffunction-sections
                -fdata-sections
@@ -370,7 +401,12 @@ elseif(APPLE)
                -fdata-sections
                >)
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -Wl,-dead_strip >)
+    target_link_options(
+        OpenScofo
+        PUBLIC
+        $<$<CONFIG:Release>:
+        -Wl,-dead_strip
+        >)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 else() # Linux (GCC or Clang)
     target_compile_options(
@@ -392,7 +428,6 @@ else() # Linux (GCC or Clang)
                >
                $<$<CONFIG:Release>:
                -O3
-               -ffast-math
                -DNDEBUG
                -ffunction-sections
                -fdata-sections
@@ -402,8 +437,16 @@ else() # Linux (GCC or Clang)
         target_compile_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-march=native>)
     endif()
 
-    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-Wl,--gc-sections;-s> -static-libgcc
-                        -static-libstdc++ -Wl,-Bstatic -lm -ldl -Wl,-Bdynamic)
+    target_link_options(
+        OpenScofo
+        PUBLIC
+        $<$<CONFIG:Release>:-Wl,--gc-sections;-s>
+        -static-libgcc
+        -static-libstdc++
+        -Wl,-Bstatic
+        -lm
+        -ldl
+        -Wl,-Bdynamic)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 endif()
 
@@ -411,8 +454,7 @@ endif()
 # │               Language               │
 # ╰──────────────────────────────────────╯
 if(NOT EMSCRIPTEN)
-    add_library(tree-sitter-openscofo SHARED
-                ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
+    add_library(tree-sitter-openscofo SHARED ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -432,7 +474,9 @@ endif()
 # ╭──────────────────────────────────────╮
 # │             Max Obj                  │
 # ╰──────────────────────────────────────╯
-if(OPENSCOFO_BUILD_MAX_OBJECT AND NOT LINUX AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_MAX_OBJECT
+   AND NOT LINUX
+   AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
 endif()
 
