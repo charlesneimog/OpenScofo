@@ -1,0 +1,7 @@
+BPM 60
+ONAUDIOSTATECHANGE microstate
+MULTI (C4 C#4 D4 D#4 E4) 2
+PTECH [slap, key_click] C4 1
+UTECH [jet_whistle, aeolian] 1
+PTECH slap D4 1
+UTECH aeolian 1

@@ -1,4 +1,4 @@
-#N canvas 0 0 925 1131 10;
+#N canvas 0 0 932 1136 10;
 #X obj 32 4 inlet;
 #X listbox 32 152 12 0 0 0 - - - 0;
 #X obj 32 377 l.orchidea;
@@ -91,7 +91,7 @@
 #X obj 233 163 - 20;
 #X obj 32 259 pack s s;
 #X msg 32 413 open \$1 \, 1;
-#X obj 32 439 mar~, f 13;
+#X obj 32 439 x.mar~, f 13;
 #X connect 0 0 12 0;
 #X connect 1 0 17 0;
 #X connect 2 0 18 0;

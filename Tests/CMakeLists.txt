@@ -11,6 +11,16 @@ if(NOT APPLE)
     target_link_libraries(score_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Score COMMAND score_tests)
 
+    add_executable(trill_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_trill.cpp")
+    target_link_libraries(trill_tests PRIVATE OpenScofo GTest::gtest_main)
+    target_compile_definitions(trill_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    add_test(NAME Trill COMMAND trill_tests)
+
+    add_executable(microstate_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_microstates.cpp")
+    target_link_libraries(microstate_tests PRIVATE OpenScofo GTest::gtest_main)
+    target_compile_definitions(microstate_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    add_test(NAME MicroStates COMMAND microstate_tests)
+
     add_executable(math_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_math.cpp")
     target_link_libraries(math_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Math COMMAND math_tests)
