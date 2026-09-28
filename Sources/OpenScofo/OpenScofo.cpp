@@ -964,7 +964,7 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
         }
     };
 
-    for (const MarkovState &state : m_States) {
+    for (const ScoreState &state : m_States) {
         for (const Observation &audioState : state.Observations) {
             if (audioState.Type == LABEL) {
                 requestScoreDescriptor(ONNX);

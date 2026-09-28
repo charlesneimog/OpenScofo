@@ -92,7 +92,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_SurvivorCache.clear();
 
     m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
-    for (MarkovState &State : m_States) {
+    for (ScoreState &State : m_States) {
         State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
@@ -110,7 +110,7 @@ int OnlineForward::GetCurrentStateIndex() {
 
 // ─────────────────────────────────────
 EventActions OnlineForward::GetCurrentEventActions() {
-    MarkovState State = m_States[m_CurrentStateIndex];
+    ScoreState State = m_States[m_CurrentStateIndex];
     return State.Actions;
 }
 
@@ -133,7 +133,7 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
         return;
     }
 
-    const MarkovState &State = m_States[StateIndex];
+    const ScoreState &State = m_States[StateIndex];
     const int AudioStateIndex = State.BestAudioStateIndex;
 
     if (State.Type != CHORD &&
@@ -219,7 +219,7 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     spdlog::debug("BufferSize is {}", m_BufferSize);
 
     m_Normalization.assign(m_BufferSize, 1.0);
-    for (MarkovState &State : m_States) {
+    for (ScoreState &State : m_States) {
         // States entering the moving decode window after the first frame
         // must not retain an uninitialized initial probability.
         State.InitProb = 0.0;
@@ -231,12 +231,12 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_CurrentStateIndex = 0;
     if (m_SectionRestrict) {
         auto FirstSectionState = std::find_if(m_States.begin(), m_States.end(),
-                                              [](const MarkovState &State) { return !State.Section.empty(); });
+                                              [](const ScoreState &State) { return !State.Section.empty(); });
         if (FirstSectionState != m_States.end()) {
             m_CurrentStateIndex = static_cast<int>(std::distance(m_States.begin(), FirstSectionState));
         }
     }
-    const MarkovState &InitialState = m_States[static_cast<size_t>(m_CurrentStateIndex)];
+    const ScoreState &InitialState = m_States[static_cast<size_t>(m_CurrentStateIndex)];
     m_LastNotifiedStateIndex = -1;
     m_LastNotifiedAudioStateIndex = -1;
     m_PendingAudioStateActions.clear();
@@ -440,7 +440,7 @@ void OnlineForward::SetCurrentEvent(int Event) {
 // ─────────────────────────────────────
 bool OnlineForward::SetCurrentSection(const std::string &Section) {
     auto State = std::find_if(m_States.begin(), m_States.end(),
-                              [&](const MarkovState &Candidate) { return Candidate.Section == Section; });
+                              [&](const ScoreState &Candidate) { return Candidate.Section == Section; });
     if (State == m_States.end()) {
         spdlog::error("SECTION '{}' was not found in the loaded score", Section);
         return false;
@@ -457,17 +457,17 @@ int OnlineForward::GetStatesSize() {
 }
 
 // ─────────────────────────────────────
-void OnlineForward::AddState(MarkovState State) {
+void OnlineForward::AddState(ScoreState State) {
     m_States.push_back(State);
 }
 
 // ─────────────────────────────────────
-MarkovState OnlineForward::GetState(int Index) {
+ScoreState OnlineForward::GetState(int Index) {
     return m_States[Index];
 }
 
 // ─────────────────────────────────────
-std::vector<MarkovState> &OnlineForward::GetStates() {
+std::vector<ScoreState> &OnlineForward::GetStates() {
     return m_States;
 }
 
@@ -501,7 +501,7 @@ void OnlineForward::ResetDecoding() {
     }
 
     const int StartStateIndex = std::clamp(m_CurrentStateIndex, 0, static_cast<int>(m_States.size()) - 1);
-    MarkovState &StartState = m_States[static_cast<size_t>(StartStateIndex)];
+    ScoreState &StartState = m_States[static_cast<size_t>(StartStateIndex)];
 
     // Reset timing variables
     m_Tau = 0;
@@ -524,7 +524,7 @@ void OnlineForward::ResetDecoding() {
     m_PhaseCoupling = StartState.PhaseCoupling;
 
     // Reset all state probabilities
-    for (MarkovState &State : m_States) {
+    for (ScoreState &State : m_States) {
         std::fill(State.Forward.begin(), State.Forward.end(), 0.0);
         std::fill(State.ExitProb.begin(), State.ExitProb.end(), 0.0);
         std::fill(State.BestObs.begin(), State.BestObs.end(), std::numeric_limits<double>::min());
@@ -795,9 +795,9 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
     }
 
     // Cont (2010), Large and Palmer (1999) and Large and Jones (2002)
-    MarkovState &LastState = m_States[StateIndex - 1];
-    MarkovState &CurrentState = m_States[StateIndex];
-    MarkovState &NextState = m_States[StateIndex + 1];
+    ScoreState &LastState = m_States[StateIndex - 1];
+    ScoreState &CurrentState = m_States[StateIndex];
+    ScoreState &NextState = m_States[StateIndex + 1];
 
     double IOISeconds = m_CurrentStateOnset - m_LastTn;
     double LastPhiN = LastState.IOIPhiN;
@@ -839,8 +839,8 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
         if ((size_t)i >= m_States.size()) {
             break;
         }
-        MarkovState &FutureState = m_States[i];
-        MarkovState &PreviousFutureState = m_States[(i - 1)];
+        ScoreState &FutureState = m_States[i];
+        ScoreState &PreviousFutureState = m_States[(i - 1)];
         double Duration = PreviousFutureState.Duration;
         double FutureOnset = LastOnsetExpected + Duration * PsiN1;
 
@@ -878,7 +878,7 @@ void OnlineForward::GetAudioObservations() {
     int globalBestAudioStateIndex = -1;
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        MarkovState &state = m_States[j];
+        ScoreState &state = m_States[j];
 
         double bestPitch = 0.0;
         double bestTech = 0.0;
@@ -1017,7 +1017,7 @@ void OnlineForward::GetAudioObservations() {
         bool skippedSoundedState = false;
         const double soundEvidence = std::max(maxSoundEvidence, std::numeric_limits<double>::min());
         for (int j = m_CurrentStateIndex + 1; j <= m_WinEnd; ++j) {
-            MarkovState &candidate = m_States[j];
+            ScoreState &candidate = m_States[j];
             if (candidate.Type == REST) {
                 if (skippedSoundedState) {
                     double &observation = candidate.BestObs[m_CircularBufferIndex];
@@ -1128,7 +1128,7 @@ void OnlineForward::GetInitialDistribution() {
 
     std::vector<double> NonNullInitialProb(Size, 0.0);
     for (int destination = 0; destination < Size; ++destination) {
-        const MarkovState &DestinationState = m_States[m_CurrentStateIndex + destination];
+        const ScoreState &DestinationState = m_States[m_CurrentStateIndex + destination];
         const double destinationExpectedFrames = std::max(1.0, (m_PsiN1 * DestinationState.Duration) / m_BlockDur);
         const double destinationLambda = std::round(destinationExpectedFrames * 10.0) / 10.0;
         const double destinationNonNull =
@@ -1137,7 +1137,7 @@ void OnlineForward::GetInitialDistribution() {
         for (int source = 0; source <= destination; ++source) {
             double skipped = 1.0;
             for (int k = source; k < destination; ++k) {
-                const MarkovState &SkippedState = m_States[m_CurrentStateIndex + k];
+                const ScoreState &SkippedState = m_States[m_CurrentStateIndex + k];
                 if (SkippedState.HSMMType == SEMIMARKOV) {
                     const double expectedFrames = std::max(1.0, (m_PsiN1 * SkippedState.Duration) / m_BlockDur);
                     const double lambda = std::round(expectedFrames * 10.0) / 10.0;
@@ -1160,7 +1160,7 @@ void OnlineForward::GetInitialDistribution() {
         if (j < 0 || j >= (int)m_States.size())
             continue;
         int idx = j - m_CurrentStateIndex;
-        MarkovState &StateJ = m_States[j];
+        ScoreState &StateJ = m_States[j];
         StateJ.InitProb =
             (idx >= 0 && idx < static_cast<int>(NonNullInitialProb.size())) ? NonNullInitialProb[idx] : 0.0;
         if (j < m_CurrentStateIndex) {
@@ -1172,14 +1172,37 @@ void OnlineForward::GetInitialDistribution() {
 
 // ─────────────────────────────────────
 // CUVILLIER and CONT (2014) section 2.1.
-double OnlineForward::GetTransProbability(int i, int j) {
+double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
     return (i + 1 == j) ? 1.0 : 0.0;
+}
+
+// ─────────────────────────────────────
+double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
+    const ScoreState &State = m_States[m_CurrentStateIndex];
+    const int K = static_cast<int>(State.MicroStates.size());
+
+    if (K == 0 || i < 0 || i >= K) {
+        return 0.0;
+    }
+
+    const double expectedFrames = std::max(1.0, (m_PsiN1 * State.Duration) / m_BlockDur);
+    const double advance = std::clamp(static_cast<double>(K) / expectedFrames, 0.0, 1.0);
+    const double stay = 1.0 - advance;
+    if (j == i) {
+        return stay;
+    }
+
+    if (j == i + 1) {
+        return advance;
+    }
+
+    return 0.0;
 }
 
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
-double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
+double OnlineForward::GetOccupancyDistribution(ScoreState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0) {
         ExpectedFrames = 1.0;
@@ -1198,7 +1221,7 @@ double OnlineForward::GetOccupancyDistribution(MarkovState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
-double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
+double OnlineForward::GetSurvivorDistribution(ScoreState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0) {
         ExpectedFrames = 1.0;
@@ -1218,7 +1241,7 @@ double OnlineForward::GetSurvivorDistribution(MarkovState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
-int OnlineForward::GetMaxUForJ(MarkovState &StateJ) {
+int OnlineForward::GetMaxUForJ(ScoreState &StateJ) {
     double Expected_Frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
     if (Expected_Frames < 1.0) {
         Expected_Frames = 1.0;
@@ -1229,7 +1252,7 @@ int OnlineForward::GetMaxUForJ(MarkovState &StateJ) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void OnlineForward::Markov(MarkovState &StateJ, int j) {
+void OnlineForward::Markov(ScoreState &StateJ, int j) {
     double Bj = StateJ.BestObs[m_CircularBufferIndex];
     double Fj;
 
@@ -1246,7 +1269,7 @@ void OnlineForward::Markov(MarkovState &StateJ, int j) {
 
         // Arrive from j-1
         if (j - 1 >= m_CurrentStateIndex && j - 1 >= 0) {
-            double trans = GetTransProbability(j - 1, j);
+            double trans = GetSemiMarkovTransitionProbability(j - 1, j);
             sumPrev += trans * m_States[j - 1].ExitProb[prevBuf];
         }
         Fj = Bj * sumPrev;
@@ -1259,7 +1282,7 @@ void OnlineForward::Markov(MarkovState &StateJ, int j) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
-void OnlineForward::SemiMarkov(MarkovState &StateJ, int j) {
+void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     double Bj = StateJ.BestObs[m_CircularBufferIndex];
 
     double FTildeJ = 0.0;
@@ -1280,7 +1303,7 @@ void OnlineForward::SemiMarkov(MarkovState &StateJ, int j) {
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double TransSum = 0.0;
         for (int i = m_WinStart; i < j; ++i)
-            TransSum += GetTransProbability(i, j) * m_States[i].ExitProb[EntryBuf];
+            TransSum += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
         FTildeJ += Dju * ObsProd * TransSum;
         FTildeJo += dju * ObsProd * TransSum;
 
@@ -1311,7 +1334,7 @@ int OnlineForward::GetAlphaT() {
                   m_WinEnd, m_CircularBufferIndex, m_Tau, m_Kappa);
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        MarkovState &StateJ = m_States[j];
+        ScoreState &StateJ = m_States[j];
         switch (StateJ.HSMMType) {
         case SEMIMARKOV:
             SemiMarkov(StateJ, j);
@@ -1347,7 +1370,7 @@ int OnlineForward::GetAlphaT() {
     int BestStateIndex = m_CurrentStateIndex;
 
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        MarkovState &StateJ = m_States[j];
+        ScoreState &StateJ = m_States[j];
         double fwd = StateJ.Forward[m_CircularBufferIndex];
         bool canAdvance = j >= m_CurrentStateIndex;
         if (m_IsSilence && j > m_CurrentStateIndex) {
@@ -1371,7 +1394,7 @@ int OnlineForward::GetAlphaT() {
                       StateJ.ExitProb[m_CircularBufferIndex]);
     }
 
-    MarkovState &BestState = m_States[BestStateIndex];
+    ScoreState &BestState = m_States[BestStateIndex];
     spdlog::debug("Best: State ({}) | Forward {:.5f}", BestState.Index, BestState.Forward[m_CircularBufferIndex]);
 
     return BestStateIndex;

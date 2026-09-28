@@ -64,7 +64,7 @@ TEST(ScoreSections, RestrictsForwardInferenceToSelectedSection) {
 
     OpenScofo::States States;
     for (int Index = 0; Index < 4; ++Index) {
-        OpenScofo::MarkovState State{};
+        OpenScofo::ScoreState State{};
         State.Index = Index;
         State.ScorePos = Index + 1;
         State.Section = Index < 2 ? "A" : "B";

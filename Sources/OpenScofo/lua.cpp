@@ -103,7 +103,7 @@ static void PushDescription(lua_State *L, const Description &desc) {
 }
 
 // ─────────────────────────────────────
-static void PushMarkovState(lua_State *L, const MarkovState &state) {
+static void PushMarkovState(lua_State *L, const ScoreState &state) {
     lua_createtable(L, 0, 15);
     lua_pushinteger(L, state.ScorePos);
     lua_setfield(L, -2, "position");

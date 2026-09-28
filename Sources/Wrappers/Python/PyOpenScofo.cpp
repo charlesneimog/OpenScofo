@@ -18,6 +18,7 @@
 
 namespace nb = nanobind;
 
+// ─────────────────────────────────────
 template <typename F> static auto checked_call(F func) {
     try {
         auto result = func();
@@ -30,6 +31,8 @@ template <typename F> static auto checked_call(F func) {
         throw;
     }
 }
+
+// ─────────────────────────────────────
 template <typename T> static bool process_python_block(OpenScofo::OpenScofo &self, const T *data, size_t size) {
     if (size == 0) {
         return true;
@@ -52,6 +55,7 @@ template <typename T> static bool process_python_block(OpenScofo::OpenScofo &sel
     return ok;
 }
 
+// ─────────────────────────────────────
 static void python_error_callback(const spdlog::details::log_msg &log, void *data) {
     (void)data;
     std::string text(log.payload.data(), log.payload.size());
@@ -77,6 +81,7 @@ static void python_error_callback(const spdlog::details::log_msg &log, void *dat
     }
 }
 
+// ─────────────────────────────────────
 NB_MODULE(_OpenScofo, m) {
 
     m.doc() = "OpenScofo Python bindings";
@@ -146,7 +151,7 @@ NB_MODULE(_OpenScofo, m) {
         .value("MARKOV", OpenScofo::MARKOV)
         .export_values();
 
-    nb::class_<OpenScofo::Observation>(m, "AudioState")
+    nb::class_<OpenScofo::Observation>(m, "Observation")
         .def(nb::init<>())
         .def_rw("type", &OpenScofo::Observation::Type)
         .def_rw("frequency", &OpenScofo::Observation::Freq)
@@ -214,45 +219,45 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("onnx", &OpenScofo::Description::ONNX); // ONNX
 
     // State Class
-    nb::class_<OpenScofo::MarkovState>(m, "MarkovState")
+    nb::class_<OpenScofo::ScoreState>(m, "ScoreState")
         .def(nb::init<>())
 
         // Core
-        .def_rw("index", &OpenScofo::MarkovState::Index)
-        .def_rw("score_pos", &OpenScofo::MarkovState::ScorePos)
-        .def_rw("section", &OpenScofo::MarkovState::Section)
-        .def_rw("markov_index", &OpenScofo::MarkovState::MarkovIndex)
-        .def_rw("audio_states", &OpenScofo::MarkovState::Observations)
+        .def_rw("index", &OpenScofo::ScoreState::Index)
+        .def_rw("score_pos", &OpenScofo::ScoreState::ScorePos)
+        .def_rw("section", &OpenScofo::ScoreState::Section)
+        .def_rw("markov_index", &OpenScofo::ScoreState::MarkovIndex)
+        .def_rw("audio_states", &OpenScofo::ScoreState::Observations)
 
         // State actions
-        .def_rw("hsmm_type", &OpenScofo::MarkovState::HSMMType)
-        .def_rw("type", &OpenScofo::MarkovState::Type)
-        .def_rw("actions", &OpenScofo::MarkovState::Actions)
+        .def_rw("hsmm_type", &OpenScofo::ScoreState::HSMMType)
+        .def_rw("type", &OpenScofo::ScoreState::Type)
+        .def_rw("actions", &OpenScofo::ScoreState::Actions)
 
         // Inference
-        .def_rw("init_prob", &OpenScofo::MarkovState::InitProb)
-        .def_rw("forward", &OpenScofo::MarkovState::Forward)
-        .def_rw("exit_prob", &OpenScofo::MarkovState::ExitProb)
-        .def_rw("best_obs", &OpenScofo::MarkovState::BestObs)
+        .def_rw("init_prob", &OpenScofo::ScoreState::InitProb)
+        .def_rw("forward", &OpenScofo::ScoreState::Forward)
+        .def_rw("exit_prob", &OpenScofo::ScoreState::ExitProb)
+        .def_rw("best_obs", &OpenScofo::ScoreState::BestObs)
 
         // Time
-        .def_rw("upper_bound", &OpenScofo::MarkovState::UpperBound)
-        .def_rw("bpm_expected", &OpenScofo::MarkovState::BPMExpected)
-        .def_rw("bpm_observed", &OpenScofo::MarkovState::BPMObserved)
-        .def_rw("onset_expected", &OpenScofo::MarkovState::OnsetExpected)
-        .def_rw("onset_observed", &OpenScofo::MarkovState::OnsetObserved)
-        .def_rw("phase_expected", &OpenScofo::MarkovState::PhaseExpected)
-        .def_rw("phase_observed", &OpenScofo::MarkovState::PhaseObserved)
-        .def_rw("ioi_phi_n", &OpenScofo::MarkovState::IOIPhiN)
-        .def_rw("ioi_hat_phi_n", &OpenScofo::MarkovState::IOIHatPhiN)
-        .def_rw("duration", &OpenScofo::MarkovState::Duration)
+        .def_rw("upper_bound", &OpenScofo::ScoreState::UpperBound)
+        .def_rw("bpm_expected", &OpenScofo::ScoreState::BPMExpected)
+        .def_rw("bpm_observed", &OpenScofo::ScoreState::BPMObserved)
+        .def_rw("onset_expected", &OpenScofo::ScoreState::OnsetExpected)
+        .def_rw("onset_observed", &OpenScofo::ScoreState::OnsetObserved)
+        .def_rw("phase_expected", &OpenScofo::ScoreState::PhaseExpected)
+        .def_rw("phase_observed", &OpenScofo::ScoreState::PhaseObserved)
+        .def_rw("ioi_phi_n", &OpenScofo::ScoreState::IOIPhiN)
+        .def_rw("ioi_hat_phi_n", &OpenScofo::ScoreState::IOIHatPhiN)
+        .def_rw("duration", &OpenScofo::ScoreState::Duration)
 
         // Configuration
-        .def_rw("phase_coupling", &OpenScofo::MarkovState::PhaseCoupling)
-        .def_rw("sync_strength", &OpenScofo::MarkovState::SyncStrength)
+        .def_rw("phase_coupling", &OpenScofo::ScoreState::PhaseCoupling)
+        .def_rw("sync_strength", &OpenScofo::ScoreState::SyncStrength)
 
         // Error
-        .def_rw("line", &OpenScofo::MarkovState::Line);
+        .def_rw("line", &OpenScofo::ScoreState::Line);
 
     nb::class_<OpenScofo::Configuration>(m, "Configuration")
         .def(nb::init<>())

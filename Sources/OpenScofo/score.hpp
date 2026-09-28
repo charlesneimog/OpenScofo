@@ -36,9 +36,9 @@ class Score {
     Configuration *m_Config;
 
     // Helpers
-    MarkovState AddDummySilence();
+    ScoreState AddDummySilence();
     double ModPhases(double Phase);
-    MarkovState AddTransState(MarkovState &State, int ScoreEvent, int BPM);
+    ScoreState AddTransState(ScoreState &State, int ScoreEvent, int BPM);
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
     void PitchNode2Freq(const std::string Score, TSNode node, Observation &State);
     void ParseInput(const std::string &Score);
@@ -56,9 +56,9 @@ class Score {
     void NewConfig(const std::string &Score, TSNode Node, Configuration &Config);
     void NewSection(const std::string &Score, TSNode Node);
     void EnsureSectionStart(TSNode Event, Configuration &Config);
-    void NewEventAction(const std::string &Score, TSNode Node, MarkovState &Event);
+    void NewEventAction(const std::string &Score, TSNode Node, ScoreState &Event);
 
-    void ProcessEventTime(MarkovState &Event);
+    void ProcessEventTime(ScoreState &Event);
     void ProcessNote(TSNode Note);
 
     // Get TreeSitter Values
@@ -68,15 +68,15 @@ class Score {
     static std::string GetChildStringFromType(const std::string &Score, TSNode Parent, const std::string &WantedType);
 
     // Events
-    MarkovState NewRestEvent(const std::string &Score, TSNode Node);
-    MarkovState NewPitchEvent(const std::string &Score, TSNode Node);
-    MarkovState NewMultiPitchEvent(const std::string &Score, TSNode Node);
-    MarkovState NewPTechEvent(const std::string &ScoreStr, TSNode Node);
-    MarkovState NewUTechEvent(const std::string &ScoreStr, TSNode Node);
+    ScoreState NewRestEvent(const std::string &Score, TSNode Node);
+    ScoreState NewPitchEvent(const std::string &Score, TSNode Node);
+    ScoreState NewMultiPitchEvent(const std::string &Score, TSNode Node);
+    ScoreState NewPTechEvent(const std::string &ScoreStr, TSNode Node);
+    ScoreState NewUTechEvent(const std::string &ScoreStr, TSNode Node);
 
     // Add events
-    MarkovState GetFirstEvent();
-    MarkovState AddDumpSilence();
+    ScoreState GetFirstEvent();
+    ScoreState AddDumpSilence();
     void AddAction(std::vector<std::string> Tokens);
 
   private:

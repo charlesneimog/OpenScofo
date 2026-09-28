@@ -203,8 +203,8 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::AddDummySilence() {
-    MarkovState Event;
+ScoreState Score::AddDummySilence() {
+    ScoreState Event;
     Event.HSMMType = SEMIMARKOV;
     Event.Type = REST;
     Event.ScorePos = m_ScorePosition;
@@ -222,8 +222,8 @@ MarkovState Score::AddDummySilence() {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::GetFirstEvent() {
-    MarkovState Event;
+ScoreState Score::GetFirstEvent() {
+    ScoreState Event;
     Event.HSMMType = MARKOV;
     Event.Type = FIRSTEVENT;
     Event.ScorePos = 0;
@@ -242,10 +242,10 @@ MarkovState Score::GetFirstEvent() {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    MarkovState Event;
+    ScoreState Event;
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -307,10 +307,10 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    MarkovState Event;
+    ScoreState Event;
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -367,10 +367,10 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
 }
 
 // ─────────────────────────────────────
-MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    MarkovState Event;
+    ScoreState Event;
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -441,10 +441,10 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    MarkovState Event;
+    ScoreState Event;
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -504,7 +504,7 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     // m_ScorePosition++;
     // Note that Rest do not count for the score position, as they are not considered in the evaluation
 
@@ -516,7 +516,7 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
         return {};
     }
 
-    MarkovState Event;
+    ScoreState Event;
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
     Event.Index = m_ScoreStates.size();
@@ -549,14 +549,14 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-void Score::ProcessEventTime(MarkovState &Event) {
+void Score::ProcessEventTime(ScoreState &Event) {
     Event.Section = m_CurrentSection;
 
     const bool IsFirstStateInSection =
         Event.Index == 0 || m_ScoreStates[static_cast<size_t>(Event.Index - 1)].Section != Event.Section;
     if (!IsFirstStateInSection) {
         int index = Event.Index;
-        MarkovState &prev = m_ScoreStates[index - 1];
+        ScoreState &prev = m_ScoreStates[index - 1];
 
         double psiPrev = 60.0f / prev.BPMExpected;
         double ioibeats = prev.Duration;
@@ -599,13 +599,13 @@ void Score::NewSection(const std::string &ScoreStr, TSNode Node) {
     }
 
     const bool HasMusicalEvent = std::any_of(m_ScoreStates.begin(), m_ScoreStates.end(),
-                                             [](const MarkovState &State) { return State.Type != FIRSTEVENT; });
+                                             [](const ScoreState &State) { return State.Type != FIRSTEVENT; });
 
     // BPM is commonly declared before the first SECTION. In that case its
     // leading FIRSTEVENT is the boundary of the first section, not an
     // unsectioned state.
     if (!m_HasSection && !HasMusicalEvent) {
-        for (MarkovState &State : m_ScoreStates) {
+        for (ScoreState &State : m_ScoreStates) {
             if (State.Type == FIRSTEVENT && State.Section.empty()) {
                 State.Section = Name;
             }
@@ -625,12 +625,12 @@ void Score::EnsureSectionStart(TSNode EventNode, Configuration &Config) {
         return;
     }
 
-    MarkovState *SectionStart = nullptr;
+    ScoreState *SectionStart = nullptr;
     if (!m_ScoreStates.empty() && m_ScoreStates.back().Type == FIRSTEVENT &&
         m_ScoreStates.back().Section == m_CurrentSection) {
         SectionStart = &m_ScoreStates.back();
     } else {
-        MarkovState Begin = GetFirstEvent();
+        ScoreState Begin = GetFirstEvent();
         Begin.Line = static_cast<int>(ts_node_start_point(EventNode).row + 1);
         Begin.TimeTolerance = m_TimeTolerance;
         Begin.SyncStrength = Config.SyncStrength;
@@ -668,7 +668,7 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 // ─────────────────────────────────────
 void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Config) {
     EnsureSectionStart(Node, Config);
-    MarkovState Event;
+    ScoreState Event;
 
     TSNode definition = GetField(Node, "definition");
     if (ts_node_is_null(definition)) {
@@ -805,7 +805,7 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
                 m_CurrentBPM = 1;
             }
 
-            MarkovState Begin = GetFirstEvent();
+            ScoreState Begin = GetFirstEvent();
             ProcessEventTime(Begin);
             Begin.BPMExpected = v;
             m_ScoreStates.emplace_back(Begin);
@@ -1044,7 +1044,7 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
 }
 
 // ─────────────────────────────────────
-void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, MarkovState &Event) {
+void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, ScoreState &Event) {
     ScoreAction BaseAction;
     BaseAction.AbsoluteTime = true;
     BaseAction.Time = 0;

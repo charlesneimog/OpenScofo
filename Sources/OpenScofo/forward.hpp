@@ -61,9 +61,9 @@ class OnlineForward {
     int GetTunning();
     EventActions GetCurrentEventActions();
     EventActions GetAudioStateChangeActions();
-    std::vector<MarkovState> &GetStates();
-    MarkovState GetState(int Index);
-    void AddState(MarkovState state);
+    std::vector<ScoreState> &GetStates();
+    ScoreState GetState(int Index);
+    void AddState(ScoreState state);
 
     int GetStatesSize();
     int GetEvent(Description &Desc);
@@ -87,23 +87,24 @@ class OnlineForward {
     static double CalculateA2(double kappa);
     double ModPhases(double value);
     double CouplingFunction(double Phi, double PhiMu, double Kappa);
-    double GetOccupancyDistribution(MarkovState &State, int u);
-    double GetSurvivorDistribution(MarkovState &State, int u);
+    double GetOccupancyDistribution(ScoreState &State, int u);
+    double GetSurvivorDistribution(ScoreState &State, int u);
     void InitTimeDecoding();
     void BuildDistributionCache(double ExpectedFrames);
     void ResetCaches();
 
     // Markov and Probabilities
-    double GetTransProbability(int i, int j);
+    double GetSemiMarkovTransitionProbability(int i, int j);
+    double GetMarkovTransitionProbability(int i, int j);
     void GetInitialDistribution();
-    int GetMaxUForJ(MarkovState &StateJ);
+    int GetMaxUForJ(ScoreState &StateJ);
 
     // Markov
     double GetBestEvent();
     int GetMaxJIndex(int StateIndex);
 
-    void Markov(MarkovState &StateJ, int j);
-    void SemiMarkov(MarkovState &StateJ, int j);
+    void Markov(ScoreState &StateJ, int j);
+    void SemiMarkov(ScoreState &StateJ, int j);
 
     int GetAlphaT();
 
@@ -196,7 +197,7 @@ class OnlineForward {
     bool m_ReverbSpectralPowerHasEnergy = false;
 
     // Pitch
-    std::vector<MarkovState> m_States;
+    std::vector<ScoreState> m_States;
     double m_PitchScalingFactor = 0.5;
 
     std::unordered_map<double, PitchTemplateArray> m_PitchCQTTemplates;

@@ -124,12 +124,20 @@ struct Observation {
 };
 
 // ─────────────────────────────────────
-struct MarkovState {
+struct MarkovMicroState {
+    std::vector<Observation> Observations;
+    double SelfTransitionProb = 0.0;
+    std::vector<double> Forward;
+};
+
+// ─────────────────────────────────────
+struct ScoreState {
     int Index;
     int ScorePos;
     std::string Section;
     int MarkovIndex = -1;
     std::vector<Observation> Observations;
+    std::vector<MarkovMicroState> MicroStates;
     int BestAudioStateIndex = -1;
 
     // States Actions
@@ -164,7 +172,7 @@ struct MarkovState {
     int Line;
 };
 
-using States = std::vector<MarkovState>;
+using States = std::vector<ScoreState>;
 
 // ─────────────────────────────────────
 struct Description {
