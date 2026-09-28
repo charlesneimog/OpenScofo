@@ -1,0 +1,11 @@
+BPM 60
+SECTION A
+NOTE C4 1 @percussive
+CHORD (C4 E4 G4) 2
+PTECH [slap, key_click] C4 1
+UTECH aeolian 1
+REST 2
+NOTE D4 1
+SECTION B
+NOTE E4 1
+NOTE F4 1
