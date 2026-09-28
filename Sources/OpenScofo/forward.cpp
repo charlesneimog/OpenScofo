@@ -219,6 +219,9 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
 
     m_Normalization.assign(m_BufferSize, 1.0);
     for (MarkovState &State : m_States) {
+        // States entering the moving decode window after the first frame
+        // must not retain an uninitialized initial probability.
+        State.InitProb = 0.0;
         State.Forward.assign(m_BufferSize, std::numeric_limits<double>::min());
         State.ExitProb.assign(m_BufferSize, std::numeric_limits<double>::min());
         State.BestObs.assign(m_BufferSize, std::numeric_limits<double>::min());
@@ -859,20 +862,21 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
 void OnlineForward::GetAudioObservations() {
-    double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
-    double techWeight = m_Desc.ExtendedTechProb;
-    double pitchWeight = 1.0 - m_Desc.ExtendedTechProb;
+    const double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
+    const double techWeight = m_Desc.ExtendedTechProb;
 
     EventType CurrentEventType = m_States[m_CurrentStateIndex].Type;
-    double maxSoundEvidence = 0.0;
-    bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
 
-    // Global best AudioState across all semi-Markov states
+    double maxSoundEvidence = 0.0;
+
+    const bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
+
+    // Global best AudioState across all semi-Markov states.
     double globalBestAudioStateEvidence = 0.0;
     int globalBestStateIndex = -1;
     int globalBestAudioStateIndex = -1;
 
-    for (int j = m_WinStart; j <= m_WinEnd; j++) {
+    for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &state = m_States[j];
 
         double bestPitch = 0.0;
@@ -886,30 +890,35 @@ void OnlineForward::GetAudioObservations() {
         for (size_t audioStateIndex = 0; audioStateIndex < state.AudioStates.size(); ++audioStateIndex) {
 
             const AudioState &as = state.AudioStates[audioStateIndex];
+
             double audioStateEvidence = 0.0;
 
             switch (as.Type) {
             case PITCH: {
-                double p = GetPitchProbability(as.Freq);
+                const double p = GetPitchProbability(as.Freq);
+
                 audioStateEvidence = p;
 
                 bestPitch = std::max(bestPitch, p);
                 sumPitch += p;
-                pitchCount++;
+                ++pitchCount;
+
                 break;
             }
 
             case LABEL: {
-                double p = m_Desc.ONNX[as.Label];
-                audioStateEvidence = p;
+                const double p = m_Desc.ONNX[as.Label];
 
+                audioStateEvidence = p;
                 bestTech = std::max(bestTech, p);
+
                 break;
             }
 
             case ONSET: {
                 audioStateEvidence = m_Desc.Onset;
                 bestOnset = std::max(bestOnset, m_Desc.Onset);
+
                 break;
             }
 
@@ -918,11 +927,14 @@ void OnlineForward::GetAudioObservations() {
                     audioStateEvidence = m_Desc.SilenceProb;
                     bestSilence = std::max(bestSilence, m_Desc.SilenceProb);
                 }
+
                 break;
             }
             }
 
-            // Compare against every AudioState of every MarkovState
+            // Keep track of the globally strongest raw AudioState
+            // observation. This is intentionally done before the
+            // event-level gates below.
             if (audioStateEvidence > globalBestAudioStateEvidence) {
                 globalBestAudioStateEvidence = audioStateEvidence;
                 globalBestStateIndex = j;
@@ -935,24 +947,44 @@ void OnlineForward::GetAudioObservations() {
         switch (state.Type) {
         case NOTE:
         case TRILL:
-            stateLikelihood = std::max(bestPitch * pitchWeight * soundProb, bestSilence);
+            // Pitch is already an observation probability.
+            // Do not gate it using the complement of the
+            // extended-technique detector.
+            stateLikelihood = std::max(bestPitch * soundProb, bestSilence);
             break;
 
         case PTECH: {
-            double techObs = bestTech * techWeight * soundProb;
-            double pitchObs = bestPitch * pitchWeight * soundProb;
+            // Pitched extended technique:
+            //
+            // The state may be supported independently by:
+            //   1. the trained technique classifier, gated by
+            //      ExtendedTechProb;
+            //   2. its expected pitch.
+            //
+            // Therefore technique and pitch are not complements.
+            const double techObs = bestTech * techWeight * soundProb;
+
+            const double pitchObs = bestPitch * soundProb;
 
             stateLikelihood = std::max({techObs, pitchObs, bestSilence});
+
             break;
         }
 
-        case UTECH:
-            stateLikelihood = std::max(bestTech * techWeight * soundProb, bestSilence);
+        case UTECH: {
+            // Unpitched extended technique:
+            // pitch evidence has no role here.
+            const double techObs = bestTech * techWeight * soundProb;
+
+            stateLikelihood = std::max(techObs, bestSilence);
+
             break;
+        }
 
         case CHORD:
-            if (pitchCount > 0)
-                stateLikelihood = (sumPitch / pitchCount) * pitchWeight * soundProb;
+            if (pitchCount > 0) {
+                stateLikelihood = (sumPitch / static_cast<double>(pitchCount)) * soundProb;
+            }
             break;
 
         case FIRSTEVENT:
@@ -961,19 +993,42 @@ void OnlineForward::GetAudioObservations() {
             break;
 
         default:
-            spdlog::error("Event type of line {} of score file is not implemented, please remove it", state.Line);
+            spdlog::error("Event type of line {} of score file is not "
+                          "implemented, please remove it",
+                          state.Line);
             break;
         }
 
         state.BestObs[m_CircularBufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
 
-        if (state.Type != REST)
+        if (state.Type != REST) {
             maxSoundEvidence = std::max(maxSoundEvidence, stateLikelihood);
+        }
     }
 
     m_IsSilence = (m_Desc.SilenceProb > maxSoundEvidence);
 
-    // Save global winner
+    if (m_IsSilence) {
+        // A silent frame can support the next REST, but cannot establish
+        // that the performer skipped sounding events to reach a later REST.
+        // Keep those hypotheses in the forward window, with no stronger
+        // observation than the best sounded event has in this frame.
+        bool skippedSoundedState = false;
+        const double soundEvidence = std::max(maxSoundEvidence, std::numeric_limits<double>::min());
+        for (int j = m_CurrentStateIndex + 1; j <= m_WinEnd; ++j) {
+            MarkovState &candidate = m_States[j];
+            if (candidate.Type == REST) {
+                if (skippedSoundedState) {
+                    double &observation = candidate.BestObs[m_CircularBufferIndex];
+                    observation = std::min(observation, soundEvidence);
+                }
+            } else {
+                skippedSoundedState = true;
+            }
+        }
+    }
+
+    // Save global winner.
     m_BestAudioStateStateIndex = globalBestStateIndex;
     m_BestAudioStateIndex = globalBestAudioStateIndex;
 }
@@ -1293,7 +1348,19 @@ int OnlineForward::GetAlphaT() {
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         MarkovState &StateJ = m_States[j];
         double fwd = StateJ.Forward[m_CircularBufferIndex];
-        if (fwd > maxVal && j >= m_CurrentStateIndex) {
+        bool canAdvance = j >= m_CurrentStateIndex;
+        if (m_IsSilence && j > m_CurrentStateIndex) {
+            // During silence, cross REST states only if every intervening
+            // state is also REST. Sounded skips remain available once audio
+            // returns; no internal state is removed from the forward model.
+            canAdvance = StateJ.Type == REST;
+            for (int k = m_CurrentStateIndex + 1; canAdvance && k < j; ++k) {
+                if (m_States[k].Type != REST) {
+                    canAdvance = false;
+                }
+            }
+        }
+        if (fwd > maxVal && canAdvance) {
             maxVal = fwd;
             BestStateIndex = j;
         }
@@ -1301,10 +1368,6 @@ int OnlineForward::GetAlphaT() {
         spdlog::debug("State ({}) | Obs = {:.5f}, Forward {:.5f}, Exit Prob {:.5f}", StateJ.Index,
                       StateJ.BestObs[m_CircularBufferIndex], StateJ.Forward[m_CircularBufferIndex],
                       StateJ.ExitProb[m_CircularBufferIndex]);
-    }
-
-    if (m_IsSilence && BestStateIndex != m_CurrentStateIndex && m_States[BestStateIndex].Type != REST) {
-        return m_CurrentStateIndex;
     }
 
     MarkovState &BestState = m_States[BestStateIndex];
