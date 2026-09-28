@@ -20,6 +20,7 @@ Latency is fixed to zero because this benchmark runs in strict online mode.
 """
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 import os
@@ -107,6 +108,7 @@ COLOR_RESET = "\033[0m"
 
 RESULTS_PATH = "follower_validation.json"
 RESULT_FILES_DIR = "mirex_results"
+OUTLIER_FILES = {"score-15.wav", "score-30.wav", "score-32.wav"}
 
 PROTOCOL_TOLERANCE_MS = {
     "cont-8.2": 250.0,
@@ -117,15 +119,17 @@ DEFAULT_PROTOCOL = "cont-8.2"
 ONLINE_LATENCY_MS = 0.0
 SCHEMA_VERSION = "mirex_2006_v2"
 
-# Bulletproof fallback map assuming standard C++ enum 0-indexing.
+# Match EventType in states.hpp (FIRSTEVENT is index 0).
 FALLBACK_EVENT_TYPES = {
-    0: "REST",
-    1: "NOTE",
-    2: "CHORD",
-    3: "TRILL",
-    4: "MULTI",
-    5: "PTECH",
-    6: "UTECH",
+    0: "FIRSTEVENT",
+    1: "REST",
+    2: "NOTE",
+    3: "CHORD",
+    4: "TRILL",
+    5: "MULTI",
+    6: "PTECH",
+    7: "UTECH",
+    8: "EVENT",
 }
 
 
@@ -447,7 +451,7 @@ def process_audio_file(
         expected_times: dict[score_pos] = reference_time_seconds. For synthetic
             cases these come from the score; for real performances they come
             from annotations_path.
-        score_context: dict[score_pos] = {"type": current, "prev_type": previous}
+        score_context: dict[score_pos] contains current, previous and next event types.
     """
     print(f"\n--- Processing {audio_path} ---")
 
@@ -480,11 +484,20 @@ def process_audio_file(
                     "prev_type": prev_type_str,
                 }
 
-            # Advance the topological memory
-            prev_type_str = current_type_str
+                # Advance only when entering a new score event, not a new
+                # internal state of the same event.
+                prev_type_str = current_type_str
 
         except (TypeError, ValueError):
             continue
+
+    positions = sorted(score_context)
+    for index, pos in enumerate(positions):
+        score_context[pos]["next_type"] = (
+            score_context[positions[index + 1]]["type"]
+            if index + 1 < len(positions)
+            else "END_OF_SCORE"
+        )
 
     if annotations_path is not None:
         expected_times = load_reference_annotations(
@@ -554,6 +567,102 @@ def process_audio_file(
     )
 
     return detected_events, expected_times, score_context
+
+
+def analyze_missed_transitions(piece: Dict) -> Dict:
+    """Classify the benchmark's missed positions using score event context."""
+    metrics = piece["metrics"]
+    score_context = piece["score_context"]
+    detected_by_pos: Dict[int, List[float]] = {}
+    for pos, detected_time in piece["detected_events"]:
+        detected_by_pos.setdefault(int(pos), []).append(float(detected_time))
+
+    misaligned_positions = set(metrics["misaligned_positions"])
+    event_types = Counter()
+    transitions = Counter()
+    contexts = Counter()
+    reasons = Counter()
+    details = []
+
+    for pos in sorted(metrics["missing_positions"]):
+        context = score_context.get(pos, {})
+        current = context.get("type", "UNKNOWN")
+        previous = context.get("prev_type", "UNKNOWN")
+        following = context.get("next_type", "UNKNOWN")
+        transition = f"{previous} -> {current}"
+        triple = f"{previous} -> {current} -> {following}"
+        detections = detected_by_pos.get(pos, [])
+
+        if pos in misaligned_positions:
+            reason = "MISALIGNED"
+        elif not detections:
+            reason = "NOT_DETECTED"
+        else:
+            reason = "MISSED"  # Data inconsistency; included for visibility.
+
+        offset_ms = (
+            (min(detections) - piece["expected_times"][pos]) * 1000.0
+            if detections else None
+        )
+        event_types[current] += 1
+        transitions[transition] += 1
+        contexts[triple] += 1
+        reasons[reason] += 1
+        details.append({
+            "position": pos,
+            "type": current,
+            "prev_type": previous,
+            "next_type": following,
+            "reason": reason,
+            "offset_ms": offset_ms,
+        })
+
+    return {
+        "event_types": event_types,
+        "transitions": transitions,
+        "contexts": contexts,
+        "reasons": reasons,
+        "details": details,
+    }
+
+
+def print_missed_transition_analysis(rows: List[Dict]) -> None:
+    """Print event-level diagnostics for the three outlier scores."""
+    print("\n" + "=" * 72)
+    print("MISSED EVENT TRANSITION ANALYSIS")
+    print("=" * 72)
+
+    for piece in rows:
+        filename = Path(piece["audio_file"]).name
+        if filename not in OUTLIER_FILES:
+            continue
+
+        analysis = analyze_missed_transitions(piece)
+        print(f"\n{filename} ({len(analysis['details'])} misses)")
+        print("-" * 72)
+        for heading, key in (
+            ("Reason", "reasons"),
+            ("Expected event type", "event_types"),
+            ("Previous -> missed", "transitions"),
+            ("Previous -> missed -> next", "contexts"),
+        ):
+            print(f"{heading}:")
+            for label, count in analysis[key].most_common():
+                print(f"  {label:<48} {count:>3}")
+            if not analysis[key]:
+                print("  (none)")
+
+        print("Individual misses:")
+        for miss in analysis["details"]:
+            offset = (
+                f" offset={miss['offset_ms']:+.1f} ms"
+                if miss["offset_ms"] is not None else ""
+            )
+            print(
+                f"  pos={miss['position']:03d} "
+                f"{miss['prev_type']} -> {miss['type']} -> "
+                f"{miss['next_type']} [{miss['reason']}]{offset}"
+            )
 
 
 def compute_global_metrics_mirex(piece_results: List[Dict]) -> Dict:
@@ -838,6 +947,7 @@ def process_audio_file_worker(
             "metrics": metrics,
             "detected_events": detected_events,
             "expected_times": expected_times,
+            "score_context": score_context,
         }
 
         status_msg = (
@@ -1054,6 +1164,8 @@ def main() -> None:
             f"{metrics['std_offset_ms']:>11.1f} "  # MIREX-COMPLIANT
             f"{metrics['precision_pct']:>13.2f}"  # MIREX-COMPLIANT
         )  # MIREX-COMPLIANT
+
+    print_missed_transition_analysis(rows)
 
     print("=" * 72)  # MIREX-COMPLIANT
     print("GLOBAL:")  # MIREX-COMPLIANT

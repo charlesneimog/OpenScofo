@@ -20,10 +20,12 @@ Latency is fixed to zero because this benchmark runs in strict online mode.
 """
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 import os
 import sys
+import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from datetime import datetime
@@ -107,6 +109,7 @@ COLOR_RESET = "\033[0m"
 
 RESULTS_PATH = "follower_validation.json"
 RESULT_FILES_DIR = "mirex_results"
+OUTLIER_FILES = {"score-15.wav", "score-30.wav", "score-32.wav"}
 
 PROTOCOL_TOLERANCE_MS = {
     "cont-8.2": 250.0,
@@ -117,15 +120,17 @@ DEFAULT_PROTOCOL = "cont-8.2"
 ONLINE_LATENCY_MS = 0.0
 SCHEMA_VERSION = "mirex_2006_v2"
 
-# Bulletproof fallback map assuming standard C++ enum 0-indexing.
+# Match EventType in states.hpp (FIRSTEVENT is index 0).
 FALLBACK_EVENT_TYPES = {
-    0: "REST",
-    1: "NOTE",
-    2: "CHORD",
-    3: "TRILL",
-    4: "MULTI",
-    5: "PTECH",
-    6: "UTECH",
+    0: "FIRSTEVENT",
+    1: "REST",
+    2: "NOTE",
+    3: "CHORD",
+    4: "TRILL",
+    5: "MULTI",
+    6: "PTECH",
+    7: "UTECH",
+    8: "EVENT",
 }
 
 
@@ -295,19 +300,22 @@ class ScoreFollowerValidator:
         run_history = storage.setdefault("run_history", [])  # MIREX-COMPLIANT
 
         for piece in piece_results:
-            history.append(  # MIREX-COMPLIANT
-                {
-                    "schema_version": SCHEMA_VERSION,  # MIREX-COMPLIANT
-                    "timestamp": timestamp,  # MIREX-COMPLIANT
-                    "implementation": implementation_name,  # MIREX-COMPLIANT
-                    "protocol": self.protocol_name,  # MIREX-COMPLIANT
-                    "tolerance_ms": self.tolerance_ms,  # MIREX-COMPLIANT
-                    "audio_file": piece["audio_file"],  # MIREX-COMPLIANT
-                    "score_file": piece["score_file"],  # MIREX-COMPLIANT
-                    "annotations_file": piece.get("annotations_file"),
-                    "metrics": piece["metrics"],  # MIREX-COMPLIANT
-                }
-            )
+            entry = {
+                "schema_version": SCHEMA_VERSION,  # MIREX-COMPLIANT
+                "timestamp": timestamp,  # MIREX-COMPLIANT
+                "implementation": implementation_name,  # MIREX-COMPLIANT
+                "protocol": self.protocol_name,  # MIREX-COMPLIANT
+                "tolerance_ms": self.tolerance_ms,  # MIREX-COMPLIANT
+                "audio_file": piece["audio_file"],  # MIREX-COMPLIANT
+                "score_file": piece["score_file"],  # MIREX-COMPLIANT
+                "annotations_file": piece.get("annotations_file"),
+                "metrics": piece["metrics"],  # MIREX-COMPLIANT
+            }
+            # Keep the detailed trace in this same JSON so a single file can
+            # be shared for diagnosis. Other pieces retain the original schema.
+            if piece.get("diagnostics") is not None:
+                entry["diagnostics"] = piece["diagnostics"]
+            history.append(entry)
 
         run_history.append(  # MIREX-COMPLIANT
             {
@@ -438,7 +446,7 @@ def process_audio_file(
     score_path: str,
     tolerance_ms: float,
     annotations_path: Optional[str] = None,
-) -> Tuple[List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]]]:
+) -> Tuple[List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]], Optional[Dict]]:
     """
     Process one audio file with OpenScofo.
 
@@ -447,7 +455,8 @@ def process_audio_file(
         expected_times: dict[score_pos] = reference_time_seconds. For synthetic
             cases these come from the score; for real performances they come
             from annotations_path.
-        score_context: dict[score_pos] = {"type": current, "prev_type": previous}
+        score_context: dict[score_pos] contains current, previous and next event types.
+        diagnostics: full score state map and state transition trace for outliers.
     """
     print(f"\n--- Processing {audio_path} ---")
 
@@ -456,6 +465,36 @@ def process_audio_file(
 
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
     scofo.load_score(Path(score_path))
+    trace_enabled = Path(audio_path).name in OUTLIER_FILES
+    state_map: List[Dict] = []
+    candidates_by_pos: Dict[int, List[int]] = {}
+    state_index_getter = getattr(scofo, "get_current_state_index", None)
+    if not callable(state_index_getter):
+        state_index_getter = None
+
+    if trace_enabled:
+        # Include REST even though it shares its preceding event's ScorePos.
+        for index, state in enumerate(scofo.get_states()):
+            pos = int(state.score_pos)
+            internal_index = int(getattr(state, "index", index))
+            # The Python binding cannot convert the FIRSTEVENT (0) enum.
+            # It can convert event types for real score positions.
+            event_type = (
+                "FIRSTEVENT" if pos == 0
+                else _get_enum_name(getattr(state, "type", "UNKNOWN"))
+            )
+            record = {
+                "index": internal_index,
+                "score_pos": pos,
+                "type": event_type,
+                "onset_expected_s": float(state.onset_expected),
+            }
+            if hasattr(state, "duration"):
+                record["duration_beats"] = float(state.duration)
+            if hasattr(state, "line"):
+                record["score_line"] = int(state.line)
+            state_map.append(record)
+            candidates_by_pos.setdefault(pos, []).append(internal_index)
 
     expected_times: Dict[int, float] = {}
     score_context: Dict[int, Dict[str, str]] = {}
@@ -480,11 +519,20 @@ def process_audio_file(
                     "prev_type": prev_type_str,
                 }
 
-            # Advance the topological memory
-            prev_type_str = current_type_str
+                # Advance only when entering a new score event, not a new
+                # internal state of the same event.
+                prev_type_str = current_type_str
 
         except (TypeError, ValueError):
             continue
+
+    positions = sorted(score_context)
+    for index, pos in enumerate(positions):
+        score_context[pos]["next_type"] = (
+            score_context[positions[index + 1]]["type"]
+            if index + 1 < len(positions)
+            else "END_OF_SCORE"
+        )
 
     if annotations_path is not None:
         expected_times = load_reference_annotations(
@@ -495,6 +543,10 @@ def process_audio_file(
     n_samples = len(audio)
     prev_pos: Optional[int] = None
     detected_events: List[Tuple[int, float]] = []
+    transition_trace: List[Dict] = []
+    previous_state_index = (
+        int(state_index_getter()) if trace_enabled and state_index_getter else None
+    )
 
     for start in range(0, n_samples, 64):
         end = min(start + 64, n_samples)
@@ -505,6 +557,37 @@ def process_audio_file(
 
         scofo.process_block(frame)
         pos = int(scofo.get_current_score_position())
+
+        if trace_enabled and pos > 0:
+            state_index = int(state_index_getter()) if state_index_getter else None
+            position_changed = pos != prev_pos
+            internal_state_changed = (
+                state_index is not None
+                and previous_state_index is not None
+                and state_index != previous_state_index
+            )
+            if position_changed or internal_state_changed:
+                previous = prev_pos if prev_pos is not None else 0
+                reference_time = expected_times.get(pos)
+                detected_time = start / SR
+                transition_trace.append({
+                    "time_s": detected_time,
+                    "from_score_pos": previous,
+                    "to_score_pos": pos,
+                    "from_state_index": previous_state_index,
+                    "to_state_index": state_index,
+                    "candidate_state_indices": candidates_by_pos.get(pos, []),
+                    "kind": "SCORE_POSITION" if position_changed else "INTERNAL_STATE",
+                    "skipped_score_positions": (
+                        list(range(previous + 1, pos)) if pos > previous + 1 else []
+                    ),
+                    "expected_time_s": reference_time,
+                    "offset_ms": (
+                        (detected_time - reference_time) * 1000.0
+                        if reference_time is not None else None
+                    ),
+                })
+            previous_state_index = state_index
 
         # Position zero is the follower's initialization state, not a score event.
         if pos <= 0 or pos == prev_pos:
@@ -553,7 +636,128 @@ def process_audio_file(
         else "Unexpected detected tags: 0"
     )
 
-    return detected_events, expected_times, score_context
+    diagnostics = None
+    if trace_enabled:
+        first_anomaly_index = next(
+            (
+                i for i, event in enumerate(transition_trace)
+                if event["skipped_score_positions"]
+                or (event["kind"] == "SCORE_POSITION"
+                    and event["offset_ms"] is not None
+                    and abs(event["offset_ms"]) > tolerance_ms)
+            ),
+            None,
+        )
+        diagnostics = {
+            "internal_state_index_available": state_index_getter is not None,
+            "state_map": state_map,
+            "expected_times_s": expected_times,
+            "detected_events": detected_events,
+            "transitions": transition_trace,
+            "first_anomaly_transition_index": first_anomaly_index,
+            "first_anomaly_context": (
+                transition_trace[max(0, first_anomaly_index - 4):first_anomaly_index + 5]
+                if first_anomaly_index is not None else []
+            ),
+        }
+
+    return detected_events, expected_times, score_context, diagnostics
+
+
+def analyze_missed_transitions(piece: Dict) -> Dict:
+    """Classify the benchmark's missed positions using score event context."""
+    metrics = piece["metrics"]
+    score_context = piece["score_context"]
+    detected_by_pos: Dict[int, List[float]] = {}
+    for pos, detected_time in piece["detected_events"]:
+        detected_by_pos.setdefault(int(pos), []).append(float(detected_time))
+
+    misaligned_positions = set(metrics["misaligned_positions"])
+    event_types = Counter()
+    transitions = Counter()
+    contexts = Counter()
+    reasons = Counter()
+    details = []
+
+    for pos in sorted(metrics["missing_positions"]):
+        context = score_context.get(pos, {})
+        current = context.get("type", "UNKNOWN")
+        previous = context.get("prev_type", "UNKNOWN")
+        following = context.get("next_type", "UNKNOWN")
+        transition = f"{previous} -> {current}"
+        triple = f"{previous} -> {current} -> {following}"
+        detections = detected_by_pos.get(pos, [])
+
+        if pos in misaligned_positions:
+            reason = "MISALIGNED"
+        elif not detections:
+            reason = "NOT_DETECTED"
+        else:
+            reason = "MISSED"  # Data inconsistency; included for visibility.
+
+        offset_ms = (
+            (min(detections) - piece["expected_times"][pos]) * 1000.0
+            if detections else None
+        )
+        event_types[current] += 1
+        transitions[transition] += 1
+        contexts[triple] += 1
+        reasons[reason] += 1
+        details.append({
+            "position": pos,
+            "type": current,
+            "prev_type": previous,
+            "next_type": following,
+            "reason": reason,
+            "offset_ms": offset_ms,
+        })
+
+    return {
+        "event_types": event_types,
+        "transitions": transitions,
+        "contexts": contexts,
+        "reasons": reasons,
+        "details": details,
+    }
+
+
+def print_missed_transition_analysis(rows: List[Dict]) -> None:
+    """Print event-level diagnostics for the three outlier scores."""
+    print("\n" + "=" * 72)
+    print("MISSED EVENT TRANSITION ANALYSIS")
+    print("=" * 72)
+
+    for piece in rows:
+        filename = Path(piece["audio_file"]).name
+        if filename not in OUTLIER_FILES:
+            continue
+
+        analysis = analyze_missed_transitions(piece)
+        print(f"\n{filename} ({len(analysis['details'])} misses)")
+        print("-" * 72)
+        for heading, key in (
+            ("Reason", "reasons"),
+            ("Expected event type", "event_types"),
+            ("Previous -> missed", "transitions"),
+            ("Previous -> missed -> next", "contexts"),
+        ):
+            print(f"{heading}:")
+            for label, count in analysis[key].most_common():
+                print(f"  {label:<48} {count:>3}")
+            if not analysis[key]:
+                print("  (none)")
+
+        print("Individual misses:")
+        for miss in analysis["details"]:
+            offset = (
+                f" offset={miss['offset_ms']:+.1f} ms"
+                if miss["offset_ms"] is not None else ""
+            )
+            print(
+                f"  pos={miss['position']:03d} "
+                f"{miss['prev_type']} -> {miss['type']} -> "
+                f"{miss['next_type']} [{miss['reason']}]{offset}"
+            )
 
 
 def compute_global_metrics_mirex(piece_results: List[Dict]) -> Dict:
@@ -817,7 +1021,7 @@ def process_audio_file_worker(
         import io
 
         with redirect_stdout(io.StringIO()):
-            detected_events, expected_times, score_context = process_audio_file(
+            detected_events, expected_times, score_context, diagnostics = process_audio_file(
                 audio_path, score_path, tolerance_ms, annotations_path
             )
 
@@ -838,6 +1042,8 @@ def process_audio_file_worker(
             "metrics": metrics,
             "detected_events": detected_events,
             "expected_times": expected_times,
+            "score_context": score_context,
+            "diagnostics": diagnostics,
         }
 
         status_msg = (
@@ -854,7 +1060,10 @@ def process_audio_file_worker(
         return piece_result, status_msg
 
     except Exception as e:
-        return None, f"✗ {Path(audio_path).name}: {str(e)}"
+        return None, (
+            f"✗ {Path(audio_path).name}: {e}\n"
+            f"{traceback.format_exc()}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -1055,6 +1264,8 @@ def main() -> None:
             f"{metrics['precision_pct']:>13.2f}"  # MIREX-COMPLIANT
         )  # MIREX-COMPLIANT
 
+    print_missed_transition_analysis(rows)
+
     print("=" * 72)  # MIREX-COMPLIANT
     print("GLOBAL:")  # MIREX-COMPLIANT
     print(
@@ -1132,6 +1343,11 @@ def main() -> None:
         global_metrics=global_metrics,
         implementation_name=current_implementation,
     )
+    if any(piece.get("diagnostics") is not None for piece in piece_results):
+        print(
+            "Share this updated JSON for the outlier investigation: "
+            f"{Path(args.results_path).resolve()}"
+        )
 
 
 if __name__ == "__main__":
