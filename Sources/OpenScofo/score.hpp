@@ -40,7 +40,7 @@ class Score {
     double ModPhases(double Phase);
     MarkovState AddTransState(MarkovState &State, int ScoreEvent, int BPM);
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
-    void PitchNode2Freq(const std::string Score, TSNode node, AudioState &State);
+    void PitchNode2Freq(const std::string Score, TSNode node, Observation &State);
     void ParseInput(const std::string &Score);
     void PrintTreeSitterNode(TSNode node, int indent = 0);
     TSNode GetField(TSNode Node, std::string s);

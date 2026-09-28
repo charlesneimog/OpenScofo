@@ -115,7 +115,7 @@ struct ScoreAction {
 using EventActions = std::vector<ScoreAction>;
 
 // ─────────────────────────────────────
-struct AudioState {
+struct Observation {
     AudioDescType Type;
     double Freq = 0;
     double Midi = 0;
@@ -129,7 +129,7 @@ struct MarkovState {
     int ScorePos;
     std::string Section;
     int MarkovIndex = -1;
-    std::vector<AudioState> AudioStates;
+    std::vector<Observation> Observations;
     int BestAudioStateIndex = -1;
 
     // States Actions

@@ -136,7 +136,8 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
     const MarkovState &State = m_States[StateIndex];
     const int AudioStateIndex = State.BestAudioStateIndex;
 
-    if (State.Type != CHORD && (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.AudioStates.size()))) {
+    if (State.Type != CHORD &&
+        (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.Observations.size()))) {
         return;
     }
 
@@ -155,13 +156,13 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
 
     if (State.Type == CHORD) {
         Action.Args.emplace_back(std::string("chord"));
-        for (const AudioState &AudioState : State.AudioStates) {
+        for (const Observation &AudioState : State.Observations) {
             if (AudioState.Type == PITCH) {
                 Action.Args.emplace_back(static_cast<float>(AudioState.Freq));
             }
         }
     } else {
-        const AudioState &AudioState = State.AudioStates[static_cast<size_t>(AudioStateIndex)];
+        const Observation &AudioState = State.Observations[static_cast<size_t>(AudioStateIndex)];
         switch (AudioState.Type) {
         case PITCH:
             Action.Args.emplace_back(static_cast<float>(AudioState.Freq));
@@ -354,7 +355,7 @@ void OnlineForward::UpdateAudioTemplate() {
 
     for (int h = 0; h < StateSize; h++) {
         if (m_States[h].Type == NOTE || m_States[h].Type == TRILL) {
-            for (AudioState &SubState : m_States[h].AudioStates) {
+            for (Observation &SubState : m_States[h].Observations) {
                 if (SubState.Type == PITCH) {
                     BuildPitchTemplate(SubState.Freq);
                 }
@@ -887,9 +888,9 @@ void OnlineForward::GetAudioObservations() {
         double sumPitch = 0.0;
         int pitchCount = 0;
 
-        for (size_t audioStateIndex = 0; audioStateIndex < state.AudioStates.size(); ++audioStateIndex) {
+        for (size_t audioStateIndex = 0; audioStateIndex < state.Observations.size(); ++audioStateIndex) {
 
-            const AudioState &as = state.AudioStates[audioStateIndex];
+            const Observation &as = state.Observations[audioStateIndex];
 
             double audioStateEvidence = 0.0;
 

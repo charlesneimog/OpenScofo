@@ -171,10 +171,38 @@ void OpenScofo::SetRequestedDescriptors(std::vector<Descriptors> Descriptors) {
 
 // ─────────────────────────────────────
 void OpenScofo::ActivateAllDescriptors() {
-    SetRequestedDescriptors({ODSONSET, LOUDNESS, DB, MAXAMP, RMS, STDDEV, MAGNITUDE, POWERARRAY, SILENCEPROB,
-                             MFCC, CHROMA, LOGMEL, ZCR, HFR, CENTROID, SPREADHZ, SPREADVARIANCE, CREST,
-                             FLATNESS, ENTROPY, ROLLOFF, CENTROIDVEL, FLUX, SKEWNESS, SLOPE, KURTOSIS,
-                             IRREGULARITY, HARMONICITY, YIN, YINCONFIDENCE, EXTENDEDTECHNIQUE, ONNX});
+    SetRequestedDescriptors({ODSONSET,
+                             LOUDNESS,
+                             DB,
+                             MAXAMP,
+                             RMS,
+                             STDDEV,
+                             MAGNITUDE,
+                             POWERARRAY,
+                             SILENCEPROB,
+                             MFCC,
+                             CHROMA,
+                             LOGMEL,
+                             ZCR,
+                             HFR,
+                             CENTROID,
+                             SPREADHZ,
+                             SPREADVARIANCE,
+                             CREST,
+                             FLATNESS,
+                             ENTROPY,
+                             ROLLOFF,
+                             CENTROIDVEL,
+                             FLUX,
+                             SKEWNESS,
+                             SLOPE,
+                             KURTOSIS,
+                             IRREGULARITY,
+                             HARMONICITY,
+                             YIN,
+                             YINCONFIDENCE,
+                             EXTENDEDTECHNIQUE,
+                             ONNX});
 }
 
 // ─────────────────────────────────────
@@ -937,7 +965,7 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     };
 
     for (const MarkovState &state : m_States) {
-        for (const AudioState &audioState : state.AudioStates) {
+        for (const Observation &audioState : state.Observations) {
             if (audioState.Type == LABEL) {
                 requestScoreDescriptor(ONNX);
                 requestScoreDescriptor(EXTENDEDTECHNIQUE);
@@ -972,7 +1000,7 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     // verify the states.
     const std::vector<std::string> &ONNXLabels = m_MIR.GetONNXLabels();
     for (auto &state : m_States) {
-        for (auto &audioState : state.AudioStates) {
+        for (auto &audioState : state.Observations) {
             if (audioState.Type == LABEL) {
                 const auto &label = audioState.Label;
                 auto it = std::find(ONNXLabels.begin(), ONNXLabels.end(), label);

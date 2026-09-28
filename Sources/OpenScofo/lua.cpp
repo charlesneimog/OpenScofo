@@ -37,7 +37,7 @@ static void PushNumberVector(lua_State *L, const std::vector<double> &values) {
 }
 
 // ─────────────────────────────────────
-static void PushAudioState(lua_State *L, const AudioState &state) {
+static void PushAudioState(lua_State *L, const Observation &state) {
     lua_createtable(L, 0, 4);
     lua_pushinteger(L, state.Type);
     lua_setfield(L, -2, "type");
@@ -137,9 +137,9 @@ static void PushMarkovState(lua_State *L, const MarkovState &state) {
     lua_pushinteger(L, state.Line);
     lua_setfield(L, -2, "line");
 
-    lua_createtable(L, static_cast<int>(state.AudioStates.size()), 0);
-    for (size_t i = 0; i < state.AudioStates.size(); ++i) {
-        PushAudioState(L, state.AudioStates[i]);
+    lua_createtable(L, static_cast<int>(state.Observations.size()), 0);
+    for (size_t i = 0; i < state.Observations.size(); ++i) {
+        PushAudioState(L, state.Observations[i]);
         lua_rawseti(L, -2, static_cast<int>(i + 1));
     }
     lua_setfield(L, -2, "audiostates");

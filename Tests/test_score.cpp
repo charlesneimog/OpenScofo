@@ -75,9 +75,9 @@ TEST(ScoreSections, RestrictsForwardInferenceToSelectedSection) {
         State.SyncStrength = 0.5;
         State.PhaseCoupling = 0.5;
 
-        OpenScofo::AudioState Silence{};
+        OpenScofo::Observation Silence{};
         Silence.Type = OpenScofo::SILENCE;
-        State.AudioStates.push_back(Silence);
+        State.Observations.push_back(Silence);
         States.push_back(std::move(State));
     }
 

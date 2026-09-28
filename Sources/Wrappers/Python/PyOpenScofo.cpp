@@ -21,9 +21,14 @@ namespace nb = nanobind;
 template <typename F> static auto checked_call(F func) {
     try {
         auto result = func();
-        if (PyErr_Occurred()) throw nb::python_error();
+        if (PyErr_Occurred())
+            throw nb::python_error();
         return result;
-    } catch (...) { if (PyErr_Occurred()) throw nb::python_error(); throw; }
+    } catch (...) {
+        if (PyErr_Occurred())
+            throw nb::python_error();
+        throw;
+    }
 }
 template <typename T> static bool process_python_block(OpenScofo::OpenScofo &self, const T *data, size_t size) {
     if (size == 0) {
@@ -141,13 +146,13 @@ NB_MODULE(_OpenScofo, m) {
         .value("MARKOV", OpenScofo::MARKOV)
         .export_values();
 
-    nb::class_<OpenScofo::AudioState>(m, "AudioState")
+    nb::class_<OpenScofo::Observation>(m, "AudioState")
         .def(nb::init<>())
-        .def_rw("type", &OpenScofo::AudioState::Type)
-        .def_rw("frequency", &OpenScofo::AudioState::Freq)
-        .def_rw("midi", &OpenScofo::AudioState::Midi)
-        .def_rw("label", &OpenScofo::AudioState::Label)
-        .def_rw("index", &OpenScofo::AudioState::Index);
+        .def_rw("type", &OpenScofo::Observation::Type)
+        .def_rw("frequency", &OpenScofo::Observation::Freq)
+        .def_rw("midi", &OpenScofo::Observation::Midi)
+        .def_rw("label", &OpenScofo::Observation::Label)
+        .def_rw("index", &OpenScofo::Observation::Index);
 
     // Description Class
     nb::class_<OpenScofo::Description>(m, "Description")
@@ -217,7 +222,7 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("score_pos", &OpenScofo::MarkovState::ScorePos)
         .def_rw("section", &OpenScofo::MarkovState::Section)
         .def_rw("markov_index", &OpenScofo::MarkovState::MarkovIndex)
-        .def_rw("audio_states", &OpenScofo::MarkovState::AudioStates)
+        .def_rw("audio_states", &OpenScofo::MarkovState::Observations)
 
         // State actions
         .def_rw("hsmm_type", &OpenScofo::MarkovState::HSMMType)
@@ -320,7 +325,10 @@ NB_MODULE(_OpenScofo, m) {
              })
 
         // Score
-        .def("load_score", [](OpenScofo::OpenScofo &self, const std::filesystem::path &path) { return checked_call([&] { return self.LoadScore(path); }); })
+        .def("load_score",
+             [](OpenScofo::OpenScofo &self, const std::filesystem::path &path) {
+                 return checked_call([&] { return self.LoadScore(path); });
+             })
         .def("score_is_loaded", &OpenScofo::OpenScofo::ScoreIsLoaded)
 
         // Config

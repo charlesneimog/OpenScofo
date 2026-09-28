@@ -72,7 +72,7 @@ bool Score::isNumber(std::string str) {
 }
 
 // ─────────────────────────────────────
-void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, AudioState &State) {
+void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation &State) {
     TSNode pitch = node;
     std::string type = ts_node_type(pitch);
     if (type == "midi") {
@@ -211,13 +211,13 @@ MarkovState Score::AddDummySilence() {
     Event.Index = m_ScoreStates.size();
     Event.Duration = 0;
 
-    AudioState Silence;
+    Observation Silence;
     Silence.Type = SILENCE;
     Silence.Freq = 0;
     Silence.Midi = 0;
     Silence.Index = 0;
 
-    Event.AudioStates.emplace_back(Silence);
+    Event.Observations.emplace_back(Silence);
     return Event;
 }
 
@@ -230,13 +230,13 @@ MarkovState Score::GetFirstEvent() {
     Event.Index = m_ScoreStates.size();
     Event.Duration = 0.0;
 
-    AudioState Silence;
+    Observation Silence;
     Silence.Type = SILENCE;
     Silence.Freq = 0;
     Silence.Midi = 0;
     Silence.Index = 0;
 
-    Event.AudioStates.emplace_back(Silence);
+    Event.Observations.emplace_back(Silence);
 
     return Event;
 }
@@ -282,20 +282,20 @@ MarkovState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     Event.Type = NOTE;
 
     // Pitch
-    AudioState SubState;
+    Observation SubState;
     PitchNode2Freq(ScoreStr, PitchNode, SubState);
-    Event.AudioStates.push_back(SubState);
+    Event.Observations.push_back(SubState);
 
     // Silence
     if (Percussive) {
-        AudioState PercussiveDesc;
+        Observation PercussiveDesc;
         PercussiveDesc.Type = SILENCE;
-        Event.AudioStates.push_back(PercussiveDesc);
+        Event.Observations.push_back(PercussiveDesc);
 
         // TODO: need tests
-        AudioState Onset;
+        Observation Onset;
         Onset.Type = ONSET;
-        Event.AudioStates.push_back(Onset);
+        Event.Observations.push_back(Onset);
     }
 
     // Duration
@@ -354,9 +354,9 @@ MarkovState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) 
         if (std::string(ts_node_type(PitchNode)) != "pitch") {
             continue;
         }
-        AudioState SubState;
+        Observation SubState;
         PitchNode2Freq(ScoreStr, PitchNode, SubState);
-        Event.AudioStates.push_back(SubState);
+        Event.Observations.push_back(SubState);
     }
 
     double duration = GetDurationFromNode(ScoreStr, DurationNode);
@@ -397,20 +397,20 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
                 continue;
             }
 
-            AudioState SubState;
+            Observation SubState;
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
-            Event.AudioStates.push_back(SubState);
+            Event.Observations.push_back(SubState);
             HasTechnique = true;
         }
     } else {
         std::string Label = GetChildStringFromField(ScoreStr, Node, "technique");
 
         if (!Label.empty()) {
-            AudioState SubState;
+            Observation SubState;
             SubState.Label = Label;
             SubState.Type = LABEL;
-            Event.AudioStates.push_back(SubState);
+            Event.Observations.push_back(SubState);
             HasTechnique = true;
         }
     }
@@ -422,14 +422,14 @@ MarkovState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     }
 
     // Pitch
-    AudioState Pitch;
+    Observation Pitch;
     PitchNode2Freq(ScoreStr, PitchNode, Pitch);
-    Event.AudioStates.push_back(Pitch);
+    Event.Observations.push_back(Pitch);
 
     // Silence
-    AudioState Silence;
+    Observation Silence;
     Silence.Type = SILENCE;
-    Event.AudioStates.push_back(Silence);
+    Event.Observations.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -466,19 +466,19 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
             if (std::string(ts_node_type(TechniqueNode)) != "identifier") {
                 continue;
             }
-            AudioState SubState;
+            Observation SubState;
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
-            Event.AudioStates.push_back(SubState);
+            Event.Observations.push_back(SubState);
             HasTechnique = true;
         }
     } else {
         std::string Label = GetChildStringFromField(ScoreStr, Node, "technique");
         if (!Label.empty()) {
-            AudioState SubState;
+            Observation SubState;
             SubState.Label = Label;
             SubState.Type = LABEL;
-            Event.AudioStates.push_back(SubState);
+            Event.Observations.push_back(SubState);
             HasTechnique = true;
         }
     }
@@ -490,9 +490,9 @@ MarkovState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     }
 
     // Silence
-    AudioState Silence;
+    Observation Silence;
     Silence.Type = SILENCE;
-    Event.AudioStates.push_back(Silence);
+    Event.Observations.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -540,9 +540,9 @@ MarkovState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     Event.Duration = duration;
     Event.Type = REST;
 
-    AudioState Silence;
+    Observation Silence;
     Silence.Type = SILENCE;
-    Event.AudioStates.push_back(Silence);
+    Event.Observations.push_back(Silence);
 
     ProcessEventTime(Event);
     return Event;
@@ -697,7 +697,7 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     // Configuration by Event
     Event.TimeTolerance = m_TimeTolerance;
 
-    if (Event.AudioStates.empty()) {
+    if (Event.Observations.empty()) {
         return;
     }
 
