@@ -20,6 +20,32 @@
 
 namespace OpenScofo {
 
+namespace {
+
+// A finite log-zero sentinel also works with the project's Release -ffast-math.
+double LogProbability(double Probability) {
+    return Probability > 0.0 ? std::log(Probability) : -std::numeric_limits<double>::max();
+}
+
+double LogMultiply(double A, double B) {
+    const double zero = -std::numeric_limits<double>::max();
+    return A == zero || B == zero ? zero : A + B;
+}
+
+double LogAdd(double A, double B) {
+    const double zero = -std::numeric_limits<double>::max();
+    if (A == zero) {
+        return B;
+    }
+    if (B == zero) {
+        return A;
+    }
+    const double high = std::max(A, B);
+    return high + std::log1p(std::exp(std::min(A, B) - high));
+}
+
+} // namespace
+
 /*
     // ──────────────────────────────── REFERENCES ───────────────────────────────────────
 
@@ -96,7 +122,9 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
         State.Forward.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         State.ExitProb.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
+        ResetMicroStateRuntime(State);
     }
+    m_ActiveMarkovScoreStateIndex = -1;
 
     if (!m_States.empty()) {
         UpdateAudioTemplate();
@@ -134,19 +162,29 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
     }
 
     const ScoreState &State = m_States[StateIndex];
-    const int AudioStateIndex = State.BestAudioStateIndex;
+    const int MicroStateIndex = State.BestMicroStateIndex;
+    const std::vector<Observation> *Observations = &State.Observations;
+    int AudioStateIndex = State.BestAudioStateIndex;
+    if (State.MicroTopologyType != NO_MICROSTATES) {
+        if (MicroStateIndex < 0 || MicroStateIndex >= static_cast<int>(State.MicroStates.size())) {
+            return;
+        }
+        Observations = &State.MicroStates[static_cast<size_t>(MicroStateIndex)].Observations;
+        AudioStateIndex = State.BestMicroObservationIndex;
+    }
 
-    if (State.Type != CHORD &&
-        (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(State.Observations.size()))) {
+    if (State.Type != CHORD && (AudioStateIndex < 0 || AudioStateIndex >= static_cast<int>(Observations->size()))) {
         return;
     }
 
-    if (StateIndex == m_LastNotifiedStateIndex && AudioStateIndex == m_LastNotifiedAudioStateIndex) {
+    if (StateIndex == m_LastNotifiedStateIndex && AudioStateIndex == m_LastNotifiedAudioStateIndex &&
+        MicroStateIndex == m_LastNotifiedMicroStateIndex) {
         return;
     }
 
     m_LastNotifiedStateIndex = StateIndex;
     m_LastNotifiedAudioStateIndex = AudioStateIndex;
+    m_LastNotifiedMicroStateIndex = MicroStateIndex;
 
     ScoreAction Action{};
     Action.isAudioStateChange = true;
@@ -162,7 +200,7 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
             }
         }
     } else {
-        const Observation &AudioState = State.Observations[static_cast<size_t>(AudioStateIndex)];
+        const Observation &AudioState = (*Observations)[static_cast<size_t>(AudioStateIndex)];
         switch (AudioState.Type) {
         case PITCH:
             Action.Args.emplace_back(static_cast<float>(AudioState.Freq));
@@ -184,6 +222,10 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
 
 // ─────────────────────────────────────
 void OnlineForward::ResetCaches() {
+    m_ActiveMarkovScoreStateIndex = -1;
+    for (ScoreState &State : m_States) {
+        ResetMicroStateRuntime(State);
+    }
     // Clear all caches
     m_PitchTemplates.clear();
     m_PitchTemplatesPrecomputed.clear();
@@ -226,6 +268,9 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
         State.Forward.assign(m_BufferSize, std::numeric_limits<double>::min());
         State.ExitProb.assign(m_BufferSize, std::numeric_limits<double>::min());
         State.BestObs.assign(m_BufferSize, std::numeric_limits<double>::min());
+        State.BestAudioStateIndex = -1;
+        State.BestMicroStateIndex = -1;
+        State.BestMicroObservationIndex = -1;
     }
 
     m_CurrentStateIndex = 0;
@@ -239,6 +284,7 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     const ScoreState &InitialState = m_States[static_cast<size_t>(m_CurrentStateIndex)];
     m_LastNotifiedStateIndex = -1;
     m_LastNotifiedAudioStateIndex = -1;
+    m_LastNotifiedMicroStateIndex = -1;
     m_PendingAudioStateActions.clear();
     m_Kappa = 10;
     m_BPM = InitialState.BPMExpected;
@@ -354,10 +400,17 @@ void OnlineForward::UpdateAudioTemplate() {
     m_PitchTemplatesPrecomputed.clear();
 
     for (int h = 0; h < StateSize; h++) {
-        if (m_States[h].Type == NOTE || m_States[h].Type == TRILL) {
-            for (Observation &SubState : m_States[h].Observations) {
+        if (m_States[h].Type == NOTE || m_States[h].MicroTopologyType != NO_MICROSTATES) {
+            for (const Observation &SubState : m_States[h].Observations) {
                 if (SubState.Type == PITCH) {
                     BuildPitchTemplate(SubState.Freq);
+                }
+            }
+            for (const MarkovMicroState &MicroState : m_States[h].MicroStates) {
+                for (const Observation &SubState : MicroState.Observations) {
+                    if (SubState.Type == PITCH) {
+                        BuildPitchTemplate(SubState.Freq);
+                    }
                 }
             }
         }
@@ -377,6 +430,7 @@ PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
 // ╰─────────────────────────────────────╯
 void OnlineForward::ClearStates() {
     m_States.clear();
+    m_ActiveMarkovScoreStateIndex = -1;
 }
 // ─────────────────────────────────────
 double OnlineForward::GetCurrentBPM() {
@@ -496,6 +550,7 @@ void OnlineForward::InitTimeDecoding(void) {
 
 // ─────────────────────────────────────
 void OnlineForward::ResetDecoding() {
+    m_ActiveMarkovScoreStateIndex = -1;
     if (m_States.empty()) {
         return;
     }
@@ -529,6 +584,9 @@ void OnlineForward::ResetDecoding() {
         std::fill(State.ExitProb.begin(), State.ExitProb.end(), 0.0);
         std::fill(State.BestObs.begin(), State.BestObs.end(), std::numeric_limits<double>::min());
         State.BestAudioStateIndex = -1;
+        State.BestMicroStateIndex = -1;
+        State.BestMicroObservationIndex = -1;
+        ResetMicroStateRuntime(State);
         State.OnsetObserved = 0;
         State.PhaseObserved = 0;
         State.IOIPhiN = 0;
@@ -543,6 +601,7 @@ void OnlineForward::ResetDecoding() {
 
     m_LastNotifiedStateIndex = -1;
     m_LastNotifiedAudioStateIndex = -1;
+    m_LastNotifiedMicroStateIndex = -1;
     m_PendingAudioStateActions.clear();
 
     spdlog::debug("OnlineForward decoding state fully reset");
@@ -862,6 +921,46 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 // ╭─────────────────────────────────────╮
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
+double OnlineForward::GetObservationEvidence(const Observation &Obs, bool AllowSilence) {
+    switch (Obs.Type) {
+    case PITCH:
+        return GetPitchProbability(Obs.Freq);
+    case LABEL: {
+        const auto it = m_Desc.ONNX.find(Obs.Label);
+        return it == m_Desc.ONNX.end() ? 0.0 : it->second;
+    }
+    case ONSET:
+        return m_Desc.Onset;
+    case SILENCE:
+        return AllowSilence ? m_Desc.SilenceProb : 0.0;
+    }
+    return 0.0;
+}
+
+// ─────────────────────────────────────
+double OnlineForward::GetMicroStateEmission(MarkovMicroState &MicroState, bool AllowSilence, bool ApplyGates) {
+    const double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
+    double best = 0.0;
+    MicroState.BestObservationIndex = -1;
+    for (size_t i = 0; i < MicroState.Observations.size(); ++i) {
+        const Observation &Obs = MicroState.Observations[i];
+        double evidence = GetObservationEvidence(Obs, AllowSilence);
+        if (ApplyGates) {
+            if (Obs.Type == PITCH) {
+                evidence *= soundProb;
+            } else if (Obs.Type == LABEL) {
+                evidence *= m_Desc.ExtendedTechProb * soundProb;
+            }
+        }
+        if (evidence > best) {
+            best = evidence;
+            MicroState.BestObservationIndex = static_cast<int>(i);
+        }
+    }
+    return best;
+}
+
+// ─────────────────────────────────────
 void OnlineForward::GetAudioObservations() {
     const double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     const double techWeight = m_Desc.ExtendedTechProb;
@@ -872,7 +971,7 @@ void OnlineForward::GetAudioObservations() {
 
     const bool allowSilence = (CurrentEventType != FIRSTEVENT) && (CurrentEventType != REST);
 
-    // Global best AudioState across all semi-Markov states.
+    // Strongest raw observation across score states.
     double globalBestAudioStateEvidence = 0.0;
     int globalBestStateIndex = -1;
     int globalBestAudioStateIndex = -1;
@@ -882,55 +981,31 @@ void OnlineForward::GetAudioObservations() {
 
         double bestPitch = 0.0;
         double bestTech = 0.0;
-        double bestOnset = 0.0;
         double bestSilence = 0.0;
 
         double sumPitch = 0.0;
         int pitchCount = 0;
+        double bestStateObservationEvidence = 0.0;
+        state.BestAudioStateIndex = -1;
 
         for (size_t audioStateIndex = 0; audioStateIndex < state.Observations.size(); ++audioStateIndex) {
 
             const Observation &as = state.Observations[audioStateIndex];
 
-            double audioStateEvidence = 0.0;
-
-            switch (as.Type) {
-            case PITCH: {
-                const double p = GetPitchProbability(as.Freq);
-
-                audioStateEvidence = p;
-
-                bestPitch = std::max(bestPitch, p);
-                sumPitch += p;
+            const double audioStateEvidence = GetObservationEvidence(as, allowSilence);
+            if (as.Type == PITCH) {
+                bestPitch = std::max(bestPitch, audioStateEvidence);
+                sumPitch += audioStateEvidence;
                 ++pitchCount;
-
-                break;
+            } else if (as.Type == LABEL) {
+                bestTech = std::max(bestTech, audioStateEvidence);
+            } else if (as.Type == SILENCE) {
+                bestSilence = std::max(bestSilence, audioStateEvidence);
             }
 
-            case LABEL: {
-                const double p = m_Desc.ONNX[as.Label];
-
-                audioStateEvidence = p;
-                bestTech = std::max(bestTech, p);
-
-                break;
-            }
-
-            case ONSET: {
-                audioStateEvidence = m_Desc.Onset;
-                bestOnset = std::max(bestOnset, m_Desc.Onset);
-
-                break;
-            }
-
-            case SILENCE: {
-                if (allowSilence) {
-                    audioStateEvidence = m_Desc.SilenceProb;
-                    bestSilence = std::max(bestSilence, m_Desc.SilenceProb);
-                }
-
-                break;
-            }
+            if (audioStateEvidence > bestStateObservationEvidence) {
+                bestStateObservationEvidence = audioStateEvidence;
+                state.BestAudioStateIndex = static_cast<int>(audioStateIndex);
             }
 
             // Keep track of the globally strongest raw AudioState
@@ -943,61 +1018,91 @@ void OnlineForward::GetAudioObservations() {
             }
         }
 
-        double stateLikelihood = 0.0;
-
-        switch (state.Type) {
-        case NOTE:
-        case TRILL:
-            // Pitch is already an observation probability.
-            // Do not gate it using the complement of the
-            // extended-technique detector.
-            stateLikelihood = std::max(bestPitch * soundProb, bestSilence);
-            break;
-
-        case PTECH: {
-            // Pitched extended technique:
-            //
-            // The state may be supported independently by:
-            //   1. the trained technique classifier, gated by
-            //      ExtendedTechProb;
-            //   2. its expected pitch.
-            //
-            // Therefore technique and pitch are not complements.
-            const double techObs = bestTech * techWeight * soundProb;
-
-            const double pitchObs = bestPitch * soundProb;
-
-            stateLikelihood = std::max({techObs, pitchObs, bestSilence});
-
-            break;
-        }
-
-        case UTECH: {
-            // Unpitched extended technique:
-            // pitch evidence has no role here.
-            const double techObs = bestTech * techWeight * soundProb;
-
-            stateLikelihood = std::max(techObs, bestSilence);
-
-            break;
-        }
-
-        case CHORD:
-            if (pitchCount > 0) {
-                stateLikelihood = (sumPitch / static_cast<double>(pitchCount)) * soundProb;
+        double bestMicroLikelihood = 0.0;
+        if (state.MicroTopologyType != NO_MICROSTATES) {
+            state.BestMicroStateIndex = -1;
+            state.BestMicroObservationIndex = -1;
+            for (size_t k = 0; k < state.MicroStates.size(); ++k) {
+                MarkovMicroState &micro = state.MicroStates[k];
+                // TRILL keeps its raw pitch maximum and winner before sound gating.
+                micro.CurrentEmission = GetMicroStateEmission(micro, allowSilence, state.Type != TRILL);
+                if (micro.CurrentEmission > bestMicroLikelihood) {
+                    bestMicroLikelihood = micro.CurrentEmission;
+                    if (state.MicroTopologyType == UNORDERED) {
+                        state.BestMicroStateIndex = static_cast<int>(k);
+                        state.BestMicroObservationIndex = micro.BestObservationIndex;
+                    }
+                }
+                if (micro.CurrentEmission > globalBestAudioStateEvidence) {
+                    globalBestAudioStateEvidence = micro.CurrentEmission;
+                    globalBestStateIndex = j;
+                    globalBestAudioStateIndex = micro.BestObservationIndex;
+                }
             }
-            break;
+        }
 
-        case FIRSTEVENT:
-        case REST:
-            stateLikelihood = m_Desc.SilenceProb;
-            break;
+        double stateLikelihood = 0.0;
+        if (state.MicroTopologyType != NO_MICROSTATES) {
+            // For LEFT_RIGHT this scalar is diagnostic/silence evidence only.
+            // SemiMarkov uses age-conditioned LogForwardByAge segment likelihoods.
+            stateLikelihood = bestMicroLikelihood;
+            if (state.Type == TRILL) {
+                stateLikelihood = std::max(bestMicroLikelihood * soundProb, bestSilence);
+            }
+        } else {
+            switch (state.Type) {
+            case NOTE:
+                // Pitch is already an observation probability.
+                // Do not gate it using the complement of the
+                // extended-technique detector.
+                stateLikelihood = std::max(bestPitch * soundProb, bestSilence);
+                break;
 
-        default:
-            spdlog::error("Event type of line {} of score file is not "
-                          "implemented, please remove it",
-                          state.Line);
-            break;
+            case PTECH: {
+                // Pitched extended technique:
+                //
+                // The state may be supported independently by:
+                //   1. the trained technique classifier, gated by
+                //      ExtendedTechProb;
+                //   2. its expected pitch.
+                //
+                // Therefore technique and pitch are not complements.
+                const double techObs = bestTech * techWeight * soundProb;
+
+                const double pitchObs = bestPitch * soundProb;
+
+                stateLikelihood = std::max({techObs, pitchObs, bestSilence});
+
+                break;
+            }
+
+            case UTECH: {
+                // Unpitched extended technique:
+                // pitch evidence has no role here.
+                const double techObs = bestTech * techWeight * soundProb;
+
+                stateLikelihood = std::max(techObs, bestSilence);
+
+                break;
+            }
+
+            case CHORD:
+                if (pitchCount > 0) {
+                    stateLikelihood = (sumPitch / static_cast<double>(pitchCount)) * soundProb;
+                }
+                break;
+
+            case FIRSTEVENT:
+            case REST:
+                stateLikelihood = m_Desc.SilenceProb;
+                break;
+
+            default:
+                spdlog::error("Event type of line {} of score file is not "
+                              "implemented, please remove it",
+                              state.Line);
+                break;
+            }
         }
 
         state.BestObs[m_CircularBufferIndex] = std::max(stateLikelihood, std::numeric_limits<double>::min());
@@ -1177,26 +1282,116 @@ double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
 }
 
 // ─────────────────────────────────────
-double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
-    const ScoreState &State = m_States[m_CurrentStateIndex];
-    const int K = static_cast<int>(State.MicroStates.size());
+// OpenScofo duration policy, not a numerical prescription from Cont.
+void OnlineForward::PrepareMicroStateDurations(const ScoreState &Parent) {
+    const size_t K = Parent.MicroStates.size();
+    m_MicroExpectedFrames.assign(K, 1.0);
+    if (K == 0 || !(m_BlockDur > 0.0)) {
+        return;
+    }
+    const double expectedFrames = std::max(1.0, (m_PsiN1 * Parent.Duration) / m_BlockDur);
+    const bool pitchedTechnique = Parent.Type == PTECH && K == 4;
+    const size_t first = pitchedTechnique ? 1 : 0;
+    const size_t end = pitchedTechnique ? K - 1 : K;
+    // PTECH onset is transient. Reserve a nominal frame for its absorbing tail.
+    const double available = pitchedTechnique ? std::max(2.0, expectedFrames - 2.0) : expectedFrames;
+    if (available <= static_cast<double>(end - first)) {
+        return; // A chain shorter than its phase count still needs one frame per phase.
+    }
+    double totalWeight = 0.0;
+    for (size_t k = first; k < end; ++k) {
+        totalWeight += std::max(0.0, Parent.MicroStates[k].DurationWeight);
+    }
+    for (size_t k = first; k < end; ++k) {
+        const double share = totalWeight > 0.0 ? std::max(0.0, Parent.MicroStates[k].DurationWeight) / totalWeight
+                                               : 1.0 / static_cast<double>(end - first);
+        m_MicroExpectedFrames[k] = std::max(1.0, available * share);
+    }
+}
 
-    if (K == 0 || i < 0 || i >= K) {
+// ─────────────────────────────────────
+double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
+    if (m_ActiveMarkovScoreStateIndex < 0 || m_ActiveMarkovScoreStateIndex >= static_cast<int>(m_States.size())) {
         return 0.0;
     }
+    const ScoreState &Parent = m_States[m_ActiveMarkovScoreStateIndex];
+    const int K = static_cast<int>(Parent.MicroStates.size());
+    if (Parent.MicroTopologyType != LEFT_RIGHT || i < 0 || j < 0 || i >= K || j >= K) {
+        return 0.0;
+    }
+    if (i == K - 1) {
+        return j == i ? 1.0 : 0.0;
+    }
+    if (i >= static_cast<int>(m_MicroExpectedFrames.size())) {
+        return 0.0;
+    }
+    const double advance = std::clamp(1.0 / std::max(1.0, m_MicroExpectedFrames[i]), 0.0, 1.0);
+    return j == i ? 1.0 - advance : (j == i + 1 ? advance : 0.0);
+}
 
-    const double expectedFrames = std::max(1.0, (m_PsiN1 * State.Duration) / m_BlockDur);
-    const double advance = std::clamp(static_cast<double>(K) / expectedFrames, 0.0, 1.0);
-    const double stay = 1.0 - advance;
-    if (j == i) {
-        return stay;
+// ─────────────────────────────────────
+void OnlineForward::ResetMicroStateRuntime(ScoreState &State) {
+    State.MicroForwardLastFrame = -1;
+    State.BestMicroStateIndex = -1;
+    State.BestMicroObservationIndex = -1;
+    for (MarkovMicroState &Micro : State.MicroStates) {
+        Micro.CurrentEmission = 0.0;
+        Micro.BestObservationIndex = -1;
+        Micro.LogForwardByAge.clear();
+    }
+}
+
+// ─────────────────────────────────────
+void OnlineForward::UpdateMicroStateForward(ScoreState &State, int StateIndex, int MaxAge) {
+    if (State.MicroTopologyType != LEFT_RIGHT) {
+        return;
+    }
+    MaxAge = std::max(0, MaxAge);
+    const size_t K = State.MicroStates.size();
+    for (MarkovMicroState &Micro : State.MicroStates) {
+        // A newly visible chain cannot inherit a trajectory across unobserved frames.
+        if (State.MicroForwardLastFrame != m_Tau - 1) {
+            Micro.LogForwardByAge.clear();
+        }
+        Micro.LogForwardByAge.resize(static_cast<size_t>(MaxAge + 1), -std::numeric_limits<double>::max());
+    }
+    State.MicroForwardLastFrame = m_Tau;
+    if (K == 0 || MaxAge == 0) {
+        return;
     }
 
-    if (j == i + 1) {
-        return advance;
+    const int previousContext = m_ActiveMarkovScoreStateIndex;
+    m_ActiveMarkovScoreStateIndex = StateIndex;
+    PrepareMicroStateDurations(State);
+    m_MicroLogSelfProb.resize(K);
+    m_MicroLogAdvanceProb.resize(K);
+    for (size_t k = 0; k < K; ++k) {
+        m_MicroLogSelfProb[k] =
+            LogProbability(GetMarkovTransitionProbability(static_cast<int>(k), static_cast<int>(k)));
+        m_MicroLogAdvanceProb[k] =
+            LogProbability(GetMarkovTransitionProbability(static_cast<int>(k), static_cast<int>(k) + 1));
     }
+    m_ActiveMarkovScoreStateIndex = previousContext;
 
-    return 0.0;
+    m_MicroLogEmission.resize(K);
+    for (size_t k = 0; k < K; ++k) {
+        m_MicroLogEmission[k] = LogProbability(State.MicroStates[k].CurrentEmission);
+    }
+    const int oldestAge = std::min(MaxAge, m_Tau + 1);
+    for (int u = oldestAge; u >= 2; --u) {
+        for (size_t k = 0; k < K; ++k) {
+            MarkovMicroState &Micro = State.MicroStates[k];
+            double incoming = LogMultiply(m_MicroLogSelfProb[k], Micro.LogForwardByAge[u - 1]);
+            if (k > 0) {
+                incoming = LogAdd(incoming, LogMultiply(m_MicroLogAdvanceProb[k - 1],
+                                                        State.MicroStates[k - 1].LogForwardByAge[u - 1]));
+            }
+            Micro.LogForwardByAge[u] = LogMultiply(m_MicroLogEmission[k], incoming);
+        }
+    }
+    for (size_t k = 0; k < K; ++k) {
+        State.MicroStates[k].LogForwardByAge[1] = k == 0 ? m_MicroLogEmission[k] : -std::numeric_limits<double>::max();
+    }
 }
 
 // ─────────────────────────────────────
@@ -1297,6 +1492,53 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
 
+    if (StateJ.MicroTopologyType == LEFT_RIGHT) {
+        UpdateMicroStateForward(StateJ, j, maxU);
+        m_MicroPosterior.assign(StateJ.MicroStates.size(), 0.0);
+        // Each age is a distinct entry-time hypothesis. The current emission is
+        // already in alpha, so there is no extra Bj factor in this branch.
+        for (int u = 1; u <= observedHistory; ++u) {
+            const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+            const double incoming =
+                j > m_WinStart ? GetSemiMarkovTransitionProbability(j - 1, j) * m_States[j - 1].ExitProb[EntryBuf]
+                               : 0.0;
+            for (size_t k = 0; k < StateJ.MicroStates.size(); ++k) {
+                const double path =
+                    incoming > 0.0 ? std::exp(StateJ.MicroStates[k].LogForwardByAge[u] + std::log(incoming)) : 0.0;
+                const double occupancy = surv_cache[u] * path;
+                FTildeJ += occupancy;
+                FTildeJo += occ_cache[u] * path;
+                m_MicroPosterior[k] += occupancy;
+            }
+        }
+        const int initialDuration = m_Tau + 1;
+        if (initialDuration <= maxU) {
+            for (size_t k = 0; k < StateJ.MicroStates.size(); ++k) {
+                const double path =
+                    StateJ.InitProb > 0.0
+                        ? std::exp(StateJ.MicroStates[k].LogForwardByAge[initialDuration] + std::log(StateJ.InitProb))
+                        : 0.0;
+                const double occupancy = surv_cache[initialDuration] * path;
+                FTildeJ += occupancy;
+                FTildeJo += occ_cache[initialDuration] * path;
+                m_MicroPosterior[k] += occupancy;
+            }
+        }
+        StateJ.Forward[m_CircularBufferIndex] = FTildeJ;
+        StateJ.ExitProb[m_CircularBufferIndex] = FTildeJo;
+        StateJ.BestMicroStateIndex = -1;
+        StateJ.BestMicroObservationIndex = -1;
+        double best = 0.0;
+        for (size_t k = 0; k < m_MicroPosterior.size(); ++k) {
+            if (m_MicroPosterior[k] > best) {
+                best = m_MicroPosterior[k];
+                StateJ.BestMicroStateIndex = static_cast<int>(k);
+                StateJ.BestMicroObservationIndex = StateJ.MicroStates[k].BestObservationIndex;
+            }
+        }
+        return;
+    }
+
     for (int u = 1; u <= observedHistory; ++u) {
         const double Dju = surv_cache[u];
         const double dju = occ_cache[u];
@@ -1358,11 +1600,23 @@ int OnlineForward::GetAlphaT() {
     m_Normalization[m_CircularBufferIndex] = N;
 
     // Apply Normalization
+    const double logN = std::log(N);
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
         m_States[j].Forward[m_CircularBufferIndex] /= N;
         m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
         m_States[j].ExitProb[m_CircularBufferIndex] /= N;
         m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+        if (m_States[j].MicroTopologyType == LEFT_RIGHT) {
+            // Shared score-level scaling: never normalize individual age vectors
+            // to unit mass. At the next frame alpha carries all previous Ns.
+            for (MarkovMicroState &Micro : m_States[j].MicroStates) {
+                for (double &LogAlpha : Micro.LogForwardByAge) {
+                    if (LogAlpha != -std::numeric_limits<double>::max()) {
+                        LogAlpha -= logN;
+                    }
+                }
+            }
+        }
     }
 
     // Find the Argmax (Best State)

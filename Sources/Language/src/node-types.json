@@ -68,6 +68,10 @@
             "named": true
           },
           {
+            "type": "multi_event",
+            "named": true
+          },
+          {
             "type": "note_event",
             "named": true
           },
@@ -343,6 +347,32 @@
         "types": [
           {
             "type": "lua_call",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "multi_event",
+    "named": true,
+    "fields": {
+      "duration": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "pitches": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "pitch_group",
             "named": true
           }
         ]
@@ -674,6 +704,10 @@
   },
   {
     "type": "LUAEVENT",
+    "named": false
+  },
+  {
+    "type": "MULTI",
     "named": false
   },
   {

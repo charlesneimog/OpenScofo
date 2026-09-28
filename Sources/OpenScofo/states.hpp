@@ -128,8 +128,14 @@ enum MicroTopology { NO_MICROSTATES, UNORDERED, LEFT_RIGHT };
 
 struct MarkovMicroState {
     std::vector<Observation> Observations;
+    double DurationWeight = 1.0;
 
-    double SelfTransitionProb = 0.0;
+    // Runtime. UNORDERED states only use the current emission and its winner.
+    double CurrentEmission = 0.0;
+    int BestObservationIndex = -1;
+    // LEFT_RIGHT log(alpha[u][k]), scaled by the score-level normalization.
+    // Age zero is unused; -numeric_limits<double>::max() denotes zero probability.
+    std::vector<double> LogForwardByAge;
 };
 
 // ─────────────────────────────────────
@@ -140,7 +146,11 @@ struct ScoreState {
     int MarkovIndex = -1;
     std::vector<Observation> Observations;
     std::vector<MarkovMicroState> MicroStates;
+    // Direct-observation winner (existing listener API).
     int BestAudioStateIndex = -1;
+    // Internal winner and observation within that microstate.
+    int BestMicroStateIndex = -1;
+    int BestMicroObservationIndex = -1;
 
     // States Actions
     HMMType HSMMType;
@@ -148,6 +158,7 @@ struct ScoreState {
     EventActions Actions;
 
     MicroTopology MicroTopologyType = NO_MICROSTATES;
+    int MicroForwardLastFrame = -1;
 
     // Inference
     double InitProb;

@@ -144,6 +144,7 @@ module.exports = grammar({
                         $.rest_event,
                         $.chord_event,
                         $.trill_event,
+                        $.multi_event,
                         $.ptech_event,
                         $.utech_event,
                         $.lua_event,
@@ -163,6 +164,7 @@ module.exports = grammar({
         rest_event: ($) => seq("REST", field("duration", $.number)),
         chord_event: ($) => seq("CHORD", field("pitches", $.pitch_group), field("duration", $.number)),
         trill_event: ($) => seq("TRILL", field("pitches", $.pitch_group), field("duration", $.number)),
+        multi_event: ($) => seq("MULTI", field("pitches", $.pitch_group), field("duration", $.number)),
         ptech_event: ($) =>
             seq(
                 "PTECH",

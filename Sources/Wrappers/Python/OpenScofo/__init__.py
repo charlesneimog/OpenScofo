@@ -11,12 +11,19 @@ from ._OpenScofo import (
     OpenScofo,
     EventType,
     HMMType,
-    AudioState,
-    MarkovState,
+    Observation,
+    ScoreState,
+    MarkovMicroState,
+    MicroTopology,
+    AudioDescType,
     Description,
     Descriptors,
     Configuration,
 )
+
+# Compatibility with the names used before the observation/score-state rename.
+AudioState = Observation
+MarkovState = ScoreState
 
 __all__ = [
     "OpenScofo",
@@ -24,6 +31,11 @@ __all__ = [
     "HMMType",
     "AudioState",
     "MarkovState",
+    "Observation",
+    "ScoreState",
+    "MarkovMicroState",
+    "MicroTopology",
+    "AudioDescType",
     "Description",
     "Descriptors",
     "Configuration",

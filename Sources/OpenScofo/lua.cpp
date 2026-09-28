@@ -38,7 +38,7 @@ static void PushNumberVector(lua_State *L, const std::vector<double> &values) {
 
 // ─────────────────────────────────────
 static void PushAudioState(lua_State *L, const Observation &state) {
-    lua_createtable(L, 0, 4);
+    lua_createtable(L, 0, 5);
     lua_pushinteger(L, state.Type);
     lua_setfield(L, -2, "type");
     lua_pushnumber(L, state.Freq);
@@ -47,6 +47,16 @@ static void PushAudioState(lua_State *L, const Observation &state) {
     lua_setfield(L, -2, "midi");
     lua_pushinteger(L, static_cast<lua_Integer>(state.Index));
     lua_setfield(L, -2, "index");
+    lua_pushlstring(L, state.Label.data(), state.Label.size());
+    lua_setfield(L, -2, "label");
+}
+
+static void PushObservations(lua_State *L, const std::vector<Observation> &observations) {
+    lua_createtable(L, static_cast<int>(observations.size()), 0);
+    for (size_t i = 0; i < observations.size(); ++i) {
+        PushAudioState(L, observations[i]);
+        lua_rawseti(L, -2, static_cast<int>(i + 1));
+    }
 }
 
 // // ─────────────────────────────────────
@@ -137,12 +147,23 @@ static void PushMarkovState(lua_State *L, const ScoreState &state) {
     lua_pushinteger(L, state.Line);
     lua_setfield(L, -2, "line");
 
-    lua_createtable(L, static_cast<int>(state.Observations.size()), 0);
-    for (size_t i = 0; i < state.Observations.size(); ++i) {
-        PushAudioState(L, state.Observations[i]);
+    PushObservations(L, state.Observations);
+    lua_setfield(L, -2, "audiostates");
+
+    lua_pushinteger(L, state.MicroTopologyType);
+    lua_setfield(L, -2, "micro_topology");
+    lua_pushinteger(L, state.BestMicroStateIndex);
+    lua_setfield(L, -2, "best_microstate_index");
+    lua_createtable(L, static_cast<int>(state.MicroStates.size()), 0);
+    for (size_t i = 0; i < state.MicroStates.size(); ++i) {
+        lua_createtable(L, 0, 2);
+        PushObservations(L, state.MicroStates[i].Observations);
+        lua_setfield(L, -2, "observations");
+        lua_pushnumber(L, state.MicroStates[i].DurationWeight);
+        lua_setfield(L, -2, "duration_weight");
         lua_rawseti(L, -2, static_cast<int>(i + 1));
     }
-    lua_setfield(L, -2, "audiostates");
+    lua_setfield(L, -2, "microstates");
 }
 
 // ─────────────────────────────────────

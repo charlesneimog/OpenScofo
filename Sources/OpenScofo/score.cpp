@@ -334,6 +334,10 @@ ScoreState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
     std::string nodeType = ts_node_type(Node);
     if (nodeType == "trill_event") {
         Event.Type = TRILL;
+        Event.MicroTopologyType = UNORDERED;
+    } else if (nodeType == "multi_event") {
+        Event.Type = MULTI;
+        Event.MicroTopologyType = LEFT_RIGHT;
     } else if (nodeType == "chord_event") {
         Event.Type = CHORD;
     } else {
@@ -356,7 +360,13 @@ ScoreState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
         }
         Observation SubState;
         PitchNode2Freq(ScoreStr, PitchNode, SubState);
-        Event.Observations.push_back(SubState);
+        if (Event.Type == TRILL || Event.Type == MULTI) {
+            MarkovMicroState MicroState;
+            MicroState.Observations.push_back(SubState);
+            Event.MicroStates.push_back(std::move(MicroState));
+        } else {
+            Event.Observations.push_back(SubState);
+        }
     }
 
     double duration = GetDurationFromNode(ScoreStr, DurationNode);
@@ -385,14 +395,16 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
 
     Event.Type = PTECH;
+    Event.MicroTopologyType = LEFT_RIGHT;
+
+    // Logical phases: alternative labels, optional pitch, silence.
+    Event.MicroStates.resize(3);
     bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
     if (!ts_node_is_null(TechniquesNode)) {
         uint32_t count = ts_node_named_child_count(TechniquesNode);
-
         for (uint32_t i = 0; i < count; ++i) {
             TSNode TechniqueNode = ts_node_named_child(TechniquesNode, i);
-
             if (std::string(ts_node_type(TechniqueNode)) != "identifier") {
                 continue;
             }
@@ -400,17 +412,16 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
             Observation SubState;
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
-            Event.Observations.push_back(SubState);
+            Event.MicroStates[0].Observations.push_back(SubState);
             HasTechnique = true;
         }
     } else {
         std::string Label = GetChildStringFromField(ScoreStr, Node, "technique");
-
         if (!Label.empty()) {
             Observation SubState;
             SubState.Label = Label;
             SubState.Type = LABEL;
-            Event.Observations.push_back(SubState);
+            Event.MicroStates[0].Observations.push_back(SubState);
             HasTechnique = true;
         }
     }
@@ -424,12 +435,12 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     // Pitch
     Observation Pitch;
     PitchNode2Freq(ScoreStr, PitchNode, Pitch);
-    Event.Observations.push_back(Pitch);
+    Event.MicroStates[1].Observations.push_back(Pitch);
 
     // Silence
     Observation Silence;
     Silence.Type = SILENCE;
-    Event.Observations.push_back(Silence);
+    Event.MicroStates.back().Observations.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -457,6 +468,9 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     }
 
     Event.Type = UTECH;
+    Event.MicroTopologyType = UNORDERED;
+    // Logical phases: alternative labels, optional pitch, silence.
+    Event.MicroStates.resize(2);
     bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
     if (!ts_node_is_null(TechniquesNode)) {
@@ -469,7 +483,7 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
             Observation SubState;
             SubState.Label = GetCodeStr(ScoreStr, TechniqueNode);
             SubState.Type = LABEL;
-            Event.Observations.push_back(SubState);
+            Event.MicroStates[0].Observations.push_back(SubState);
             HasTechnique = true;
         }
     } else {
@@ -478,7 +492,7 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
             Observation SubState;
             SubState.Label = Label;
             SubState.Type = LABEL;
-            Event.Observations.push_back(SubState);
+            Event.MicroStates[0].Observations.push_back(SubState);
             HasTechnique = true;
         }
     }
@@ -492,7 +506,7 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     // Silence
     Observation Silence;
     Silence.Type = SILENCE;
-    Event.Observations.push_back(Silence);
+    Event.MicroStates.back().Observations.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -680,7 +694,7 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     std::string defType = ts_node_type(definition);
     if (defType == "note_event") {
         Event = NewPitchEvent(ScoreStr, definition);
-    } else if (defType == "chord_event" || defType == "trill_event") {
+    } else if (defType == "chord_event" || defType == "trill_event" || defType == "multi_event") {
         Event = NewMultiPitchEvent(ScoreStr, definition);
     } else if (defType == "ptech_event") {
         Event = NewPTechEvent(ScoreStr, definition);
@@ -697,8 +711,54 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     // Configuration by Event
     Event.TimeTolerance = m_TimeTolerance;
 
-    if (Event.Observations.empty()) {
+    if ((Event.Observations.empty() && Event.MicroStates.empty()) ||
+        std::any_of(Event.MicroStates.begin(), Event.MicroStates.end(),
+                    [](const MarkovMicroState &MicroState) { return MicroState.Observations.empty(); })) {
         return;
+    }
+
+    if (Event.Type == TRILL || Event.Type == MULTI || Event.Type == UTECH || Event.Type == PTECH) {
+        const bool Technique = Event.Type == UTECH || Event.Type == PTECH;
+        const MicroTopology Topology = Event.Type == MULTI || Event.Type == PTECH ? LEFT_RIGHT : UNORDERED;
+
+        const size_t ExpectedMicroStates = Event.Type == PTECH   ? 3U
+                                           : Event.Type == UTECH ? 2U
+                                                                 : Event.MicroStates.size();
+
+        if (!Event.Observations.empty() || Event.MicroStates.empty() || Event.MicroTopologyType != Topology ||
+            (Technique && Event.MicroStates.size() != ExpectedMicroStates)) {
+
+            spdlog::error("Invalid microstate structure on line {}", Event.Line);
+            return;
+        }
+
+        for (size_t k = 0; k < Event.MicroStates.size(); ++k) {
+            AudioDescType Expected = PITCH;
+
+            if (Event.Type == PTECH) {
+                // LABEL -> PITCH -> SILENCE
+                Expected = k == 0 ? LABEL : k == 1 ? PITCH : SILENCE;
+            } else if (Event.Type == UTECH) {
+                // unordered { LABEL, SILENCE }
+                Expected = k == 0 ? LABEL : SILENCE;
+            }
+
+            const auto &Observations = Event.MicroStates[k].Observations;
+
+            if (Expected != LABEL && Observations.size() != 1) {
+                spdlog::error("Invalid microstate observations on line {}", Event.Line);
+                return;
+            }
+
+            for (const Observation &Obs : Observations) {
+                if (Obs.Type != Expected || (Expected == LABEL && Obs.Label.empty()) ||
+                    (Expected == PITCH && !(Obs.Freq > 0.0))) {
+
+                    spdlog::error("Invalid microstate observation on line {}", Event.Line);
+                    return;
+                }
+            }
+        }
     }
 
     uint32_t child_count = ts_node_child_count(Node);

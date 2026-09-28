@@ -20,11 +20,22 @@ NOTE C4 1
 | `NOTE` | Single pitch | `NOTE <PITCH> <DURATION>` | `NOTE C4 1` | Pitch name or MIDI number. |
 | `CHORD` | Simultaneous pitches | `CHORD (<PITCH...>) <DURATION>` | `CHORD (C4 E4 G4) 2` | For chords and stable multiphonics. |
 | `TRILL` | Alternating pitches | `TRILL (<PITCH...>) <DURATION>` | `TRILL (D4 E4) 4` | For trills and tremolos. |
+| `MULTI` | Ordered pitch trajectory | `MULTI (<PITCH...>) <DURATION>` | `MULTI (C4 C#4 D4 D#4 E4) 2` | Each written pitch is one internal state; no interpolation. |
 | `REST` | Silence | `REST <DURATION>` | `REST 1` | Keeps score time moving. |
 | `PTECH` | Pitched technique | `PTECH <LABEL> <PITCH> <DURATION>` | `PTECH pizz C4 1` | For extended techniques **with** pitch. Check [AI](../ai/index.md)! |
 | `UTECH` | Unpitched technique | `UTECH <LABEL> <DURATION>` | `UTECH jet-whistle 2` | For extended techniques **without** pitch. Check [AI](../ai/index.md)! |
 
 ## Example
+
+`TRILL` and `UTECH` use the strongest current internal observation, without an ordering constraint.
+`UTECH` considers onset, alternative technique labels, and silence.
+`PTECH` follows the ordered internal phases onset → alternative labels → pitch → silence.
+`MULTI` follows its written pitches in order. These internal states share the event's overall duration.
+
+The initial duration policy divides `MULTI` equally by default. For `PTECH`, onset gets one analysis frame,
+the silence tail has a nominal one-frame allocation, and labels/pitch share the remaining duration.
+The final internal state is absorbing until the outer duration model exits the event; these allocations
+are modeling defaults, not separate notated durations. A `PTECH` trajectory needs onset evidence to begin.
 
 ```openscofo hl_lines="3 6 9"
 BPM 60

@@ -77,6 +77,7 @@ class OnlineForward {
     void ClearStates();
 
   private:
+    friend struct OnlineForwardTestAccess;
     void GetDecodeWindow();
 
     // Time
@@ -96,6 +97,9 @@ class OnlineForward {
     // Markov and Probabilities
     double GetSemiMarkovTransitionProbability(int i, int j);
     double GetMarkovTransitionProbability(int i, int j);
+    void PrepareMicroStateDurations(const ScoreState &Parent);
+    void UpdateMicroStateForward(ScoreState &State, int StateIndex, int MaxAge);
+    void ResetMicroStateRuntime(ScoreState &State);
     void GetInitialDistribution();
     int GetMaxUForJ(ScoreState &StateJ);
 
@@ -113,6 +117,8 @@ class OnlineForward {
 
     // Get Audio Obs
     void GetAudioObservations();
+    double GetObservationEvidence(const Observation &Obs, bool AllowSilence);
+    double GetMicroStateEmission(MarkovMicroState &MicroState, bool AllowSilence, bool ApplyGates);
     void NotifyAudioStateChange(int StateIndex);
 
   private:
@@ -125,6 +131,13 @@ class OnlineForward {
 
     int m_BestAudioStateStateIndex;
     int m_BestAudioStateIndex;
+    int m_ActiveMarkovScoreStateIndex = -1;
+    // Reused scratch space for one active LEFT_RIGHT parent at a time.
+    std::vector<double> m_MicroExpectedFrames;
+    std::vector<double> m_MicroLogEmission;
+    std::vector<double> m_MicroLogSelfProb;
+    std::vector<double> m_MicroLogAdvanceProb;
+    std::vector<double> m_MicroPosterior;
 
     // Config
     double m_MinEntropy = 0;
@@ -135,6 +148,7 @@ class OnlineForward {
     // Audio-state change notifications
     int m_LastNotifiedStateIndex = -1;
     int m_LastNotifiedAudioStateIndex = -1;
+    int m_LastNotifiedMicroStateIndex = -1;
     std::deque<ScoreAction> m_PendingAudioStateActions;
 
     // Audio

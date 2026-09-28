@@ -505,6 +505,10 @@
               },
               {
                 "type": "SYMBOL",
+                "name": "multi_event"
+              },
+              {
+                "type": "SYMBOL",
                 "name": "ptech_event"
               },
               {
@@ -620,6 +624,31 @@
         {
           "type": "STRING",
           "value": "TRILL"
+        },
+        {
+          "type": "FIELD",
+          "name": "pitches",
+          "content": {
+            "type": "SYMBOL",
+            "name": "pitch_group"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "duration",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        }
+      ]
+    },
+    "multi_event": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "MULTI"
         },
         {
           "type": "FIELD",

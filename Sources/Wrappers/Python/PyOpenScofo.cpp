@@ -151,6 +151,12 @@ NB_MODULE(_OpenScofo, m) {
         .value("MARKOV", OpenScofo::MARKOV)
         .export_values();
 
+    nb::enum_<OpenScofo::AudioDescType>(m, "AudioDescType")
+        .value("PITCH", OpenScofo::PITCH)
+        .value("SILENCE", OpenScofo::SILENCE)
+        .value("LABEL", OpenScofo::LABEL)
+        .value("ONSET", OpenScofo::ONSET);
+
     nb::class_<OpenScofo::Observation>(m, "Observation")
         .def(nb::init<>())
         .def_rw("type", &OpenScofo::Observation::Type)
@@ -158,6 +164,16 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("midi", &OpenScofo::Observation::Midi)
         .def_rw("label", &OpenScofo::Observation::Label)
         .def_rw("index", &OpenScofo::Observation::Index);
+
+    nb::enum_<OpenScofo::MicroTopology>(m, "MicroTopology")
+        .value("NO_MICROSTATES", OpenScofo::NO_MICROSTATES)
+        .value("UNORDERED", OpenScofo::UNORDERED)
+        .value("LEFT_RIGHT", OpenScofo::LEFT_RIGHT);
+
+    nb::class_<OpenScofo::MarkovMicroState>(m, "MarkovMicroState")
+        .def(nb::init<>())
+        .def_rw("observations", &OpenScofo::MarkovMicroState::Observations)
+        .def_rw("duration_weight", &OpenScofo::MarkovMicroState::DurationWeight);
 
     // Description Class
     nb::class_<OpenScofo::Description>(m, "Description")
@@ -228,6 +244,9 @@ NB_MODULE(_OpenScofo, m) {
         .def_rw("section", &OpenScofo::ScoreState::Section)
         .def_rw("markov_index", &OpenScofo::ScoreState::MarkovIndex)
         .def_rw("audio_states", &OpenScofo::ScoreState::Observations)
+        .def_rw("microstates", &OpenScofo::ScoreState::MicroStates)
+        .def_rw("micro_topology", &OpenScofo::ScoreState::MicroTopologyType)
+        .def_rw("best_microstate_index", &OpenScofo::ScoreState::BestMicroStateIndex)
 
         // State actions
         .def_rw("hsmm_type", &OpenScofo::ScoreState::HSMMType)

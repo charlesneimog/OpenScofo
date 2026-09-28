@@ -31,6 +31,7 @@
 (utech_event) @type.builtin
 (chord_event) @type.builtin
 (trill_event) @type.builtin
+(multi_event) @type.builtin
 (lua_event) @type.builtin
 
 ; ================================

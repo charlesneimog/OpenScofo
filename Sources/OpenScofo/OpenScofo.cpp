@@ -973,6 +973,16 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
                 requestScoreDescriptor(ODSONSET);
             }
         }
+        for (const MarkovMicroState &microState : state.MicroStates) {
+            for (const Observation &audioState : microState.Observations) {
+                if (audioState.Type == LABEL) {
+                    requestScoreDescriptor(ONNX);
+                    requestScoreDescriptor(EXTENDEDTECHNIQUE);
+                } else if (audioState.Type == ONSET) {
+                    requestScoreDescriptor(ODSONSET);
+                }
+            }
+        }
     }
 
     UpdateConfiguration(newConfig);
@@ -1000,7 +1010,7 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     // verify the states.
     const std::vector<std::string> &ONNXLabels = m_MIR.GetONNXLabels();
     for (auto &state : m_States) {
-        for (auto &audioState : state.Observations) {
+        for (const Observation &audioState : state.Observations) {
             if (audioState.Type == LABEL) {
                 const auto &label = audioState.Label;
                 auto it = std::find(ONNXLabels.begin(), ONNXLabels.end(), label);
@@ -1016,6 +1026,27 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
                     spdlog::error("Extended Technique Label '{}' is not valid on line {}. Valid labels: {}", label,
                                   state.Line, validLabels);
                     return false;
+                }
+            }
+        }
+        for (const MarkovMicroState &microState : state.MicroStates) {
+            for (const Observation &audioState : microState.Observations) {
+                if (audioState.Type == LABEL) {
+                    const auto &label = audioState.Label;
+                    auto it = std::find(ONNXLabels.begin(), ONNXLabels.end(), label);
+                    if (it == ONNXLabels.end()) {
+                        std::string validLabels = "[";
+                        for (size_t i = 0; i < ONNXLabels.size(); ++i) {
+                            validLabels += ONNXLabels[i];
+                            if (i + 1 < ONNXLabels.size()) {
+                                validLabels += ", ";
+                            }
+                        }
+                        validLabels += "]";
+                        spdlog::error("Extended Technique Label '{}' is not valid on line {}. Valid labels: {}", label,
+                                      state.Line, validLabels);
+                        return false;
+                    }
                 }
             }
         }

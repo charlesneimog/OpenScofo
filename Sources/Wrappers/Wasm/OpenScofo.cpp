@@ -48,10 +48,30 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
     enum_<OpenScofo::HMMType>("HMMType").value("SEMIMARKOV", OpenScofo::SEMIMARKOV).value("MARKOV", OpenScofo::MARKOV);
 
     // AudioState
-    class_<OpenScofo::AudioState>("AudioState")
+    enum_<OpenScofo::AudioDescType>("AudioDescType")
+        .value("PITCH", OpenScofo::PITCH)
+        .value("SILENCE", OpenScofo::SILENCE)
+        .value("LABEL", OpenScofo::LABEL)
+        .value("ONSET", OpenScofo::ONSET);
+    class_<OpenScofo::Observation>("AudioState")
         .constructor<>()
-        .property("frequency", &OpenScofo::AudioState::Freq)
-        .property("index", &OpenScofo::AudioState::Index);
+        .property("type", &OpenScofo::Observation::Type)
+        .property("frequency", &OpenScofo::Observation::Freq)
+        .property("midi", &OpenScofo::Observation::Midi)
+        .property("label", &OpenScofo::Observation::Label)
+        .property("index", &OpenScofo::Observation::Index);
+
+    enum_<OpenScofo::MicroTopology>("MicroTopology")
+        .value("NO_MICROSTATES", OpenScofo::NO_MICROSTATES)
+        .value("UNORDERED", OpenScofo::UNORDERED)
+        .value("LEFT_RIGHT", OpenScofo::LEFT_RIGHT);
+
+    register_vector<OpenScofo::Observation>("VectorObservation");
+    class_<OpenScofo::MarkovMicroState>("MarkovMicroState")
+        .constructor<>()
+        .property("observations", &OpenScofo::MarkovMicroState::Observations)
+        .property("duration_weight", &OpenScofo::MarkovMicroState::DurationWeight);
+    register_vector<OpenScofo::MarkovMicroState>("VectorMarkovMicroState");
 
     // Description
     class_<OpenScofo::Description>("Description")
@@ -89,24 +109,27 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
         .property("magnitude", &OpenScofo::Description::Magnitude);
 
     // MarkovState
-    class_<OpenScofo::MarkovState>("MarkovState")
+    class_<OpenScofo::ScoreState>("MarkovState")
         .constructor<>()
-        .property("position", &OpenScofo::MarkovState::ScorePos)
-        .property("section", &OpenScofo::MarkovState::Section)
-        .property("type", &OpenScofo::MarkovState::Type)
-        .property("markov", &OpenScofo::MarkovState::HSMMType)
-        .property("forward", &OpenScofo::MarkovState::Forward)
-        .property("bpm_expected", &OpenScofo::MarkovState::BPMExpected)
-        .property("bpm_observed", &OpenScofo::MarkovState::BPMObserved)
-        .property("onset_expected", &OpenScofo::MarkovState::OnsetExpected)
-        .property("onset_observed", &OpenScofo::MarkovState::OnsetObserved)
-        .property("phase_expected", &OpenScofo::MarkovState::PhaseExpected)
-        .property("phase_observed", &OpenScofo::MarkovState::PhaseObserved)
-        .property("ioi_phi_n", &OpenScofo::MarkovState::IOIPhiN)
-        .property("ioi_hat_phi_n", &OpenScofo::MarkovState::IOIHatPhiN)
-        .property("audio_states", &OpenScofo::MarkovState::AudioStates)
-        .property("duration", &OpenScofo::MarkovState::Duration)
-        .property("line", &OpenScofo::MarkovState::Line);
+        .property("position", &OpenScofo::ScoreState::ScorePos)
+        .property("section", &OpenScofo::ScoreState::Section)
+        .property("type", &OpenScofo::ScoreState::Type)
+        .property("markov", &OpenScofo::ScoreState::HSMMType)
+        .property("forward", &OpenScofo::ScoreState::Forward)
+        .property("bpm_expected", &OpenScofo::ScoreState::BPMExpected)
+        .property("bpm_observed", &OpenScofo::ScoreState::BPMObserved)
+        .property("onset_expected", &OpenScofo::ScoreState::OnsetExpected)
+        .property("onset_observed", &OpenScofo::ScoreState::OnsetObserved)
+        .property("phase_expected", &OpenScofo::ScoreState::PhaseExpected)
+        .property("phase_observed", &OpenScofo::ScoreState::PhaseObserved)
+        .property("ioi_phi_n", &OpenScofo::ScoreState::IOIPhiN)
+        .property("ioi_hat_phi_n", &OpenScofo::ScoreState::IOIHatPhiN)
+        .property("audio_states", &OpenScofo::ScoreState::Observations)
+        .property("microstates", &OpenScofo::ScoreState::MicroStates)
+        .property("micro_topology", &OpenScofo::ScoreState::MicroTopologyType)
+        .property("best_microstate_index", &OpenScofo::ScoreState::BestMicroStateIndex)
+        .property("duration", &OpenScofo::ScoreState::Duration)
+        .property("line", &OpenScofo::ScoreState::Line);
 
     // OpenScofo class
     class_<OpenScofo::OpenScofo>("OpenScofo")
