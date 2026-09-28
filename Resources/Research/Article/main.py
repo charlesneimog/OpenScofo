@@ -1,6 +1,7 @@
 import OpenScofo
 import librosa
 from pathlib import Path
+import math
 
 
 class ExtendedTechniqueGate:
@@ -18,61 +19,75 @@ class ExtendedTechniqueGate:
 
         self.scofo.activate_all_descriptors()
         self.check_gate(
-            # "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/tongue_ram/Fl-tng_ram-A3-mf-N-N.wav"
-            # "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/pizzicato/Fl-pizz-D4-f-N-N.wav"
-            "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/jet_whistle/Fl-jet_wh-N-N-N-N.wav"
+            {
+                "Tongue Ram": "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/tongue_ram/Fl-tng_ram-A3-mf-N-N.wav",
+                "Pizzicato": "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/pizzicato/Fl-pizz-D4-f-N-N.wav",
+                "Jet Whistle": "/home/neimog/Nextcloud/Music-Resources/Samples/Orchidea/Winds/Flute/jet_whistle/Fl-jet_wh-N-N-N-N.wav",
+            }
         )
 
     def list_SOL_files(self):
         return list(Path(self.orchidea_sol).rglob("*.wav"))
 
-    def check_gate(self, audio_path):
+    def check_gate(self, audio_paths):
         import matplotlib.pyplot as plt
 
-        audio, _ = librosa.load(audio_path, sr=self.sr, mono=True)
+        fig, axes = plt.subplots(
+            3,
+            1,
+            figsize=(14, 10),
+            sharex=False,
+            sharey=True,
+        )
 
-        times = []
-        silence_gate = []
-        sound_gate = []
-        tech_gate = []
-        pitch_gate = []
+        for ax, (name, audio_path) in zip(axes, audio_paths.items()):
+            audio, _ = librosa.load(audio_path, sr=self.sr, mono=True)
 
-        for i in range(0, len(audio), self.hop_size):
-            block = audio[i : i + self.hop_size]
+            times = []
+            silence_gate = []
+            tech_gate = []
+            pitch_gate = []
 
-            if len(block) < self.hop_size:
-                block = librosa.util.fix_length(block, size=self.hop_size)
+            for i in range(0, len(audio), self.hop_size):
+                block = audio[i : i + self.hop_size]
 
-            if not self.scofo.process_block(block):
-                raise RuntimeError("Failed to process block")
+                if len(block) < self.hop_size:
+                    block = librosa.util.fix_length(
+                        block,
+                        size=self.hop_size,
+                    )
 
-            desc = self.scofo.get_description()
+                if not self.scofo.process_block(block):
+                    raise RuntimeError("Failed to process block")
 
-            silence_prob = desc.silence
-            ext_prob = desc.ext
+                desc = self.scofo.get_description()
 
-            sound_prob = max(0.0, 1.0 - silence_prob)
-            tech_weight = ext_prob
-            pitch_weight = 1.0 - ext_prob
+                silence_prob = desc.silence
+                ext_prob = desc.ext
 
-            times.append(i / self.sr)
+                sound_prob = 1.0 - silence_prob
+                tech_weight = ext_prob
+                pitch_weight = 1.0 - ext_prob
 
-            silence_gate.append(silence_prob)
-            sound_gate.append(sound_prob)
-            tech_gate.append(tech_weight * sound_prob)
-            pitch_gate.append(desc.pitch_confidence * pitch_weight * sound_prob)
+                times.append(i / self.sr)
 
-        plt.figure(figsize=(14, 5))
+                silence_gate.append(silence_prob)
+                tech_gate.append(tech_weight * sound_prob)
+                pitch_gate.append(pitch_weight * sound_prob)
 
-        plt.plot(times, silence_gate, label="Silence")
-        plt.plot(times, tech_gate, label="Extended Technique")
-        plt.plot(times, pitch_gate, label="Pitch / Note")
+            ax.plot(times, silence_gate, label="Silence")
+            ax.plot(times, tech_gate, label="Extended Technique")
+            ax.plot(times, pitch_gate, label="Pitch / Note")
 
-        plt.xlabel("Time (s)")
-        plt.ylabel("Gate")
-        plt.ylim(0.0, 1.0)
-        plt.legend()
-        plt.grid(alpha=0.3)
+            ax.set_title(name)
+            ax.set_ylabel("Gate")
+            ax.set_ylim(0.0, 1.0)
+            ax.grid(alpha=0.3)
+            ax.legend(loc="upper right")
+
+        axes[-1].set_xlabel("Time (s)")
+
+        fig.suptitle("OpenScofo Gate Analysis", fontsize=16)
 
         plt.tight_layout()
         plt.show()
