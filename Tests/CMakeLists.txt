@@ -25,26 +25,40 @@ if(NOT APPLE)
     target_link_libraries(math_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Math COMMAND math_tests)
 
-    # Passa o caminho da pasta 'assets' para o código C++
-    target_compile_definitions(main_class
-                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
-    target_compile_definitions(score_tests
-                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
-    target_compile_definitions(math_tests
-                               PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    add_executable(onnx_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_onnx.cpp")
+    target_link_libraries(onnx_tests PRIVATE OpenScofo GTest::gtest_main)
+    add_test(NAME Onnx COMMAND onnx_tests)
 
-    FetchContent_Declare(AudioFile GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
-                         GIT_TAG master)
+    # Passa o caminho da pasta 'assets' para o código C++
+    target_compile_definitions(main_class PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(score_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(math_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    target_compile_definitions(onnx_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+
+    FetchContent_Declare(
+        AudioFile
+        GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
+        GIT_TAG master)
     FetchContent_MakeAvailable(AudioFile)
 
     add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
-    target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
-                                                  -Wno-unused-variable)
+    target_compile_options(
+        openscofo_perf
+        PRIVATE -O2
+                -g
+                -fno-omit-frame-pointer
+                -Wno-shadow
+                -Wno-unused-variable)
 
     #
     add_executable(openscofo_perf_folder "${CMAKE_CURRENT_SOURCE_DIR}/performance-folder.cpp")
     target_link_libraries(openscofo_perf_folder PRIVATE OpenScofo AudioFile)
-    target_compile_options(openscofo_perf_folder PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
-                                                         -Wno-unused-variable)
+    target_compile_options(
+        openscofo_perf_folder
+        PRIVATE -O2
+                -g
+                -fno-omit-frame-pointer
+                -Wno-shadow
+                -Wno-unused-variable)
 endif()
