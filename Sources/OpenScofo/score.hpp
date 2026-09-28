@@ -36,7 +36,7 @@ class Score {
     Configuration *m_Config;
 
     // Helpers
-    ScoreState AddDummySilence();
+    void AddDummySilence(const ScoreState &Next);
     double ModPhases(double Phase);
     ScoreState AddTransState(ScoreState &State, int ScoreEvent, int BPM);
     double PitchName2Midi(char pitchName, std::string alt, std::string octave);
@@ -70,7 +70,9 @@ class Score {
     // Events
     ScoreState NewRestEvent(const std::string &Score, TSNode Node);
     ScoreState NewPitchEvent(const std::string &Score, TSNode Node);
-    ScoreState NewMultiPitchEvent(const std::string &Score, TSNode Node);
+    ScoreState NewChordEvent(const std::string &Score, TSNode Node);
+    ScoreState NewTrillEvent(const std::string &Score, TSNode Node);
+    ScoreState NewMultiEvent(const std::string &Score, TSNode Node);
     ScoreState NewPTechEvent(const std::string &ScoreStr, TSNode Node);
     ScoreState NewUTechEvent(const std::string &ScoreStr, TSNode Node);
 

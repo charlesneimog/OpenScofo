@@ -152,6 +152,8 @@ static void PushMarkovState(lua_State *L, const ScoreState &state) {
 
     lua_pushinteger(L, state.MicroTopologyType);
     lua_setfield(L, -2, "micro_topology");
+    lua_pushboolean(L, state.IsInterEventSilence);
+    lua_setfield(L, -2, "inter_event_silence");
     lua_pushinteger(L, state.BestMicroStateIndex);
     lua_setfield(L, -2, "best_microstate_index");
     lua_createtable(L, static_cast<int>(state.MicroStates.size()), 0);

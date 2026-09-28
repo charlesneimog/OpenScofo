@@ -241,6 +241,7 @@ NB_MODULE(_OpenScofo, m) {
         // Core
         .def_rw("index", &OpenScofo::ScoreState::Index)
         .def_rw("score_pos", &OpenScofo::ScoreState::ScorePos)
+        .def_ro("inter_event_silence", &OpenScofo::ScoreState::IsInterEventSilence)
         .def_rw("section", &OpenScofo::ScoreState::Section)
         .def_rw("markov_index", &OpenScofo::ScoreState::MarkovIndex)
         .def_rw("audio_states", &OpenScofo::ScoreState::Observations)

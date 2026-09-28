@@ -203,22 +203,36 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-ScoreState Score::AddDummySilence() {
-    ScoreState Event;
-    Event.HSMMType = SEMIMARKOV;
+void Score::AddDummySilence(const ScoreState &Next) {
+    if (m_ScoreStates.empty() || Next.Type == REST || Next.Type == FIRSTEVENT) {
+        return;
+    }
+    const ScoreState &Previous = m_ScoreStates.back();
+    const bool Sounded =
+        Previous.Type == NOTE || Previous.Type == CHORD || Previous.Type == PTECH || Previous.Type == UTECH;
+    if (!Sounded || Previous.Section != Next.Section) {
+        return;
+    }
+
+    ScoreState Event{};
+    Event.HSMMType = MARKOV;
     Event.Type = REST;
-    Event.ScorePos = m_ScorePosition;
-    Event.Index = m_ScoreStates.size();
+    Event.IsInterEventSilence = true;
+    Event.ScorePos = Previous.ScorePos;
+    Event.Index = static_cast<int>(m_ScoreStates.size());
     Event.Duration = 0;
-
-    Observation Silence;
-    Silence.Type = SILENCE;
-    Silence.Freq = 0;
-    Silence.Midi = 0;
-    Silence.Index = 0;
-
-    Event.Observations.emplace_back(Silence);
-    return Event;
+    Event.Section = Previous.Section;
+    Event.Line = Previous.Line;
+    Event.BPMExpected = Previous.BPMExpected;
+    Event.OnsetExpected = Next.OnsetExpected;
+    Event.PhaseExpected = Next.PhaseExpected;
+    Event.IOIHatPhiN = Next.IOIHatPhiN;
+    Event.IOIPhiN = Next.IOIPhiN;
+    Event.SyncStrength = Previous.SyncStrength;
+    Event.PhaseCoupling = Previous.PhaseCoupling;
+    Event.TimeTolerance = Previous.TimeTolerance;
+    Event.Observations.push_back({SILENCE});
+    m_ScoreStates.emplace_back(std::move(Event));
 }
 
 // ─────────────────────────────────────
@@ -286,12 +300,7 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     PitchNode2Freq(ScoreStr, PitchNode, SubState);
     Event.Observations.push_back(SubState);
 
-    // Silence
     if (Percussive) {
-        Observation PercussiveDesc;
-        PercussiveDesc.Type = SILENCE;
-        Event.Observations.push_back(PercussiveDesc);
-
         // TODO: need tests
         Observation Onset;
         Onset.Type = ONSET;
@@ -307,71 +316,142 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
-ScoreState Score::NewMultiPitchEvent(const std::string &ScoreStr, TSNode Node) {
+ScoreState Score::NewChordEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
-    ScoreState Event;
+    ScoreState Event{};
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
+    Event.Type = CHORD;
+    Event.MicroTopologyType = NO_MICROSTATES;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
 
-    if (ts_node_has_error(Node)) {
-        TSPoint Init = ts_node_start_point(Node);
-        spdlog::error("Multi pitch event with syntax error on line {}", Init.row + 1);
+    TSNode PitchesNode = ts_node_child_by_field_name(Node, "pitches", 7);
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+    if (ts_node_has_error(Node) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
+        spdlog::error("Invalid CHORD event structure on line {}", Event.Line);
         return {};
     }
+    const uint32_t PitchCount = ts_node_named_child_count(PitchesNode);
+    if (PitchCount == 0) {
+        spdlog::error("Missing CHORD pitches on line {}", Event.Line);
+        return {};
+    }
+
+    for (uint32_t i = 0; i < PitchCount; ++i) {
+        TSNode PitchNode = ts_node_named_child(PitchesNode, i);
+        Observation Pitch{};
+        PitchNode2Freq(ScoreStr, PitchNode, Pitch);
+        if (!(Pitch.Freq > 0.0)) {
+            return {};
+        }
+        Event.Observations.push_back(Pitch);
+    }
+
+    Event.Duration = GetDurationFromNode(ScoreStr, DurationNode);
+    ProcessEventTime(Event);
+    return Event;
+}
+
+// ─────────────────────────────────────
+ScoreState Score::NewTrillEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    ScoreState Event{};
+    Event.Line = ts_node_start_point(Node).row + 1;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Type = TRILL;
+    Event.MicroTopologyType = UNORDERED;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
 
     TSNode PitchesNode = ts_node_child_by_field_name(Node, "pitches", 7);
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
-
-    if (ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
-        TSPoint Init = ts_node_start_point(Node);
-        spdlog::error("Invalid multi pitch event structure on line {}", Init.row + 1);
+    if (ts_node_has_error(Node) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
+        spdlog::error("Invalid TRILL event structure on line {}", Event.Line);
+        return {};
+    }
+    const uint32_t PitchCount = ts_node_named_child_count(PitchesNode);
+    if (PitchCount == 0) {
+        spdlog::error("Missing TRILL pitches on line {}", Event.Line);
         return {};
     }
 
-    std::string nodeType = ts_node_type(Node);
-    if (nodeType == "trill_event") {
-        Event.Type = TRILL;
-        Event.MicroTopologyType = UNORDERED;
-    } else if (nodeType == "multi_event") {
-        Event.Type = MULTI;
-        Event.MicroTopologyType = LEFT_RIGHT;
-    } else if (nodeType == "chord_event") {
-        Event.Type = CHORD;
-    } else {
-        TSPoint Init = ts_node_start_point(Node);
-        spdlog::error("Wrong Type on {}", Init.row + 1);
-        return {};
-    }
-
-    uint32_t pitch_count = ts_node_named_child_count(PitchesNode);
-    if (pitch_count == 0) {
-        TSPoint Init = ts_node_start_point(PitchesNode);
-        spdlog::error("Missing pitches on line {}", Init.row + 1);
-        return {};
-    }
-
-    for (uint32_t i = 0; i < pitch_count; i++) {
+    for (uint32_t i = 0; i < PitchCount; ++i) {
         TSNode PitchNode = ts_node_named_child(PitchesNode, i);
-        if (std::string(ts_node_type(PitchNode)) != "pitch") {
-            continue;
+        Observation Pitch{};
+        PitchNode2Freq(ScoreStr, PitchNode, Pitch);
+        if (!(Pitch.Freq > 0.0)) {
+            return {};
         }
-        Observation SubState;
-        PitchNode2Freq(ScoreStr, PitchNode, SubState);
-        if (Event.Type == TRILL || Event.Type == MULTI) {
-            MarkovMicroState MicroState;
-            MicroState.Observations.push_back(SubState);
-            Event.MicroStates.push_back(std::move(MicroState));
-        } else {
-            Event.Observations.push_back(SubState);
-        }
+        MarkovMicroState MicroState;
+        MicroState.Observations.push_back(Pitch);
+        Event.MicroStates.push_back(std::move(MicroState));
     }
 
-    double duration = GetDurationFromNode(ScoreStr, DurationNode);
-    Event.Duration = duration;
+    Event.Duration = GetDurationFromNode(ScoreStr, DurationNode);
+    ProcessEventTime(Event);
+    return Event;
+}
 
+// ─────────────────────────────────────
+ScoreState Score::NewMultiEvent(const std::string &ScoreStr, TSNode Node) {
+    m_ScorePosition++;
+
+    ScoreState Event{};
+    Event.Line = ts_node_start_point(Node).row + 1;
+    Event.HSMMType = SEMIMARKOV;
+    Event.Type = MULTI;
+    Event.MicroTopologyType = LEFT_RIGHT;
+    Event.Index = m_ScoreStates.size();
+    Event.ScorePos = m_ScorePosition;
+
+    TSNode PitchesNode = ts_node_child_by_field_name(Node, "pitches", 7);
+    TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
+    if (ts_node_has_error(Node) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
+        spdlog::error("Invalid MULTI event structure on line {}", Event.Line);
+        return {};
+    }
+    const uint32_t PitchCount = ts_node_named_child_count(PitchesNode);
+    if (PitchCount == 0) {
+        spdlog::error("Missing MULTI pitches on line {}", Event.Line);
+        return {};
+    }
+
+    // Build the complete glissando here. The forward model only follows
+    // this ordered chain; it never generates intermediate pitches.
+    auto AddPitch = [&](const Observation &Pitch) {
+        MarkovMicroState MicroState;
+        MicroState.Observations.push_back(Pitch);
+        Event.MicroStates.push_back(std::move(MicroState));
+    };
+
+    for (uint32_t i = 0; i < PitchCount; ++i) {
+        TSNode PitchNode = ts_node_named_child(PitchesNode, i);
+        Observation Pitch{};
+        PitchNode2Freq(ScoreStr, PitchNode, Pitch);
+        if (!(Pitch.Freq > 0.0)) {
+            return {};
+        }
+        if (!Event.MicroStates.empty()) {
+            const double PreviousMidi = Event.MicroStates.back().Observations[0].Midi;
+            if (Pitch.Midi == PreviousMidi) {
+                continue;
+            }
+            const double Step = Pitch.Midi > PreviousMidi ? 0.5 : -0.5;
+            for (double Midi = PreviousMidi + Step; Step > 0 ? Midi < Pitch.Midi : Midi > Pitch.Midi; Midi += Step) {
+                Observation Intermediate{};
+                Intermediate.Type = PITCH;
+                Intermediate.Midi = Midi;
+                Intermediate.Freq = m_Tunning * std::pow(2.0, (Midi - 69.0) / 12.0);
+                AddPitch(Intermediate);
+            }
+        }
+        AddPitch(Pitch);
+    }
+
+    Event.Duration = GetDurationFromNode(ScoreStr, DurationNode);
     ProcessEventTime(Event);
     return Event;
 }
@@ -395,12 +475,13 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
 
     Event.Type = PTECH;
-    Event.MicroTopologyType = LEFT_RIGHT;
+    Event.MicroTopologyType = UNORDERED;
 
-    // Logical phases: alternative labels, optional pitch, silence.
-    Event.MicroStates.resize(3);
+    // Sounded alternatives: technique labels or pitch.
+    Event.MicroStates.resize(2);
     bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
+
     if (!ts_node_is_null(TechniquesNode)) {
         uint32_t count = ts_node_named_child_count(TechniquesNode);
         for (uint32_t i = 0; i < count; ++i) {
@@ -437,11 +518,6 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     PitchNode2Freq(ScoreStr, PitchNode, Pitch);
     Event.MicroStates[1].Observations.push_back(Pitch);
 
-    // Silence
-    Observation Silence;
-    Silence.Type = SILENCE;
-    Event.MicroStates.back().Observations.push_back(Silence);
-
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
     double Duration = GetDurationFromNode(ScoreStr, DurationNode);
@@ -469,8 +545,8 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
 
     Event.Type = UTECH;
     Event.MicroTopologyType = UNORDERED;
-    // Logical phases: alternative labels, optional pitch, silence.
-    Event.MicroStates.resize(2);
+    // Alternative technique labels share one sounded microstate.
+    Event.MicroStates.resize(1);
     bool HasTechnique = false;
     TSNode TechniquesNode = ts_node_child_by_field_name(Node, "techniques", 10);
     if (!ts_node_is_null(TechniquesNode)) {
@@ -502,11 +578,6 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
         spdlog::error("UTECH event without technique on line {}", Init.row + 1);
         return {};
     }
-
-    // Silence
-    Observation Silence;
-    Silence.Type = SILENCE;
-    Event.MicroStates.back().Observations.push_back(Silence);
 
     // Duration
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
@@ -694,8 +765,12 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     std::string defType = ts_node_type(definition);
     if (defType == "note_event") {
         Event = NewPitchEvent(ScoreStr, definition);
-    } else if (defType == "chord_event" || defType == "trill_event" || defType == "multi_event") {
-        Event = NewMultiPitchEvent(ScoreStr, definition);
+    } else if (defType == "chord_event") {
+        Event = NewChordEvent(ScoreStr, definition);
+    } else if (defType == "trill_event") {
+        Event = NewTrillEvent(ScoreStr, definition);
+    } else if (defType == "multi_event") {
+        Event = NewMultiEvent(ScoreStr, definition);
     } else if (defType == "ptech_event") {
         Event = NewPTechEvent(ScoreStr, definition);
     } else if (defType == "utech_event") {
@@ -719,15 +794,9 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
 
     if (Event.Type == TRILL || Event.Type == MULTI || Event.Type == UTECH || Event.Type == PTECH) {
         const bool Technique = Event.Type == UTECH || Event.Type == PTECH;
-        const MicroTopology Topology = Event.Type == MULTI || Event.Type == PTECH ? LEFT_RIGHT : UNORDERED;
-
-        const size_t ExpectedMicroStates = Event.Type == PTECH   ? 3U
-                                           : Event.Type == UTECH ? 2U
-                                                                 : Event.MicroStates.size();
-
-        if (!Event.Observations.empty() || Event.MicroStates.empty() || Event.MicroTopologyType != Topology ||
+        const size_t ExpectedMicroStates = Event.Type == PTECH ? 2 : 1;
+        if (!Event.Observations.empty() || Event.MicroStates.empty() ||
             (Technique && Event.MicroStates.size() != ExpectedMicroStates)) {
-
             spdlog::error("Invalid microstate structure on line {}", Event.Line);
             return;
         }
@@ -736,11 +805,10 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
             AudioDescType Expected = PITCH;
 
             if (Event.Type == PTECH) {
-                // LABEL -> PITCH -> SILENCE
-                Expected = k == 0 ? LABEL : k == 1 ? PITCH : SILENCE;
+                // Unordered technique and pitch alternatives.
+                Expected = k == 0 ? LABEL : PITCH;
             } else if (Event.Type == UTECH) {
-                // unordered { LABEL, SILENCE }
-                Expected = k == 0 ? LABEL : SILENCE;
+                Expected = LABEL;
             }
 
             const auto &Observations = Event.MicroStates[k].Observations;
@@ -775,7 +843,10 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
 
     m_PrevDuration = Event.Duration;
     m_LastOnset = Event.OnsetExpected;
-    m_ScoreStates.emplace_back(Event);
+    // Event timing is already computed from the previous scored event.
+    AddDummySilence(Event);
+    Event.Index = static_cast<int>(m_ScoreStates.size());
+    m_ScoreStates.emplace_back(std::move(Event));
 }
 
 // ─────────────────────────────────────

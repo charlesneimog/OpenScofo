@@ -15,6 +15,8 @@
 #include "states.hpp"
 #include "log.hpp"
 
+#include "utils.hpp"
+
 #if defined(OPENSCOFO_LUA)
 extern "C" {
 #include <lua.h>

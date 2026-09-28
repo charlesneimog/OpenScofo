@@ -144,6 +144,8 @@ struct ScoreState {
     int ScorePos;
     std::string Section;
     int MarkovIndex = -1;
+    // Unscored, optional silence after a sounded event; keeps its score position.
+    bool IsInterEventSilence = false;
     std::vector<Observation> Observations;
     std::vector<MarkovMicroState> MicroStates;
     // Direct-observation winner (existing listener API).

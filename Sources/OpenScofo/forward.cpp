@@ -7,7 +7,6 @@
     See the LICENSE file for details.
 */
 #include "OpenScofo.hpp"
-
 #include <algorithm>
 
 #if defined(__APPLE__) || defined(__EMSCRIPTEN__)
@@ -19,32 +18,6 @@
 #endif
 
 namespace OpenScofo {
-
-namespace {
-
-// A finite log-zero sentinel also works with the project's Release -ffast-math.
-double LogProbability(double Probability) {
-    return Probability > 0.0 ? std::log(Probability) : -std::numeric_limits<double>::max();
-}
-
-double LogMultiply(double A, double B) {
-    const double zero = -std::numeric_limits<double>::max();
-    return A == zero || B == zero ? zero : A + B;
-}
-
-double LogAdd(double A, double B) {
-    const double zero = -std::numeric_limits<double>::max();
-    if (A == zero) {
-        return B;
-    }
-    if (B == zero) {
-        return A;
-    }
-    const double high = std::max(A, B);
-    return high + std::log1p(std::exp(std::min(A, B) - high));
-}
-
-} // namespace
 
 /*
     // ──────────────────────────────── REFERENCES ───────────────────────────────────────
@@ -72,8 +45,6 @@ double LogAdd(double A, double B) {
         [S.l.], v.26, n.1, p.1–37, 2002.
 
     * BATSCHELET, E. Circular statistics in biology. London: Academic Press, 1981.
-
-
 */
 
 // ╭─────────────────────────────────────╮
@@ -838,7 +809,7 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
 
-    if (StateIndex == m_CurrentStateIndex) {
+    if (StateIndex == m_CurrentStateIndex || m_States[StateIndex].IsInterEventSilence) {
         m_PsiN1 = m_PsiN;
         return m_PsiN;
     }
@@ -853,10 +824,18 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
         return m_PsiN;
     }
 
-    // Cont (2010), Large and Palmer (1999) and Large and Jones (2002)
-    ScoreState &LastState = m_States[StateIndex - 1];
+    // Cont (2010), Large and Palmer (1999) and Large and Jones (2002).
+    // Only scored events drive phase and tempo updates.
+    int PreviousIndex = StateIndex - 1;
+    while (PreviousIndex > 0 && m_States[PreviousIndex].IsInterEventSilence) {
+        --PreviousIndex;
+    }
+    int NextIndex = StateIndex + 1;
+    while (NextIndex < static_cast<int>(m_States.size()) && m_States[NextIndex].IsInterEventSilence) {
+        ++NextIndex;
+    }
+    ScoreState &LastState = m_States[PreviousIndex];
     ScoreState &CurrentState = m_States[StateIndex];
-    ScoreState &NextState = m_States[StateIndex + 1];
 
     double IOISeconds = m_CurrentStateOnset - m_LastTn;
     double LastPhiN = LastState.IOIPhiN;
@@ -886,15 +865,19 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
     // Prediction for Next HatPhiN
     double Tn1 = m_CurrentStateOnset + CurrentState.Duration * PsiN1;
     double PhiN1 = ModPhases((Tn1 - m_CurrentStateOnset) / PsiN1);
-    NextState.IOIHatPhiN = PhiN1;
+    if (NextIndex < static_cast<int>(m_States.size())) {
+        m_States[NextIndex].IOIHatPhiN = PhiN1;
+    }
 
-    // Update all next expected onsets
-    NextState.OnsetExpected = Tn1;
+    // Update all next expected onsets, including zero-beat gap states.
+    if (StateIndex + 1 < static_cast<int>(m_States.size())) {
+        m_States[StateIndex + 1].OnsetExpected = Tn1;
+    }
     double LastOnsetExpected = Tn1;
 
     // the m_CurrentEvent + 1 already updated, now
     // we update the future events to get the Sojourn Time
-    for (int i = m_CurrentStateIndex + 2; i < m_CurrentStateIndex + 20; i++) {
+    for (int i = StateIndex + 2; i < StateIndex + 20; i++) {
         if ((size_t)i >= m_States.size()) {
             break;
         }
@@ -992,7 +975,7 @@ void OnlineForward::GetAudioObservations() {
 
             const Observation &as = state.Observations[audioStateIndex];
 
-            const double audioStateEvidence = GetObservationEvidence(as, allowSilence);
+            const double audioStateEvidence = GetObservationEvidence(as, state.IsInterEventSilence || allowSilence);
             if (as.Type == PITCH) {
                 bestPitch = std::max(bestPitch, audioStateEvidence);
                 sumPitch += audioStateEvidence;
@@ -1055,7 +1038,7 @@ void OnlineForward::GetAudioObservations() {
                 // Pitch is already an observation probability.
                 // Do not gate it using the complement of the
                 // extended-technique detector.
-                stateLikelihood = std::max(bestPitch * soundProb, bestSilence);
+                stateLikelihood = bestPitch * soundProb;
                 break;
 
             case PTECH: {
@@ -1071,7 +1054,7 @@ void OnlineForward::GetAudioObservations() {
 
                 const double pitchObs = bestPitch * soundProb;
 
-                stateLikelihood = std::max({techObs, pitchObs, bestSilence});
+                stateLikelihood = std::max(techObs, pitchObs);
 
                 break;
             }
@@ -1081,7 +1064,7 @@ void OnlineForward::GetAudioObservations() {
                 // pitch evidence has no role here.
                 const double techObs = bestTech * techWeight * soundProb;
 
-                stateLikelihood = std::max(techObs, bestSilence);
+                stateLikelihood = techObs;
 
                 break;
             }
@@ -1220,9 +1203,9 @@ void OnlineForward::GetInitialDistribution() {
 
     for (int i = 0; i < Size; i++) {
         double DurProb = exp(-1.0 * (Dur / m_BeatsAhead));
-        InitialProb[i] = DurProb;
+        InitialProb[i] = m_States[m_CurrentStateIndex + i].IsInterEventSilence ? 0.0 : DurProb;
         Dur += m_States[m_CurrentStateIndex + i].Duration;
-        Sum += DurProb;
+        Sum += InitialProb[i];
     }
 
     if (Sum > 1e-12) {
@@ -1247,6 +1230,8 @@ void OnlineForward::GetInitialDistribution() {
                     const double expectedFrames = std::max(1.0, (m_PsiN1 * SkippedState.Duration) / m_BlockDur);
                     const double lambda = std::round(expectedFrames * 10.0) / 10.0;
                     skipped *= std::exp(-lambda);
+                } else if (SkippedState.IsInterEventSilence) {
+                    skipped *= 0.5; // Direct path around the optional silence.
                 } else {
                     skipped = 0.0;
                     break;
@@ -1254,7 +1239,7 @@ void OnlineForward::GetInitialDistribution() {
             }
             probability += InitialProb[source] * skipped;
         }
-        NonNullInitialProb[destination] = destinationNonNull * probability;
+        NonNullInitialProb[destination] = DestinationState.IsInterEventSilence ? 0.0 : destinationNonNull * probability;
     }
     const double nonNullSum = std::accumulate(NonNullInitialProb.begin(), NonNullInitialProb.end(), 0.0);
     if (nonNullSum > std::numeric_limits<double>::min())
@@ -1278,7 +1263,15 @@ void OnlineForward::GetInitialDistribution() {
 // ─────────────────────────────────────
 // CUVILLIER and CONT (2014) section 2.1.
 double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
-    return (i + 1 == j) ? 1.0 : 0.0;
+    if (i < 0 || j <= i || j >= static_cast<int>(m_States.size())) {
+        return 0.0;
+    }
+    // Optional atemporal silence (Cont's hybrid topology). These equal branch
+    // priors are OpenScofo policy, not numerical parameters from the paper.
+    if (i + 1 < static_cast<int>(m_States.size()) && m_States[i + 1].IsInterEventSilence) {
+        return (j == i + 1 || j == i + 2) ? 0.5 : 0.0;
+    }
+    return j == i + 1 ? 1.0 : 0.0;
 }
 
 // ─────────────────────────────────────
@@ -1290,11 +1283,9 @@ void OnlineForward::PrepareMicroStateDurations(const ScoreState &Parent) {
         return;
     }
     const double expectedFrames = std::max(1.0, (m_PsiN1 * Parent.Duration) / m_BlockDur);
-    const bool pitchedTechnique = Parent.Type == PTECH && K == 4;
-    const size_t first = pitchedTechnique ? 1 : 0;
-    const size_t end = pitchedTechnique ? K - 1 : K;
-    // PTECH onset is transient. Reserve a nominal frame for its absorbing tail.
-    const double available = pitchedTechnique ? std::max(2.0, expectedFrames - 2.0) : expectedFrames;
+    const size_t first = 0;
+    const size_t end = K;
+    const double available = expectedFrames;
     if (available <= static_cast<double>(end - first)) {
         return; // A chain shorter than its phase count still needs one frame per phase.
     }
@@ -1459,7 +1450,7 @@ void OnlineForward::Markov(ScoreState &StateJ, int j) {
 
         // Stay in j (self-loop)
         if (j >= m_CurrentStateIndex) {
-            sumPrev += StateJ.Forward[prevBuf];
+            sumPrev += (StateJ.IsInterEventSilence ? 0.5 : 1.0) * StateJ.Forward[prevBuf];
         }
 
         // Arrive from j-1
@@ -1470,9 +1461,10 @@ void OnlineForward::Markov(ScoreState &StateJ, int j) {
         Fj = Bj * sumPrev;
     }
 
-    // For Markov states Forward = ExitProb (they can exit at every step)
+    // Gap duration is geometric: stay or leave with equal probability. Exit
+    // mass is consumed once by the next state's transition, not counted twice.
     StateJ.Forward[m_CircularBufferIndex] = Fj;
-    StateJ.ExitProb[m_CircularBufferIndex] = Fj;
+    StateJ.ExitProb[m_CircularBufferIndex] = (StateJ.IsInterEventSilence ? 0.5 : 1.0) * Fj;
 }
 
 // ─────────────────────────────────────
@@ -1499,9 +1491,10 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
         // already in alpha, so there is no extra Bj factor in this branch.
         for (int u = 1; u <= observedHistory; ++u) {
             const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            const double incoming =
-                j > m_WinStart ? GetSemiMarkovTransitionProbability(j - 1, j) * m_States[j - 1].ExitProb[EntryBuf]
-                               : 0.0;
+            double incoming = 0.0;
+            for (int i = std::max(m_WinStart, j - 2); i < j; ++i) {
+                incoming += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
+            }
             for (size_t k = 0; k < StateJ.MicroStates.size(); ++k) {
                 const double path =
                     incoming > 0.0 ? std::exp(StateJ.MicroStates[k].LogForwardByAge[u] + std::log(incoming)) : 0.0;

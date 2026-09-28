@@ -141,6 +141,7 @@ const std::vector<Descriptors> &ONNXModel::GetDescriptors() const {
 // ─────────────────────────────────────
 void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Configuration &configuration,
                              std::vector<std::string> &metadataLabels) {
+
     const char *sampleRateMetadata = onnx_metadata_get(m_Context, "openscofo.sample_rate");
     const char *fftSizeMetadata = onnx_metadata_get(m_Context, "openscofo.fft_size");
     const char *hopSizeMetadata = onnx_metadata_get(m_Context, "openscofo.hop_size");
