@@ -298,7 +298,7 @@ list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
-set_property(TARGET OpenScofo PROPERTY INTERPROCEDURAL_OPTIMIZATION ${OPENSCOFO_ENABLE_IPO})
+# set_property(TARGET OpenScofo PROPERTY INTERPROCEDURAL_OPTIMIZATION ${OPENSCOFO_ENABLE_IPO})
 
 target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -408,7 +408,7 @@ elseif(APPLE)
         -Wl,-dead_strip
         >)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
-else() # Linux (GCC or Clang)
+elseif(LINUX) # Linux (GCC or Clang)
     target_compile_options(
         OpenScofo
         PUBLIC -Wall
@@ -437,17 +437,10 @@ else() # Linux (GCC or Clang)
         target_compile_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-march=native>)
     endif()
 
-    target_link_options(
-        OpenScofo
-        PUBLIC
-        $<$<CONFIG:Release>:-Wl,--gc-sections;-s>
-        -static-libgcc
-        -static-libstdc++
-        -Wl,-Bstatic
-        -lm
-        -ldl
-        -Wl,-Bdynamic)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>:-Wl,--gc-sections;-s>)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
+else() # Linux (GCC or Clang)
+    message(FATAL_ERROR "I don't know what to do")
 endif()
 
 # ╭──────────────────────────────────────╮
