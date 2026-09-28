@@ -78,6 +78,10 @@ struct OnlineForwardTestAccess {
         Forward.NotifyAudioStateChange(Index);
     }
 
+    static double ScoreTransition(OnlineForward &Forward, int I, int J) {
+        return Forward.GetSemiMarkovTransitionProbability(I, J);
+    }
+
     static void Tempo(OnlineForward &Forward, double Period) {
         Forward.m_PsiN1 = Period;
     }
@@ -132,9 +136,138 @@ std::vector<double> Segment(const std::vector<std::vector<double>> &Emissions, c
     return Result;
 }
 
+TEST(InterEventSilence, ParserSeparatesUnscoredGapsFromSoundAndScoredRests) {
+    Score Parser;
+    const auto [Config, States] = Parser.Parse(Asset.parent_path() / "markov-silence.scofo");
+    ASSERT_EQ(States.size(), 14U); // Eight events, two section starts, four gaps.
+    int Gaps = 0, Events = 0, ScorePosition = 0;
+    double Beats = 0.0;
+    for (size_t I = 0; I < States.size(); ++I) {
+        const auto &State = States[I];
+        EXPECT_EQ(State.Index, I);
+        if (State.IsInterEventSilence) {
+            ++Gaps;
+            ASSERT_GT(I, 0U);
+            ASSERT_LT(I + 1, States.size());
+            EXPECT_EQ(State.HSMMType, MARKOV);
+            EXPECT_EQ(State.Type, REST);
+            EXPECT_DOUBLE_EQ(State.Duration, 0.0);
+            EXPECT_EQ(State.ScorePos, States[I - 1].ScorePos);
+            EXPECT_EQ(State.Section, States[I + 1].Section);
+            EXPECT_DOUBLE_EQ(State.OnsetExpected, States[I + 1].OnsetExpected);
+            EXPECT_TRUE(State.Actions.empty());
+            ASSERT_EQ(State.Observations.size(), 1U);
+            EXPECT_EQ(State.Observations[0].Type, SILENCE);
+        } else if (State.Type != FIRSTEVENT) {
+            ++Events;
+            if (State.Type != REST) ++ScorePosition;
+            EXPECT_EQ(State.ScorePos, ScorePosition);
+            Beats += State.Duration;
+            if (State.Type == REST) {
+                EXPECT_EQ(State.HSMMType, SEMIMARKOV);
+                EXPECT_DOUBLE_EQ(State.Duration, 2.0);
+            } else {
+                for (const auto &Obs : State.Observations) EXPECT_NE(Obs.Type, SILENCE);
+                for (const auto &Micro : State.MicroStates)
+                    for (const auto &Obs : Micro.Observations) EXPECT_NE(Obs.Type, SILENCE);
+            }
+        }
+    }
+    EXPECT_EQ(Gaps, 4);
+    EXPECT_EQ(Events, 8);
+    EXPECT_DOUBLE_EQ(Beats, 10.0);
+}
+
+States GapChain(bool Nested = false) {
+    ScoreState Sound = Chain(UTECH, 0, 2.0);
+    Sound.MicroTopologyType = NO_MICROSTATES;
+    Sound.Observations = {{LABEL, 0, 0, "first"}};
+    ScoreState Gap{};
+    Gap.Type = REST;
+    Gap.HSMMType = MARKOV;
+    Gap.IsInterEventSilence = true;
+    Gap.ScorePos = 1;
+    Gap.BPMExpected = 60;
+    Gap.Observations = {{SILENCE}};
+    ScoreState Next = Sound;
+    Next.ScorePos = 2;
+    Next.Observations = {{LABEL, 0, 0, "second"}};
+    if (Nested) {
+        Next.MicroTopologyType = LEFT_RIGHT;
+        Next.MicroStates.resize(1);
+        Next.MicroStates[0].Observations = Next.Observations;
+        Next.Observations.clear();
+    }
+    States Result = {Sound, Gap, Next};
+    for (size_t I = 0; I < Result.size(); ++I) Result[I].Index = I;
+    return Result;
+}
+
+TEST(InterEventSilence, NormalizedBranchesAndGeometricOccupancy) {
+    OnlineForward Forward;
+    Access::Setup(Forward, GapChain());
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 1), 0.5);
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 2), 0.5);
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 1, 2), 1.0);
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 2, 0), 0.0);
+    Forward.GetStates()[1].InitProb = 1.0;
+    double Evidence = 1.0;
+    for (int T = 0; T < 12; ++T) {
+        Access::Frame(Forward, T);
+        for (auto &State : Forward.GetStates()) State.BestObs[T] = 0.0;
+        Forward.GetStates()[1].BestObs[T] = 1.0;
+        Evidence *= Access::Normalize(Forward);
+        EXPECT_NEAR(Evidence, std::pow(0.5, T), 1e-14);
+        EXPECT_NEAR(Forward.GetStates()[1].Forward[T], 1.0, 1e-14);
+        EXPECT_NEAR(Forward.GetStates()[1].ExitProb[T], 0.5, 1e-14);
+    }
+}
+
+TEST(InterEventSilence, BothSemiMarkovRecursionsAcceptTheDirectBypass) {
+    for (bool Nested : {false, true}) {
+        OnlineForward Forward;
+        Access::Setup(Forward, GapChain(Nested));
+        Access::Frame(Forward, 1);
+        Forward.GetStates()[0].ExitProb[0] = 0.8;
+        Forward.GetStates()[1].ExitProb[0] = 0.0;
+        Forward.GetStates()[2].BestObs[1] = 0.7;
+        if (Nested) Access::Emissions(Forward, 2, {0.7});
+        Access::SemiMarkov(Forward, 2);
+        EXPECT_NEAR(Forward.GetStates()[2].Forward[1],
+                    Access::Occupancy(Forward, 2, 1, true) * 0.8 * 0.5 * 0.7, 1e-14);
+    }
+}
+
+TEST(InterEventSilence, DecodesWithAndWithoutPauseAndDoesNotAdvanceOnSilence) {
+    for (int Pause : {0, 12}) {
+        OnlineForward Forward;
+        Access::Setup(Forward, GapChain());
+        Description Desc{};
+        Desc.ExtendedTechProb = 1.0;
+        Desc.ONNX = {{"first", 1.0f}};
+        EXPECT_EQ(Forward.GetEvent(Desc), 1);
+        EXPECT_EQ(Forward.GetEvent(Desc), 1);
+        Desc.ONNX.clear();
+        Desc.SilenceProb = 1.0;
+        const double BPM = Forward.GetCurrentBPM();
+        for (int T = 0; T < Pause; ++T) {
+            EXPECT_EQ(Forward.GetEvent(Desc), 1);
+            EXPECT_EQ(Forward.GetCurrentStateIndex(), 1);
+            EXPECT_DOUBLE_EQ(Forward.GetCurrentBPM(), BPM);
+            EXPECT_TRUE(Forward.GetCurrentEventActions().empty());
+        }
+        Desc.SilenceProb = 0.0;
+        Desc.ONNX = {{"second", 1.0f}};
+        EXPECT_EQ(Forward.GetEvent(Desc), 2);
+        EXPECT_EQ(Forward.GetCurrentStateIndex(), 2);
+        EXPECT_TRUE(std::isfinite(Forward.GetCurrentBPM()));
+    }
+}
+
 TEST(MicroStateParsing, PreservesPitchOrderAndGroupsTechniqueLabels) {
     Score Parser;
-    const auto [Config, States] = Parser.Parse(Asset);
+    auto [Config, States] = Parser.Parse(Asset);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     const auto &Multi = States[1];
     EXPECT_EQ(Multi.Type, MULTI);
@@ -142,11 +275,11 @@ TEST(MicroStateParsing, PreservesPitchOrderAndGroupsTechniqueLabels) {
     EXPECT_EQ(Multi.MicroTopologyType, LEFT_RIGHT);
     EXPECT_TRUE(Multi.Observations.empty());
     EXPECT_DOUBLE_EQ(Multi.Duration, 2.0);
-    ASSERT_EQ(Multi.MicroStates.size(), 5U);
-    for (size_t K = 0; K < 5; ++K) {
+    ASSERT_EQ(Multi.MicroStates.size(), 9U);
+    for (size_t K = 0; K < 9; ++K) {
         ASSERT_EQ(Multi.MicroStates[K].Observations.size(), 1U);
         EXPECT_EQ(Multi.MicroStates[K].Observations[0].Type, PITCH);
-        EXPECT_DOUBLE_EQ(Multi.MicroStates[K].Observations[0].Midi, 60.0 + K);
+        EXPECT_DOUBLE_EQ(Multi.MicroStates[K].Observations[0].Midi, 60.0 + 0.5 * K);
         EXPECT_DOUBLE_EQ(Multi.MicroStates[K].DurationWeight, 1.0);
     }
     for (size_t Index : {2U, 3U, 4U, 5U}) {
@@ -154,22 +287,67 @@ TEST(MicroStateParsing, PreservesPitchOrderAndGroupsTechniqueLabels) {
         const bool Pitched = Index == 2 || Index == 4;
         EXPECT_EQ(State.Type, Pitched ? PTECH : UTECH);
         EXPECT_EQ(State.HSMMType, SEMIMARKOV);
-        EXPECT_EQ(State.MicroTopologyType, Pitched ? LEFT_RIGHT : UNORDERED);
+        EXPECT_EQ(State.MicroTopologyType, UNORDERED);
         EXPECT_TRUE(State.Observations.empty());
-        ASSERT_EQ(State.MicroStates.size(), Pitched ? 4U : 3U);
-        EXPECT_EQ(State.MicroStates[0].Observations[0].Type, ONSET);
-        EXPECT_EQ(State.MicroStates.back().Observations[0].Type, SILENCE);
-        ASSERT_EQ(State.MicroStates[1].Observations.size(), Index < 4 ? 2U : 1U);
-        for (const auto &Obs : State.MicroStates[1].Observations) {
+        ASSERT_EQ(State.MicroStates.size(), Pitched ? 2U : 1U);
+        ASSERT_EQ(State.MicroStates[0].Observations.size(), Index < 4 ? 2U : 1U);
+        for (const auto &Obs : State.MicroStates[0].Observations) {
             EXPECT_EQ(Obs.Type, LABEL);
             EXPECT_FALSE(Obs.Label.empty());
         }
         if (Pitched) {
-            EXPECT_EQ(State.MicroStates[2].Observations[0].Type, PITCH);
+            EXPECT_EQ(State.MicroStates[1].Observations[0].Type, PITCH);
         }
     }
-    EXPECT_EQ(States[2].MicroStates[1].Observations[1].Label, "key_click");
-    EXPECT_EQ(States[3].MicroStates[1].Observations[1].Label, "aeolian");
+    EXPECT_EQ(States[2].MicroStates[0].Observations[1].Label, "key_click");
+    EXPECT_EQ(States[3].MicroStates[0].Observations[1].Label, "aeolian");
+}
+
+TEST(MultiGlissParsing, ExpandsIntervalsOnlyForMultiAndPreservesTuning) {
+    Score Parser;
+    auto [Config, States] = Parser.Parse(Asset.parent_path() / "multi-gliss.scofo");
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence || State.Type == FIRSTEVENT; });
+    ASSERT_EQ(States.size(), 8U);
+    const std::vector<std::vector<double>> Expected = {
+        {60, 60.5, 61, 61.5, 62, 62.5, 63, 63.5, 64, 64.5, 65, 65.5, 66, 66.5, 67},
+        {67, 66.5, 66, 65.5, 65, 64.5, 64, 63.5, 63, 62.5, 62, 61.5, 61, 60.5, 60},
+        {60, 60.5, 61, 61.5, 62, 61.5, 61, 60.5, 60},
+        {60}, {60}};
+    for (size_t I = 0; I < Expected.size(); ++I) {
+        const auto &State = States[I];
+        EXPECT_EQ(State.Type, MULTI);
+        EXPECT_EQ(State.MicroTopologyType, LEFT_RIGHT);
+        EXPECT_TRUE(State.Observations.empty());
+        EXPECT_DOUBLE_EQ(State.Duration, 2.0);
+        EXPECT_DOUBLE_EQ(State.OnsetExpected, 2.0 * I);
+        ASSERT_EQ(State.MicroStates.size(), Expected[I].size());
+        for (size_t K = 0; K < Expected[I].size(); ++K) {
+            ASSERT_EQ(State.MicroStates[K].Observations.size(), 1U);
+            const auto &Pitch = State.MicroStates[K].Observations[0];
+            EXPECT_EQ(Pitch.Type, PITCH);
+            EXPECT_DOUBLE_EQ(Pitch.Midi, Expected[I][K]);
+            EXPECT_NEAR(Pitch.Freq, 440.0 * std::pow(2.0, (Expected[I][K] - 69.0) / 12.0), 1e-10);
+        }
+    }
+    const auto &Chord = States[5];
+    EXPECT_EQ(Chord.Type, CHORD);
+    EXPECT_EQ(Chord.MicroTopologyType, NO_MICROSTATES);
+    EXPECT_TRUE(Chord.MicroStates.empty());
+    ASSERT_EQ(Chord.Observations.size(), 2U);
+    EXPECT_DOUBLE_EQ(Chord.Observations[0].Midi, 60);
+    EXPECT_DOUBLE_EQ(Chord.Observations[1].Midi, 67);
+    const auto &Trill = States[6];
+    EXPECT_EQ(Trill.Type, TRILL);
+    EXPECT_EQ(Trill.MicroTopologyType, UNORDERED);
+    ASSERT_EQ(Trill.MicroStates.size(), 2U);
+    EXPECT_DOUBLE_EQ(Trill.MicroStates[0].Observations[0].Midi, 60);
+    EXPECT_DOUBLE_EQ(Trill.MicroStates[1].Observations[0].Midi, 67);
+    ASSERT_EQ(States[7].MicroStates.size(), 5U);
+    for (size_t K = 0; K < 5; ++K) {
+        const auto &Pitch = States[7].MicroStates[K].Observations[0];
+        EXPECT_DOUBLE_EQ(Pitch.Midi, 60.25 + K * 0.5);
+        EXPECT_NEAR(Pitch.Freq, 442.0 * std::pow(2.0, (Pitch.Midi - 69.0) / 12.0), 1e-10);
+    }
 }
 
 TEST(MicroStateTransitions, TopologyDurationWeightsAndActiveParent) {
@@ -184,12 +362,12 @@ TEST(MicroStateTransitions, TopologyDurationWeightsAndActiveParent) {
         EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, Pair.first, Pair.second), 0.0);
     }
     // Parent 1 must be used even though the decoded score state is still 0.
-    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 0, 1), 1.0);
-    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 1, 2), 0.25);
-    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 2, 3), 0.25);
+    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 0, 1), 0.4);
+    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 1, 2), 0.4);
+    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 2, 3), 0.4);
     Forward.GetStates()[1].MicroStates[1].DurationWeight = 3;
-    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 1, 2), 1.0 / 6.0);
-    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 2, 3), 0.5);
+    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 1, 2), 0.2);
+    EXPECT_DOUBLE_EQ(Access::Transition(Forward, 1, 2, 3), 0.6);
     Access::Tempo(Forward, 2.0);
     EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, 0, 1), 0.25);
     Access::Tempo(Forward, 0.01);
@@ -251,8 +429,7 @@ TEST(MicroStateForward, SemiMarkovUsesSegmentsAndPathPosterior) {
         const std::vector<double> Incoming = {0.2, 0.4, 0.1, 0.5};
         const std::vector<std::vector<double>> Emissions = {
             {0.6, 0.7, 0.8, 0.99}, {0.3, 0.8, 0.2, 0.9}, {0.2, 0.7, 0.9, 0.1}, {0.1, 0.3, 0.4, 0.95}};
-        const std::vector<double> Q =
-            Type == PTECH ? std::vector<double>{1.0, 1.0 / 3, 1.0 / 3, 0.0} : std::vector<double>{0.5, 0.5, 0.5, 0.0};
+        const std::vector<double> Q = {0.5, 0.5, 0.5, 0.0};
         for (int T = 0; T < 4; ++T) {
             Access::Frame(Forward, T);
             Forward.GetStates()[0].ExitProb[T] = Incoming[T];
@@ -294,7 +471,7 @@ TEST(MicroStateForward, GlobalScalingMatchesUnnormalizedReference) {
          {0.2, 0.3, 0.8, 0.1},
          {0.1, 0.2, 0.3, 0.9},
          {0.7, 0.3, 0.2, 0.1}}};
-    const std::vector<std::vector<double>> Q = {{0.5, 0.0}, {1.0, 0.5, 0.5, 0.0}};
+    const std::vector<std::vector<double>> Q = {{0.5, 0.0}, {2.0 / 3, 2.0 / 3, 2.0 / 3, 0.0}};
     double Exit[2][5] = {};
     double Evidence[5] = {};
     for (int T = 0; T < 5; ++T) {
@@ -376,6 +553,7 @@ TEST(MicroStateForward, HandlesEmptySingleAndLongImpossibleHypotheses) {
 TEST(MicroStateEmissions, UtechMaxGatesLabelsAndNotifiesAlternatives) {
     Score Parser;
     auto [Config, States] = Parser.Parse(Asset);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     OnlineForward Forward;
     Access::Setup(Forward, {States[3]});
@@ -388,7 +566,7 @@ TEST(MicroStateEmissions, UtechMaxGatesLabelsAndNotifiesAlternatives) {
     Access::Observe(Forward, Desc);
     auto &State = Forward.GetStates()[0];
     EXPECT_DOUBLE_EQ(State.BestObs[0], static_cast<double>(0.9f) * (0.5 * 0.8));
-    EXPECT_EQ(State.BestMicroStateIndex, 1);
+    EXPECT_EQ(State.BestMicroStateIndex, 0);
     EXPECT_EQ(State.BestMicroObservationIndex, 1);
     Access::Notify(Forward, 0);
     auto Actions = Forward.GetAudioStateChangeActions();
@@ -396,13 +574,13 @@ TEST(MicroStateEmissions, UtechMaxGatesLabelsAndNotifiesAlternatives) {
     EXPECT_EQ(std::get<std::string>(Actions[0].Args[1]), "aeolian");
     Desc.Onset = 0.8;
     Access::Observe(Forward, Desc);
-    EXPECT_DOUBLE_EQ(State.BestObs[0], 0.8);
+    EXPECT_DOUBLE_EQ(State.BestObs[0], static_cast<double>(0.9f) * (0.5 * 0.8));
     EXPECT_EQ(State.BestMicroStateIndex, 0);
     Desc.Onset = 0;
     Desc.ONNX.clear();
     Access::Observe(Forward, Desc);
-    EXPECT_DOUBLE_EQ(State.BestObs[0], 0.2);
-    EXPECT_EQ(State.BestMicroStateIndex, 2);
+    EXPECT_DOUBLE_EQ(State.BestObs[0], std::numeric_limits<double>::min());
+    EXPECT_EQ(State.BestMicroStateIndex, -1);
     for (const auto &Micro : State.MicroStates) {
         EXPECT_TRUE(Micro.LogForwardByAge.empty());
     }
@@ -410,26 +588,29 @@ TEST(MicroStateEmissions, UtechMaxGatesLabelsAndNotifiesAlternatives) {
     EXPECT_DOUBLE_EQ(Access::Emission(Forward, Empty, Desc), 0.0);
 }
 
-TEST(MicroStateEmissions, PtechReportsWinningLabelWithinOrderedPath) {
+TEST(MicroStateEmissions, PtechReportsWinningLabelAmongSoundedAlternatives) {
     Score Parser;
     auto [Config, States] = Parser.Parse(Asset);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     OnlineForward Forward;
     Access::Setup(Forward, {States[2]});
     Forward.GetStates()[0].InitProb = 1.0;
     Description Desc{};
     Desc.Onset = 1.0;
+    Desc.SilenceProb = 1.0;
     Desc.ExtendedTechProb = 1.0;
     Access::Frame(Forward, 0);
     Access::Observe(Forward, Desc);
     Access::Normalize(Forward);
-    EXPECT_EQ(Forward.GetStates()[0].BestMicroStateIndex, 0);
+    EXPECT_EQ(Forward.GetStates()[0].BestMicroStateIndex, -1);
     Desc.Onset = 0;
+    Desc.SilenceProb = 0.0;
     Desc.ONNX = {{"slap", 0.3f}, {"key_click", 0.8f}};
     Access::Frame(Forward, 1);
     Access::Observe(Forward, Desc);
     Access::Normalize(Forward);
-    EXPECT_EQ(Forward.GetStates()[0].BestMicroStateIndex, 1);
+    EXPECT_EQ(Forward.GetStates()[0].BestMicroStateIndex, 0);
     EXPECT_EQ(Forward.GetStates()[0].BestMicroObservationIndex, 1);
     Access::Notify(Forward, 0);
     const auto Actions = Forward.GetAudioStateChangeActions();
@@ -469,7 +650,7 @@ TEST(MicroStateIntegration, DiscoversNestedDescriptorsAndValidatesLabels) {
     EXPECT_FALSE(Scofo.LoadScore(Asset));
     EXPECT_NE(Errors.find("slap"), std::string::npos);
     const auto Config = Scofo.GetConfiguration();
-    for (Descriptors Descriptor : {ODSONSET, ONNX, EXTENDEDTECHNIQUE}) {
+    for (Descriptors Descriptor : {ONNX, EXTENDEDTECHNIQUE}) {
         EXPECT_NE(std::find(Config.RequestedDescriptors.begin(), Config.RequestedDescriptors.end(), Descriptor),
                   Config.RequestedDescriptors.end());
     }
@@ -478,18 +659,19 @@ TEST(MicroStateIntegration, DiscoversNestedDescriptorsAndValidatesLabels) {
 #if defined(OPENSCOFO_LUA)
 TEST(MicroStateIntegration, LuaExportsPhasesLabelsAndDurationWeights) {
     Score Parser;
-    const auto [Config, States] = Parser.Parse(Asset);
+    auto [Config, States] = Parser.Parse(Asset);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ::OpenScofo::OpenScofo Scofo(48000, 2048, 512);
     Scofo.GetStates() = States;
     EXPECT_TRUE(Scofo.LuaExecute(R"(
         local s = require('OpenScofo').get_states()
-        assert(#s[2].microstates == 5 and #s[2].audiostates == 0)
+        assert(#s[2].microstates == 9 and #s[2].audiostates == 0)
         assert(s[2].micro_topology == 2)
-        assert(#s[3].microstates == 4 and s[3].micro_topology == 2)
-        assert(s[3].microstates[2].observations[2].label == 'key_click')
-        assert(s[3].microstates[2].duration_weight == 1)
-        assert(#s[4].microstates == 3 and s[4].micro_topology == 1)
-        assert(s[4].microstates[2].observations[2].label == 'aeolian')
+        assert(#s[3].microstates == 2 and s[3].micro_topology == 1)
+        assert(s[3].microstates[1].observations[2].label == 'key_click')
+        assert(s[3].microstates[1].duration_weight == 1)
+        assert(#s[4].microstates == 1 and s[4].micro_topology == 1)
+        assert(s[4].microstates[1].observations[2].label == 'aeolian')
     )")) << Scofo.LuaGetError();
 }
 #endif

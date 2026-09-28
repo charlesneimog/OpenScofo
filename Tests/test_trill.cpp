@@ -12,7 +12,8 @@ const std::filesystem::path TrillScore = std::filesystem::path(TEST_DATA_DIR) / 
 
 TEST(TrillMicroStates, ParsesOnlyTrillPitchesAsMicroStates) {
     OpenScofo::Score Parser;
-    const auto [Config, States] = Parser.Parse(TrillScore);
+    auto [Config, States] = Parser.Parse(TrillScore);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     EXPECT_EQ(States[0].Type, OpenScofo::FIRSTEVENT);
     EXPECT_EQ(States[1].Type, OpenScofo::NOTE);
@@ -71,6 +72,7 @@ TEST(TrillMicroStates, RejectsEmptyTrill) {
 TEST(TrillMicroStates, PreservesMaxEmissionAndOrdinaryEventFormulas) {
     OpenScofo::Score Parser;
     auto [Config, States] = Parser.Parse(TrillScore);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     const double C4 = States[3].MicroStates[0].Observations[0].Freq;
     const double D4 = States[3].MicroStates[1].Observations[0].Freq;
@@ -99,9 +101,6 @@ TEST(TrillMicroStates, PreservesMaxEmissionAndOrdinaryEventFormulas) {
                         Expected = Silence;
                     } else {
                         Expected = P0 * (1.0 - Silence);
-                        if (Index == 5) {
-                            Expected = std::max(Expected, Silence);
-                        }
                     }
                     const int Buffer = Forward.GetCurrentBufferIndex();
                     Forward.GetEvent(Desc);
@@ -120,6 +119,7 @@ TEST(TrillMicroStates, PreservesMaxEmissionAndOrdinaryEventFormulas) {
 TEST(TrillMicroStates, ReportsPitchChangesAndResetsWinner) {
     OpenScofo::Score Parser;
     auto [Config, States] = Parser.Parse(TrillScore);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     OpenScofo::OnlineForward Forward;
     Forward.UpdateConfiguration(Config);
@@ -150,6 +150,7 @@ TEST(TrillMicroStates, ReportsPitchChangesAndResetsWinner) {
 TEST(ObservationNotifications, TracksEachNoteWinnerAndReportsPitch) {
     OpenScofo::Score Parser;
     auto [Config, States] = Parser.Parse(TrillScore);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     auto OtherNote = States[1];
     OtherNote.Observations[0] = States[3].MicroStates[1].Observations[0];
@@ -183,6 +184,7 @@ TEST(ObservationNotifications, TracksEachNoteWinnerAndReportsPitch) {
 TEST(ObservationNotifications, ReportsDirectWinnerChangesAndClearsZeroEvidence) {
     OpenScofo::Score Parser;
     auto [Config, States] = Parser.Parse(TrillScore);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     auto State = States[1];
     State.Type = OpenScofo::UTECH;
@@ -223,7 +225,11 @@ TEST(TrillMicroStates, ExportsNestedObservationsToLua) {
     OpenScofo::OpenScofo Scofo(48000, 2048, 512);
     ASSERT_TRUE(Scofo.LoadScore(TrillScore));
     EXPECT_TRUE(Scofo.LuaExecute(R"(
-        local states = require('OpenScofo').get_states()
+        local all = require('OpenScofo').get_states()
+        local states = {}
+        for _, state in ipairs(all) do
+            if not state.inter_event_silence then table.insert(states, state) end
+        end
         assert(#states[2].audiostates == 1 and #states[2].microstates == 0)
         assert(#states[3].audiostates == 3 and #states[3].microstates == 0)
         local trill = states[4]

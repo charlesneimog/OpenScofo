@@ -15,6 +15,7 @@ TEST(ScoreSections, ParsesNamesConfigurationAndPerSectionTiming) {
     auto [Config, States] = Score.Parse(Assets / "sections.scofo");
 
     ASSERT_TRUE(Config.SectionRestrict);
+    std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 9U);
 
     const std::vector<std::string> ExpectedSections = {"1", "1", "1", "A", "A", "12B2", "12B2", "D", "D"};
