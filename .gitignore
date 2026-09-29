@@ -133,3 +133,8 @@ Tests/01-benchmark/real/*.wav
 Tests/04-miniaturas/Audios/*.mp3
 Documentation/descriptors/testing/*.mp3
 /Tests/01-benchmark/audios
+
+# Binary audio / AI models
+*.onnx
+*.wav
+*.mp3
