@@ -127,3 +127,9 @@ dist
 /Resources/Extended-Techniques/audios
 /Tests/01-Score-Follower-Benchmarks/audios
 /Tests/01-Score-Follower-Benchmarks/__pycache__
+# Benchmark/test audio
+Tests/01-benchmark/audios/*.wav
+Tests/01-benchmark/real/*.wav
+Tests/04-miniaturas/Audios/*.mp3
+Documentation/descriptors/testing/*.mp3
+/Tests/01-benchmark/audios
