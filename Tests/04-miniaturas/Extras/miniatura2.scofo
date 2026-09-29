@@ -1,6 +1,6 @@
 BPM 70
 
-ONNXMODEL ai-flute-model.onnx
+ONNXMODEL "../../flute.onnx"
 ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
 
 // Syntax
