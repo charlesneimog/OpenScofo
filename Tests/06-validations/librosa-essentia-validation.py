@@ -20,18 +20,10 @@ os.chdir(os.path.dirname(__file__))
 
 # Use one analysis per window so flux compares consecutive frames.
 scofo = OpenScofo.OpenScofo(sr, n_fft, analysis_hop)
-scofo.set_requested_descriptors(
-    [
-        OpenScofo.Descriptors.LOGMEL,
-        OpenScofo.Descriptors.MFCC,
-        OpenScofo.Descriptors.CHROMA,
-        OpenScofo.Descriptors.ZCR,
-        OpenScofo.Descriptors.SPREADHZ,
-    ]
-)
+scofo.activate_all_descriptors()
 
 y, sr = librosa.load(
-    "./assets/bwv-1013.wav",
+    "./01-benchmark/real/bwv-1013.wav",
     sr=sr,
 )
 

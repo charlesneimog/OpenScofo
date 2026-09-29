@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
 import librosa
+import soundfile as sf
 import numpy as np
 import OpenScofo
 
@@ -446,7 +447,9 @@ def process_audio_file(
     score_path: str,
     tolerance_ms: float,
     annotations_path: Optional[str] = None,
-) -> Tuple[List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]], Optional[Dict]]:
+) -> Tuple[
+    List[Tuple[int, float]], Dict[int, float], Dict[int, Dict[str, str]], Optional[Dict]
+]:
     """
     Process one audio file with OpenScofo.
 
@@ -461,10 +464,30 @@ def process_audio_file(
     print(f"\n--- Processing {audio_path} ---")
 
     # Load audio at benchmark sample rate.
-    audio, _ = librosa.load(audio_path, sr=SR)
+    # audio, _ = librosa.load(audio_path, sr=SR,mono=False)
+    audio, sr = sf.read(
+        audio_path,
+        dtype="float32",
+        always_2d=False,
+    )
 
+    if sr != SR:
+        raise RuntimeError(
+            f"Unexpected sample rate: {sr}, expected {SR}"
+        )
+
+    audio = np.ascontiguousarray(audio, dtype=np.float32)
+
+
+    if audio.ndim == 2:
+        # Stereo: use left channel for this experiment.
+        audio = audio[0]
     scofo = OpenScofo.OpenScofo(SR, FFT, HOP)
-    scofo.load_score(Path(score_path))
+
+    if not scofo.load_score(Path(score_path)):
+        raise RuntimeError(f"Could not load score: {score_path}")
+
+    scofo.set_current_event(0)
     trace_enabled = Path(audio_path).name in OUTLIER_FILES
     state_map: List[Dict] = []
     candidates_by_pos: Dict[int, List[int]] = {}
@@ -480,7 +503,8 @@ def process_audio_file(
             # The Python binding cannot convert the FIRSTEVENT (0) enum.
             # It can convert event types for real score positions.
             event_type = (
-                "FIRSTEVENT" if pos == 0
+                "FIRSTEVENT"
+                if pos == 0
                 else _get_enum_name(getattr(state, "type", "UNKNOWN"))
             )
             record = {
@@ -570,23 +594,28 @@ def process_audio_file(
                 previous = prev_pos if prev_pos is not None else 0
                 reference_time = expected_times.get(pos)
                 detected_time = start / SR
-                transition_trace.append({
-                    "time_s": detected_time,
-                    "from_score_pos": previous,
-                    "to_score_pos": pos,
-                    "from_state_index": previous_state_index,
-                    "to_state_index": state_index,
-                    "candidate_state_indices": candidates_by_pos.get(pos, []),
-                    "kind": "SCORE_POSITION" if position_changed else "INTERNAL_STATE",
-                    "skipped_score_positions": (
-                        list(range(previous + 1, pos)) if pos > previous + 1 else []
-                    ),
-                    "expected_time_s": reference_time,
-                    "offset_ms": (
-                        (detected_time - reference_time) * 1000.0
-                        if reference_time is not None else None
-                    ),
-                })
+                transition_trace.append(
+                    {
+                        "time_s": detected_time,
+                        "from_score_pos": previous,
+                        "to_score_pos": pos,
+                        "from_state_index": previous_state_index,
+                        "to_state_index": state_index,
+                        "candidate_state_indices": candidates_by_pos.get(pos, []),
+                        "kind": (
+                            "SCORE_POSITION" if position_changed else "INTERNAL_STATE"
+                        ),
+                        "skipped_score_positions": (
+                            list(range(previous + 1, pos)) if pos > previous + 1 else []
+                        ),
+                        "expected_time_s": reference_time,
+                        "offset_ms": (
+                            (detected_time - reference_time) * 1000.0
+                            if reference_time is not None
+                            else None
+                        ),
+                    }
+                )
             previous_state_index = state_index
 
         # Position zero is the follower's initialization state, not a score event.
@@ -640,11 +669,14 @@ def process_audio_file(
     if trace_enabled:
         first_anomaly_index = next(
             (
-                i for i, event in enumerate(transition_trace)
+                i
+                for i, event in enumerate(transition_trace)
                 if event["skipped_score_positions"]
-                or (event["kind"] == "SCORE_POSITION"
+                or (
+                    event["kind"] == "SCORE_POSITION"
                     and event["offset_ms"] is not None
-                    and abs(event["offset_ms"]) > tolerance_ms)
+                    and abs(event["offset_ms"]) > tolerance_ms
+                )
             ),
             None,
         )
@@ -656,8 +688,11 @@ def process_audio_file(
             "transitions": transition_trace,
             "first_anomaly_transition_index": first_anomaly_index,
             "first_anomaly_context": (
-                transition_trace[max(0, first_anomaly_index - 4):first_anomaly_index + 5]
-                if first_anomaly_index is not None else []
+                transition_trace[
+                    max(0, first_anomaly_index - 4) : first_anomaly_index + 5
+                ]
+                if first_anomaly_index is not None
+                else []
             ),
         }
 
@@ -697,20 +732,23 @@ def analyze_missed_transitions(piece: Dict) -> Dict:
 
         offset_ms = (
             (min(detections) - piece["expected_times"][pos]) * 1000.0
-            if detections else None
+            if detections
+            else None
         )
         event_types[current] += 1
         transitions[transition] += 1
         contexts[triple] += 1
         reasons[reason] += 1
-        details.append({
-            "position": pos,
-            "type": current,
-            "prev_type": previous,
-            "next_type": following,
-            "reason": reason,
-            "offset_ms": offset_ms,
-        })
+        details.append(
+            {
+                "position": pos,
+                "type": current,
+                "prev_type": previous,
+                "next_type": following,
+                "reason": reason,
+                "offset_ms": offset_ms,
+            }
+        )
 
     return {
         "event_types": event_types,
@@ -751,7 +789,8 @@ def print_missed_transition_analysis(rows: List[Dict]) -> None:
         for miss in analysis["details"]:
             offset = (
                 f" offset={miss['offset_ms']:+.1f} ms"
-                if miss["offset_ms"] is not None else ""
+                if miss["offset_ms"] is not None
+                else ""
             )
             print(
                 f"  pos={miss['position']:03d} "
@@ -1021,8 +1060,10 @@ def process_audio_file_worker(
         import io
 
         with redirect_stdout(io.StringIO()):
-            detected_events, expected_times, score_context, diagnostics = process_audio_file(
-                audio_path, score_path, tolerance_ms, annotations_path
+            detected_events, expected_times, score_context, diagnostics = (
+                process_audio_file(
+                    audio_path, score_path, tolerance_ms, annotations_path
+                )
             )
 
         validator = ScoreFollowerValidator(  # MIREX-COMPLIANT
@@ -1060,10 +1101,7 @@ def process_audio_file_worker(
         return piece_result, status_msg
 
     except Exception as e:
-        return None, (
-            f"✗ {Path(audio_path).name}: {e}\n"
-            f"{traceback.format_exc()}"
-        )
+        return None, (f"✗ {Path(audio_path).name}: {e}\n" f"{traceback.format_exc()}")
 
 
 def parse_args() -> argparse.Namespace:

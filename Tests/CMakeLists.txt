@@ -3,29 +3,29 @@ if(NOT APPLE)
     find_package(GTest REQUIRED)
 
     # Executable for the test
-    add_executable(main_class "${CMAKE_CURRENT_SOURCE_DIR}/test_openscofo.cpp")
+    add_executable(main_class "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_openscofo.cpp")
     target_link_libraries(main_class PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME OpenScofo COMMAND main_class)
 
-    add_executable(score_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_score.cpp")
+    add_executable(score_tests "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_score.cpp")
     target_link_libraries(score_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Score COMMAND score_tests)
 
-    add_executable(trill_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_trill.cpp")
+    add_executable(trill_tests "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_trill.cpp")
     target_link_libraries(trill_tests PRIVATE OpenScofo GTest::gtest_main)
     target_compile_definitions(trill_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
     add_test(NAME Trill COMMAND trill_tests)
 
-    add_executable(microstate_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_microstates.cpp")
+    add_executable(microstate_tests "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_microstates.cpp")
     target_link_libraries(microstate_tests PRIVATE OpenScofo GTest::gtest_main)
     target_compile_definitions(microstate_tests PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
     add_test(NAME MicroStates COMMAND microstate_tests)
 
-    add_executable(math_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_math.cpp")
+    add_executable(math_tests "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_math.cpp")
     target_link_libraries(math_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Math COMMAND math_tests)
 
-    add_executable(onnx_tests "${CMAKE_CURRENT_SOURCE_DIR}/test_onnx.cpp")
+    add_executable(onnx_tests "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/test_onnx.cpp")
     target_link_libraries(onnx_tests PRIVATE OpenScofo GTest::gtest_main)
     add_test(NAME Onnx COMMAND onnx_tests)
 
@@ -41,7 +41,7 @@ if(NOT APPLE)
         GIT_TAG master)
     FetchContent_MakeAvailable(AudioFile)
 
-    add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/performance.cpp")
+    add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/performance.cpp")
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
     target_compile_options(
         openscofo_perf
@@ -52,7 +52,7 @@ if(NOT APPLE)
                 -Wno-unused-variable)
 
     #
-    add_executable(openscofo_perf_folder "${CMAKE_CURRENT_SOURCE_DIR}/performance-folder.cpp")
+    add_executable(openscofo_perf_folder "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/performance-folder.cpp")
     target_link_libraries(openscofo_perf_folder PRIVATE OpenScofo AudioFile)
     target_compile_options(
         openscofo_perf_folder

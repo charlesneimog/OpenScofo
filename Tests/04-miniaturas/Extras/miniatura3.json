@@ -1,0 +1,254 @@
+{
+  "audio": "miniatura3.mp3",
+  "duration_seconds": 112.517333,
+  "events": [
+    {
+      "event": 1,
+      "timestamp_seconds": 5.212
+    },
+    {
+      "event": 2,
+      "timestamp_seconds": 7.207
+    },
+    {
+      "event": 3,
+      "timestamp_seconds": 9.095
+    },
+    {
+      "event": 4,
+      "timestamp_seconds": 11.164
+    },
+    {
+      "event": 5,
+      "timestamp_seconds": 13.031
+    },
+    {
+      "event": 6,
+      "timestamp_seconds": 14.993
+    },
+    {
+      "event": 7,
+      "timestamp_seconds": 16.903
+    },
+    {
+      "event": 8,
+      "timestamp_seconds": 18.812
+    },
+    {
+      "event": 9,
+      "timestamp_seconds": 19.495
+    },
+    {
+      "event": 10,
+      "timestamp_seconds": 20.156
+    },
+    {
+      "event": 11,
+      "timestamp_seconds": 20.497
+    },
+    {
+      "event": 12,
+      "timestamp_seconds": 24.273
+    },
+    {
+      "event": 13,
+      "timestamp_seconds": 25.724
+    },
+    {
+      "event": 14,
+      "timestamp_seconds": 27.228
+    },
+    {
+      "event": 15,
+      "timestamp_seconds": 28.753
+    },
+    {
+      "event": 16,
+      "timestamp_seconds": 30.193
+    },
+    {
+      "event": 17,
+      "timestamp_seconds": 31.665
+    },
+    {
+      "event": 18,
+      "timestamp_seconds": 33.297
+    },
+    {
+      "event": 19,
+      "timestamp_seconds": 36.519
+    },
+    {
+      "event": 20,
+      "timestamp_seconds": 38.705
+    },
+    {
+      "event": 21,
+      "timestamp_seconds": 40.881
+    },
+    {
+      "event": 22,
+      "timestamp_seconds": 42.3
+    },
+    {
+      "event": 23,
+      "timestamp_seconds": 43.793
+    },
+    {
+      "event": 24,
+      "timestamp_seconds": 45.301
+    },
+    {
+      "event": 25,
+      "timestamp_seconds": 46.109
+    },
+    {
+      "event": 26,
+      "timestamp_seconds": 46.88
+    },
+    {
+      "event": 27,
+      "timestamp_seconds": 47.271
+    },
+    {
+      "event": 28,
+      "timestamp_seconds": 50.097
+    },
+    {
+      "event": 29,
+      "timestamp_seconds": 52.327
+    },
+    {
+      "event": 30,
+      "timestamp_seconds": 54.62
+    },
+    {
+      "event": 31,
+      "timestamp_seconds": 57.02
+    },
+    {
+      "event": 32,
+      "timestamp_seconds": 59.249
+    },
+    {
+      "event": 33,
+      "timestamp_seconds": 61.479
+    },
+    {
+      "event": 34,
+      "timestamp_seconds": 69.543
+    },
+    {
+      "event": 35,
+      "timestamp_seconds": 70.343
+    },
+    {
+      "event": 36,
+      "timestamp_seconds": 71.004
+    },
+    {
+      "event": 37,
+      "timestamp_seconds": 71.847
+    },
+    {
+      "event": 38,
+      "timestamp_seconds": 72.508
+    },
+    {
+      "event": 39,
+      "timestamp_seconds": 73.287
+    },
+    {
+      "event": 40,
+      "timestamp_seconds": 75.025
+    },
+    {
+      "event": 41,
+      "timestamp_seconds": 76.551
+    },
+    {
+      "event": 42,
+      "timestamp_seconds": 79.068
+    },
+    {
+      "event": 43,
+      "timestamp_seconds": 79.889
+    },
+    {
+      "event": 44,
+      "timestamp_seconds": 80.636
+    },
+    {
+      "event": 45,
+      "timestamp_seconds": 81.5
+    },
+    {
+      "event": 46,
+      "timestamp_seconds": 82.247
+    },
+    {
+      "event": 47,
+      "timestamp_seconds": 83.068
+    },
+    {
+      "event": 48,
+      "timestamp_seconds": 83.975
+    },
+    {
+      "event": 49,
+      "timestamp_seconds": 84.775
+    },
+    {
+      "event": 50,
+      "timestamp_seconds": 85.137
+    },
+    {
+      "event": 51,
+      "timestamp_seconds": 85.543
+    },
+    {
+      "event": 52,
+      "timestamp_seconds": 85.991
+    },
+    {
+      "event": 53,
+      "timestamp_seconds": 86.94
+    },
+    {
+      "event": 54,
+      "timestamp_seconds": 88.529
+    },
+    {
+      "event": 55,
+      "timestamp_seconds": 91.111
+    },
+    {
+      "event": 56,
+      "timestamp_seconds": 93.639
+    },
+    {
+      "event": 57,
+      "timestamp_seconds": 96.124
+    },
+    {
+      "event": 58,
+      "timestamp_seconds": 98.78
+    },
+    {
+      "event": 59,
+      "timestamp_seconds": 101.265
+    },
+    {
+      "event": 60,
+      "timestamp_seconds": 103.473
+    },
+    {
+      "event": 61,
+      "timestamp_seconds": 105.809
+    },
+    {
+      "event": 62,
+      "timestamp_seconds": 107.958
+    }
+  ]
+}
