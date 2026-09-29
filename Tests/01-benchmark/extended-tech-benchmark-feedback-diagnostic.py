@@ -128,7 +128,7 @@ FALLBACK_EVENT_TYPES = {
     2: "NOTE",
     3: "CHORD",
     4: "TRILL",
-    5: "MULTI",
+    5: "GLISS",
     6: "PTECH",
     7: "UTECH",
     8: "EVENT",

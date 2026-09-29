@@ -648,7 +648,7 @@
       "members": [
         {
           "type": "STRING",
-          "value": "MULTI"
+          "value": "GLISS"
         },
         {
           "type": "FIELD",

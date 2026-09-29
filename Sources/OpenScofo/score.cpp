@@ -402,7 +402,7 @@ ScoreState Score::NewMultiEvent(const std::string &ScoreStr, TSNode Node) {
     ScoreState Event{};
     Event.Line = ts_node_start_point(Node).row + 1;
     Event.HSMMType = SEMIMARKOV;
-    Event.Type = MULTI;
+    Event.Type = GLISS;
     Event.MicroTopologyType = LEFT_RIGHT;
     Event.Index = m_ScoreStates.size();
     Event.ScorePos = m_ScorePosition;
@@ -410,12 +410,12 @@ ScoreState Score::NewMultiEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode PitchesNode = ts_node_child_by_field_name(Node, "pitches", 7);
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
     if (ts_node_has_error(Node) || ts_node_is_null(PitchesNode) || ts_node_is_null(DurationNode)) {
-        spdlog::error("Invalid MULTI event structure on line {}", Event.Line);
+        spdlog::error("Invalid GLISS event structure on line {}", Event.Line);
         return {};
     }
     const uint32_t PitchCount = ts_node_named_child_count(PitchesNode);
     if (PitchCount == 0) {
-        spdlog::error("Missing MULTI pitches on line {}", Event.Line);
+        spdlog::error("Missing GLISS pitches on line {}", Event.Line);
         return {};
     }
 
@@ -792,7 +792,7 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
         return;
     }
 
-    if (Event.Type == TRILL || Event.Type == MULTI || Event.Type == UTECH || Event.Type == PTECH) {
+    if (Event.Type == TRILL || Event.Type == GLISS || Event.Type == UTECH || Event.Type == PTECH) {
         const bool Technique = Event.Type == UTECH || Event.Type == PTECH;
         const size_t ExpectedMicroStates = Event.Type == PTECH ? 2 : 1;
         if (!Event.Observations.empty() || Event.MicroStates.empty() ||

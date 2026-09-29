@@ -92,7 +92,7 @@ NB_MODULE(_OpenScofo, m) {
         .value("NOTE", OpenScofo::NOTE)
         .value("CHORD", OpenScofo::CHORD)
         .value("TRILL", OpenScofo::TRILL)
-        .value("MULTI", OpenScofo::MULTI)
+        .value("GLISS", OpenScofo::GLISS)
         .value("PTECH", OpenScofo::PTECH)
         .value("UTECH", OpenScofo::UTECH)
         .export_values();

@@ -270,7 +270,7 @@ TEST(MicroStateParsing, PreservesPitchOrderAndGroupsTechniqueLabels) {
     std::erase_if(States, [](const auto &State) { return State.IsInterEventSilence; });
     ASSERT_EQ(States.size(), 6U);
     const auto &Multi = States[1];
-    EXPECT_EQ(Multi.Type, MULTI);
+    EXPECT_EQ(Multi.Type, GLISS);
     EXPECT_EQ(Multi.HSMMType, SEMIMARKOV);
     EXPECT_EQ(Multi.MicroTopologyType, LEFT_RIGHT);
     EXPECT_TRUE(Multi.Observations.empty());
@@ -315,7 +315,7 @@ TEST(MultiGlissParsing, ExpandsIntervalsOnlyForMultiAndPreservesTuning) {
         {60}, {60}};
     for (size_t I = 0; I < Expected.size(); ++I) {
         const auto &State = States[I];
-        EXPECT_EQ(State.Type, MULTI);
+        EXPECT_EQ(State.Type, GLISS);
         EXPECT_EQ(State.MicroTopologyType, LEFT_RIGHT);
         EXPECT_TRUE(State.Observations.empty());
         EXPECT_DOUBLE_EQ(State.Duration, 2.0);
@@ -352,7 +352,7 @@ TEST(MultiGlissParsing, ExpandsIntervalsOnlyForMultiAndPreservesTuning) {
 
 TEST(MicroStateTransitions, TopologyDurationWeightsAndActiveParent) {
     OnlineForward Forward;
-    Access::Setup(Forward, {Chain(MULTI, 4, 8), Chain(PTECH, 4, 10)});
+    Access::Setup(Forward, {Chain(GLISS, 4, 8), Chain(PTECH, 4, 10)});
     for (int I = 0; I < 3; ++I) {
         EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, I, I), 0.5);
         EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, I, I) + Access::Transition(Forward, 0, I, I + 1), 1.0);
@@ -388,7 +388,7 @@ TEST(MicroStateParsing, RejectsEmptyPitchAndLabelGroups) {
 
 TEST(MicroStateForward, MatchesExhaustivePathsForEveryEntryTime) {
     OnlineForward Forward;
-    Access::Setup(Forward, {Chain(MULTI, 3, 6)});
+    Access::Setup(Forward, {Chain(GLISS, 3, 6)});
     const std::vector<std::vector<double>> Emissions = {
         {0.8, 0.2, 0.1}, {0.3, 0.9, 0.2}, {0.4, 0.7, 0.8}, {0.1, 0.2, 0.9}, {0.7, 0.4, 0.3}};
     for (int T = 0; T < static_cast<int>(Emissions.size()); ++T) {
@@ -403,7 +403,7 @@ TEST(MicroStateForward, MatchesExhaustivePathsForEveryEntryTime) {
 }
 
 TEST(MicroStateForward, OrderedEvidenceWinsForMultiAndPtech) {
-    for (EventType Type : {MULTI, PTECH}) {
+    for (EventType Type : {GLISS, PTECH}) {
         double Likelihood[2] = {};
         for (int Reverse = 0; Reverse < 2; ++Reverse) {
             OnlineForward Forward;
@@ -422,9 +422,9 @@ TEST(MicroStateForward, OrderedEvidenceWinsForMultiAndPtech) {
 }
 
 TEST(MicroStateForward, SemiMarkovUsesSegmentsAndPathPosterior) {
-    for (EventType Type : {MULTI, PTECH}) {
+    for (EventType Type : {GLISS, PTECH}) {
         OnlineForward Forward;
-        Access::Setup(Forward, {Chain(MULTI, 1, 8), Chain(Type, 4, 8)});
+        Access::Setup(Forward, {Chain(GLISS, 1, 8), Chain(Type, 4, 8)});
         Forward.GetStates()[1].InitProb = 0.3;
         const std::vector<double> Incoming = {0.2, 0.4, 0.1, 0.5};
         const std::vector<std::vector<double>> Emissions = {
@@ -461,7 +461,7 @@ TEST(MicroStateForward, SemiMarkovUsesSegmentsAndPathPosterior) {
 
 TEST(MicroStateForward, GlobalScalingMatchesUnnormalizedReference) {
     OnlineForward Forward;
-    Access::Setup(Forward, {Chain(MULTI, 2, 4), Chain(PTECH, 4, 6)});
+    Access::Setup(Forward, {Chain(GLISS, 2, 4), Chain(PTECH, 4, 6)});
     Forward.GetStates()[0].InitProb = 0.7;
     Forward.GetStates()[1].InitProb = 0.3;
     const std::vector<std::vector<std::vector<double>>> Emissions = {
@@ -506,7 +506,7 @@ TEST(MicroStateForward, GlobalScalingMatchesUnnormalizedReference) {
 
 TEST(MicroStateForward, ResizesResetsAndDoesNotReuseMissingFrames) {
     OnlineForward Forward;
-    Access::Setup(Forward, {Chain(MULTI, 2, 4)});
+    Access::Setup(Forward, {Chain(GLISS, 2, 4)});
     Access::Advance(Forward, 0, 2, {0.8, 0.2});
     Access::Advance(Forward, 1, 4, {0.3, 0.9});
     EXPECT_NEAR(Alpha(Forward.GetStates()[0].MicroStates[1], 2), 0.8 * 0.5 * 0.9, 1e-14);
@@ -529,15 +529,15 @@ TEST(MicroStateForward, ResizesResetsAndDoesNotReuseMissingFrames) {
 
 TEST(MicroStateForward, HandlesEmptySingleAndLongImpossibleHypotheses) {
     OnlineForward Forward;
-    Access::Setup(Forward, {Chain(MULTI, 0, 0)});
+    Access::Setup(Forward, {Chain(GLISS, 0, 0)});
     Access::Advance(Forward, 0, 0, {});
     EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, 0, 0), 0.0);
-    Access::Setup(Forward, {Chain(MULTI, 1, 0)});
+    Access::Setup(Forward, {Chain(GLISS, 1, 0)});
     EXPECT_DOUBLE_EQ(Access::Transition(Forward, 0, 0, 0), 1.0);
     Access::Advance(Forward, 0, 0, {0.5});
     Access::Advance(Forward, 1, 2, {0.8});
     EXPECT_DOUBLE_EQ(Alpha(Forward.GetStates()[0].MicroStates[0], 2), 0.0);
-    Access::Setup(Forward, {Chain(MULTI, 1, 1)});
+    Access::Setup(Forward, {Chain(GLISS, 1, 1)});
     // No possible entry, but diagnostic age hypotheses continue to be evaluated.
     for (int T = 0; T < 80; ++T) {
         Access::Frame(Forward, T);
@@ -623,7 +623,7 @@ TEST(MicroStateForward, SingleMicroStateMatchesOrdinarySemiMarkov) {
     auto Note = Chain(NOTE, 0, 8);
     Note.MicroTopologyType = NO_MICROSTATES;
     Note.Observations.push_back({PITCH, 440.0});
-    Access::Setup(Nested, {Chain(MULTI, 1, 8)});
+    Access::Setup(Nested, {Chain(GLISS, 1, 8)});
     Access::Setup(Direct, {Note});
     Nested.GetStates()[0].InitProb = 1.0;
     Direct.GetStates()[0].InitProb = 1.0;

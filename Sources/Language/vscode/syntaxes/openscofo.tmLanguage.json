@@ -148,7 +148,7 @@
 
                 {
                     "name": "meta.pitch-group.openscofo",
-                    "begin": "\\b(CHORD|TRILL|MULTI)\\s*(\\()",
+                    "begin": "\\b(CHORD|TRILL|GLISS)\\s*(\\()",
                     "beginCaptures": {
                         "1": { "name": "keyword.control.event.openscofo" },
                         "2": { "name": "punctuation.definition.group.begin.openscofo" }
@@ -196,7 +196,7 @@
 
                 {
                     "name": "keyword.control.event.openscofo",
-                    "match": "\\b(NOTE|REST|PTECH|UTECH|CHORD|TRILL|MULTI|LUAEVENT)\\b"
+                    "match": "\\b(NOTE|REST|PTECH|UTECH|CHORD|TRILL|GLISS|LUAEVENT)\\b"
                 },
 
                 { "include": "#literals" }

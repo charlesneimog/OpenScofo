@@ -43,7 +43,7 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
         .value("NOTE", OpenScofo::NOTE)
         .value("CHORD", OpenScofo::CHORD)
         .value("TRILL", OpenScofo::TRILL)
-        .value("MULTI", OpenScofo::MULTI);
+        .value("GLISS", OpenScofo::GLISS);
 
     enum_<OpenScofo::HMMType>("HMMType").value("SEMIMARKOV", OpenScofo::SEMIMARKOV).value("MARKOV", OpenScofo::MARKOV);
 

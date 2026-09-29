@@ -20,7 +20,7 @@ NOTE C4 1
 | `NOTE` | Single pitch | `NOTE <PITCH> <DURATION>` | `NOTE C4 1` | Pitch name or MIDI number. |
 | `CHORD` | Simultaneous pitches | `CHORD (<PITCH...>) <DURATION>` | `CHORD (C4 E4 G4) 2` | For chords and stable multiphonics. |
 | `TRILL` | Alternating pitches | `TRILL (<PITCH...>) <DURATION>` | `TRILL (D4 E4) 4` | For trills and tremolos. |
-| `MULTI` | Ordered pitch trajectory | `MULTI (<PITCH...>) <DURATION>` | `MULTI (C4 C#4 D4 D#4 E4) 2` | Glissando in quarter-tone steps between written pitches. |
+| `GLISS` | Ordered pitch trajectory | `GLISS (<PITCH...>) <DURATION>` | `GLISS (C4 C#4 D4 D#4 E4) 2` | Glissando in quarter-tone steps between written pitches. |
 | `REST` | Silence | `REST <DURATION>` | `REST 1` | Keeps score time moving. |
 | `PTECH` | Pitched technique | `PTECH <LABEL> <PITCH> <DURATION>` | `PTECH pizz C4 1` | For extended techniques **with** pitch. Check [AI](../ai/index.md)! |
 | `UTECH` | Unpitched technique | `UTECH <LABEL> <DURATION>` | `UTECH jet-whistle 2` | For extended techniques **without** pitch. Check [AI](../ai/index.md)! |
@@ -29,8 +29,8 @@ NOTE C4 1
 
 `TRILL`, `PTECH`, and `UTECH` use the strongest current internal observation, without an ordering constraint.
 `UTECH` uses alternative technique labels. `PTECH` uses alternative technique labels or its expected pitch.
-`MULTI` expands each interval into an ordered chain of quarter-tone (0.5 MIDI) steps during score parsing.
-For example, `MULTI (C4 G4) 2` creates 15 pitch microstates from MIDI 60 through 67, including both endpoints.
+`GLISS` expands each interval into an ordered chain of quarter-tone (0.5 MIDI) steps during score parsing.
+For example, `GLISS (C4 G4) 2` creates 15 pitch microstates from MIDI 60 through 67, including both endpoints.
 Descending intervals use descending steps; shared endpoints and consecutive repeated pitches appear once.
 These microstates share the event's overall duration equally
 by default, and its final internal state is absorbing until the outer duration model exits the event.

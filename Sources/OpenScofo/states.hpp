@@ -91,7 +91,7 @@ enum EventType {
     NOTE,
     CHORD,
     TRILL,
-    MULTI,
+    GLISS,
     PTECH,
     UTECH,
 
