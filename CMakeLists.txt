@@ -35,6 +35,12 @@ option(OPENSCOFO_BUILD_CSOUND_PLUGIN "Build CSound Plugin" OFF)
 option(OPENSCOFO_BUILD_SC_PLUGIN "Build SuperCollider Plugin" OFF)
 option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
+option(OPENSCOFO_RUN_TESTS_ON_BUILD "Run tests as part of every build" ON)
+option(OPENSCOFO_BUILD_BENCHMARKS "Build performance benchmarks" OFF)
+if(OPENSCOFO_BUILD_TESTS)
+    # Must be enabled here so ctest --test-dir build discovers subdirectory tests.
+    enable_testing()
+endif()
 option(OPENSCOFO_BUILD_ALL "Build All OpenScofo Tests and Wrappers" ON)
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
@@ -121,7 +127,7 @@ set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
 set(GRAMMAR_JS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/grammar.js")
 set(GRAMMAR_JS_BUILD "${GRAMMAR_BUILD_DIR}/grammar.js")
 
-set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Resources/OpenScofo Language/tree-sitter.json")
+set(GRAMMAR_JSON_SRC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/tree-sitter.json")
 set(GRAMMAR_JSON_BUILD "${GRAMMAR_BUILD_DIR}/tree-sitter.json")
 
 set(PARSER_GENERATED_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
@@ -141,15 +147,15 @@ if(OPENSCOFO_UPDATE_LANGUAGE)
 
     add_custom_command(
         OUTPUT "${PARSER_GENERATED_OUTPUT}"
-        BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/tree-sitter-${GRAMMAR_NAME}.wasm"
+        BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/src/grammar.json"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${GRAMMAR_BUILD_DIR}/src"
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JS_SRC}" "${GRAMMAR_JS_BUILD}"
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_JSON_SRC}" "${GRAMMAR_JSON_BUILD}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} generate
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-        DEPENDS "${GRAMMAR_JS_SRC}"
-        COMMENT "Generating Tree-sitter parser and WASM..."
+        DEPENDS "${GRAMMAR_JS_SRC}" "${GRAMMAR_JSON_SRC}"
+        COMMENT "Generating Tree-sitter parser..."
         VERBATIM)
 
     add_custom_target(generate_tree_sitter_parser DEPENDS "${PARSER_GENERATED_OUTPUT}")
@@ -447,7 +453,7 @@ endif()
 # │               Language               │
 # ╰──────────────────────────────────────╯
 if(NOT EMSCRIPTEN)
-    add_library(tree-sitter-openscofo SHARED ${CMAKE_CURRENT_BINARY_DIR}/openscofo_grammar/src/parser.c)
+    add_library(tree-sitter-openscofo SHARED "${PARSER_OUTPUT}")
 endif()
 
 # ╭──────────────────────────────────────╮
@@ -504,7 +510,7 @@ endif()
 # ╭──────────────────────────────────────╮
 # │                Tests                 │
 # ╰──────────────────────────────────────╯
-if(OPENSCOFO_BUILD_TESTS AND NOT EMSCRIPTEN)
+if(OPENSCOFO_BUILD_TESTS)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tests")
 endif()
 

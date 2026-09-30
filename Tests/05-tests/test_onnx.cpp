@@ -1,30 +1,17 @@
 #include <gtest/gtest.h>
 #include <onnx.h>
 
-// clang-format off
-TEST(OnnxMetadata, OnnxMetadata) {
-    fprintf(stderr, "before context allocation\n");
-    struct onnx_context_t *ctx = onnx_context_alloc_from_file("/home/neimog/Documents/Git/OpenScofo/Tests/models/flute.onnx", NULL, 0);
-    fprintf(stderr, "after context allocation: %p\n", (void *)ctx);
+#include <filesystem>
 
-    if (!ctx) {
-        return ;
-    }
-
-    const char *keys[] = 
-        {
-            "openscofo.sample_rate", 
-            "openscofo.fft_size", 
-            "openscofo.hop_size", 
-            "openscofo.descriptors",
-            "openscofo.labels"
-        };
-
-    for (int i = 0; i < 5; ++i) {
-        const char *s = onnx_metadata_get(ctx, keys[i]);
-        fprintf(stderr, "%s: %s\n", keys[i], s ? s : "(absent)");
-    }
-
-    onnx_context_free(ctx);
-    return ;
+TEST(OnnxMetadata, ReadsPortableConfigurationFixture) {
+    const auto Path = std::filesystem::path(TEST_DATA_DIR) / "configuration.onnx";
+    auto *Context = onnx_context_alloc_from_file(Path.string().c_str(), nullptr, 0);
+    ASSERT_NE(Context, nullptr) << Path;
+    EXPECT_STREQ(onnx_metadata_get(Context, "openscofo.sample_rate"), "44100");
+    EXPECT_STREQ(onnx_metadata_get(Context, "openscofo.fft_size"), "4096");
+    EXPECT_STREQ(onnx_metadata_get(Context, "openscofo.hop_size"), "256");
+    EXPECT_STREQ(onnx_metadata_get(Context, "openscofo.labels"), "[\"quiet\", \"loud\"]");
+    // Deliberately absent so configuration tests exercise ONNXDESCRIPTORS.
+    EXPECT_EQ(onnx_metadata_get(Context, "openscofo.descriptors"), nullptr);
+    onnx_context_free(Context);
 }

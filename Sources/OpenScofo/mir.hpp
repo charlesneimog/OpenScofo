@@ -53,6 +53,7 @@ class MIR {
     std::vector<std::string> GetONNXLabels();
 
   private:
+    friend struct MIRConfigurationTestAccess;
     Configuration m_Config;
 
     double HzToOcts(double frequency, double tuning, int binsPerOctave) const;
