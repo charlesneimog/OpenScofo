@@ -312,17 +312,78 @@ score svg {
 .score-demo__controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-block: 1rem;
 }
 
-.score-demo__controls button[aria-pressed="true"] {
-    color: var(--md-primary-bg-color);
-    background: var(--md-primary-fg-color);
+.md-typeset .score-demo__controls .md-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65em;
+    min-height: 44px;
+    width: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 0.55em 1.1em;
+    border: 2px solid transparent;
+    border-radius: 0.65rem;
+    color: var(--md-accent-bg-color);
+    background: color-mix(in srgb, var(--md-accent-fg-color) 82%, black);
+    font-weight: 700;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--md-accent-fg-color) 25%, transparent);
+    cursor: pointer;
+    transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
-.score-demo__controls button:disabled {
+.score-demo__controls .md-button::before {
+    content: "";
+    flex: 0 0 0.75em;
+    height: 0.85em;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.md-typeset .score-demo__controls .md-button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--md-accent-fg-color) 74%, black);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--md-accent-fg-color) 35%, transparent);
+    transform: translateY(-2px);
+}
+
+.md-typeset .score-demo__controls .md-button:focus-visible {
+    outline: 3px solid var(--md-accent-fg-color);
+    outline-offset: 4px;
+}
+
+.md-typeset .score-demo__controls .md-button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.md-typeset .score-demo__controls .md-button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--md-accent-fg-color) 66%, black);
+}
+
+.score-demo__controls .md-button[aria-pressed="true"]::before {
+    clip-path: none;
+    background: linear-gradient(to right, currentColor 35%, transparent 35%, transparent 65%, currentColor 65%);
+}
+
+.md-typeset .score-demo__controls .md-button:disabled {
     opacity: 0.5;
     cursor: wait;
+    box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .md-typeset .score-demo__controls .md-button {
+        transition: none;
+        transform: none;
+    }
+    .md-typeset .score-demo__controls .md-button:hover:not(:disabled) {
+        transform: none;
+    }
 }
 
 .score-demo__layout {
@@ -344,6 +405,10 @@ score svg {
 
 .score-demo__score {
     background: white;
+}
+
+.score-demo__code {
+    max-height: 20rem;
 }
 
 .score-demo__code[hidden] {

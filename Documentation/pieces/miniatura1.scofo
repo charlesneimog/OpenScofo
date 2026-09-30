@@ -3,13 +3,9 @@ FFTSIZE 2048
 HOPSIZE 512
 
 ONNXMODEL "./flute.onnx"
-//ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
-
 BPM 100
 
- // ╭───────────────────────────────────────╮
- // │          Measure number 1             │
- // ╰───────────────────────────────────────╯
+ // Measure number 1
 UTECH jet_whistle 1
 REST 0.5	
 NOTE Bb4 1.5 // tied

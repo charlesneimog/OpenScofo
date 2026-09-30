@@ -1,7 +1,5 @@
-ONNXMODEL ai-flute-model.onnx
-ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
-
 BPM 100
+ONNXMODEL ai-flute-model.onnx
 
  // ╭───────────────────────────────────────╮
  // │          Measure number 1             │
