@@ -1,4 +1,10 @@
-# Composition Showcase
+---
+icon: lucide/list-music
+tags:
+  - Showcase
+---
+
+# Showcase
 
 OpenScofo is young, but there is some pieces already composed with it, all of them my pieces for now. 
 

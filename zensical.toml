@@ -1,9 +1,9 @@
 [project]
-
 site_name = "OpenScofo"
 site_url = "https://charlesneimog.github.io/OpenScofo"
+site_description = "Open-source score following for contemporary music"
 docs_dir = "Documentation"
-copyright = "Copyright &copy 2026 | Charles K. Neimog"
+copyright = "Copyright &copy; 2026 | Charles K. Neimog"
 hooks = ["Documentation/copy-editor.py"]
 repo_url = "https://github.com/charlesneimog/OpenScofo"
 edit_uri = "edit/main/Documentation/"
@@ -20,13 +20,13 @@ extra_css = [
   "https://unpkg.com/katex@0/dist/katex.min.css",
 ]
 nav = [
-  { "Getting Started" = [
+  { "OpenScofo" = [
     "index.md",
+  ] },
+  { "Composing with OpenScofo" = [
     "composition.md",
     "what-can-i-build.md",
     "where-does-it-run.md",
-  ] },
-  { "Composing with OpenScofo" = [
     "concepts/core-language-concepts.md",
     "examples/index.md",
   ] },
@@ -94,7 +94,13 @@ features = [
 ]
 
 [project.plugins.minify]
+minify_js = true
 minify_html = true
+minify_css = true
+minify_inline_js = true
+minify_inline_css = true
+
+[project.plugins.social]
 
 [project.extra]
 logo_dark_mode = "assets/favicon-dark.svg"
@@ -114,7 +120,7 @@ toggle.name = "Switch to light mode"
 media = "(prefers-color-scheme: light)"
 scheme = "default"
 accent = "blue"
-palette.primary = "indigo"
+primary = "indigo"
 
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
@@ -164,27 +170,6 @@ custom_fences = [
 [project.markdown_extensions.zensical.extensions.preview]
 configurations = [{ targets.include = ["score/*"] }]
 
-# ╭──────────────────────────────────────╮
-# │               Plugins                │
-# ╰──────────────────────────────────────╯
-
-# plugins = [
-#   "search",
-#   { "git-revision-date-localized" = { type = "timeago", custom_format = "%d. %B %Y", timezone = "Europe/Amsterdam", locale = "en", fallback_to_build_date = false, enable_creation_date = true, enable_git_follow = true, enabled = true, strict = true } },
-# ]
-
-#╭──────────────────────────────────────╮
-#│          NOT SUPPORTED YET           │
-#╰──────────────────────────────────────╯
-
-# [project.extra.social]
-# icon = "fontawesome/brands/instagram"
-# link = "https://www.instagram.com/charlesneimog/"
-#
-# [project.extra.social]
-# icon = "fontawesome/brands/github"
-# link = "https://www.github.com/charlesneimog/"
-#
-# [project.extra.social]
-# icon = "fontawesome/solid/paper-plane"
-# link = "mailto:charlesneimog@outlook.com"
+[project.extra.analytics]
+provider = "google"
+property = "G-E81RWT6R4V"

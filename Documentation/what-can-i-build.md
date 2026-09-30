@@ -1,3 +1,9 @@
+---
+icon: lucide/wrench
+tags:
+  - Introduction
+---
+
 # What Can I Build?
 
 Build live interactions that adapt to the performer in real time.

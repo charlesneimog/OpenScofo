@@ -1,5 +1,5 @@
 ---
-icon: lucide/image
+icon: lucide/book-a
 tags:
   - Score Authoring
 ---

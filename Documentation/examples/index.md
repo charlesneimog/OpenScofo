@@ -1,10 +1,10 @@
 ---
-icon: material/music
+icon: material/book-open
 tags:
   - Examples
 ---
 
-# Examples
+# Score Examples
 
 Copy a pattern into a score and rename receivers to match your host patch.
 

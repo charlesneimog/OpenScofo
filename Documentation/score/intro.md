@@ -19,15 +19,15 @@ NOTE D4 1
     delay 1 tempo sendto granular [open]
 ```
 
-## File Structure
+## What's in an OpenScofo Score?
 
 | Element | Purpose | Reference |
 | --- | --- | --- |
-| Comments | Human notes in the score | [Comments](#comments) |
-| Configuration | Tempo, sample rate, low-level settings | [Configuring a Score](config/) |
-| Events | What OpenScofo listens for | [Musical Events](events/) |
-| Actions | What the computer does | [Computer Actions](actions/) |
-| Lua | Optional custom logic | [Lua](lua/) |
+| Comments | Human-readable notes in the score | [Comments](#comments) |
+| Configuration | Tempo, sample rate, and low-level settings | [Configuring a Score](config/) |
+| Score Events | What OpenScofo listens for | [Musical Events](events/) |
+| Actions | What the computer does when an event is detected | [Computer Actions](actions/) |
+| Lua | Complex events that are easier to implement in Lua than in Pd, Max, Csound, etc. | [Lua](lua/) |
 
 ## File Extension and Editors
 
