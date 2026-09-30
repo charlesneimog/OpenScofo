@@ -18,6 +18,8 @@
 #include "utils.hpp"
 
 #if defined(OPENSCOFO_LUA)
+#include <cstdint>
+#include <map>
 extern "C" {
 #include <lua.h>
 #include <lualib.h>
@@ -92,12 +94,15 @@ class OpenScofo {
     void ClearErrors();
 
 #if defined(OPENSCOFO_LUA)
+    ~OpenScofo();
     void InitLuaModule();
     bool LuaExecute(std::string code);
     std::string LuaGetError();
     bool LuaAddModule(std::string name, lua_CFunction func);
     bool LuaAddPointer(void *pointer, const char *name);
     void LuaAddPath(std::string path);
+    uint64_t ScheduleLuaCallback(double DelayMs, int CallbackRef, int DataRef);
+    bool CancelLuaCallback(uint64_t Id);
 #endif
 
     // Errors
@@ -114,7 +119,17 @@ class OpenScofo {
     Score m_Score;
     std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
 #if defined(OPENSCOFO_LUA)
-    lua_State *m_LuaState;
+    void ProcessLuaTimers();
+    void CloseLuaModule();
+    using LuaTimerKey = std::pair<uint64_t, uint64_t>;
+    struct LuaTimer {
+        int CallbackRef;
+        int DataRef;
+    };
+    lua_State *m_LuaState = nullptr;
+    std::map<LuaTimerKey, LuaTimer> m_LuaTimers;
+    uint64_t m_LuaCurrentSample = 0;
+    uint64_t m_LuaNextTimerId = 1;
 #endif
 
     Mode m_Mode = DESCRIPTORS;

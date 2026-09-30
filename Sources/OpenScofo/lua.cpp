@@ -11,7 +11,80 @@
 
 #if defined(OPENSCOFO_LUA)
 
+#include <limits>
+
 namespace OpenScofo {
+
+// ─────────────────────────────────────
+OpenScofo::~OpenScofo() {
+    CloseLuaModule();
+}
+
+// ─────────────────────────────────────
+void OpenScofo::CloseLuaModule() {
+    if (m_LuaState == nullptr) {
+        return;
+    }
+    for (const auto &[Key, Timer] : m_LuaTimers) {
+        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.CallbackRef);
+        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.DataRef);
+    }
+    m_LuaTimers.clear();
+    lua_close(m_LuaState);
+    m_LuaState = nullptr;
+}
+
+// ─────────────────────────────────────
+uint64_t OpenScofo::ScheduleLuaCallback(double DelayMs, int CallbackRef, int DataRef) {
+    const double DelaySamples = std::ceil(DelayMs * 0.001 * m_Config.SR);
+    if (!std::isfinite(DelaySamples) || DelaySamples < 0 ||
+        DelaySamples >= static_cast<double>(std::numeric_limits<uint64_t>::max() - m_LuaCurrentSample) ||
+        m_LuaNextTimerId > static_cast<uint64_t>(LUA_MAXINTEGER)) {
+        return 0;
+    }
+    const uint64_t Id = m_LuaNextTimerId++;
+    m_LuaTimers.emplace(LuaTimerKey{m_LuaCurrentSample + static_cast<uint64_t>(DelaySamples), Id},
+                        LuaTimer{CallbackRef, DataRef});
+    return Id;
+}
+
+// ─────────────────────────────────────
+bool OpenScofo::CancelLuaCallback(uint64_t Id) {
+    for (auto It = m_LuaTimers.begin(); It != m_LuaTimers.end(); ++It) {
+        if (It->first.second == Id) {
+            luaL_unref(m_LuaState, LUA_REGISTRYINDEX, It->second.CallbackRef);
+            luaL_unref(m_LuaState, LUA_REGISTRYINDEX, It->second.DataRef);
+            m_LuaTimers.erase(It);
+            return true;
+        }
+    }
+    return false;
+}
+
+// ─────────────────────────────────────
+void OpenScofo::ProcessLuaTimers() {
+    while (!m_LuaTimers.empty()) {
+        auto It = m_LuaTimers.begin();
+        if (It->first.first > m_LuaCurrentSample) {
+            break;
+        }
+        const LuaTimer Timer = It->second;
+        m_LuaTimers.erase(It); // Callbacks may schedule or cancel other timers.
+        lua_rawgeti(m_LuaState, LUA_REGISTRYINDEX, Timer.CallbackRef);
+        if (Timer.DataRef == LUA_REFNIL) {
+            lua_pushnil(m_LuaState);
+        } else {
+            lua_rawgeti(m_LuaState, LUA_REGISTRYINDEX, Timer.DataRef);
+        }
+        if (lua_pcall(m_LuaState, 1, 0, 0) != LUA_OK) {
+            const char *Error = lua_tostring(m_LuaState, -1);
+            spdlog::error("Lua timer callback: {}", Error ? Error : "Unknown error");
+            lua_pop(m_LuaState, 1);
+        }
+        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.CallbackRef);
+        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.DataRef);
+    }
+}
 
 // ─────────────────────────────────────
 static OpenScofo *GetCurrentOpenScofo(lua_State *L) {
@@ -242,7 +315,43 @@ static int OpenScofoActivateAllDescriptors(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+static int OpenScofoSchedule(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    luaL_checktype(L, 1, LUA_TNUMBER);
+    const double DelayMs = lua_tonumber(L, 1);
+    luaL_argcheck(L, std::isfinite(DelayMs) && DelayMs >= 0, 1, "delay must be finite and non-negative");
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+    lua_settop(L, 3); // Missing data becomes nil.
+    lua_pushvalue(L, 2);
+    const int CallbackRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    lua_pushvalue(L, 3);
+    const int DataRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    const uint64_t Id = self->ScheduleLuaCallback(DelayMs, CallbackRef, DataRef);
+    if (Id == 0) {
+        luaL_unref(L, LUA_REGISTRYINDEX, CallbackRef);
+        luaL_unref(L, LUA_REGISTRYINDEX, DataRef);
+        return luaL_error(L, "Lua timer delay or ID is out of range");
+    }
+    lua_pushinteger(L, static_cast<lua_Integer>(Id));
+    return 1;
+}
+
+// ─────────────────────────────────────
+static int OpenScofoCancel(lua_State *L) {
+    OpenScofo *self = GetCurrentOpenScofo(L);
+    if (self == nullptr)
+        return luaL_error(L, "OpenScofo pointer is null");
+    const lua_Integer Id = luaL_checkinteger(L, 1);
+    lua_pushboolean(L, Id > 0 && self->CancelLuaCallback(static_cast<uint64_t>(Id)));
+    return 1;
+}
+
+// ─────────────────────────────────────
 static const luaL_Reg oscofo_funcs[] = {
+    {"schedule", OpenScofoSchedule},
+    {"cancel", OpenScofoCancel},
     {"activate_all_descriptors", OpenScofoActivateAllDescriptors},
     {"set_current_event", OpenScofoSetCurrentEvent},
     {"set_current_section", OpenScofoSetCurrentSection},

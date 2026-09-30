@@ -276,6 +276,8 @@ void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descripto
  * @note Registers the OpenScofo Lua module via `luaL_requiref`.
  */
 void OpenScofo::InitLuaModule() {
+    CloseLuaModule();
+    m_LuaCurrentSample = 0;
     m_LuaState = luaL_newstate();
     luaL_openlibs(m_LuaState); // NOTE: Rethink if I load all functions
     lua_newtable(m_LuaState);
@@ -1074,6 +1076,10 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
  * @note Updates descriptors and score position depending on mode.
  */
 template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffer, size_t n) {
+#if defined(OPENSCOFO_LUA)
+    m_LuaCurrentSample += n;
+    ProcessLuaTimers();
+#endif
     m_BlockIndex += n;
 
     std::copy(m_InBuffer.begin() + n, m_InBuffer.end(), m_InBuffer.begin());
