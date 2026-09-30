@@ -1,5 +1,4 @@
 ---
-icon: material/glasses
 tags:
   - Advanced Configuration
 ---
