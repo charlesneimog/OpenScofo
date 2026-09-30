@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygments-openscofo"
+version = "0.1.1"
+description = "Pygments lexer for the OpenScofo language"
+requires-python = ">=3.9"
+dependencies = [
+    "pygments>=2.15"
+]
+
+[project.entry-points."pygments.lexers"]
+openscofo = "openscofo_lexer:OpenScofoLexer"
+
+[tool.setuptools]
+py-modules = ["openscofo_lexer"]
