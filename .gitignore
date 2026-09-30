@@ -139,3 +139,4 @@ Documentation/descriptors/testing/*.mp3
 !Tests/02-score/configuration.onnx
 *.wav
 *.mp3
+!Documentation/assets/miniatura1.mp3
