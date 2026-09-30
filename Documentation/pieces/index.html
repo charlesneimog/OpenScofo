@@ -32,6 +32,7 @@
 
             body {
                 margin: 0;
+                font-family: system-ui, sans-serif;
                 touch-action: pan-x pan-y;
                 color: var(--fg);
                 background-color: var(--bg);
@@ -46,6 +47,56 @@
                 display: flex;
                 height: 100vh; /* Constrain the entire app to the viewport height */
                 overflow: hidden; /* Prevent the whole body from scrolling */
+            }
+
+            .score-buttons {
+                display: flex;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .score-buttons button {
+                padding: 0.5rem 1rem;
+                border: 1px solid currentColor;
+                border-radius: 0.35rem;
+                color: var(--fg);
+                background: transparent;
+                font: inherit;
+                cursor: pointer;
+            }
+
+            .score-buttons button:hover:not(:disabled) {
+                background: var(--panel);
+            }
+
+            .score-buttons button[aria-pressed="true"] {
+                color: #fff;
+                background: #641e25;
+                border-color: #641e25;
+            }
+
+            .score-buttons button:focus-visible {
+                outline: 2px solid currentColor;
+                outline-offset: 3px;
+            }
+
+            .score-buttons button:disabled {
+                opacity: 0.5;
+                cursor: wait;
+            }
+
+            #status:empty {
+                display: none;
+            }
+
+            #score {
+                padding: 20px;
+            }
+
+            #score svg {
+                width: 100%;
+                height: auto;
+                display: block;
             }
 
             /* Sidebar/Canvas Section */
@@ -95,18 +146,18 @@
                     rgba(100, 30, 37, 0.12) 0px 2px 4px 0px,
                     rgba(100, 30, 37, 0.32) 0px 2px 16px 0px;
                 outline: none;
-                border-radius: 10px;
+                border-radius: 0.65rem;
             }
         </style>
     </head>
     <body>
-        <div id="wasm-loader">
-            <span id="status">Loading...</span>
-            <progress id="progress" value="0" max="100"></progress>
-        </div>
-
         <div class="app-container">
             <div class="controls-container">
+                <div class="score-buttons" role="group" aria-label="Choose a score">
+                    <button type="button" data-score="1" aria-pressed="false" disabled>Score 1</button>
+                    <button type="button" data-score="2" aria-pressed="false" disabled>Score 2</button>
+                </div>
+                <p id="status" role="status"></p>
                 <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
                 <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
             </div>
@@ -118,24 +169,40 @@
 
         <script>
             const getEId = (id) => document.getElementById(id);
-            const ui = { status: getEId("status"), progress: getEId("progress"), loader: getEId("wasm-loader") };
+            const ui = { status: getEId("status"), score: getEId("score"), viewport: getEId("score-container") };
+            const scoreButtons = document.querySelectorAll("[data-score]");
             var Pd4Web = null;
+            let scoreRequest = 0;
 
-            // 1. Fetch and inject the SVG
-            fetch("score.svg")
-                .then((r) => r.text())
-                .then((svgText) => {
-                    const container = document.getElementById("score");
-                    container.innerHTML = svgText;
-                    const svg = container.querySelector("svg");
-                    if (svg) {
-                        svg.style.width = "100%";
-                        svg.style.height = "auto";
-                        svg.style.display = "block";
+            async function loadScore(piece, playAudio = false) {
+                const request = ++scoreRequest;
+                try {
+                    const response = await fetch(`score${piece}.svg`);
+                    if (!response.ok) throw new Error(`Failed to load score ${piece}: ${response.status}`);
+                    const svgText = await response.text();
+                    // A slower response must not replace a more recent selection.
+                    if (request !== scoreRequest) return;
+                    ui.score.innerHTML = svgText;
+                    ui.viewport.scrollTo({ top: 0, left: 0, behavior: "instant" });
+                    scoreButtons.forEach((button) => {
+                        button.setAttribute("aria-pressed", String(Number(button.dataset.score) === piece));
+                    });
+                    if (playAudio && Pd4Web) {
+                        Pd4Web.sendFloat("score", piece);
+                        Pd4Web.sendFloat("audio", piece);
                     }
-                    container.style.padding = "20px";
-                })
-                .catch((err) => console.error("Failed to load SVG:", err));
+                    ui.status.textContent = "";
+                } catch (error) {
+                    if (request !== scoreRequest) return;
+                    ui.status.textContent = `Could not load Score ${piece}. Please try again.`;
+                    console.error(error);
+                }
+            }
+
+            scoreButtons.forEach((button) => {
+                button.addEventListener("click", () => loadScore(Number(button.dataset.score), true));
+            });
+            loadScore(1);
 
             // 2. Fetch WASM payload
             const fetchWasm = async (url) => {
@@ -153,14 +220,6 @@
 
                     chunks.push(value);
                     received += value.length;
-
-                    if (contentLength) {
-                        const pct = Math.floor((received / contentLength) * 100);
-                        ui.progress.value = pct;
-                        ui.status.textContent = `Downloading WASM... ${pct}%`;
-                    } else {
-                        ui.status.textContent = `Downloading WASM... ${Math.round(received / 1024)} KB`;
-                    }
                 }
 
                 const buffer = new Uint8Array(received);
@@ -176,44 +235,44 @@
             (async () => {
                 try {
                     const wasmBinary = await fetchWasm("./pd4web.wasm");
-                    Pd4WebModule({ wasmBinary }).then(async (module) => {
-                        Pd4Web = new module.Pd4Web();
-                        Pd4Web.openPatch("index.pd", {
-                            canvasId: "Pd4WebCanvas",
-                            soundToggleId: "Pd4WebAudioSwitch",
-                        });
-                        ui.loader.style.display = "none";
-
-                        if (Pd4Web) {
-                            Pd4Web.onFloatReceived("scoreevent", (r, f) => {
-                                // Event 0: Reset the score
-                                if (f === 0) {
-                                    document.querySelectorAll("[openscofo-event-number]").forEach((note) => {
-                                        note.setAttribute("fill", "black");
-                                    });
-                                    return;
-                                }
-
-                                // Active Event: Highlight and Scroll
-                                const notes = document.querySelectorAll(`[openscofo-event-number="${f}"]`);
-
-                                if (notes.length > 0) {
-                                    // Highlight all parts of the current event
-                                    for (const note of notes) {
-                                        note.setAttribute("fill", "red");
-                                    }
-
-                                    // Native DOM Auto-Scrolling
-                                    // This forces the browser to calculate the exact offset and center the element
-                                    notes[0].scrollIntoView({
-                                        behavior: "smooth", // Smooth animation
-                                        block: "center", // Center vertically in the container
-                                        inline: "center", // Center horizontally if needed
-                                    });
-                                }
-                            });
-                        }
+                    const module = await Pd4WebModule({ wasmBinary });
+                    Pd4Web = new module.Pd4Web();
+                    await Pd4Web.openPatch("index.pd", {
+                        canvasId: "Pd4WebCanvas",
+                        soundToggleId: "Pd4WebAudioSwitch",
+                        renderGui: true,
                     });
+
+                    if (Pd4Web) {
+                        Pd4Web.onFloatReceived("scoreevent", (r, f) => {
+                            // Event 0: Reset the score
+                            if (f === 0) {
+                                document.querySelectorAll("[openscofo-event-number]").forEach((note) => {
+                                    note.setAttribute("fill", "black");
+                                });
+                                return;
+                            }
+
+                            // Active Event: Highlight and Scroll
+                            const notes = document.querySelectorAll(`[openscofo-event-number="${f}"]`);
+
+                            if (notes.length > 0) {
+                                // Highlight all parts of the current event
+                                for (const note of notes) {
+                                    note.setAttribute("fill", "red");
+                                }
+
+                                // Native DOM Auto-Scrolling
+                                // This forces the browser to calculate the exact offset and center the element
+                                notes[0].scrollIntoView({
+                                    behavior: "smooth", // Smooth animation
+                                    block: "center", // Center vertically in the container
+                                    inline: "center", // Center horizontally if needed
+                                });
+                            }
+                        });
+                    }
+                    scoreButtons.forEach((button) => { button.disabled = false; });
                 } catch (error) {
                     ui.status.textContent = "Failed to load WASM.";
                     console.error(error);

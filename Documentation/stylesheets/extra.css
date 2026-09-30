@@ -308,3 +308,65 @@ score svg {
 .md-typeset__table {
     margin: auto;
 }
+
+.score-demo__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.score-demo__controls button[aria-pressed="true"] {
+    color: var(--md-primary-bg-color);
+    background: var(--md-primary-fg-color);
+}
+
+.score-demo__controls button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.score-demo__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.score-demo__panel {
+    min-width: 0;
+}
+
+.score-demo__score,
+.score-demo__code {
+    max-height: 32rem;
+    overflow: auto;
+    border-radius: 0.3rem;
+}
+
+.score-demo__score {
+    background: white;
+}
+
+.score-demo__code[hidden] {
+    display: none;
+}
+
+.score-demo__code .highlight,
+.score-demo__code pre {
+    margin: 0;
+}
+
+@media (max-width: 767px) {
+    .score-demo__layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.score-demo__score svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.score-demo__score [data-followed] {
+    fill: #d32f2f;
+}

@@ -26,7 +26,7 @@ PTECH tongue-ram D3 1
 
 | Element | Purpose | Reference |
 | --- | --- | --- |
-| Comments | Human-readable notes in the score | [Comments](#comments) |
+| Comments | Human-readable notes in the score | Comments |
 | Configuration | Tempo, sample rate, and low-level settings | [Configuring a Score](config/) |
 | Score Events | What OpenScofo listens for | [Musical Events](events/) |
 | Actions | What the computer does when an event is detected | [Computer Actions](actions/) |
