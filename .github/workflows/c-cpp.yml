@@ -118,7 +118,7 @@ jobs:
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=ON \
                     -Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
@@ -136,7 +136,7 @@ jobs:
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF \
+                    -Ccmake.define.OPENSCOFO_BUILD_TESTS=ON \
                     -Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
@@ -159,13 +159,15 @@ jobs:
                     "-Ccmake.define.CMAKE_CXX_COMPILER=clang++"
                     "-Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache"
                     "-Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-                    "-Ccmake.define.OPENSCOFO_BUILD_TESTS=OFF"
+                    "-Ccmake.define.OPENSCOFO_BUILD_TESTS=ON"
                     "-Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF"
                     "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
                     "-Ccmake.define.OPENSCOFO_BUILD_ALL=ON"
                     "-Ccmake.args=-G Ninja"
                   )
                   python -m build --wheel @buildArgs
+            - name: Run native tests
+              run: ctest --test-dir build -C Release --output-on-failure --no-tests=error -L openscofo
             - name: Repair Linux wheel
               if: runner.os == 'Linux'
               run: |
@@ -187,10 +189,11 @@ jobs:
                     -DCMAKE_BUILD_TYPE=Release \
                     -DCMAKE_C_COMPILER_LAUNCHER=sccache \
                     -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-                    -DOPENSCOFO_BUILD_TESTS=OFF \
+                    -DOPENSCOFO_BUILD_TESTS=ON \
                     -DOPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -DOPENSCOFO_BUILD_ALL=ON
                   cmake --build build-wasm
+                  ctest --test-dir build-wasm -C Release --output-on-failure --no-tests=error -L openscofo
             - name: Show sccache stats
               if: always()
               shell: bash
