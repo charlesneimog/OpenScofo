@@ -17,7 +17,7 @@ The default method uses modified Kullback-Leibler divergence:
 
 $$MKL_n = \sum_{k=0}^{K} \log \left ( 1 + \frac{|S_{n,k}|}{|S_{n-1,k}|} \right )$$
 
-All methods below can be selected with [`ONSETFUNCTION`](../score/advanced-config/). Here, $S_{n,k}$ is an FFT bin.
+All methods below can be selected with [`ONSETFUNCTION`](../score/advanced-config/descriptors.md#onset-and-articulation). Here, $S_{n,k}$ is an FFT bin.
 
 ## Reference Table
 
@@ -26,10 +26,10 @@ All methods below can be selected with [`ONSETFUNCTION`](../score/advanced-confi
 | `pow` | Power | Energy changes; good for clear attacks. |
 | `pd` | Phase deviation | Phase discontinuities at note attacks. |
 | `wpd` | Weighted phase deviation | Phase deviation weighted by stronger spectral bins. |
-| `sf` | Spectral flux | Positive magnitude change between frames. |
+| `sf` | Magnitude sum | Selects `ODS_ODF_MAGSUM`, the same implementation as `hfc`. |
 | `cd` | Complex domain | Magnitude and phase prediction; strong general-purpose choice. |
 | `rcd` | Rectified complex domain | Complex-domain increases only; suppresses some false detections. |
-| `hfc` | High-frequency content | Percussive attacks with strong high-frequency energy. |
+| `hfc` | Magnitude sum | Selects `ODS_ODF_MAGSUM`, the same implementation as `sf`. |
 | `mkl` | Modified Kullback-Leibler | Spectral-distribution changes; useful for softer pitched attacks. |
 
 ## Example

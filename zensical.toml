@@ -37,7 +37,14 @@ nav = [
     "score/actions.md",
     "score/conventions.md",
     "score/lua.md",
-    "score/advanced-config.md",
+    { "Advanced Configuration" = [
+      "score/advanced-config.md",
+      "score/advanced-config/pitch-following.md",
+      "score/advanced-config/tempo-and-synchronization.md",
+      "score/advanced-config/silence-rest-detection.md",
+      "score/advanced-config/ai-model-recognition.md",
+      "score/advanced-config/descriptors.md",
+    ] },
   ] },
   { "Platform Integrations" = [
     "integrations/index.md",
@@ -119,8 +126,8 @@ toggle.name = "Switch to light mode"
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-accent = "blue"
-primary = "indigo"
+accent = "deep purple"
+primary = "deep purple"
 
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
@@ -129,7 +136,7 @@ toggle.name = "Switch to dark mode"
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-accent = "yellow"
+accent = "deep purple"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 

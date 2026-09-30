@@ -12,10 +12,10 @@ Configuration lines set piece-level behavior. Put global settings before the fir
 
 | Keyword | Purpose | Syntax | Default | Example |
 | --- | --- | --- | --- | --- |
-| `BPM` | Tempo for following events | `BPM <NUMBER>` | `60` | `BPM 72` |
+| `BPM` | Tempo for following events | `BPM <NUMBER>` | must be declared | `BPM 72` |
 | `TRANSPOSE` | Transpose subsequent pitches in semitones | `TRANSPOSE <NUMBER>` | `0` | `TRANSPOSE -12` |
 | `TUNINGA4` | Reference tuning for A4 in Hz | `TUNINGA4 <NUMBER>` | `440.0` | `TUNINGA4 442` |
-| `SR` | Expected sample rate | `SR <NUMBER>` | host sample rate | `SR 48000` |
+| `SR` | Expected sample rate; must match the host | `SR <NUMBER>` | `48000` | `SR 48000` |
 | `SECTIONRESTRICT` | Restrict inference to the selected section | `SECTIONRESTRICT ON\|OFF` | `OFF` | `SECTIONRESTRICT ON` |
 
 ## Sections
@@ -49,4 +49,4 @@ NOTE C4 1
 
 ## Remarks
 
-For low-level listening, model, and follower settings, see [Advanced Configuration](advanced-config/).
+For low-level listening, model, and follower settings, see [Advanced Configuration](advanced-config.md).

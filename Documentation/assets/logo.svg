@@ -27,14 +27,14 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="1.5723626"
-     inkscape:cx="100.80372"
-     inkscape:cy="115.74938"
+     inkscape:cx="177.75798"
+     inkscape:cy="116.06738"
      inkscape:window-width="1860"
-     inkscape:window-height="1163"
+     inkscape:window-height="1170"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="g3"
+     inkscape:current-layer="g4"
      inkscape:export-bgcolor="#ffffffff" />
   <defs
      id="defs1" />
@@ -70,7 +70,7 @@
         </g>
         <text
            xml:space="preserve"
-           style="font-size:28.8988px;writing-mode:lr-tb;direction:ltr;fill:#003380;stroke-width:0.677314"
+           style="font-size:28.8988px;writing-mode:lr-tb;direction:ltr;fill:#654ff0;stroke-width:0.677314;fill-opacity:1"
            x="5.7010465"
            y="144.55881"
            id="text1"
@@ -79,7 +79,7 @@
            inkscape:export-ydpi="900"><tspan
              sodipodi:role="line"
              id="tspan1"
-             style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:28.8988px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#003380;stroke-width:0.677314"
+             style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:28.8988px;font-family:'Proxima Nova';-inkscape-font-specification:'Proxima Nova Bold';fill:#654ff0;stroke-width:0.677314;fill-opacity:1"
              x="5.7010465"
              y="144.55881">OpenScofo</tspan></text>
       </g>

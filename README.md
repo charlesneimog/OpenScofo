@@ -54,6 +54,8 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 * `OPENSCOFO_BUILD_SC_PLUGIN` (ON/OFF): Build the SuperCollider plugin. Default: OFF.
 * `OPENSCOFO_BUILD_VAMP_PLUGIN` (ON/OFF): Build the Vamp plugin. Default: OFF.
 * `OPENSCOFO_BUILD_TESTS` (ON/OFF): Build the test suite. Default: ON.
+* `OPENSCOFO_RUN_TESTS_ON_BUILD` (ON/OFF): Run the test suite during normal builds and fail the build if tests fail. Default: ON.
+* `OPENSCOFO_BUILD_BENCHMARKS` (ON/OFF): Build the optional performance executables alongside tests. Default: OFF.
 * `OPENSCOFO_BUILD_WITH_LUA` (ON/OFF): Build the Lua module embedded in OpenScofo. Default: ON.
 * `OPENSCOFO_UPDATE_LANGUAGE` (ON/OFF): Update the OpenScofo language grammar (`grammar.js`). Default: ON.
 * `OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS` (ON/OFF): Enable native CPU optimizations. Default: ON.
@@ -67,6 +69,8 @@ git clone https://github.com/charlesneimog/OpenScofo
 cmake . -B build
 cmake --build build
 ```
+
+Tests run automatically with the default options. See [Running the tests](Tests/README.md) for configuration coverage, CTest commands, and WebAssembly testing.
 
 ## GPLv3 Licensing Notice
 
