@@ -2,6 +2,57 @@ body {
     margin: 0;
 }
 
+/* OpenScofo's Tree-sitter palette, scoped to score examples. */
+.highlight:is(.language-openscofo, .language-scofo) {
+    --md-code-hl-keyword-color: #7541a6;
+    --md-code-hl-string-color: #2f6f22;
+    --md-code-hl-function-color: #1d4ed8;
+    --md-code-hl-variable-color: #b4234b;
+    --md-code-hl-number-color: #b45309;
+    --openscofo-receiver-color: #886000;
+}
+
+[data-md-color-scheme="slate"] .highlight:is(.language-openscofo, .language-scofo) {
+    --md-code-hl-keyword-color: #cba6f7;
+    --md-code-hl-string-color: #a6e3a1;
+    --md-code-hl-function-color: #89b4fa;
+    --md-code-hl-variable-color: #f38ba8;
+    --md-code-hl-number-color: #fab387;
+    --openscofo-receiver-color: #f9e2af;
+}
+
+.highlight:is(.language-openscofo, .language-scofo) :is(.k, .kn, .kt) {
+    color: var(--md-code-hl-keyword-color);
+    font-weight: bold;
+}
+
+/* Each complete pitch or technique is emitted as a single String token. */
+.highlight:is(.language-openscofo, .language-scofo) .s {
+    color: var(--md-code-hl-string-color);
+    font-weight: bold;
+}
+
+.highlight:is(.language-openscofo, .language-scofo) .nf {
+    color: var(--md-code-hl-function-color);
+    font-weight: normal;
+}
+
+/* Durations and time units differ from commands such as delay and sendto. */
+.highlight:is(.language-openscofo, .language-scofo) .nv {
+    color: var(--md-code-hl-variable-color);
+    font-weight: bold;
+}
+
+.highlight:is(.language-openscofo, .language-scofo) .nc {
+    color: var(--openscofo-receiver-color);
+    font-weight: normal;
+}
+
+.highlight:is(.language-openscofo, .language-scofo) .nl {
+    color: var(--md-code-hl-function-color);
+    font-weight: bold;
+}
+
 #logo_light_mode {
     display: var(--md-footer-logo-light-mode);
 }

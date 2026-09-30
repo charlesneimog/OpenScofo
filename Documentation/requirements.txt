@@ -1,3 +1,6 @@
 mkdocs-material
 mkdocs
 requests
+zensical
+# Run pip install -r Documentation/requirements.txt from the repository root.
+-e ./Sources/Language/pygments_openscofo

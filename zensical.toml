@@ -145,8 +145,9 @@ toggle.name = "Switch to system preference"
 # ╰──────────────────────────────────────╯
 [project.markdown_extensions.attr_list]
 [project.markdown_extensions.md_in_html]
-[project.markdown_extensions.pymdownx.blocks.caption]
 [project.markdown_extensions.footnotes]
+
+[project.markdown_extensions.pymdownx.blocks.caption]
 [project.markdown_extensions.pymdownx.arithmatex]
 generic = true
 
@@ -157,13 +158,19 @@ emoji_generator = "zensical.extensions.emoji.to_svg"
 options.custom_icons = ["Documentation/overrides/.icons"]
 
 # Code blocks
+# Code blocks
 [project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
 extend_pygments_lang = [
   { name = "openscofo", lang = "openscofo", options = {} },
 ]
 
 [project.markdown_extensions.pymdownx.inlinehilite]
 [project.markdown_extensions.pymdownx.snippets]
+
 
 # Admonition
 [project.markdown_extensions.admonition]
@@ -172,6 +179,7 @@ extend_pygments_lang = [
 custom_fences = [
   { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
 ]
+
 
 # Preview
 [project.markdown_extensions.zensical.extensions.preview]

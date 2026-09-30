@@ -9,14 +9,17 @@ tags:
 An OpenScofo score is a plain-text `.scofo` file. It combines configuration, musical events, and computer actions.
 
 ```openscofo
-// Minimal score
+/* Minimal score example */
+
 BPM 60
 
 NOTE C4 1
     sendto delay [1]
 
-NOTE D4 1
+// Extended technique
+PTECH tongue-ram D3 1
     delay 1 tempo sendto granular [open]
+
 ```
 
 ## What's in an OpenScofo Score?
@@ -37,16 +40,25 @@ Use `.scofo`.
 - Neovim: [OpenScofo Neovim configuration](https://github.com/charlesneimog/OpenScofo/tree/main/Sources/Language/nvim){:target="_blank"}
 - Browser: [OpenScofo Online Editor](https://charlesneimog.github.io/OpenScofo/Editor/){:target="_blank"}
 
-![OpenScofo score editor](../assets/oscofo-code.png)
-
-## Comments
-
 ```openscofo
-// one-line comment
+BPM 120
 
-/*
-multi-line comment
-*/
+PHASECOUPLING 0.75
+
+SR 48000
+FFTSIZE 2048
+HOPSIZE 512
+
+NOTE C4 2
+TRILL (G4 C5) 2
+    // send 1 to the receiver switch
+    sendto action1 [switch 1]
+    delay 1.5 tempo sendto action2 [1 2 3]
+
+PTECH tongue-ram C3 0.33
+PTECH tongue-ram C#3 0.33
+UTECH jet-whistle 0.33
+
 ```
 
 See also: [Core Language Concepts](../concepts/core-language-concepts/).
