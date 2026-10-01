@@ -375,23 +375,6 @@ export function parseScore(doc) {
 }
 
 // ─────────────────────────────────────
-export function uploadWav() {
-    const fileInput = document.getElementById("audioInput");
-    if (!fileInput) {
-        console.error("File input not found");
-        return;
-    }
-    fileInput.click();
-    fileInput.onchange = (event) => {
-        const file = event.target.files[0];
-        if (!file) {
-            console.error("No file selected");
-            return;
-        }
-        k;
-    };
-}
-
 export function uploadScore() {
     const fileInput = document.getElementById("scoreXmlInput");
     if (!fileInput) {

@@ -40,7 +40,6 @@ import {
     loadTxtScore,
     parseScore,
     uploadScore,
-    uploadWav,
 } from "../services/score-service.js";
 
 export class OpenScofoOnlineEditor {
@@ -131,18 +130,21 @@ export class OpenScofoOnlineEditor {
         const downloadButton = document.getElementById("download-score");
         const uploadButtom = document.getElementById("upload-score");
         const loadButtom = document.getElementById("load-score");
-        const audioButtom = document.getElementById("upload-wav");
         const formatButton = document.getElementById("format-score");
+        const clearConsoleButton = document.getElementById("clear-console");
 
-        if (downloadButton && uploadButtom && loadButtom && audioButtom && formatButton) {
+        if (downloadButton && uploadButtom && loadButtom && formatButton) {
             downloadButton.addEventListener("click", () => this.downloadScore());
             uploadButtom.addEventListener("click", () => this.uploadScore());
             loadButtom.addEventListener("click", () => this.loadTxtScore());
-            audioButtom.addEventListener("click", () => this.uploadWav());
             formatButton.addEventListener("click", () => this.formatScore());
         } else {
             alert("Buttons not found");
         }
+
+        clearConsoleButton?.addEventListener("click", () => {
+            document.getElementById("editor-console").replaceChildren();
+        });
     }
 
     loadState() {
@@ -186,7 +188,6 @@ Object.assign(OpenScofoOnlineEditor.prototype, {
     getPitch,
     generateOpenScofoScore,
     parseScore,
-    uploadWav,
     uploadScore,
     loadTxtScore,
 });

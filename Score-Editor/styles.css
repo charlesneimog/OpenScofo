@@ -103,7 +103,7 @@ button:active {
 }
 
 @media (max-width: 768px) {
-    .container {
+    .score-editor {
         width: 100%;
     }
 
@@ -117,45 +117,45 @@ button:active {
     }
 }
 
-.container {
+.score-editor {
     position: relative;
-    height: 600px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
     border-radius: 5px;
     box-shadow: none;
-    overflow-x: auto;
-    overflow-y: auto;
+    overflow: hidden;
     box-sizing: border-box;
     font-size: 16px;
     transition: box-shadow 0.3s ease-in-out;
     line-height: 1.5;
     scroll-behavior: smooth;
-    poitner-events: pointer;
 }
 
-.container::-webkit-scrollbar {
+.score-editor::-webkit-scrollbar {
     width: 1px;
     height: 1px;
 }
 
-.container::-webkit-scrollbar-thumb {
+.score-editor::-webkit-scrollbar-thumb {
     width: 1px;
     height: 1px;
     border-radius: 1px;
 }
 
-.container::-webkit-scrollbar-thumb:hover {
+.score-editor::-webkit-scrollbar-thumb:hover {
     border-radius: 2px;
 }
 
-.container::-webkit-scrollbar-track {
+.score-editor::-webkit-scrollbar-track {
     border-radius: 2px;
 }
 
-.container {
+.score-editor {
     scrollbar-width: thin;
 }
 
-.container:focus-within {
+.score-editor:focus-within {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue), transparent 55%);
 
     .CodeMirror-gutters {
@@ -163,7 +163,7 @@ button:active {
     }
 }
 
-.container::-webkit-scrollbar-button {
+.score-editor::-webkit-scrollbar-button {
     display: none;
 }
 
