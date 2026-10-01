@@ -1,7 +1,10 @@
 ---
 icon: fontawesome/solid/brain
 tags:
-  - AI Models
+    - AI Models
+hide:
+    - toc
+
 ---
 
 # Training AI models

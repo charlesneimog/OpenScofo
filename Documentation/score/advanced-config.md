@@ -1,6 +1,12 @@
 ---
+icon: octicons/tools-16
 tags:
-  - Advanced Configuration
+    - Advanced Configuration
+
+hide:
+    - toc
+  
+
 ---
 
 # Advanced Configuration

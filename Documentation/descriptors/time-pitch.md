@@ -1,9 +1,10 @@
 ---
+icon: lucide/waves
 tags:
   - Pitch Detection
 ---
 
-# Time-Domain and Pitch Descriptors
+# Time-Domain and Pitch
 
 Use this page for waveform and pitch-related descriptor definitions. These descriptors complement spectral features with noisiness, estimated fundamental frequency, and pitch confidence.
 

@@ -1,4 +1,5 @@
 ---
+icon: lucide/volume-x
 tags:
   - Advanced Configuration
   - Silence Detection

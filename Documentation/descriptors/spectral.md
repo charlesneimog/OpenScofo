@@ -1,4 +1,5 @@
 ---
+icon: lucide/audio-waveform
 tags:
   - Spectral Descriptors
 ---

@@ -2,6 +2,8 @@
 icon: lucide/wrench
 tags:
   - Introduction
+hide:
+  - toc
 ---
 
 # What Can I Build?

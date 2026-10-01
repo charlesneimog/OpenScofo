@@ -2,6 +2,8 @@
 icon: lucide/list-music
 tags:
   - Showcase
+hide:
+  - toc
 ---
 
 

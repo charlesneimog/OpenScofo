@@ -1,6 +1,9 @@
 ---
+icon: lucide/music
 tags:
   - Audio Analysis
+hide:
+  - toc
 ---
 
 # Descriptors for Musicians

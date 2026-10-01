@@ -1,7 +1,9 @@
 ---
 icon: material/source-repository
 tags:
-  - Model Repository
+    - Model Repository
+hide:
+    - toc
 ---
 
 # Models to Download

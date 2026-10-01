@@ -1,4 +1,5 @@
 ---
+icon: lucide/audio-lines
 tags:
   - Advanced Configuration
   - Pitch Following

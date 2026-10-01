@@ -1,4 +1,5 @@
 ---
+icon: lucide/chart-spline
 tags:
   - Advanced Configuration
   - Audio Analysis

@@ -1,4 +1,5 @@
 ---
+icon: lucide/chart-spline
 tags:
   - Audio Analysis
 ---
@@ -11,7 +12,6 @@ Start with [Descriptors for Musicians](for-musicians.md) for a simple table of d
 
 ```openscofo
 ONNXMODEL "flute.onnx"
-ONNXDESCRIPTORS mfcc zcr centroid spread
 
 PTECH pizz C4 1
     sendto sample [start pizz_echo]

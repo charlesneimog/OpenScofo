@@ -1,10 +1,11 @@
 ---
+icon: lucide/timer-reset
 tags:
   - Advanced Configuration
   - Tempo
 ---
 
-# Tempo and Synchronization
+# Tempo
 
 Use these settings when OpenScofo recognizes the right events but its timing is too rigid or reacts too strongly to the performer.
 

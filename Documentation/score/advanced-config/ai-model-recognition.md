@@ -1,4 +1,5 @@
 ---
+icon: lucide/brain-circuit
 tags:
   - Advanced Configuration
   - AI Models

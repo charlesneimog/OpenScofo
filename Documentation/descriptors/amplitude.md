@@ -1,4 +1,5 @@
 ---
+icon: lucide/volume-2
 tags:
   - Amplitude Descriptors
 ---
