@@ -828,39 +828,52 @@
       ]
     },
     "pitch": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
           "type": "FIELD",
-          "name": "pitch_name",
+          "name": "midi",
           "content": {
             "type": "SYMBOL",
-            "name": "pitch_name"
+            "name": "number"
           }
         },
         {
-          "type": "CHOICE",
+          "type": "SEQ",
           "members": [
             {
               "type": "FIELD",
-              "name": "alteration",
+              "name": "pitch_name",
               "content": {
                 "type": "SYMBOL",
-                "name": "alteration"
+                "name": "pitch_name"
               }
             },
             {
-              "type": "BLANK"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "alteration",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "alteration"
+                  }
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            },
+            {
+              "type": "FIELD",
+              "name": "octave",
+              "content": {
+                "type": "SYMBOL",
+                "name": "octave"
+              }
             }
           ]
-        },
-        {
-          "type": "FIELD",
-          "name": "octave",
-          "content": {
-            "type": "SYMBOL",
-            "name": "octave"
-          }
         }
       ]
     },

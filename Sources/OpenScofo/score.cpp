@@ -75,10 +75,22 @@ bool Score::isNumber(std::string str) {
 void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation &State) {
     TSNode pitch = node;
     std::string type = ts_node_type(pitch);
-    if (type == "midi") {
-        float midi = std::stof(GetCodeStr(ScoreStr, pitch));
+    TSNode midiNode = ts_node_child_by_field_name(pitch, "midi", 4);
+    if (type == "midi" || !ts_node_is_null(midiNode)) {
+        double midi;
+        try {
+            midi = std::stod(GetCodeStr(ScoreStr, type == "midi" ? pitch : midiNode)) + m_Transpose;
+        } catch (const std::exception &) {
+            spdlog::error("Invalid MIDI pitch on line {}", ts_node_start_point(pitch).row + 1);
+            return;
+        }
+        const double frequency = m_Tunning * std::pow(2.0, (midi - 69.0) / 12.0);
+        if (!std::isfinite(midi) || !std::isfinite(frequency) || frequency <= 0.0) {
+            spdlog::error("MIDI pitch out of range on line {}", ts_node_start_point(pitch).row + 1);
+            return;
+        }
         State.Midi = midi;
-        State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);
+        State.Freq = frequency;
         State.Type = PITCH;
         return;
     } else if (type != "pitch") {
@@ -296,8 +308,11 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     Event.Type = NOTE;
 
     // Pitch
-    Observation SubState;
+    Observation SubState{};
     PitchNode2Freq(ScoreStr, PitchNode, SubState);
+    if (!(SubState.Freq > 0.0)) {
+        return {};
+    }
     Event.Observations.push_back(SubState);
 
     if (Percussive) {
@@ -514,8 +529,11 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     }
 
     // Pitch
-    Observation Pitch;
+    Observation Pitch{};
     PitchNode2Freq(ScoreStr, PitchNode, Pitch);
+    if (!(Pitch.Freq > 0.0)) {
+        return {};
+    }
     Event.MicroStates[1].Observations.push_back(Pitch);
 
     // Duration

@@ -188,10 +188,13 @@ module.exports = grammar({
         // Pitch
         pitch_group: ($) => seq("(", repeat1(field("pitch", $.pitch)), ")"),
         pitch: ($) =>
-            seq(
-                field("pitch_name", $.pitch_name),
-                optional(field("alteration", $.alteration)),
-                field("octave", $.octave),
+            choice(
+                field("midi", $.number),
+                seq(
+                    field("pitch_name", $.pitch_name),
+                    optional(field("alteration", $.alteration)),
+                    field("octave", $.octave),
+                ),
             ),
         pitch_name: (_) => token(/[A-Ga-g]/),
         alteration: (_) => token(choice("#", "b")),

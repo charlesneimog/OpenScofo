@@ -468,9 +468,19 @@
           }
         ]
       },
+      "midi": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
       "octave": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "octave",
@@ -480,7 +490,7 @@
       },
       "pitch_name": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "pitch_name",
@@ -699,15 +709,15 @@
     "named": false
   },
   {
+    "type": "GLISS",
+    "named": false
+  },
+  {
     "type": "LUA",
     "named": false
   },
   {
     "type": "LUAEVENT",
-    "named": false
-  },
-  {
-    "type": "GLISS",
     "named": false
   },
   {
