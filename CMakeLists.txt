@@ -21,7 +21,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
-set(TREE_SITTER_VERSION "v0.26.10")
+set(TREE_SITTER_VERSION "v0.27.0")
 
 include(FetchContent)
 
