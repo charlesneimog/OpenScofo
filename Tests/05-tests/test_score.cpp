@@ -3,12 +3,57 @@
 #include <OpenScofo.hpp>
 
 #include <filesystem>
+#include <cmath>
 #include <string>
 #include <vector>
 
 namespace {
 
 const std::filesystem::path Assets = TEST_DATA_DIR;
+
+TEST(ScorePitches, ParsesMidiAndNamedPitchesWithTuningAndTransposition) {
+    OpenScofo::Score Score;
+    auto [Config, States] = Score.Parse(Assets / "midi-pitches.scofo");
+    std::erase_if(States,
+                  [](const auto &State) { return State.IsInterEventSilence || State.Type == OpenScofo::FIRSTEVENT; });
+    const std::vector<std::vector<double>> Expected = {{60},           {60.5},         {0},
+                                                       {127},          {69},           {60, 64, 67.5},
+                                                       {60.5, 62},     {60, 60.5, 61}, {60.5},
+                                                       {62},           {60.75},        {60.25},
+                                                       {60.25, 64.25}, {60.25, 62.25}, {60.25, 60.75, 61.25},
+                                                       {60.75}};
+    ASSERT_EQ(States.size(), Expected.size());
+    const std::vector<OpenScofo::EventType> Types = {
+        OpenScofo::NOTE,  OpenScofo::NOTE,  OpenScofo::NOTE,  OpenScofo::NOTE,  OpenScofo::NOTE, OpenScofo::CHORD,
+        OpenScofo::TRILL, OpenScofo::GLISS, OpenScofo::PTECH, OpenScofo::PTECH, OpenScofo::NOTE, OpenScofo::NOTE,
+        OpenScofo::CHORD, OpenScofo::TRILL, OpenScofo::GLISS, OpenScofo::PTECH};
+    for (size_t Index = 0; Index < States.size(); ++Index) {
+        SCOPED_TRACE(Index);
+        EXPECT_EQ(States[Index].Type, Types[Index]);
+        EXPECT_DOUBLE_EQ(States[Index].Duration,
+                         Index == 1 ? 0.5
+                                    : (Types[Index] == OpenScofo::CHORD || Types[Index] == OpenScofo::TRILL ||
+                                               Types[Index] == OpenScofo::GLISS
+                                           ? 2.0
+                                           : 1.0));
+        std::vector<OpenScofo::Observation> Pitches;
+        auto Collect = [&](const auto &Observations) {
+            for (const auto &Observation : Observations) {
+                if (Observation.Type == OpenScofo::PITCH)
+                    Pitches.push_back(Observation);
+            }
+        };
+        Collect(States[Index].Observations);
+        for (const auto &MicroState : States[Index].MicroStates)
+            Collect(MicroState.Observations);
+        ASSERT_EQ(Pitches.size(), Expected[Index].size());
+        const double Tuning = Index < 10 ? 440.0 : 442.0;
+        for (size_t Pitch = 0; Pitch < Pitches.size(); ++Pitch) {
+            EXPECT_DOUBLE_EQ(Pitches[Pitch].Midi, Expected[Index][Pitch]);
+            EXPECT_NEAR(Pitches[Pitch].Freq, Tuning * std::pow(2.0, (Expected[Index][Pitch] - 69.0) / 12.0), 1e-9);
+        }
+    }
+}
 
 TEST(ScoreSections, ParsesNamesConfigurationAndPerSectionTiming) {
     OpenScofo::Score Score;

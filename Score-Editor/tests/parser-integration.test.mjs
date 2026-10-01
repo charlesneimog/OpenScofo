@@ -1,10 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import { runFormatterAfterParse } from "../src/parser/parser-integration.js";
-import { Language, Parser } from "../tree-sitter/web-tree-sitter.js";
+import { OPEN_SCOFO_HIGHLIGHT_QUERY } from "../src/config/constants.js";
+import { Language, Parser, Query } from "../tree-sitter/web-tree-sitter.js";
 
 const parserWasm = new URL("../tree-sitter/tree-sitter-openscofo.wasm", import.meta.url).pathname;
+
+test("accepts and highlights MIDI pitches while keeping durations separate", async () => {
+    await Parser.init();
+    const language = await Language.load(parserWasm);
+    const parser = new Parser();
+    parser.setLanguage(language);
+    const fixture = readFileSync(new URL("../../Tests/02-score/midi-pitches.scofo", import.meta.url), "utf8");
+    const tree = parser.parse(fixture);
+    assert.equal(tree.rootNode.hasError, false, tree.rootNode.toString());
+    tree.delete();
+
+    const note = parser.parse("NOTE 60.5 0.25");
+    const definition = note.rootNode.namedChild(0).childForFieldName("definition");
+    assert.equal(definition.childForFieldName("pitch").childForFieldName("midi").text, "60.5");
+    assert.equal(definition.childForFieldName("duration").text, "0.25");
+    const query = new Query(language, OPEN_SCOFO_HIGHLIGHT_QUERY);
+    const captures = query.captures(note.rootNode);
+    assert(captures.some(({ name, node }) => name === "string" && node.text === "60.5"));
+    assert(captures.some(({ name, node }) => name === "tempo" && node.text === "0.25"));
+    query.delete();
+    note.delete();
+
+    const incomplete = parser.parse("NOTE 60.5");
+    assert.equal(incomplete.rootNode.hasError, true, "A MIDI pitch still requires a duration");
+    incomplete.delete();
+    parser.delete();
+});
 
 function positionAt(source, index) {
     const lines = source.slice(0, index).split("\n");
