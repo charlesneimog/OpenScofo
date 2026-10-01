@@ -7,7 +7,7 @@ tags:
 
 # Showcase
 
-OpenScofo is still young, but a few pieces have already been composed using it. For now, all of them are my compositions.
+The pieces below showcase OpenScofo in practice across different performers and instruments.
 
 <div class="pieces-table" align="center" markdown>
 

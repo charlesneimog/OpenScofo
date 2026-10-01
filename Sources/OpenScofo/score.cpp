@@ -10,6 +10,8 @@
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <utility>
 #include <algorithm>
 #include <tree_sitter/api.h>
@@ -77,13 +79,15 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation 
     std::string type = ts_node_type(pitch);
     TSNode midiNode = ts_node_child_by_field_name(pitch, "midi", 4);
     if (type == "midi" || !ts_node_is_null(midiNode)) {
-        double midi;
-        try {
-            midi = std::stod(GetCodeStr(ScoreStr, type == "midi" ? pitch : midiNode)) + m_Transpose;
-        } catch (const std::exception &) {
+        const std::string midiText = GetCodeStr(ScoreStr, type == "midi" ? pitch : midiNode);
+        char *end = nullptr;
+        errno = 0;
+        const double parsedMidi = std::strtod(midiText.c_str(), &end);
+        if (end == midiText.c_str() || end != midiText.c_str() + midiText.size() || errno == ERANGE) {
             spdlog::error("Invalid MIDI pitch on line {}", ts_node_start_point(pitch).row + 1);
             return;
         }
+        const double midi = parsedMidi + m_Transpose;
         const double frequency = m_Tunning * std::pow(2.0, (midi - 69.0) / 12.0);
         if (!std::isfinite(midi) || !std::isfinite(frequency) || frequency <= 0.0) {
             spdlog::error("MIDI pitch out of range on line {}", ts_node_start_point(pitch).row + 1);

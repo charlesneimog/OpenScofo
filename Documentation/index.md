@@ -75,4 +75,4 @@ tags:
 ---
 
 !!! tip "Create actions from the score"
-    See [Actions](score/actions/) to learn how to trigger actions when score events are detected.
+    See [Actions](score/actions/#examples) to learn how to trigger actions when score events are detected.

@@ -11,7 +11,7 @@ Actions run when an event is detected. Define them one line below the event.
 !!! tip "For organization it is recommended to use indentation!"
 
 
-## Example
+## Examples
 
 <div class="grid cards" markdown>
 

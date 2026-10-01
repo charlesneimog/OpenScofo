@@ -35,7 +35,6 @@ flowchart LR
 | Event | What should OpenScofo listen for? | [Musical Events](../score/events/) |
 | Action | What should the computer do? | [Computer Actions](../score/actions/) |
 | Time | When the computer should do it? | [Computer Actions](../score/actions/#action-reference) |
-| Host | Where does `sendto` go? | [Platform Integrations](../integrations/#sendto-behavior) |
 
 ## Events
 
