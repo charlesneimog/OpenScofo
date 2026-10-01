@@ -81,25 +81,32 @@ logo = "assets/favicon.svg"
 favicon = "assets/logo.svg"
 name = "material"
 features = [
+  # navigation
   "navigation.top",
   "navigation.sections",
   "navigation.footer",
-  "content.code.annotate",
-  "content.code.copy",
-  "navigation.tabs",
-  "search.highlight",
-  "search.suggest",
-  "toc.integrate",
-  "toc.follow",
   "navigation.instant.prefetch",
   "navigation.tracking",
   "navigation.tabs.sticky",
   "navigation.expand",
-  "content.tabs.link",
-  "content.footnote.tooltips",
-  # Preview
+  "navigation.tabs",
   "navigation.instant",
   "navigation.instant.progress",
+  "navigation.path",
+
+  # correct
+  "content.code.annotate",
+  "content.code.copy",
+
+  # search
+  "search.highlight",
+  "search.suggest",
+
+  # content
+  "content.tabs.link",
+  "content.footnote.tooltips",
+
+  # Preview
 ]
 
 [project.plugins.minify]
