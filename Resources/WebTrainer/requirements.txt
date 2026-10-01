@@ -1,0 +1,2 @@
+OpenScofo
+gradio>=6,<7
