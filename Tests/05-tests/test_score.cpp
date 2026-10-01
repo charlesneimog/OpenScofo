@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <OpenScofo.hpp>
+#include <spdlog/sinks/ostream_sink.h>
+
+#include <sstream>
 
 #include <filesystem>
 #include <cmath>
@@ -10,6 +13,28 @@
 namespace {
 
 const std::filesystem::path Assets = TEST_DATA_DIR;
+
+TEST(ScoreDiagnostics, ReportsMissingTokensAndUnexpectedText) {
+    std::ostringstream Messages;
+    auto Sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(Messages);
+    auto Logger = std::make_shared<spdlog::logger>("score-diagnostics", Sink);
+    Logger->set_pattern("%v");
+    const auto PreviousLogger = spdlog::default_logger();
+    spdlog::set_default_logger(Logger);
+    OpenScofo::Score Score;
+    Score.Parse(Assets / "syntax-errors.scofo");
+    spdlog::set_default_logger(PreviousLogger);
+
+    const std::string Output = Messages.str();
+    EXPECT_NE(Output.find("Missing duration at line 2, column 8"), std::string::npos) << Output;
+    EXPECT_NE(Output.find("Unexpected text '@' at line 4, column 1"), std::string::npos) << Output;
+    EXPECT_NE(Output.find("Unexpected text '$' at line 6, column 1"), std::string::npos) << Output;
+    EXPECT_NE(Output.find("Missing \"}\" at line 9, column 1"), std::string::npos) << Output;
+    EXPECT_EQ(Output.find("Fond Error"), std::string::npos) << Output;
+    const auto Unexpected = Output.find("Unexpected text '$'");
+    ASSERT_NE(Unexpected, std::string::npos);
+    EXPECT_EQ(Output.find("Unexpected text '$'", Unexpected + 1), std::string::npos) << Output;
+}
 
 TEST(ScorePitches, ParsesMidiAndNamedPitchesWithTuningAndTransposition) {
     OpenScofo::Score Score;

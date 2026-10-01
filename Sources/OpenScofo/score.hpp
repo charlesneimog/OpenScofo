@@ -46,7 +46,7 @@ class Score {
     TSNode GetField(TSNode Node, std::string s);
     bool isNumber(const std::string &str);
     static bool ScoreIsText(const std::string &Path);
-    static void FindErrors(TSNode &Root, TSNode &Node, const std::string &Score);
+    static void FindErrors(TSNode Node, const std::string &Score, bool InsideError = false);
     static bool GetConfigNumber(const std::string &Id, const std::string &ValueType, const std::string &Value,
                                 TSPoint Position, double &Output);
     static bool GetConfigBool(const std::string &Id, const std::string &ValueType, std::string Value, TSPoint Position,

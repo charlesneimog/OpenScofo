@@ -1305,21 +1305,42 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, ScoreState 
 }
 
 // ─────────────────────────────────────
-void Score::FindErrors(TSNode &root, TSNode &node, const std::string &ScoreStr) {
-    if (!ts_node_is_null(node) && !ts_node_eq(root, node) && ts_node_has_error(node)) {
-        TSPoint start = ts_node_start_point(node);
-        uint32_t row = start.row + 1; // 1-based
-        uint32_t column = start.column + 1;
-        uint32_t byteStart = ts_node_start_byte(node);
-        uint32_t byteEnd = ts_node_end_byte(node);
-        std::string tokenText = ScoreStr.substr(byteStart, byteEnd - byteStart);
-        spdlog::error("Fond Error {}, line: {}, column: {}, token: '{}'", ts_node_type(node), row, column, tokenText);
+void Score::FindErrors(TSNode Node, const std::string &ScoreStr, bool InsideError) {
+    if (ts_node_is_null(Node)) {
+        return;
     }
 
-    uint32_t childCount = ts_node_child_count(node);
-    for (uint32_t i = 0; i < childCount; i++) {
-        TSNode child = ts_node_child(node, i);
-        FindErrors(root, child, ScoreStr);
+    const TSPoint Position = ts_node_start_point(Node);
+    if (ts_node_is_missing(Node)) {
+        std::string Label = ts_node_type(Node);
+        const TSNode Parent = ts_node_parent(Node);
+        if (Label == "number" && !ts_node_is_null(Parent)) {
+            for (const std::string Field : {"duration", "amount"}) {
+                const TSNode Value = ts_node_child_by_field_name(Parent, Field.c_str(), Field.size());
+                if (!ts_node_is_null(Value) && ts_node_eq(Value, Node)) {
+                    Label = Field;
+                    break;
+                }
+            }
+        }
+        if (!ts_node_is_named(Node)) {
+            Label = "\"" + Label + "\"";
+        }
+        spdlog::error("Missing {} at line {}, column {}", Label, Position.row + 1, Position.column + 1);
+    } else if (ts_node_is_error(Node) && !InsideError) {
+        const uint32_t Start = ts_node_start_byte(Node);
+        std::string Text = ScoreStr.substr(Start, ts_node_end_byte(Node) - Start);
+        // Keep multi-line recovery nodes readable in host consoles.
+        std::replace_if(Text.begin(), Text.end(), [](unsigned char C) { return std::isspace(C); }, ' ');
+        if (Text.size() > 80) {
+            Text = Text.substr(0, 80) + "…";
+        }
+        spdlog::error("Unexpected text '{}' at line {}, column {}", Text, Position.row + 1, Position.column + 1);
+    }
+
+    // has_error also marks ancestors; only the actual ERROR/MISSING nodes get messages.
+    for (uint32_t Index = 0; Index < ts_node_child_count(Node); ++Index) {
+        FindErrors(ts_node_child(Node, Index), ScoreStr, InsideError || ts_node_is_error(Node));
     }
 }
 
@@ -1403,7 +1424,7 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
     TSNode rootNode = ts_tree_root_node(tree);
 
     if (ts_node_has_error(rootNode)) {
-        FindErrors(rootNode, rootNode, ScoreStr);
+        FindErrors(rootNode, ScoreStr);
     }
 
     uint32_t child_count = ts_node_child_count(rootNode);

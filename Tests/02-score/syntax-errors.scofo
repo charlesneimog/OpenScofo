@@ -1,0 +1,8 @@
+BPM 60
+NOTE C4
+LUA {}
+@
+NOTE C4 1
+$
+REST 1
+LUA { print(1)
