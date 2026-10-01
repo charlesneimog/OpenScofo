@@ -10,7 +10,6 @@
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
-#include <cerrno>
 #include <cstdlib>
 #include <utility>
 #include <algorithm>
@@ -51,26 +50,16 @@ bool Score::ScoreIsLoaded() {
 }
 
 // ─────────────────────────────────────
-bool Score::isNumber(std::string str) {
+bool Score::isNumber(const std::string &str) {
     if (str.empty()) {
         return false;
     }
 
-    if (std::isspace(static_cast<unsigned char>(str[0]))) {
-        return false;
-    }
-
-    const char *start = str.c_str();
-    char *endptr;
-    errno = 0;
-
-    std::strtof(start, &endptr);
-
-    if (endptr == start || errno == ERANGE || endptr != start + str.size()) {
-        return false;
-    }
-
-    return true;
+    float value = 0.0f;
+    const char *begin = str.data();
+    const char *end = begin + str.size();
+    auto [ptr, ec] = std::from_chars(begin, end, value);
+    return ec == std::errc{} && ptr == end;
 }
 
 // ─────────────────────────────────────
@@ -78,24 +67,27 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation 
     TSNode pitch = node;
     std::string type = ts_node_type(pitch);
     TSNode midiNode = ts_node_child_by_field_name(pitch, "midi", 4);
+
     if (type == "midi" || !ts_node_is_null(midiNode)) {
         const std::string midiText = GetCodeStr(ScoreStr, type == "midi" ? pitch : midiNode);
-        char *end = nullptr;
-        errno = 0;
-        const double parsedMidi = std::strtod(midiText.c_str(), &end);
-        if (end == midiText.c_str() || end != midiText.c_str() + midiText.size() || errno == ERANGE) {
+        double parsedMidi = 0.0;
+
+        if (!ParseDouble(midiText, parsedMidi)) {
             spdlog::error("Invalid MIDI pitch on line {}", ts_node_start_point(pitch).row + 1);
             return;
         }
+
         const double midi = parsedMidi + m_Transpose;
         const double frequency = m_Tunning * std::pow(2.0, (midi - 69.0) / 12.0);
         if (!std::isfinite(midi) || !std::isfinite(frequency) || frequency <= 0.0) {
             spdlog::error("MIDI pitch out of range on line {}", ts_node_start_point(pitch).row + 1);
             return;
         }
+
         State.Midi = midi;
         State.Freq = frequency;
         State.Type = PITCH;
+
         return;
     } else if (type != "pitch") {
         TSPoint Pos = ts_node_start_point(pitch);
@@ -248,6 +240,7 @@ void Score::AddDummySilence(const ScoreState &Next) {
     Event.PhaseCoupling = Previous.PhaseCoupling;
     Event.TimeTolerance = Previous.TimeTolerance;
     Event.Observations.push_back({SILENCE});
+
     m_ScoreStates.emplace_back(std::move(Event));
 }
 
@@ -567,6 +560,7 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
 
     Event.Type = UTECH;
     Event.MicroTopologyType = UNORDERED;
+
     // Alternative technique labels share one sounded microstate.
     Event.MicroStates.resize(1);
     bool HasTechnique = false;
@@ -612,9 +606,6 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
 
 // ─────────────────────────────────────
 ScoreState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
-    // m_ScorePosition++;
-    // Note that Rest do not count for the score position, as they are not considered in the evaluation
-
     if (m_ScorePosition == 0) {
         spdlog::warn("OpenScofo cannot detect the start of a piece when the first events are REST. "
                      "It cannot distinguish between silence before the piece and the actual start of the piece. "
@@ -867,6 +858,7 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     m_LastOnset = Event.OnsetExpected;
     // Event timing is already computed from the previous scored event.
     AddDummySilence(Event);
+
     Event.Index = static_cast<int>(m_ScoreStates.size());
     m_ScoreStates.emplace_back(std::move(Event));
 }

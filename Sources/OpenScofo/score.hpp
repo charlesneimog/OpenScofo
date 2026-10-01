@@ -44,7 +44,7 @@ class Score {
     void ParseInput(const std::string &Score);
     void PrintTreeSitterNode(TSNode node, int indent = 0);
     TSNode GetField(TSNode Node, std::string s);
-    bool isNumber(std::string str);
+    bool isNumber(const std::string &str);
     static bool ScoreIsText(const std::string &Path);
     static void FindErrors(TSNode &Root, TSNode &Node, const std::string &Score);
     static bool GetConfigNumber(const std::string &Id, const std::string &ValueType, const std::string &Value,

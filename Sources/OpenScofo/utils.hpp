@@ -3,10 +3,32 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <charconv>
+#include <string>
 
 namespace OpenScofo {
 
+// ╭─────────────────────────────────────╮
+// │         String Manipulation         │
+// ╰─────────────────────────────────────╯
+inline bool ParseDouble(const std::string &text, double &value) {
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    auto [ptr, ec] = std::from_chars(begin, end, value);
+    return ec == std::errc{} && ptr == end;
+}
+
 // ─────────────────────────────────────
+inline bool ParseFloat(std::string_view text, float &value) {
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    auto [ptr, ec] = std::from_chars(begin, end, value);
+    return ec == std::errc{} && ptr == end;
+}
+
+// ╭─────────────────────────────────────╮
+// │                Math                 │
+// ╰─────────────────────────────────────╯
 inline constexpr double LogZero = -std::numeric_limits<double>::max();
 
 // ─────────────────────────────────────
