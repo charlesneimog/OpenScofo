@@ -165,7 +165,7 @@ export function runFormatterAfterParse(rootNode) {
         }
 
         if (node.type === "action") {
-            ensureLineStart(this, node, "\t");
+            ensureLineStart(this, node, isInsideSection ? "\t\t" : "\t");
         }
 
         if (node.type === "lua_body") {
