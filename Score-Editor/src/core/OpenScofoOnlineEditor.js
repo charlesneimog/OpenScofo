@@ -60,6 +60,7 @@ export class OpenScofoOnlineEditor {
         this.bigTextWarning = false;
 
         this.codeInput = document.getElementById("code-input");
+        this.loadState();
         this.codeEditor = CodeMirror.fromTextArea(this.codeInput, {
             lineNumbers: true,
             showCursorWhenSelecting: true,
@@ -108,7 +109,6 @@ export class OpenScofoOnlineEditor {
 
         this.codeContainer = document.getElementById("code-container");
 
-        this.loadState();
         this.saveStateOnChange = this.debounce(this.saveState, 2000);
         this.runTreeQueryOnChange = this.debounce(this.runTreeQuery, 100);
         this.runTreeQueryOnViewportChange = this.debounce(this.runTreeQuery, 50);

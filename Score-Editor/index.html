@@ -1,12 +1,12 @@
 <!doctype html>
 
-<html class="dark" lang="en">
+<html lang="en">
     <head>
         <meta charset="utf-8" />
         <meta content="width=device-width, initial-scale=1.0" name="viewport" />
         <title>OpenScofo Editor Workspace</title>
         <link
-            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@300;400;500;600;700&amp;display=swap"
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
             rel="stylesheet"
         />
         <link
@@ -43,29 +43,7 @@
             referrerpolicy="no-referrer"
         />
 
-        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-        <script id="tailwind-config">
-            tailwind.config = {
-                darkMode: "class",
-                theme: {
-                    extend: {
-                        colors: {
-                            primary: "#89b4fa",
-                            "background-light": "#eff1f5",
-                            "background-dark": "#1e1e2e",
-                            "surface-dark": "#181825",
-                            "surface-border": "#313244",
-                            "console-bg": "#11111b",
-                        },
-                        fontFamily: {
-                            display: ["Space Grotesk", "sans-serif"],
-                            mono: ["Noto Sans Mono", "monospace"],
-                        },
-                        borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
-                    },
-                },
-            };
-        </script>
+        <link href="./output.css" rel="stylesheet" />
         <link href="./styles.css" rel="stylesheet" />
         <style>
             /* Custom scrollbar for code editor feel */
@@ -74,14 +52,14 @@
                 height: 8px;
             }
             ::-webkit-scrollbar-track {
-                background: #1e1e2e;
+                background: var(--bg);
             }
             ::-webkit-scrollbar-thumb {
-                background: #313244;
+                background: var(--surface-border);
                 border-radius: 4px;
             }
             ::-webkit-scrollbar-thumb:hover {
-                background: #45475a;
+                background: var(--comment);
             }
             .code-line-numbers {
                 counter-reset: line;
@@ -92,117 +70,108 @@
                 display: inline-block;
                 width: 2rem;
                 margin-right: 1rem;
-                color: #6c7086;
+                color: var(--line-number);
                 text-align: right;
                 user-select: none;
             }
         </style>
     </head>
     <body
-        class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display h-dvh flex flex-col overflow-hidden"
+        class="bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary font-display h-dvh flex flex-col overflow-hidden"
     >
         <!-- Header -->
         <header
-            class="flex h-16 shrink-0 items-center justify-between border-b border-solid border-surface-border bg-surface-dark px-6 z-20"
+            class="flex min-h-16 shrink-0 flex-wrap gap-3 py-2 items-center justify-between border-b border-solid border-hover-light dark:border-text-light-third bg-background-light dark:bg-background-dark px-6 z-20"
         >
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="size-12 flex-shrink-0">
                         <a href="https://charlesneimog.github.io/OpenScofo/">
                             <img
-                                src="https://raw.githubusercontent.com/charlesneimog/OpenScofo/refs/heads/main/Documentation/assets/g2.png"
+                                src="https://raw.githubusercontent.com/charlesneimog/OpenScofo/refs/heads/main/Documentation/assets/logo.svg"
                                 class="h-12 w-12 object-contain"
                                 alt="OpenScofo"
                             />
                         </a>
                     </div>
                     <div class="flex flex-col justify-center">
-                        <h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-slate-100">
-                            OpenScofo Editor
-                        </h1>
-                        <p class="text-xs text-slate-400 font-normal">v0.1.4</p>
+                        <h2
+                            class="font-bold leading-tight tracking-[-0.015em] text-text-light-primary dark:text-text-dark-primary"
+                        >
+                            OpenScofo Score Editor
+                        </h2>
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="flex flex-col justify-center">
-                        <h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-slate-100">
-                            Under Construction
-                        </h1>
-                    </div>
-                    <span class="material-symbols-outlined text-4xl text-yellow-400"> precision_manufacturing </span>
-                </div>
+            <div role="toolbar" aria-label="Score actions" class="score-toolbar flex flex-wrap gap-2">
+                <button
+                    class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-hover-light dark:bg-hover-dark px-3 py-1.5 text-xs font-bold text-text-light-primary dark:text-text-dark-primary hover:bg-accent hover:text-white transition-colors"
+                    id="upload-score"
+                >
+                    <input type="file" id="scoreXmlInput" accept=".xml, .musicxml, .mxl" style="display: none" />
+                    <span class="material-symbols-outlined text-base">music_note</span>
+                    Import MusicXML
+                </button>
+                <button
+                    class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-hover-light dark:bg-hover-dark px-3 py-1.5 text-xs font-bold text-text-light-primary dark:text-text-dark-primary hover:bg-accent hover:text-white transition-colors"
+                    id="load-score"
+                >
+                    <input type="file" id="scoreTxtInput" accept=".txt, .scofo" style="display: none" />
+                    <span class="material-symbols-outlined text-base">upload_file</span>
+                    Load Score
+                </button>
+                <button
+                    class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-hover-light dark:bg-hover-dark px-3 py-1.5 text-xs font-bold text-text-light-primary dark:text-text-dark-primary hover:bg-accent hover:text-white transition-colors"
+                    id="format-score"
+                    type="button"
+                >
+                    <span class="material-symbols-outlined text-base">format_align_left</span>
+                    Format Score
+                </button>
+                <button
+                    class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white hover:brightness-110 transition-colors"
+                    id="download-score"
+                >
+                    <span class="material-symbols-outlined text-base">download</span>
+                    Download Score
+                </button>
             </div>
         </header>
         <!-- Main Workspace -->
         <main class="flex min-h-0 flex-1 overflow-hidden">
             <!-- Score Editor and Error Console -->
-            <section class="flex min-h-0 min-w-0 w-full flex-col bg-surface-dark/50">
-                <!-- Editor Toolbar -->
-                <div
-                    class="flex min-h-12 shrink-0 flex-wrap gap-2 items-center justify-between border-b border-surface-border bg-surface-dark px-4 py-2"
-                >
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-semibold text-slate-200">Scofo Score</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
-                            id="upload-score"
-                        >
-                            <input
-                                type="file"
-                                id="scoreXmlInput"
-                                accept=".xml, .musicxml, .mxl"
-                                style="display: none"
-                            />
-                            <span class="material-symbols-outlined text-base">music_note</span>
-                            Import MusicXML
-                        </button>
-                        <button
-                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
-                            id="load-score"
-                        >
-                            <input type="file" id="scoreTxtInput" accept=".txt, .scofo" style="display: none" />
-                            <span class="material-symbols-outlined text-base">upload_file</span>
-                            Load Score
-                        </button>
-                        <button
-                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-colors"
-                            id="format-score"
-                            type="button"
-                        >
-                            <span class="material-symbols-outlined text-base">format_align_left</span>
-                            Format Score
-                        </button>
-                        <button
-                            class="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors"
-                            id="download-score"
-                        >
-                            <span class="material-symbols-outlined text-base">download</span>
-                            Download Score
-                        </button>
-                    </div>
-                </div>
+            <section class="flex min-h-0 min-w-0 w-full flex-col bg-background-light dark:bg-background-dark">
                 <!-- Editor Area -->
                 <div id="code-container" class="score-editor">
                     <textarea id="code-input"> </textarea>
                 </div>
 
                 <!-- Console Area -->
-                <div class="flex h-48 max-h-[30dvh] shrink-0 flex-col border-t border-surface-border bg-console-bg">
+                <div
+                    class="flex h-48 max-h-[30dvh] shrink-0 flex-col border-t border-hover-light dark:border-text-light-third bg-hover-light dark:bg-hover-dark"
+                >
                     <div
-                        class="flex h-8 shrink-0 items-center justify-between border-b border-surface-border bg-surface-dark px-4"
+                        class="flex h-8 shrink-0 items-center justify-between border-b border-hover-light dark:border-text-light-third bg-background-light dark:bg-background-dark px-4"
                     >
-                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider"
+                        <span
+                            class="text-xs font-semibold text-text-light-secondary dark:text-text-dark-secondary uppercase tracking-wider"
                             >Score Errors</span
                         >
                         <div class="flex flex-wrap gap-2">
-                            <button id="clear-console" type="button" class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                            <button
+                                id="clear-console"
+                                type="button"
+                                class="text-xs text-text-light-secondary dark:text-text-dark-secondary hover:text-accent"
+                            >
+                                Clear
+                            </button>
                         </div>
                     </div>
-                    <div id="editor-console" aria-label="Score errors" class="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs"></div>
+                    <div
+                        id="editor-console"
+                        aria-label="Score errors"
+                        class="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs"
+                    ></div>
                 </div>
             </section>
         </main>

@@ -226,95 +226,53 @@ export function runFormatterAfterParse(rootNode) {
     return true;
 }
 
-export function getMissing(node, list) {
-    for (let i = 0; i < node.namedChildCount; i++) {
-        let child = node.namedChild(i);
-        if (child.isMissing) {
-            list.push(child);
-        }
-        this.getMissing(child);
+// Missing punctuation is anonymous, so diagnostics must visit all children.
+function walkSyntaxNodes(node, visit, insideError = false) {
+    visit(node, insideError);
+    for (let i = 0; i < node.childCount; i++) {
+        walkSyntaxNodes(node.child(i), visit, insideError || node.isError);
     }
 }
 
-export function checkErrors(node) {
-    node = node.rootNode;
-    var lineWithErrors = [];
-    var lineWithUnexpected = [];
+function missingLabel(node) {
+    if (node.type === "number" && node.parent) {
+        for (const field of ["duration", "amount"]) {
+            if (node.parent.childForFieldName(field)?.id === node.id) {
+                return field;
+            }
+        }
+    }
+    return node.isNamed ? node.type : JSON.stringify(node.type);
+}
+
+export function getMissing(node, list = []) {
+    walkSyntaxNodes(node, (child) => {
+        if (child.isMissing) list.push(child);
+    });
+    return list;
+}
+
+export function checkErrors(tree) {
     const errorContainer = document.getElementById("editor-console");
     errorContainer.style.color = "var(--red)";
     errorContainer.innerHTML = "";
-    // console.log(node.toString());
 
-    function checkNode(node) {
-        for (let i = 0; i < node.namedChildCount; i++) {
-            let child = node.namedChild(i);
-
-            if (child.isMissing) {
-                const missingElement = document.createElement("p");
-                missingElement.style.color = "var(--red)";
-                let missingLabel = child.type;
-
-                if (child.type === "number" && child.parent) {
-                    const parentType = child.parent.type;
-                    if (
-                        parentType === "note_event" ||
-                        parentType === "rest_event" ||
-                        parentType === "chord_event" ||
-                        parentType === "trill_event" ||
-                        parentType === "tech_event"
-                    ) {
-                        missingLabel = "duration";
-                    } else if (parentType === "delay") {
-                        missingLabel = "amount";
-                    }
-                }
-
-                missingElement.textContent =
-                    "Missing " +
-                    missingLabel +
-                    " at line " +
-                    (child.startPosition.row + 1) +
-                    ", column " +
-                    (child.startPosition.column + 1);
-                errorContainer.appendChild(missingElement);
-            }
-
-            if (child.hasError) {
-                let message = "";
-                lineWithErrors.push(child.startPosition.row + 1);
-
-                if (child.type === "number" && child.text === "") {
-                    message =
-                        "Missing " +
-                        child.parent.type +
-                        " at line " +
-                        (child.parent.endPosition.row + 1) +
-                        ", column " +
-                        (child.parent.endPosition.column + 1);
-                } else if (child.type === "pitch" && child.text === "") {
-                    message = `Missing pitch at line ${child.endPosition.row + 1}`;
-                }
-
-                if (message !== "") {
-                    const errorElement = document.createElement("p");
-                    errorElement.style.color = "var(--red)";
-                    errorElement.textContent = message;
-                    errorContainer.appendChild(errorElement);
-                }
-            }
-
-            let treeString = child.toString();
-            if (treeString.startsWith("(UNEXPECTED") && !lineWithUnexpected.includes(child.startPosition.row + 1)) {
-                lineWithUnexpected.push(child.startPosition.row + 1);
-                const unexpectedElement = document.createElement("p");
-                unexpectedElement.style.color = "var(--red)";
-                unexpectedElement.textContent = "UNEXPECTED keyword at line " + (child.startPosition.row + 1);
-                errorContainer.appendChild(unexpectedElement);
-            }
-
-            checkNode(child);
+    walkSyntaxNodes(tree.rootNode, (node, insideError) => {
+        let message;
+        const position = `at line ${node.startPosition.row + 1}, column ${node.startPosition.column + 1}`;
+        if (node.isMissing) {
+            message = `Missing ${missingLabel(node)} ${position}`;
+        } else if (node.isError && !insideError) {
+            const text = node.text.replace(/\s+/g, " ").trim();
+            const preview = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+            message = preview ? `Unexpected text ${JSON.stringify(preview)} ${position}` : `Syntax error ${position}`;
+        } else {
+            return;
         }
-    }
 
-    checkNode(node);
+        const element = document.createElement("p");
+        element.style.color = "var(--red)";
+        element.textContent = message;
+        errorContainer.appendChild(element);
+    });
 }

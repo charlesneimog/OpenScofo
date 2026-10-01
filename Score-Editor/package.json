@@ -1,0 +1,12 @@
+{
+    "name": "openscofo-score-editor",
+    "private": true,
+    "scripts": {
+        "build:css": "tailwindcss -i ./input.css -o ./output.css --minify",
+        "watch:css": "tailwindcss -i ./input.css -o ./output.css --watch"
+    },
+    "devDependencies": {
+        "@tailwindcss/cli": "4.3.3",
+        "tailwindcss": "4.3.3"
+    }
+}

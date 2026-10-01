@@ -78,8 +78,7 @@ export function generateOpenScofoScore() {
         const measure = measures[measureNumber];
         const numericMeasureNumber = Number(measureNumber);
         const markerMeasureNumber =
-            measure[0]?.measureNumber ??
-            (Number.isFinite(numericMeasureNumber) ? numericMeasureNumber : measureNumber);
+            measure[0]?.measureNumber ?? (Number.isFinite(numericMeasureNumber) ? numericMeasureNumber : measureNumber);
         const rehearsalLabels = this.musicxmlScore.rehearsals?.[measureNumber] ?? [];
         for (const sectionName of rehearsalLabels) {
             allNotes.push({ isSection: true, sectionName, measureNumber: markerMeasureNumber });
@@ -95,9 +94,9 @@ export function generateOpenScofoScore() {
     let lastMeasureNumber = null;
 
     if (this.musicxmlScore.useAIModel) {
-        score += `// Your seems to be using extended techniques, this required one AI model\n`;
+        score += `// You seem to be using extended techniques; this requires an AI model. Check the Documentation for details!\n`;
         score += `ONNXMODEL PUT-YOUR-MODEL-NAME-HERE.onnx\n`;
-        score += `ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis`;
+        score += `// PTECH was added with notehead and pitch information; replace these with the correct AI label (check the docs!).`;
     }
 
     while (i < allNotes.length) {

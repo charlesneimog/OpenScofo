@@ -1,31 +1,53 @@
 :root {
-    --bg: #1e1e2e;
-    --fg: #cdd6f4;
-    --red: #f38ba8;
-    --orange: #fab387;
-    --yellow: #f9e2af;
-    --green: #a6e3a1;
-    --cyan: #89dceb;
-    --blue: #89b4fa;
-    --purple: #cba6f7;
-    --pink: #f5c2e7;
-    --white: #cdd6f4;
+    color-scheme: light dark;
+    --bg: var(--color-background-light);
+    --fg: var(--color-text-light-primary);
+    --red: #b42346;
+    --orange: #a5480b;
+    --yellow: #806000;
+    --green: #28752b;
+    --cyan: #006b7a;
+    --blue: #245bc2;
+    --purple: #7040ba;
+    --pink: #a32980;
+    --white: #ffffff;
     --black: #000000;
-    --gray: #6c7086;
-    --highlight: #b4befe;
-    --comment: #9399b2;
-    --line-number: #6c7086;
-    --selection: #45475a;
-    --surface: #181825;
-    --surface-border: #313244;
+    --gray: var(--color-text-light-secondary);
+    --highlight: var(--color-accent);
+    --comment: var(--color-text-light-secondary);
+    --line-number: var(--color-text-light-secondary);
+    --selection: color-mix(in srgb, var(--color-accent), transparent 75%);
+    --surface: var(--color-hover-light);
+    --surface-border: var(--color-hover-light);
     --none: none;
     --lua-opacity: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-primary: #ffffff;
+        --bg: var(--color-background-dark);
+        --fg: var(--color-text-dark-primary);
+        --red: #f38ba8;
+        --orange: #fab387;
+        --yellow: #f9e2af;
+        --green: #a6e3a1;
+        --cyan: #89dceb;
+        --blue: #89b4fa;
+        --purple: #cba6f7;
+        --pink: #f5c2e7;
+        --gray: var(--color-text-dark-secondary);
+        --comment: var(--color-text-dark-secondary);
+        --line-number: var(--color-text-dark-secondary);
+        --surface: var(--color-hover-dark);
+        --surface-border: var(--color-text-light-third);
+    }
 }
 
 body {
     background-color: var(--bg);
     color: var(--fg);
-    font-family: "FiraCodeNerdFont", "Courier New", monospace;
+    font-family: var(--font-display);
 }
 
 a {
@@ -68,12 +90,20 @@ button {
     font-weight: bold;
     border: none;
     border-radius: 5px;
-    background-color: var(--fg);
-    color: var(--bg);
     cursor: pointer;
     transition:
         background-color 0.3s ease,
         transform 0.2s ease;
+}
+
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+}
+
+.score-toolbar button {
+    margin: 0;
 }
 
 button:hover {
@@ -156,7 +186,7 @@ button:active {
 }
 
 .score-editor:focus-within {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue), transparent 55%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent), transparent 55%);
 
     .CodeMirror-gutters {
         box-shadow: none;
@@ -217,6 +247,7 @@ button:active {
  *╰─────────────────────────────────────╯
 */
 .CodeMirror {
+    font-family: var(--font-mono);
     width: 100%;
     height: 100%;
     background-color: var(--bg);
@@ -254,6 +285,7 @@ button:active {
     width: 0;
 }
 
+.CodeMirror-selected,
 .CodeMirror-focused .CodeMirror-selected {
     background-color: var(--selection);
 }
@@ -291,7 +323,7 @@ button:active {
 /* Define the custom font */
 @font-face {
     font-family: "FiraCodeNerdFont";
-    src: url("FiraCodeNerdFont-Medium.ttf") format("truetype");
+    src: url("./resources/FiraCodeNerdFont-Medium.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
 }
