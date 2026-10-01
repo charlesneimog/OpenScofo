@@ -11,7 +11,7 @@ Copy a pattern into a score and rename receivers to match your host patch.
 ## Overview
 
 | Area | Pattern | Receiver names |
-| --- | --- | --- |
+| :---: | :---: | :---: |
 | Interactive electronics | delay answer | `delay`, `echo` |
 | Interactive electronics | processing change | `reverb`, `freeze`, `granular` |
 | Interactive electronics | crossfade | `dry`, `wet` |

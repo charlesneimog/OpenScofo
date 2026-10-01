@@ -31,22 +31,6 @@ nav = [
     "concepts/core-language-concepts.md",
     "examples/index.md",
   ] },
-  { "OpenScofo Language Reference" = [
-    "score/intro.md",
-    "score/config.md",
-    "score/events.md",
-    "score/actions.md",
-    "score/conventions.md",
-    "score/lua.md",
-    { "Advanced Configuration" = [
-      "score/advanced-config.md",
-      "score/advanced-config/pitch-following.md",
-      "score/advanced-config/tempo-and-synchronization.md",
-      "score/advanced-config/silence-rest-detection.md",
-      "score/advanced-config/ai-model-recognition.md",
-      "score/advanced-config/descriptors.md",
-    ] },
-  ] },
   { "Platform Integrations" = [
     "integrations/index.md",
     "integrations/puredata.md",
@@ -58,8 +42,25 @@ nav = [
     "integrations/javascript.md",
     "integrations/cpp.md",
   ] },
+  { "OpenScofo Language Reference" = [
+    "score/intro.md",
+    "score/config.md",
+    "score/events.md",
+    "score/actions.md",
+    "score/lua.md",
+    { "Advanced Configuration" = [
+      "score/advanced-config.md",
+      "score/advanced-config/pitch-following.md",
+      "score/advanced-config/tempo-and-synchronization.md",
+      "score/advanced-config/silence-rest-detection.md",
+      "score/advanced-config/ai-model-recognition.md",
+      "score/advanced-config/descriptors.md",
+    ] },
+  ] },
+
   { "Audio Analysis" = [
     "descriptors/index.md",
+    "descriptors/for-musicians.md",
     "descriptors/amplitude.md",
     "descriptors/onset.md",
     "descriptors/time-pitch.md",

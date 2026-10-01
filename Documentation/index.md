@@ -24,7 +24,7 @@ tags:
 
 ---
 
-OpenScofo exists so live electronics can stay aligned with a human performer. It follows a notated score in real time and triggers computer actions at musical events. Basically, based on a tradicional notated score, you create an electronic score as showed below.
+<p markdown align="center">OpenScofo is a **score follower designed for contemporary music**, synchronizing live electronics with a performer by tracking their position and tempo in a musical score in real time.</p>
 
 ---
 
@@ -39,7 +39,11 @@ OpenScofo exists so live electronics can stay aligned with a human performer. It
     <button type="button" class="md-button" data-piece="2" aria-pressed="false" disabled>Play Miniatura 2</button>
   </div>
 
-  <p data-demo-status role="status">Loading the interactive player…</p>
+  <aside class="score-demo__note" aria-label="Player note">
+    <strong>Note:</strong> <span data-demo-status role="status">Loading the interactive player…</span>
+  </aside>
+
+  
 
   <div class="score-demo__layout" markdown="1">
 
@@ -69,3 +73,6 @@ OpenScofo exists so live electronics can stay aligned with a human performer. It
 </div>
 
 ---
+
+!!! tip "Create actions from the score"
+    See [Actions](score/actions/) to learn how to trigger actions when score events are detected.

@@ -317,6 +317,17 @@ score svg {
     margin-block: 1rem;
 }
 
+.score-demo__note {
+    margin-block: 1rem;
+    padding: 0.65rem 0.85rem;
+    border-inline-start: 3px solid var(--md-default-fg-color--lighter);
+    border-radius: 0.2rem;
+    background: var(--md-code-bg-color);
+    color: var(--md-default-fg-color--light);
+    font-size: 0.7rem;
+    line-height: 1.6;
+}
+
 .md-typeset .score-demo__controls .md-button {
     display: inline-flex;
     align-items: center;
@@ -334,7 +345,10 @@ score svg {
     font-weight: 700;
     box-shadow: 0 4px 12px color-mix(in srgb, var(--md-accent-fg-color) 25%, transparent);
     cursor: pointer;
-    transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+    transition:
+        transform 150ms ease,
+        background-color 150ms ease,
+        box-shadow 150ms ease;
 }
 
 .score-demo__controls .md-button::before {
@@ -405,6 +419,12 @@ score svg {
 
 .score-demo__score {
     background: white;
+}
+
+/* Partial inversion maps white to approximately #262626 in dark mode. */
+[data-md-color-scheme="slate"] .score-demo__score,
+[data-md-color-scheme="slate"] .md-typeset img[src$=".svg" i] {
+    filter: invert(0.94);
 }
 
 .score-demo__code {

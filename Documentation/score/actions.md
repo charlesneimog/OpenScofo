@@ -8,6 +8,39 @@ tags:
 
 Actions run when an event is detected. Define them one line below the event.
 
+!!! tip "For organization it is recommended to use indentation!"
+
+
+## Example
+
+<div class="grid cards" markdown>
+
+- __Immediate action__
+    ```openscofo hl_lines="2"
+    NOTE C4 1
+        sendto freeze [1]
+    ```
+
+- __Tempo-relative delay__
+    ```openscofo hl_lines="2"
+    NOTE D4 1
+        delay 1 tempo sendto granular [open]
+    ```
+
+- __Absolute delay__
+    ```openscofo hl_lines="2"
+    NOTE E4 1 
+        delay 500 ms sendto video [fade_in]
+    ```
+
+- __Lua action__
+    ```openscofo hl_lines="2"
+    NOTE C4 1
+        luacall(cue("section A"))
+    ```
+
+</div>
+
 ## Reference Table
 
 | Action | Syntax | Arguments | Example | Remarks |
@@ -42,36 +75,6 @@ starts at `p4`. Other hosts receive the payload as a normal list.
 3 pizz
 3 silence
 ```
-
-## Example
-
-<div class="grid cards" markdown>
-
-- __Immediate action__
-    ```openscofo hl_lines="2"
-    NOTE C4 1
-        sendto freeze [1]
-    ```
-
-- __Tempo-relative delay__
-    ```openscofo hl_lines="2"
-    NOTE D4 1
-        delay 1 tempo sendto granular [open]
-    ```
-
-- __Absolute delay__
-    ```openscofo hl_lines="2"
-    NOTE E4 1 
-        delay 500 ms sendto video [fade_in]
-    ```
-
-- __Lua action__
-    ```openscofo hl_lines="2"
-    NOTE C4 1
-        luacall(cue("section A"))
-    ```
-
-</div>
 
 ## Remarks
 

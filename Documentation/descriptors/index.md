@@ -7,6 +7,8 @@ tags:
 
 OpenScofo uses audio descriptors for onset detection, pitch tracking, and AI models.
 
+Start with [Descriptors for Musicians](for-musicians.md) for a simple table of descriptor names, OpenScofo IDs, and what their values mean musically.
+
 ```openscofo
 ONNXMODEL "flute.onnx"
 ONNXDESCRIPTORS mfcc zcr centroid spread
