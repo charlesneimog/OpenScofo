@@ -80,6 +80,32 @@ TEST(ScorePitches, ParsesMidiAndNamedPitchesWithTuningAndTransposition) {
     }
 }
 
+TEST(ScorePitches, PreservesMicrotonalAccidentals) {
+    OpenScofo::Score Score;
+    auto [Config, States] = Score.Parse(Assets / "microtonal-pitches.scofo");
+    std::erase_if(States,
+                  [](const auto &State) { return State.IsInterEventSilence || State.Type == OpenScofo::FIRSTEVENT; });
+    const std::vector<std::vector<double>> Expected = {
+        {55.5}, {81}, {55}, {55.5}, {80}, {55}, {59.5}, {61.5}, {58.5}, {61}, {58},
+        {55.75, 59.75, 61.75, 58.75, 61.25, 58.25}};
+    const std::vector<double> Durations = {3, 0.5, 4, 3, 1, 4, 1, 1, 1, 1, 1, 2};
+    ASSERT_EQ(States.size(), Expected.size());
+    for (size_t Index = 0; Index < States.size(); ++Index) {
+        SCOPED_TRACE(Index);
+        EXPECT_EQ(States[Index].Type, Index < 11 ? OpenScofo::NOTE : OpenScofo::CHORD);
+        EXPECT_DOUBLE_EQ(States[Index].Duration, Durations[Index]);
+        EXPECT_DOUBLE_EQ(States[Index].BPMExpected, 60.0);
+        ASSERT_EQ(States[Index].Observations.size(), Expected[Index].size());
+        const double Tuning = Index < 11 ? 440.0 : 442.0;
+        for (size_t Pitch = 0; Pitch < Expected[Index].size(); ++Pitch) {
+            const auto &Observation = States[Index].Observations[Pitch];
+            EXPECT_EQ(Observation.Type, OpenScofo::PITCH);
+            EXPECT_DOUBLE_EQ(Observation.Midi, Expected[Index][Pitch]);
+            EXPECT_NEAR(Observation.Freq, Tuning * std::pow(2.0, (Expected[Index][Pitch] - 69.0) / 12.0), 1e-9);
+        }
+    }
+}
+
 TEST(ScoreSections, ParsesNamesConfigurationAndPerSectionTiming) {
     OpenScofo::Score Score;
     auto [Config, States] = Score.Parse(Assets / "sections.scofo");

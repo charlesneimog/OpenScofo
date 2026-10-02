@@ -1,0 +1,25 @@
+BPM 60
+
+// Measure 1
+NOTE G+3 3
+
+// Measure 2
+NOTE A5 0.5
+NOTE G3 4
+
+// Measure 3
+NOTE G+3 3
+
+// Measure 4
+NOTE G#5 1
+NOTE G3 4
+
+// Other supported accidentals, including octave boundaries
+NOTE C-4 1
+NOTE C#+4 1
+NOTE Cb-4 1
+NOTE B##3 1
+NOTE Cbb4 1
+TUNINGA4 442
+TRANSPOSE 0.25
+CHORD (G+3 C-4 C#+4 Cb-4 B##3 Cbb4) 2
