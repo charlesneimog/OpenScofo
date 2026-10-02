@@ -113,7 +113,7 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation 
     char pitchName = static_cast<char>(std::toupper(static_cast<unsigned char>(pitchNameStr[0])));
     std::string alt = GetChildStringFromField(ScoreStr, pitch, "alteration");
 
-    int classNote = -1;
+    double classNote = -1;
     switch (pitchName) {
     case 'C':
         classNote = 0;
@@ -162,7 +162,7 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation 
         }
     }
 
-    float midi = classNote + 12 + (12 * std::stoi(octave));
+    double midi = classNote + 12 + (12 * std::stoi(octave));
     midi = midi + m_Transpose;
     State.Midi = midi;
     State.Freq = m_Tunning * pow(2, (midi - 69.0) / 12);

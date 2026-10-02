@@ -896,6 +896,30 @@
           {
             "type": "STRING",
             "value": "b"
+          },
+          {
+            "type": "STRING",
+            "value": "##"
+          },
+          {
+            "type": "STRING",
+            "value": "bb"
+          },
+          {
+            "type": "STRING",
+            "value": "+"
+          },
+          {
+            "type": "STRING",
+            "value": "#+"
+          },
+          {
+            "type": "STRING",
+            "value": "-"
+          },
+          {
+            "type": "STRING",
+            "value": "b-"
           }
         ]
       }

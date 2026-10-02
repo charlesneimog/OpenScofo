@@ -197,7 +197,7 @@ module.exports = grammar({
                 ),
             ),
         pitch_name: (_) => token(/[A-Ga-g]/),
-        alteration: (_) => token(choice("#", "b")),
+        alteration: (_) => token(choice("#", "b", "##", "bb", "+", "#+", "-", "b-")),
         octave: (_) => token(/(1[0-2]|[0-9])/),
 
         // technique
