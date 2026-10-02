@@ -1,36 +1,35 @@
 name: Documentation
 on:
-  push:
-    branches:
-      - master
-      - main
+    push:
+        branches:
+            - main
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+    contents: read
+    pages: write
+    id-token: write
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm install --ignore-scripts --no-audit --no-fund && npm run build:css
-        working-directory: Score-Editor
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - run: pip install -r Documentation/requirements.txt
-      - run: zensical build --clean 
-      - run: rsync -a --exclude=node_modules ./Score-Editor/ ./site/Editor/
+    deploy:
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/configure-pages@v5
+            - uses: actions/checkout@v5
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+            - run: npm install --ignore-scripts --no-audit --no-fund && npm run build:css
+              working-directory: ./Resources/Score-Editor
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: 3.x
+            - run: pip install -r Documentation/requirements.txt
+            - run: zensical build --clean
+            - run: rsync -a --exclude=node_modules ./Resources/Score-Editor/ ./site/Editor/
 
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-      - uses: actions/deploy-pages@v4
-        id: deployment
+            - uses: actions/upload-pages-artifact@v4
+              with:
+                  path: site
+            - uses: actions/deploy-pages@v4
+              id: deployment
