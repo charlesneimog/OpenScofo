@@ -20,18 +20,26 @@ extra_css = [
   "stylesheets/extra.css",
   "https://unpkg.com/katex@0/dist/katex.min.css",
 ]
+
 nav = [
-  { "OpenScofo" = [
+  { "Overview" = [
     "index.md",
   ] },
-  { "Composing with OpenScofo" = [
-    "composition.md",
-    "what-can-i-build.md",
-    "where-does-it-run.md",
-    "concepts/core-language-concepts.md",
-    "examples/index.md",
+  { "Getting Started" = [
+    "getting-started/composition.md",
+    "getting-started/what-can-i-build.md",
+    "getting-started/where-does-it-run.md",
+    "getting-started/core-language-concepts.md",
+    "getting-started/examples.md",
+    { "Plataforms" = [
+        "getting-started/plataforms/pd.md",
+        "getting-started/plataforms/max.md",
+        "getting-started/plataforms/csound.md",
+        "getting-started/plataforms/supercollider.md",
+    ]}
+
   ] },
-  { "Platform Integrations" = [
+  { "Integrations" = [
     "integrations/index.md",
     "integrations/puredata.md",
     "integrations/max.md",
@@ -42,7 +50,7 @@ nav = [
     "integrations/javascript.md",
     "integrations/cpp.md",
   ] },
-  { "OpenScofo Language Reference" = [
+  { "Language Reference" = [
     "score/intro.md",
     "score/config.md",
     "score/events.md",

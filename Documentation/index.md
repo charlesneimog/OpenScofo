@@ -76,3 +76,14 @@ tags:
 
 !!! tip "Create actions from the score"
     See [Actions](score/actions/#examples) to learn how to trigger actions when score events are detected.
+
+## Download
+
+* Installer automatic install all the enviroments (Pd, Max, Csound, etc...); 
+* Emscripten is the binary for Web;
+* Python is the wheel (is better to install using `pip`);
+
+<release latex="false" interface="All"><i>Loading Releases</i></release>
+
+See also: [Your First Interactive Patch](../getting-started/first-interactive-patch/), [Computer Actions](../score/actions/).
+
