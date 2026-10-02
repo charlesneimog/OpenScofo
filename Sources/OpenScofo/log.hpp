@@ -56,12 +56,6 @@ template <typename Mutex> class OpenScofoLog : public spdlog::sinks::base_sink<M
 
         if (m_Callback) {
             m_Callback(msg, m_Data);
-        } else {
-            // Caso não haja callback, imprime de forma "bonitinha"
-            spdlog::memory_buf_t formatted;
-            spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
-            fwrite(formatted.data(), 1, formatted.size(), stdout);
-            fflush(stdout);
         }
     }
 

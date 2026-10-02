@@ -992,13 +992,13 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     // Timbre/Extended Tech detection
     if (fs::exists(newConfig.TimbreONNXModel)) {
         std::vector<std::string> descriptors = newConfig.ONNXDescriptors;
-        spdlog::warn("Loading ONNX model, wait...");
+        spdlog::info("Loading ONNX model, wait...");
         std::vector<Descriptors> DescEnum;
         for (auto d : descriptors) {
             DescEnum.push_back(GetDescriptorsEnum(d.c_str()));
         }
         m_MIR.ONNXInit(newConfig.TimbreONNXModel, DescEnum);
-        spdlog::warn("ONNX Model ready");
+        spdlog::info("ONNX Model ready");
     }
 
     // Add States
