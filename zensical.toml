@@ -68,7 +68,6 @@ nav = [
   ] },
   { "AI Models" = [
     "ai/index.md",
-    "ai/train.md",
     "ai/model-repository.md",
   ] },
   { "Score Editor" = "https://charlesneimog.github.io/OpenScofo/Editor/" },

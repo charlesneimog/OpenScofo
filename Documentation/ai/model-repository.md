@@ -6,7 +6,7 @@ hide:
     - toc
 ---
 
-# Models to Download
+# Pre-Trained Models
 
 
 | Model | Instrument | Extended Technique labels / Phonemes / Syllables |
