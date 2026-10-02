@@ -85,20 +85,9 @@ if(NOT EXISTS "${PDCMAKE_FILE}")
         "${PDCMAKE_FILE}"
         STATUS PDCMAKE_DOWNLOAD_STATUS
         SHOW_PROGRESS)
-    list(
-        GET
-        PDCMAKE_DOWNLOAD_STATUS
-        0
-        PDCMAKE_DOWNLOAD_CODE)
-    list(
-        GET
-        PDCMAKE_DOWNLOAD_STATUS
-        1
-        PDCMAKE_DOWNLOAD_MESSAGE)
-    if(NOT
-       PDCMAKE_DOWNLOAD_CODE
-       EQUAL
-       0)
+    list(GET PDCMAKE_DOWNLOAD_STATUS 0 PDCMAKE_DOWNLOAD_CODE)
+    list(GET PDCMAKE_DOWNLOAD_STATUS 1 PDCMAKE_DOWNLOAD_MESSAGE)
+    if(NOT PDCMAKE_DOWNLOAD_CODE EQUAL 0)
         message(FATAL_ERROR "Failed to download pd.cmake: ${PDCMAKE_DOWNLOAD_MESSAGE}")
     endif()
 endif()
@@ -134,7 +123,8 @@ set(PARSER_GENERATED_OUTPUT "${GRAMMAR_BUILD_DIR}/src/parser.c")
 set(PARSER_COMMITTED_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Sources/Language/src/parser.c")
 set(PARSER_BYPRODUCTS "${GRAMMAR_BUILD_DIR}/src/node-types.json")
 
-set(OPENSCOFO_ONLINE_EDITOR_WASM "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
+set(OPENSCOFO_ONLINE_EDITOR_WASM
+    "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm")
 
 if(OPENSCOFO_UPDATE_LANGUAGE)
     find_program(
@@ -178,7 +168,7 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
         OUTPUT "${OPENSCOFO_ONLINE_EDITOR_WASM}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build --wasm
         COMMAND ${CMAKE_COMMAND} -E copy "${GRAMMAR_BUILD_DIR}/tree-sitter-openscofo.wasm"
-                "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Score-Editor/tree-sitter/tree-sitter-openscofo.wasm"
         DEPENDS "${GRAMMAR_JS_SRC}"
         COMMENT "Generating Tree-sitter parser for OpenScofo Online Editor and WASM..."
         VERBATIM)
@@ -188,7 +178,7 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
 
     set(TS_ARCHIVE "${CMAKE_BINARY_DIR}/web-tree-sitter.tar.gz")
     set(TS_TEMP_DIR "${CMAKE_BINARY_DIR}/web-tree-sitter-temp")
-    set(TS_DEST "${CMAKE_CURRENT_SOURCE_DIR}/Score-Editor/tree-sitter")
+    set(TS_DEST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Score-Editor/tree-sitter")
 
     file(MAKE_DIRECTORY "${TS_TEMP_DIR}")
     file(MAKE_DIRECTORY "${TS_DEST}")
@@ -196,15 +186,8 @@ if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
     # Download archive if missing
     if(NOT EXISTS "${TS_ARCHIVE}")
         file(DOWNLOAD "${TS_URL}" "${TS_ARCHIVE}" STATUS download_status)
-        list(
-            GET
-            download_status
-            0
-            status_code)
-        if(NOT
-           status_code
-           EQUAL
-           0)
+        list(GET download_status 0 status_code)
+        if(NOT status_code EQUAL 0)
             message(FATAL_ERROR "Failed to download web-tree-sitter archive")
         endif()
     endif()
@@ -407,12 +390,7 @@ elseif(APPLE)
                -fdata-sections
                >)
 
-    target_link_options(
-        OpenScofo
-        PUBLIC
-        $<$<CONFIG:Release>:
-        -Wl,-dead_strip
-        >)
+    target_link_options(OpenScofo PUBLIC $<$<CONFIG:Release>: -Wl,-dead_strip >)
     target_compile_options(OpenScofo PRIVATE -fno-exceptions)
 elseif(LINUX) # Linux (GCC or Clang)
     target_compile_options(
