@@ -8,6 +8,8 @@ tags:
 
 Copy a pattern into a score and rename receivers to match your host patch.
 
+!!! info "I use Pure Data as main plataform, so the score is formated to be used with Pd!"
+
 ## Miniatura 1
 
 <div class="score-demo__panel" markdown="1">

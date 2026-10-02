@@ -73,11 +73,3 @@ openscofo~ rms db centroid mfcc chroma
 ```
 
 Vector descriptors such as `mfcc`, `chroma`, `logmel`, and `magnitude` output lists. Scalar descriptors output one float.
-
-## Complete Example
-
-See [Your First Interactive Patch](../getting-started/first-interactive-patch/) for the smallest complete patch.
-
-## Remarks
-
-Lua actions run when the external is built with Lua support. Inside `LUA { ... }`, use the `max` module; see [Lua](../score/lua/).
