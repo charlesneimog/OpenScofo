@@ -85,5 +85,5 @@ tags:
 
 <release latex="false" interface="All"><i>Loading Releases</i></release>
 
-See also: [Your First Interactive Patch](../getting-started/first-interactive-patch/), [Computer Actions](../score/actions/).
+See also: [Computer Actions](../score/actions/#examples).
 

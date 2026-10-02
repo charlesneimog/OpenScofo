@@ -45,9 +45,9 @@ Actions run when an event is detected. Define them one line below the event.
 
 | Action | Syntax | Arguments | Example | Remarks |
 | --- | --- | --- | --- | --- |
-| `sendto` | `sendto <DESTINATION> [<MESSAGE>]` | receiver name, message list | `sendto delay [1]` | Host-specific delivery; see [Platform Integrations](../integrations/#sendto-behavior). |
-| `delay` | `delay <VALUE> <UNIT> <ACTION>` | `ms`, `sec`, or `tempo` | `delay 1 tempo sendto echo [1]` | Schedules an action. `tempo` is performer beat-relative. |
-| `luacall` | `luacall(<FUNCTION_CALL>)` | Lua function call | `luacall(cue("A"))` | Useful for small logic before sending. |
+| `sendto` | `sendto <DESTINATION> [<MESSAGE>]` | receiver name, message list | `#!openscofo sendto delay [1]` | Host-specific delivery; see [Platform Integrations](../integrations/#sendto-behavior). |
+| `delay` | `delay <VALUE> <UNIT> <ACTION>` | `ms`, `sec`, or `tempo` | `#!openscofo delay 1 tempo sendto echo [1]` | Schedules an action. `tempo` is performer beat-relative. |
+| `luacall` | `luacall(<FUNCTION_CALL>)` | Lua function call | `#!openscofo luacall(cue("A"))` | Useful for small logic before sending. |
 
 ## Audio state changes
 

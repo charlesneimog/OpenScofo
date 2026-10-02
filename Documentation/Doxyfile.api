@@ -1,0 +1,26 @@
+PROJECT_NAME           = "OpenScofo"
+
+INPUT                  = Sources
+RECURSIVE              = YES
+
+FILE_PATTERNS           = *.h *.hpp *.c *.cc *.cpp
+
+EXTRACT_ALL             = NO
+EXTRACT_PRIVATE         = NO
+EXTRACT_STATIC          = NO
+HIDE_UNDOC_MEMBERS      = YES
+
+GENERATE_HTML           = NO
+GENERATE_LATEX          = NO
+GENERATE_XML            = YES
+
+OUTPUT_DIRECTORY        = build/doxygen
+XML_OUTPUT              = xml
+
+XML_PROGRAMLISTING      = NO
+
+QUIET                   = YES
+WARNINGS                = YES
+
+ENABLE_PREPROCESSING    = YES
+MACRO_EXPANSION         = YES

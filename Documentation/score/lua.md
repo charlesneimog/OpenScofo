@@ -31,24 +31,24 @@ local oscofo = require("OpenScofo")
 
 | Function | Description |
 | --- | --- |
-| `oscofo.activate_all_descriptors()` | Enables all descriptors before audio processing; ONNX requires a loaded model. |
-| `oscofo.set_db_threshold(value)` | Sets audio threshold. |
-| `oscofo.set_tuning(value)` | Sets tuning reference. |
-| `oscofo.set_current_event(event)` | Forces score position. |
-| `oscofo.set_current_section(section)` | Resets to the first event of a named section. |
-| `oscofo.set_harmonics(value)` | Sets pitch-template harmonics. |
-| `oscofo.set_pitch_template_sigma(value)` | Sets pitch tolerance. |
-| `oscofo.get_live_bpm()` | Returns estimated BPM. |
-| `oscofo.get_event_index()` | Returns current event index. |
-| `oscofo.get_states()` | Returns current score states. |
-| `oscofo.get_pitch_template(freq)` | Returns pitch template for a frequency. |
-| `oscofo.get_audio_description()` | Returns current audio descriptors. |
-| `oscofo.schedule(delay_ms, callback, data)` | Schedules a Lua callback and returns a unique timer ID. |
-| `oscofo.cancel(timer_id)` | Cancels a pending timer; returns `true` if found and cancelled, or `false` otherwise. |
+| `#!lua oscofo.activate_all_descriptors()` | Enables all descriptors before audio processing; ONNX requires a loaded model. |
+| `#!lua oscofo.set_db_threshold(value)` | Sets audio threshold. |
+| `#!lua oscofo.set_tuning(value)` | Sets tuning reference. |
+| `#!lua oscofo.set_current_event(event)` | Forces score position. |
+| `#!lua oscofo.set_current_section(section)` | Resets to the first event of a named section. |
+| `#!lua oscofo.set_harmonics(value)` | Sets pitch-template harmonics. |
+| `#!lua oscofo.set_pitch_template_sigma(value)` | Sets pitch tolerance. |
+| `#!lua oscofo.get_live_bpm()` | Returns estimated BPM. |
+| `#!lua oscofo.get_event_index()` | Returns current event index. |
+| `#!lua oscofo.get_states()` | Returns current score states. |
+| `#!lua oscofo.get_pitch_template(freq)` | Returns pitch template for a frequency. |
+| `#!lua oscofo.get_audio_description()` | Returns current audio descriptors. |
+| `#!lua oscofo.schedule(delay_ms, callback, data)` | Schedules a Lua callback and returns a unique timer ID. |
+| `#!lua oscofo.cancel(timer_id)` | Cancels a pending timer; returns `true` if found and cancelled, or `false` otherwise. |
 
 #### Scheduled Callbacks
 
-Use `openscofo.schedule(delay_ms, callback, data)` to execute a Lua function after a delay:
+Use `#!lua openscofo.schedule(delay_ms, callback, data)` to execute a Lua function after a delay:
 
 | Parameter | Description |
 | --- | --- |
@@ -79,7 +79,7 @@ end, {
 })
 ```
 
-Use `openscofo.cancel(timer_id)` to cancel a pending callback. It returns `true` if the pending timer was found and cancelled, or `false` otherwise:
+Use `#!lua openscofo.cancel(timer_id)` to cancel a pending callback. It returns `true` if the pending timer was found and cancelled, or `false` otherwise:
 
 ```lua
 local openscofo = require("OpenScofo")

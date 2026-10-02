@@ -14,6 +14,7 @@ import tomllib
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
 from urllib.parse import urlparse
 
 
@@ -30,10 +31,131 @@ CURRENT_MARKDOWN_FILE: Path | None = None
 CURRENT_DOCS_DIR: Path | None = None
 CURRENT_OUTPUT_DIR: Path | None = None
 CURRENT_TYPST_DIR: Path | None = None
+CURRENT_SITE_URL = ""
 CURRENT_CHAPTER_LINKS: dict[Path, tuple[str, str]] = {}
 CURRENT_FOOTNOTES: dict[str, str] = {}
 CURRENT_HEADING_BASE = 1
 GRID_CARD_COUNTER = 0
+
+# Keep the generated project standalone: no online packages or custom fonts are
+# required. The first installed font in each tuple is used by Typst.
+TYPST_STYLE = dedent(r'''
+    #let ink = rgb("202936")
+    #let muted = rgb("657080")
+    #let accent = rgb("6250a2")
+    #let rule = rgb("dde1e8")
+    #let surface = rgb("f6f7fa")
+    #let sans = ("Inter", "Noto Sans", "DejaVu Sans")
+    #let mono = ("DejaVu Sans Mono", "Liberation Mono")
+
+    #let document-style(body) = [
+    #set page(paper: "a4", margin: (top: 23mm, bottom: 23mm, x: 22mm))
+    #set text(font: sans, size: 10pt, fill: ink, lang: "en")
+    #set par(justify: false, leading: 0.95em, spacing: 1.1em)
+    #set heading(numbering: "1.1")
+    #show heading: set block(sticky: true, above: 1.9em, below: 0.85em)
+    #show heading.where(level: 1): set text(size: 27pt, weight: "bold", fill: ink)
+    #show heading.where(level: 1): set block(above: 0pt, below: 1.5em)
+    #show heading.where(level: 1): it => {
+      pagebreak(weak: true)
+      it
+    }
+    #show heading.where(level: 2): set text(size: 18pt, weight: "bold")
+    #show heading.where(level: 3): set text(size: 12pt, weight: "semibold", fill: accent)
+    #show heading.where(level: 4): set text(size: 10.5pt, weight: "semibold")
+    #show heading.where(level: 5): set text(size: 10pt, weight: "semibold")
+    #show heading.where(level: 6): set text(size: 10pt, weight: "semibold")
+    #show heading.where(level: 3): set heading(numbering: none)
+    #show heading.where(level: 4): set heading(numbering: none)
+    #show heading.where(level: 5): set heading(numbering: none)
+    #show heading.where(level: 6): set heading(numbering: none)
+    #show link: set text(fill: accent)
+    #show raw: set text(font: mono, size: 0.9em / 0.8)
+    #set raw(tab-size: 4, syntaxes: ("openscofo.sublime-syntax",))
+    #set list(indent: 0.2em, body-indent: 0.8em, spacing: 0.45em)
+    #set enum(indent: 0.2em, body-indent: 0.8em, spacing: 0.45em)
+    #set figure(gap: 0.7em)
+    #show figure.caption: set text(size: 8.5pt, fill: muted)
+    #show footnote.entry: set text(size: 8pt)
+    #show math.equation.where(block: true): set block(above: 1em, below: 1em)
+    #body
+    ]
+
+    #let code-block(source, lang: "") = block(
+      width: 100%, fill: surface, stroke: 0.5pt + rule,
+      radius: 4pt, inset: 10pt, above: 0.8em, below: 0.8em,
+      breakable: true,
+    )[
+      #set par(leading: 0.45em, spacing: 0pt)
+      #if lang != "" {
+        block(sticky: true, below: 5pt, text(size: 7pt, fill: muted, upper(lang)))
+      }
+      #show raw: set text(size: 8pt / 0.8)
+      #show raw.line: line => block(above: 0pt, below: 0pt, width: 100%, line.body)
+      #raw(source, block: true, lang: lang)
+    ]
+
+    #let callout(kind, title, body) = {
+      let color = if kind in ("warning", "caution", "attention") { rgb("9a640e") }
+        else if kind in ("danger", "error", "failure", "bug") { rgb("ae3e42") }
+        else if kind in ("tip", "success", "hint") { rgb("267263") }
+        else { accent }
+      block(width: 100%, breakable: true, inset: 11pt,
+        fill: color.lighten(94%), stroke: (left: 2.5pt + color),
+        above: 1em, below: 1em)[
+        #block(sticky: true, below: 0.5em, text(weight: "semibold", fill: color, title))
+        #body
+      ]
+    }
+
+    #let doc-table(columns, align, ..cells) = block(above: 0.9em, below: 1em)[
+      #set text(size: 8.5pt)
+      #set par(leading: 0.5em, spacing: 0.4em)
+      #table(columns: columns, align: align, inset: (x: 7pt, y: 7pt),
+        stroke: (top: none, bottom: 0.5pt + rule, left: none, right: none),
+        fill: (_, y) => if y == 0 { accent.lighten(94%) }
+          else if calc.odd(y) { none } else { surface },
+        ..cells)
+    ]
+''').strip()
+
+OPENSCOFO_SYNTAX = dedent(r'''
+    %YAML 1.2
+    ---
+    name: OpenScofo
+    file_extensions: [scofo]
+    scope: source.openscofo
+    contexts:
+      main:
+        - match: '//.*$'
+          scope: comment.line.double-slash.openscofo
+        - match: '/\*'
+          scope: punctuation.definition.comment.begin.openscofo
+          push: comment
+        - match: '"'
+          scope: punctuation.definition.string.begin.openscofo
+          push: string
+        - match: '\b(NOTE|CHORD|TRILL|GLISS|REST|PTECH|UTECH)\b'
+          scope: keyword.control.openscofo
+        - match: '\b[A-Z][A-Z0-9_]+\b'
+          scope: storage.type.openscofo
+        - match: '\b(sendto|delay|tempo|lua)\b'
+          scope: keyword.control.openscofo
+        - match: '\b[A-G](?:[#b+\-])*[0-9]+\b'
+          scope: constant.other.openscofo
+        - match: '\b[0-9]+(?:\.[0-9]+)?\b'
+          scope: constant.numeric.openscofo
+      comment:
+        - meta_scope: comment.block.openscofo
+        - match: '\*/'
+          pop: true
+      string:
+        - meta_scope: string.quoted.double.openscofo
+        - match: '\\.'
+          scope: constant.character.escape.openscofo
+        - match: '"'
+          pop: true
+''').strip()
 
 
 @dataclass(frozen=True)
@@ -145,7 +267,7 @@ def flatten_nav(
                                 source,
                                 title_from_markdown(source),
                                 f"{slug_for_path(Path(children))}.typ",
-                                section_path + (title,),
+                                section_path,
                             )
                         )
                 elif isinstance(children, list):
@@ -180,6 +302,40 @@ def remove_typst_false_html(markdown: str) -> str:
         previous = markdown
         markdown = block_pattern.sub("", markdown)
     return re.sub(rf"<{tag_name}\b(?=[^>]*{false_attr})[^>]*?/?>", "", markdown, flags=re.IGNORECASE)
+
+
+def replace_interactive_demo(markdown: str) -> str:
+    """Replace the web player, including nested divs, with a printable link."""
+    opening = re.search(r"<div\b[^>]*\bdata-score-demo(?:\s|=|>)[^>]*>", markdown, re.IGNORECASE)
+    if opening is None:
+        return markdown
+    depth = 1
+    for tag in re.finditer(r"</?div\b[^>]*>", markdown[opening.end():], re.IGNORECASE):
+        depth += -1 if tag.group(0).startswith("</") else 1
+        if depth == 0:
+            end = opening.end() + tag.end()
+            return markdown[:opening.start()] + (
+                "\nThe interactive listening demo is available in the "
+                "[online documentation](https://charlesneimog.github.io/OpenScofo/).\n"
+            ) + markdown[end:]
+    return markdown
+
+
+def expand_snippets(markdown: str) -> str:
+    """Expand the single-file snippet directives used in score examples."""
+    if CURRENT_DOCS_DIR is None or CURRENT_MARKDOWN_DIR is None:
+        return markdown
+
+    def replace(match: re.Match[str]) -> str:
+        indent, target = match.groups()
+        for base in (CURRENT_DOCS_DIR.parent, CURRENT_MARKDOWN_DIR, CURRENT_DOCS_DIR):
+            path = base / target
+            if path.is_file():
+                return "\n".join(indent + line for line in path.read_text(encoding="utf-8").splitlines())
+        print(f"Warning: could not expand documentation snippet {target}")
+        return match.group(0)
+
+    return re.sub(r'^([ \t]*)--8<--[ \t]+"([^"\n]+)"[ \t]*$', replace, markdown, flags=re.MULTILINE)
 
 
 def output_relative(path: Path) -> str:
@@ -282,8 +438,7 @@ def render_mermaid(source: str) -> str | None:
 
 
 def raw_block(source: str, language: str = "") -> str:
-    lang = f', lang: "{typst_string(language)}"' if language else ""
-    return f'#raw("{typst_string(source)}", block: true{lang})'
+    return f'#code-block("{typst_string(source)}", lang: "{typst_string(language)}")'
 
 
 def convert_mermaid(source_lines: list[str]) -> str:
@@ -309,13 +464,19 @@ def resolve_local_markdown_link(target: str) -> tuple[str, str] | None:
         return CURRENT_CHAPTER_LINKS.get(CURRENT_MARKDOWN_FILE.resolve())
 
     candidate = (CURRENT_MARKDOWN_DIR / target_path).resolve()
-    candidates = [candidate]
+    roots = [candidate]
+    # Zensical pages also contain site-root paths and directory-style URLs.
+    if CURRENT_DOCS_DIR is not None:
+        roots.append((CURRENT_DOCS_DIR / target_path.lstrip("./")).resolve())
+    candidates = []
 
     suffix = Path(target_path).suffix.lower()
-    if suffix == "":
-        candidates.extend([candidate.with_suffix(".md"), candidate / "index.md"])
-    elif suffix != ".md":
+    if suffix not in {"", ".md"}:
         return None
+    for root in roots:
+        candidates.append(root)
+        if suffix == "":
+            candidates.extend([root.with_suffix(".md"), root / "index.md"])
 
     for resolved in candidates:
         chapter = CURRENT_CHAPTER_LINKS.get(resolved)
@@ -411,7 +572,7 @@ def latex_math_to_typst(source: str) -> str:
             i += 1
         return "".join(out)
 
-    def replace_one_group_command(value: str, command: str, build) -> str:
+    def replace_one_group_command(value: str, command: str, build, *, convert: bool = True) -> str:
         needle = "\\" + command
         out: list[str] = []
         i = 0
@@ -423,18 +584,29 @@ def latex_math_to_typst(source: str) -> str:
                 group = read_group(value, j)
                 if group is not None:
                     body, j2 = group
-                    out.append(build(latex_math_to_typst(body)))
+                    out.append(build(latex_math_to_typst(body) if convert else body))
                     i = j2
                     continue
             out.append(value[i])
             i += 1
         return "".join(out)
 
+    text = re.sub(
+        r"\\begin\{cases\}(.*?)\\end\{cases\}",
+        lambda match: "cases(" + ", ".join(
+            latex_math_to_typst(re.sub(r",\s*&", " &", row.strip()))
+            for row in match.group(1).split(r"\\") if row.strip()
+        ) + ")",
+        text, flags=re.DOTALL,
+    )
     # Repeat so nested fractions are handled from the outside through recursion.
-    text = replace_two_group_command(text, "frac", lambda a, b: f"({a})/({b})")
-    text = replace_one_group_command(text, "text", lambda a: f'"{a}"')
+    text = replace_two_group_command(text, "frac", lambda a, b: f"frac({a}, {b})")
+    text = replace_one_group_command(text, "text", lambda a: f'"{typst_string(a)}"', convert=False)
     text = replace_one_group_command(text, "mathrm", lambda a: f"upright({a})")
     text = replace_one_group_command(text, "mathbf", lambda a: f"bold({a})")
+    text = replace_one_group_command(text, "mathbb", lambda a: f"bb({a})")
+    text = replace_one_group_command(text, "hat", lambda a: f"hat({a})")
+    text = replace_one_group_command(text, "overline", lambda a: f"overline({a})")
 
     replacements = {
         r"\alpha": "alpha", r"\beta": "beta", r"\gamma": "gamma", r"\delta": "delta",
@@ -449,6 +621,9 @@ def latex_math_to_typst(source: str) -> str:
         r"\Psi": "Psi", r"\Omega": "Omega",
         r"\times": "times", r"\cdot": "dot", r"\pm": "+-", r"\mp": "-+",
         r"\leq": "<=", r"\geq": ">=", r"\neq": "!=", r"\approx": "approx",
+        r"\le": "<=", r"\ge": ">=", r"\ne": "!=",
+        r"\lfloor": "floor.l", r"\rfloor": "floor.r", r"\quad": "quad",
+        r"\left": "", r"\right": "",
         r"\infty": "infinity", r"\sum": "sum", r"\prod": "product", r"\int": "integral",
         r"\partial": "diff", r"\rightarrow": "->", r"\leftarrow": "<-",
         r"\Rightarrow": "=>", r"\Leftarrow": "<=", r"\in": "in", r"\notin": "in.not",
@@ -462,15 +637,14 @@ def latex_math_to_typst(source: str) -> str:
         r"\sec": "sec", r"\csc": "csc", r"\sinh": "sinh", r"\cosh": "cosh",
         r"\tanh": "tanh", r"\min": "min", r"\max": "max", r"\det": "det",
     }
-    # Longest commands first so e.g. \subseteq is handled before \subset.
-    for old in sorted(replacements, key=len, reverse=True):
-        text = text.replace(old, replacements[old])
+    # Match whole commands: replacing \le inside \left corrupts the delimiter.
+    text = re.sub(r"\\[A-Za-z]+", lambda match: replacements.get(match.group(0), match.group(0)), text)
 
     text = text.replace(r"\left", "").replace(r"\right", "")
     text = text.replace("{", "(").replace("}", ")")
 
-    # Preserve quoted text while splitting TeX-style juxtaposed letters. In TeX,
-    # RMS means R M S; Typst otherwise interprets RMS as one identifier.
+    # Protect quoted text while distinguishing named labels from short,
+    # juxtaposed variables. Typst treats unquoted words as identifiers.
     quoted: list[str] = []
 
     def stash_quoted(match: re.Match[str]) -> str:
@@ -489,6 +663,7 @@ def latex_math_to_typst(source: str) -> str:
         "sqrt", "upright", "italic", "bold", "sin", "cos", "tan", "cot",
         "sec", "csc", "sinh", "cosh", "tanh", "log", "ln", "exp", "lim",
         "min", "max", "mod", "gcd", "lcm", "det", "Pr",
+        "frac", "bb", "hat", "overline", "cases", "floor", "quad",
     }
 
     def split_identifier(match: re.Match[str]) -> str:
@@ -497,7 +672,9 @@ def latex_math_to_typst(source: str) -> str:
             return word
         if len(word) <= 1:
             return word
-        return " ".join(word)
+        # Named descriptors and word subscripts read as labels, rather than
+        # strings of widely spaced italic variables. Preserve short products.
+        return f'"{word}"' if len(word) > 2 or word.isupper() else " ".join(word)
 
     text = re.sub(r"(?<![@.A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])", split_identifier, text)
 
@@ -532,14 +709,10 @@ def convert_inline(text: str) -> str:
     def stash_math(match: re.Match[str]) -> str:
         return stash(convert_math_token(match.group(0)))
 
-    text = html.unescape(text)
-    text = re.sub(r"\$\$.*?\$\$", stash_math, text, flags=re.DOTALL)
-    text = re.sub(r"\\\[.*?\\\]", stash_math, text, flags=re.DOTALL)
-    text = re.sub(r"\\\(.*?\\\)", stash_math, text, flags=re.DOTALL)
-    text = re.sub(r"(?<!\\)\$(?!\s)(.+?)(?<!\s)(?<!\\)\$", stash_math, text)
-
     def code_repl(match: re.Match[str]) -> str:
-        return stash(f'#raw("{typst_string(match.group(1))}")')
+        # Pymdownx inline highlighting uses `#!language code`.
+        code = re.sub(r"^#![A-Za-z0-9_+-]+\s+", "", match.group(1))
+        return stash(f'#raw("{typst_string(code)}")')
 
     def bold_repl(match: re.Match[str]) -> str:
         return stash(f'*{convert_inline(match.group(1))}*')
@@ -567,13 +740,36 @@ def convert_inline(text: str) -> str:
             if not label:
                 label = typst_escape(chapter_title)
             return stash(f'#link(<{chapter_label}>)[{label}]')
+        if CURRENT_SITE_URL and CURRENT_DOCS_DIR is not None and Path(target.split("#", 1)[0]).suffix in {"", ".md"}:
+            # Keep links to pages outside the PDF navigation useful in print.
+            url_path = target.lstrip("./").split("#", 1)[0]
+            if url_path.endswith(".md"):
+                url_path = url_path[:-3]
+            url_path = re.sub(r"(?:^|/)index$", "", url_path).rstrip("/")
+            if url_path:
+                return stash(f'#link("{typst_string(CURRENT_SITE_URL.rstrip("/") + "/" + url_path + "/")}")[{label}]')
         suffix = f' (#raw("{typst_string(target)}"))' if target else ""
         return stash(label + suffix)
 
+    # Protect code before math, HTML, links, and emphasis: all of these may
+    # appear literally in code (including <PITCH>, dollars, and underscores).
+    text = html.unescape(text)
+    text = re.sub(r"`([^`]+)`", code_repl, text)
+    text = re.sub(
+        r'<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        lambda match: stash(f'#link("{typst_string(match.group(1))}")[{convert_inline(match.group(2))}]'),
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    text = clean_html_line(text)
+    text = re.sub(r"</?[A-Za-z][^>]*>", "", text)
+    text = re.sub(r"\$\$.*?\$\$", stash_math, text, flags=re.DOTALL)
+    text = re.sub(r"\\\[.*?\\\]", stash_math, text, flags=re.DOTALL)
+    text = re.sub(r"\\\(.*?\\\)", stash_math, text, flags=re.DOTALL)
+    text = re.sub(r"(?<!\\)\$(?!\s)(.+?)(?<!\s)(?<!\\)\$", stash_math, text)
     text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?", image_repl, text)
     text = re.sub(r"\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?", link_repl, text)
     text = re.sub(r"\[\^([^\]]+)\]", footnote_repl, text)
-    text = re.sub(r"`([^`]+)`", code_repl, text)
     text = re.sub(r"\*\*(.+?)\*\*", bold_repl, text)
     text = re.sub(r"__(.+?)__", bold_repl, text)
     text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", italic_repl, text)
@@ -601,7 +797,7 @@ def clean_html_line(line: str) -> str:
         return f"Unsupported score preview: {attrs}"
     line = re.sub(r"<br\s*/?>", "  ", line, flags=re.IGNORECASE)
     line = re.sub(r"</?hr\s*/?>", "---", line, flags=re.IGNORECASE)
-    line = re.sub(r"</?(?:div|p|span|center|style|a|h[1-6])\b[^>]*>", "", line, flags=re.IGNORECASE)
+    line = re.sub(r"</?(?:div|p|span|center|style|h[1-6])\b[^>]*>", "", line, flags=re.IGNORECASE)
     line = re.sub(r"<i>(.*?)</i>", r"*\1*", line, flags=re.IGNORECASE)
     line = re.sub(r"<em>(.*?)</em>", r"*\1*", line, flags=re.IGNORECASE)
     line = re.sub(r"<b>(.*?)</b>", r"**\1**", line, flags=re.IGNORECASE)
@@ -631,23 +827,8 @@ def score_event_image(score_name: str) -> str | None:
     return f'#align(center)[#image("{typst_string(copied)}", width: 80%)]'
 
 
-def sanitize_code_line(line: str) -> str:
-    replacements = {
-        "├": "|",
-        "└": "`",
-        "│": "|",
-        "─": "-",
-        "“": '"',
-        "”": '"',
-        "‘": "'",
-        "’": "'",
-        "→": "->",
-    }
-    return "".join(replacements.get(char, char) for char in line)
-
-
 def match_code_fence(line: str) -> re.Match[str] | None:
-    return re.match(r"^```\s*([A-Za-z0-9_+-]*)[^\n`]*$", line)
+    return re.match(r"^\s*```[ \t]*([A-Za-z0-9_+-]*)[^\n`]*$", line)
 
 
 def convert_admonition(kind: str, title: str, body: list[str]) -> str:
@@ -655,21 +836,9 @@ def convert_admonition(kind: str, title: str, body: list[str]) -> str:
     converted_body = convert_markdown_lines(body).strip()
     if not converted_body:
         converted_body = "#v(1mm)"
-    return RAW_TYPST_PREFIX + "\n".join(
-        [
-            "#block(",
-            "  width: 100%,",
-            "  inset: 8pt,",
-            "  radius: 4pt,",
-            "  stroke: 0.5pt + luma(70%),",
-            "  fill: luma(97%),",
-            ")[",
-            f"  *{convert_inline(heading)}*",
-            "",
-            converted_body,
-            "]",
-            "",
-        ]
+    return RAW_TYPST_PREFIX + (
+        f'#callout("{typst_string(kind)}", [{convert_inline(heading)}])[\n'
+        f'{converted_body}\n]\n'
     )
 
 
@@ -728,7 +897,7 @@ def convert_card_body(lines: list[str]) -> str:
                 index += 1
             if index < len(lines):
                 index += 1
-            output.append(convert_code_block(language, [sanitize_code_line(x) for x in code_lines]))
+            output.append(convert_code_block(language, code_lines))
             continue
 
         image = re.match(r"^!\[[^\]]*\]\(([^)]+)\)(?:\{[^}]*\})?\s*$", line)
@@ -768,11 +937,11 @@ def convert_grid_cards(block_lines: list[str]) -> str:
                 [
                     "block(",
                     "  width: 100%,",
-                    "  inset: 8pt,",
+                    "  inset: 11pt,",
                     "  radius: 4pt,",
-                    "  stroke: 0.35pt + luma(82%),",
+                    "  stroke: 0.5pt + rule,",
                     ")[",
-                    f"*{convert_inline(title)}*",
+                    f'#block(sticky: true, below: 6pt)[#text(weight: "semibold", fill: accent)[{convert_inline(title)}]]',
                     "",
                     convert_card_body(body),
                     "]",
@@ -820,7 +989,18 @@ def split_table_row(line: str) -> list[str]:
         line = line[1:]
     if line.endswith("|"):
         line = line[:-1]
-    return [cell.strip() for cell in line.split("|")]
+    # Pipes in inline code and escaped pipes are not cell boundaries.
+    cells: list[str] = []
+    start = 0
+    in_code = False
+    for index, char in enumerate(line):
+        if char == "`":
+            in_code = not in_code
+        elif char == "|" and not in_code and (index == 0 or line[index - 1] != "\\"):
+            cells.append(line[start:index].strip().replace(r"\|", "|"))
+            start = index + 1
+    cells.append(line[start:].strip().replace(r"\|", "|"))
+    return cells
 
 
 def is_table_separator(line: str) -> bool:
@@ -841,20 +1021,36 @@ def convert_markdown_table(rows: list[str]) -> str:
         padded = cells[:column_count] + [""] * max(0, column_count - len(cells))
         return padded[:column_count]
 
-    cells: list[str] = []
-    for cell in normalize_cells(header):
-        cells.append(f"[*{convert_inline(cell)}*]")
+    # Allocate space according to typical content length; cap weights so one
+    # long example cannot squeeze all the other columns out of the page.
+    weights = []
+    for column, title in enumerate(header):
+        # Preserve angle-bracket syntax parameters inside code when measuring.
+        content = [re.sub(r"\[([^\]]*)\]\([^)]+\)", r"\1", row[column])
+                   for row in body_rows if column < len(row)]
+        content = [re.sub(r"</?(?:a|b|strong|em|span)\b[^>]*>|#![A-Za-z0-9_+-]+\s+|[`*]", "", cell)
+                   for cell in content]
+        lengths = [len(cell) for cell in content]
+        average = sum(lengths) / len(lengths) if lengths else 0
+        longest_word = max((len(word) for cell in content for word in cell.split()), default=0)
+        weights.append(max(8, min(36, max(len(title), average, 1.6 * longest_word))))
+    columns = "(" + ", ".join(f"{weight:.1f}fr" for weight in weights) + ",)"
+    alignments = []
+    for separator in split_table_row(rows[1]):
+        alignments.append("center" if separator.startswith(":") and separator.endswith(":")
+                          else "right" if separator.endswith(":") else "left")
+    align = "(" + ", ".join(f"{value} + top" for value in alignments) + ",)"
+    header_cells = ", ".join(f"[*{convert_inline(cell)}*]" for cell in normalize_cells(header))
+    cells = [f"table.header(repeat: true, {header_cells})"]
     for row in body_rows:
         for cell in normalize_cells(row):
             cells.append(f"[{convert_inline(cell)}]")
 
     return RAW_TYPST_PREFIX + "\n".join(
         [
-            "#table(",
-            f"  columns: {column_count},",
-            "  stroke: 0.4pt + luma(75%),",
-            "  inset: 5pt,",
-            "  align: left + top,",
+            "#doc-table(",
+            f"  {columns},",
+            f"  {align},",
             "  " + ",\n  ".join(cells) + ",",
             ")",
             "",
@@ -893,7 +1089,14 @@ def normalize_tables(lines: list[str]) -> list[str]:
 def normalize_admonitions(lines: list[str]) -> list[str]:
     output: list[str] = []
     index = 0
+    in_code = False
     while index < len(lines):
+        if match_code_fence(lines[index]):
+            in_code = not in_code
+        if in_code:
+            output.append(lines[index])
+            index += 1
+            continue
         match = re.match(r'^([!?]{3})\s+([A-Za-z0-9_-]+)(?:\s+"([^"]+)")?\s*$', lines[index])
         if not match:
             output.append(lines[index])
@@ -928,6 +1131,7 @@ def convert_markdown_lines(lines: list[str]) -> str:
     in_code = False
     code_language = ""
     code_lines: list[str] = []
+    code_indent = 0
     in_style = False
     list_stack: list[str] = []
     current_heading = ""
@@ -958,6 +1162,7 @@ def convert_markdown_lines(lines: list[str]) -> str:
             close_lists()
             if not in_code:
                 code_language = fence.group(1)
+                code_indent = len(line) - len(line.lstrip())
                 code_lines = []
                 in_code = True
             else:
@@ -968,7 +1173,10 @@ def convert_markdown_lines(lines: list[str]) -> str:
             continue
 
         if in_code:
-            code_lines.append(sanitize_code_line(line))
+            # HTML wrappers often indent the fence itself. Remove that indent,
+            # while retaining indentation that belongs to the example.
+            prefix = " " * code_indent
+            code_lines.append(line.removeprefix(prefix))
             continue
 
         html_img = re.search(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>', line, re.IGNORECASE)
@@ -984,7 +1192,9 @@ def convert_markdown_lines(lines: list[str]) -> str:
                 output.append(score_image)
                 continue
 
-        line = clean_html_line(line)
+        # HTML cleaning happens after inline code has been protected.
+        if re.fullmatch(r"\s*</?(?:div|p|span|center)\b[^>]*>\s*", line, re.IGNORECASE):
+            continue
         if not line.strip():
             close_lists()
             output.append("")
@@ -1000,7 +1210,7 @@ def convert_markdown_lines(lines: list[str]) -> str:
             close_lists()
             level = len(heading.group(1))
             current_heading = strip_markdown_formatting(heading.group(2))
-            output.append(heading_markup(level, convert_inline(current_heading)))
+            output.append(heading_markup(level, convert_inline(heading.group(2))))
             continue
 
         unordered = re.match(r"^\s*[-*]\s+(.+)$", line)
@@ -1012,7 +1222,8 @@ def convert_markdown_lines(lines: list[str]) -> str:
             if not list_stack:
                 list_stack.append(env)
             marker = "-" if env == "unordered" else "+"
-            output.append(f"{marker} {convert_inline((unordered or ordered).group(1))}")
+            indent = len(line) - len(line.lstrip())
+            output.append(f"{' ' * indent}{marker} {convert_inline((unordered or ordered).group(1))}")
             continue
 
         quote = re.match(r"^>\s?(.*)$", line)
@@ -1025,6 +1236,9 @@ def convert_markdown_lines(lines: list[str]) -> str:
             )
             continue
 
+        if list_stack and line.startswith(("  ", "\t")):
+            output.append(convert_inline(line))
+            continue
         close_lists()
         output.append(convert_inline(line))
 
@@ -1034,7 +1248,10 @@ def convert_markdown_lines(lines: list[str]) -> str:
     return "\n".join(output)
 
 
-def convert_markdown(markdown_path: Path, label: str, fallback_title: str, heading_base: int = 1) -> str:
+def convert_markdown(
+    markdown_path: Path, label: str, fallback_title: str, heading_base: int = 1,
+    section_opener: bool = False,
+) -> str:
     global CURRENT_DOCS_DIR, CURRENT_FOOTNOTES, CURRENT_HEADING_BASE, CURRENT_MARKDOWN_DIR, CURRENT_MARKDOWN_FILE
     CURRENT_MARKDOWN_DIR = markdown_path.parent
     CURRENT_MARKDOWN_FILE = markdown_path
@@ -1048,6 +1265,9 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str, headi
 
     markdown = remove_typst_false_html(strip_front_matter(markdown_path.read_text(encoding="utf-8")))
     if is_index:
+        markdown = replace_interactive_demo(markdown)
+        # Web layout dividers add distracting rules between short paragraphs.
+        markdown = re.sub(r"^\s*---\s*$", "", markdown, flags=re.MULTILINE)
         markdown = re.sub(
             r"^\s*!\[[^\]]*\]\([^)]*#only-(?:light|dark)\)\{[^}]*\}\s*$",
             "",
@@ -1060,7 +1280,7 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str, headi
             body = match.group(2)
             image = re.search(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>', body, re.IGNORECASE | re.DOTALL)
             if image is None:
-                return ""
+                return match.group(0)
             figure = convert_composition_card(image.group(1), link)
             return "\n".join(RAW_TYPST_PREFIX + line for line in figure.splitlines())
 
@@ -1071,6 +1291,13 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str, headi
             flags=re.IGNORECASE | re.DOTALL,
         )
 
+    markdown = expand_snippets(markdown)
+    # Dynamic download widgets cannot resolve in print; point to the releases.
+    markdown = re.sub(
+        r"<release\b[^>]*>.*?</release>",
+        "[Download the latest release](https://github.com/charlesneimog/OpenScofo/releases).",
+        markdown, flags=re.IGNORECASE | re.DOTALL,
+    )
     markdown = re.sub(r"<hr\s*/?>", "---", markdown, flags=re.IGNORECASE)
     markdown = re.sub(
         r'<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>',
@@ -1125,6 +1352,8 @@ def convert_markdown(markdown_path: Path, label: str, fallback_title: str, headi
     first_heading = heading_pattern.search(typst)
     if first_heading:
         line = first_heading.group(0)
+        if section_opener:
+            line = "=" * (heading_base - 1) + " " + first_heading.group(2)
         replacement = line + f" <{label}>"
         typst = typst[: first_heading.start()] + replacement + typst[first_heading.end() :]
     else:
@@ -1150,52 +1379,69 @@ def title_logo(project: dict) -> str:
     copied = copy_local_asset(logo_path)
     if copied is None:
         return ""
-    return f'#image("{typst_string(copied)}", width: 22%)'
+    return f'#image("{typst_string(copied)}", width: 25mm)'
 
 
 def section_heading_line(section_path: tuple[str, ...]) -> str:
-    title = " / ".join(section_path)
-    return f'= {typst_escape(title)}'
+    return f'{"=" * len(section_path)} {typst_escape(section_path[-1])}'
 
 
 def write_main(project: dict, entries: list[NavEntry], output_dir: Path) -> None:
     global CURRENT_TYPST_DIR
     CURRENT_TYPST_DIR = output_dir
     site_name = project.get("site_name", "Documentation")
-    subtitle = project.get("extra", {}).get("subtitle", "A Machine Listening System for Contemporary Music")
+    subtitle = project.get("extra", {}).get("subtitle", project.get("site_description", "Documentation"))
     copyright_text = html.unescape(re.sub(r"&copy;?", "©", project.get("copyright", "")))
     logo = title_logo(project)
 
     lines = [
-        '#set page(paper: "a4", margin: 25mm)',
-        '#set text(size: 11pt)',
-        '#set par(justify: true, leading: 0.7em)',
-        '#set heading(numbering: "1.1")',
-        '#show heading.where(level: 1): it => block(above: 1.4em, below: 0.8em, text(size: 20pt, weight: "bold", it))',
-        '#show heading.where(level: 2): it => block(above: 1.2em, below: 0.6em, text(size: 16pt, weight: "bold", it))',
-        '#show raw.where(block: true): it => block(fill: luma(96%), inset: 7pt, radius: 3pt, width: 100%, it)',
-        '',
-        '#pagebreak()',
-        '#align(center)[',
-        '  #v(35mm)',
+        f'#set document(title: "{typst_string(site_name)} — Documentation")',
+        '#import "theme.typ": *',
+        '#show: document-style', '',
+        '#page(header: none, footer: none)[',
+        '  #v(18mm)',
     ]
     if logo:
-        lines.extend([f"  {logo}", "  #v(16pt)"])
+        lines.extend([f"  {logo}", "  #v(22mm)"])
     lines.extend(
         [
-            f'  #text(size: 26pt, weight: "bold")[{typst_escape(site_name)}]',
-            '  #v(8pt)',
-            f'  #text(size: 13pt)[{typst_escape(subtitle)}]',
-            '  #v(20mm)',
+            '  #text(size: 9pt, fill: accent, tracking: 1.5pt, weight: "semibold")[DOCUMENTATION]',
+            '  #v(8mm)',
+            f'  #text(size: 44pt, weight: "bold")[{typst_escape(site_name)}]',
+            '  #v(6mm)',
+            f'  #block(width: 80%)[#text(size: 16pt, fill: muted)[{typst_escape(subtitle)}]]',
+            '  #v(10mm)',
+            '  #line(length: 30mm, stroke: 2pt + accent)',
+            '  #v(1fr)',
+            '  #text(size: 11pt, weight: "semibold")[User guide & reference]',
+            '  #v(4mm)',
         ]
     )
+    if project.get("site_url"):
+        site_url = project["site_url"]
+        lines.extend([f'  #text(size: 8.5pt)[#link("{typst_string(site_url)}")[{typst_escape(site_url)}]]', '  #v(3mm)'])
     if copyright_text:
-        lines.append(f'  #text(size: 9pt)[{typst_escape(copyright_text)}]')
+        lines.append(f'  #text(size: 8pt, fill: muted)[{typst_escape(copyright_text)}]')
     lines.extend([
         ']',
-        '#pagebreak()',
-        '#outline(title: [Contents])',
-        '#pagebreak()',
+        '#set page(numbering: "i", footer: context align(right, text(size: 8pt, fill: muted, counter(page).display())))',
+        '#counter(page).update(1)',
+        '#show outline.entry.where(level: 1): set text(weight: "semibold")',
+        '#show outline.entry: set block(above: 0.45em, below: 0.45em)',
+        '#outline(title: [Contents], depth: 2, indent: 1em)',
+        '#pagebreak(weak: true)',
+        '#set page(numbering: "1", header: context {',
+        '  let sections = query(heading.where(level: 1)).filter(h => h.location().page() <= here().page())',
+        f'  let section = if sections.len() > 0 {{ sections.last().body }} else {{ [{typst_escape(site_name)}] }}',
+        '  set text(size: 8pt, fill: muted)',
+        f'  grid(columns: (1fr, auto), [{typst_escape(site_name)}], section)',
+        '  v(3pt)',
+        '  line(length: 100%, stroke: 0.5pt + rule)',
+        '}, footer: context {',
+        '  set text(size: 8pt, fill: muted)',
+        f'  grid(columns: (1fr, auto), [{typst_escape(site_name)} · Documentation], counter(page).display())',
+        '})',
+        '#counter(page).update(1)',
         '',
     ])
 
@@ -1204,9 +1450,17 @@ def write_main(project: dict, entries: list[NavEntry], output_dir: Path) -> None
         if isinstance(entry, ExternalLink):
             continue
         if entry.section_path != current_section:
+            common = 0
+            for old, new in zip(current_section, entry.section_path):
+                if old != new:
+                    break
+                common += 1
+            for depth in range(common + 1, len(entry.section_path) + 1):
+                if depth == len(entry.section_path) and entry.title == entry.section_path[-1]:
+                    # The page's own title serves as this section's opener.
+                    continue
+                lines.extend([section_heading_line(entry.section_path[:depth]), ""])
             current_section = entry.section_path
-            if current_section:
-                lines.extend(["#pagebreak()", section_heading_line(current_section), ""])
         lines.append(f'#include "chapters/{typst_string(entry.typ_name)}"')
         lines.append("")
 
@@ -1223,13 +1477,14 @@ def copy_assets(docs_dir: Path, output_dir: Path) -> None:
 
 
 def build_typst_project(config: Path, output_dir: Path) -> None:
-    global CURRENT_CHAPTER_LINKS, CURRENT_DOCS_DIR, CURRENT_OUTPUT_DIR, CURRENT_TYPST_DIR, GRID_CARD_COUNTER
+    global CURRENT_CHAPTER_LINKS, CURRENT_DOCS_DIR, CURRENT_OUTPUT_DIR, CURRENT_TYPST_DIR, CURRENT_SITE_URL, GRID_CARD_COUNTER
     project = load_project(config)
     docs_dir = (config.parent / project.get("docs_dir", "docs")).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     CURRENT_DOCS_DIR = docs_dir
     CURRENT_OUTPUT_DIR = output_dir
+    CURRENT_SITE_URL = project.get("site_url", "")
     GRID_CARD_COUNTER = 0
 
     entries = flatten_nav(project.get("nav", []), docs_dir)
@@ -1241,18 +1496,26 @@ def build_typst_project(config: Path, output_dir: Path) -> None:
 
     chapters_dir = output_dir / "chapters"
     chapters_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "theme.typ").write_text(TYPST_STYLE + "\n", encoding="utf-8")
+    (output_dir / "openscofo.sublime-syntax").write_text(OPENSCOFO_SYNTAX + "\n", encoding="utf-8")
     for old_chapter in chapters_dir.glob("*.typ"):
         old_chapter.unlink()
 
     copy_assets(docs_dir, output_dir)
 
+    previous_section: tuple[str, ...] = ()
     for page in pages:
         chapter_path = chapters_dir / page.typ_name
         CURRENT_TYPST_DIR = chapter_path.parent
         label = f"chap_{slug_for_path(page.source.relative_to(docs_dir))}"
-        heading_base = 2 if page.section_path else 1
+        heading_base = len(page.section_path) + 1
+        section_opener = (page.section_path != previous_section and bool(page.section_path)
+                          and page.title == page.section_path[-1])
+        previous_section = page.section_path
         chapter_path.write_text(
-            convert_markdown(page.source, label, page.title, heading_base=heading_base),
+            '#import "../theme.typ": *\n\n' + convert_markdown(
+                page.source, label, page.title, heading_base=heading_base, section_opener=section_opener,
+            ),
             encoding="utf-8",
         )
 
@@ -1301,8 +1564,8 @@ def main() -> None:
     build_typst_project(args.config.resolve(), output_dir)
     print(f"Wrote Typst project to {output_dir}")
     print(f"Main file: {output_dir / 'main.typ'}")
-    if args.compile:
-        compile_typst_project(output_dir)
+    if args.compile and not compile_typst_project(output_dir):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

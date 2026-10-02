@@ -185,3 +185,7 @@ Replace `get_next_audio_block(...)` with your audio input code.
 * `GetDescriptionArray(...)` returns data owned by the `Description` object you pass in.
 * Lua API functions are available when OpenScofo is built with `OPENSCOFO_BUILD_WITH_LUA=ON`.
 * The API is still changing while OpenScofo is in pre-alpha.
+
+## API
+
+[API](../api/openscofo.md)

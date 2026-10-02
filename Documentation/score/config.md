@@ -12,11 +12,11 @@ Configuration lines set piece-level behavior. Put global settings before the fir
 
 | Keyword | Purpose | Syntax | Default | Example |
 | --- | --- | --- | --- | --- |
-| `BPM` | Tempo for following events | `BPM <NUMBER>` | must be declared | `BPM 72` |
-| `TRANSPOSE` | Transpose subsequent pitches in semitones | `TRANSPOSE <NUMBER>` | `0` | `TRANSPOSE -12` |
-| `TUNINGA4` | Reference tuning for A4 in Hz | `TUNINGA4 <NUMBER>` | `440.0` | `TUNINGA4 442` |
-| `SR` | Expected sample rate; must match the host | `SR <NUMBER>` | `48000` | `SR 48000` |
-| `SECTIONRESTRICT` | Restrict inference to the selected section | `SECTIONRESTRICT ON\|OFF` | `OFF` | `SECTIONRESTRICT ON` |
+| `BPM` | Tempo for following events | `BPM <NUMBER>` | must be declared | `#!openscofo BPM 72` |
+| `TRANSPOSE` | Transpose subsequent pitches in semitones | `TRANSPOSE <NUMBER>` | `0` | `#!openscofo TRANSPOSE -12` |
+| `TUNINGA4` | Reference tuning for A4 in Hz | `TUNINGA4 <NUMBER>` | `440.0` | `#!openscofo TUNINGA4 442` |
+| `SR` | Expected sample rate; must match the host | `SR <NUMBER>` | `48000` | `#!openscofo SR 48000` |
+| `SECTIONRESTRICT` | Restrict inference to the selected section | `SECTIONRESTRICT ON\|OFF` | `OFF` | `#!openscofo SECTIONRESTRICT ON` |
 
 ## Sections
 

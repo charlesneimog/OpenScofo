@@ -21,10 +21,10 @@ The score language is shared, but `sendto` is host-dependent.
 
 | Host | Behavior | Example |
 | --- | --- | --- |
-| Pure Data | sends to `[r receiver]` | `sendto delay [1]` -> `[r delay]` |
-| Max | sends to `[receive receiver]` | `sendto delay [1]` -> `[receive delay]` |
-| Csound | schedules an instrument event | `sendto 2 [0 0.25 440]` -> `i 2 0 0.25 440` |
-| SuperCollider | sends to `/<namespace>/receiver` | `sendto delay [1]` -> `~oscofo.listen("delay", ...)` |
+| Pure Data | sends to `[r receiver]` | `#!openscofo sendto delay [1]` -> `[r delay]` |
+| Max | sends to `[receive receiver]` | `#!openscofo sendto delay [1]` -> `[receive delay]` |
+| Csound | schedules an instrument event | `#!openscofo sendto 2 [0 0.25 440]` -> `i 2 0 0.25 440` |
+| SuperCollider | sends to `/<namespace>/receiver` | `#!openscofo sendto delay [1]` -> `~oscofo.listen("delay", ...)` |
 | Python / JavaScript / C++ | exposes score actions through API data | inspect the returned action object |
 
 ## Releases

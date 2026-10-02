@@ -28,6 +28,8 @@ flatness flux irregularity kurtosis harmonicity yin
 
 Choose only the descriptors the model expects, in the order used for training. Vector descriptors such as MFCC and chroma contribute multiple input values, so their sizes also matter.
 
+Check the [Descriptors For Musicians](../../descriptors/for-musicians/) for a complet overview of the `IDs`.
+
 ## Model metadata
 
 Valid, nonempty `openscofo.descriptors` metadata takes precedence over `ONNXDESCRIPTORS`. When that metadata is absent or cannot be parsed, the loader uses the score/API list. A model needs a valid descriptor list from one of these sources.

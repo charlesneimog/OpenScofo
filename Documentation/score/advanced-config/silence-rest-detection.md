@@ -19,7 +19,7 @@ Written rests and short gaps between sounds use silence evidence from the audio 
 
 Changing `DBTHRESHOLD` currently does not adjust silence detection. The audio analysis calculates silence probability from filtered loudness `L` using:
 
-```text
+```cpp
 silence_probability = 1 / (1 + exp(0.25 * (L + 60)))
 ```
 

@@ -30,7 +30,7 @@ NOTE C4 1
 `TRILL`, `PTECH`, and `UTECH` use the strongest current internal observation, without an ordering constraint.
 `UTECH` uses alternative technique labels. `PTECH` uses alternative technique labels or its expected pitch.
 `GLISS` expands each interval into an ordered chain of quarter-tone (0.5 MIDI) steps during score parsing.
-For example, `GLISS (C4 G4) 2` creates 15 pitch microstates from MIDI 60 through 67, including both endpoints.
+For example, `#!openscofo GLISS (C4 G4) 2` creates 15 pitch microstates from MIDI 60 through 67, including both endpoints.
 Descending intervals use descending steps; shared endpoints and consecutive repeated pitches appear once.
 These microstates share the event's overall duration equally
 by default, and its final internal state is absorbing until the outer duration model exits the event.
