@@ -30,17 +30,18 @@ Use sections for passages with different timing settings. The parser records tem
 SECTIONRESTRICT ON
 
 SECTION "A"
-BPM 96
-SYNCSTRENGTH 0.4
-PHASECOUPLING 0.5
-NOTE C4 1
-NOTE D4 1
+    BPM 96
+    SYNCSTRENGTH 0.4
+    PHASECOUPLING 0.5
+
+    NOTE C4 1
+    NOTE D4 1
 
 SECTION "B"
-BPM 72
-SYNCSTRENGTH 0.6
-PHASECOUPLING 0.5
-NOTE E4 2
+    BPM 72
+    SYNCSTRENGTH 0.6
+    PHASECOUPLING 0.5
+    NOTE E4 2
 ```
 
 ## Current time-tolerance behavior

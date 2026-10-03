@@ -52,9 +52,9 @@ The `sendto` receiver is the Csound instrument name or number. The bracket list 
 
 | Score action | Csound event |
 | --- | --- |
-| `sendto 2 [0 0.25]` | `i 2 0 0.25` |
-| `sendto 2 [0 0.25 440 0.2]` | `i 2 0 0.25 440 0.2` |
-| `sendto namedPing [0 0.5 880]` | `i "namedPing" 0 0.5 880` |
+| `#!openscofo sendto 2 [0 0.25]` | `i 2 0 0.25` |
+| `#!openscofo sendto 2 [0 0.25 440 0.2]` | `i 2 0 0.25 440 0.2` |
+| `#!openscofo sendto namedPing [0 0.5 880]` | `i "namedPing" 0 0.5 880` |
 
 `p2` and `p3` are required. Use OpenScofo `delay` for score-relative timing and Csound `p2` for local offsets. For shared action syntax, see [Computer Actions](../score/actions/).
 
