@@ -7,6 +7,14 @@
     See the LICENSE file for details.
 */
 
+/**
+ * @file lua.cpp
+ * @brief Embedded Lua bindings, table serialization, and sample-clock timers.
+ *
+ * @note Compiled only when OPENSCOFO_LUA is enabled; timer callbacks run during audio block processing.
+ * @warning Lua state and timer operations must be serialized with processing and runtime destruction.
+ */
+
 #include <OpenScofo.hpp>
 
 #if defined(OPENSCOFO_LUA)
@@ -16,11 +24,23 @@
 namespace OpenScofo {
 
 // ─────────────────────────────────────
+/**
+ * @brief Release the embedded Lua runtime when the instance is destroyed.
+ *
+ * @note Calls CloseLuaModule() to release pending callback references before closing Lua.
+ * @warning Destroy the instance only after audio processing and Lua access have stopped.
+ */
 OpenScofo::~OpenScofo() {
     CloseLuaModule();
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Release pending timers and close the embedded Lua state.
+ *
+ * @note Unreferences callback functions and data; repeated calls are harmless after the state is closed.
+ * @warning Invalidates all external references to this Lua state and cancels its pending callbacks.
+ */
 void OpenScofo::CloseLuaModule() {
     if (m_LuaState == nullptr) {
         return;
@@ -35,6 +55,20 @@ void OpenScofo::CloseLuaModule() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Schedule a callback against the processed-audio sample clock.
+ *
+ * @param DelayMs Finite nonnegative delay in milliseconds, rounded up to an audio sample.
+ * @param CallbackRef Lua registry reference to the callback function.
+ * @param DataRef Lua registry reference to callback data, or LUA_REFNIL.
+ *
+ * @return Nonzero timer identifier, or zero when the delay, sample deadline, or identifier is out of range.
+ *
+ * @note A successful insertion takes ownership of the registry references until execution, cancellation, or runtime
+ * closure.
+ * @warning References must belong to this instance Lua state. On failure, the caller remains responsible for
+ * releasing them.
+ */
 uint64_t OpenScofo::ScheduleLuaCallback(double DelayMs, int CallbackRef, int DataRef) {
     const double DelaySamples = std::ceil(DelayMs * 0.001 * m_Config.SR);
     if (!std::isfinite(DelaySamples) || DelaySamples < 0 ||
@@ -49,6 +83,15 @@ uint64_t OpenScofo::ScheduleLuaCallback(double DelayMs, int CallbackRef, int Dat
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Cancel a pending callback by timer identifier.
+ *
+ * @param Id Identifier returned by ScheduleLuaCallback().
+ *
+ * @return True if a pending timer was removed; false if the identifier was not found.
+ *
+ * @note Releases the callback and data registry references when a matching timer is removed.
+ */
 bool OpenScofo::CancelLuaCallback(uint64_t Id) {
     for (auto It = m_LuaTimers.begin(); It != m_LuaTimers.end(); ++It) {
         if (It->first.second == Id) {
@@ -62,6 +105,14 @@ bool OpenScofo::CancelLuaCallback(uint64_t Id) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Execute callbacks whose sample-clock deadlines have passed.
+ *
+ * @note Removes each timer before invocation so callbacks can alter other timers; logs Lua errors and releases
+ * references.
+ * @warning Runs callbacks synchronously on the ProcessBlock() caller thread; deadlines are checked at block
+ * boundaries.
+ */
 void OpenScofo::ProcessLuaTimers() {
     while (!m_LuaTimers.empty()) {
         auto It = m_LuaTimers.begin();
@@ -87,6 +138,16 @@ void OpenScofo::ProcessLuaTimers() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Resolve the instance pointer stored in the global Lua binding table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return Instance pointer, or null when the binding table or pointer is unavailable.
+ *
+ * @note Restores the stack after inspecting _OpenScofo.pointer.
+ * @warning The table stores non-owning lightuserdata; the pointed-to instance must remain alive.
+ */
 static OpenScofo *GetCurrentOpenScofo(lua_State *L) {
     lua_getglobal(L, "_OpenScofo");
     if (!lua_istable(L, -1)) {
@@ -101,6 +162,14 @@ static OpenScofo *GetCurrentOpenScofo(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Push numeric values as a Lua sequence table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ * @param values Numeric values to copy into a Lua table.
+ *
+ * @note Adds one table to the stack and uses one-based Lua array indices.
+ */
 static void PushNumberVector(lua_State *L, const std::vector<double> &values) {
     lua_createtable(L, static_cast<int>(values.size()), 0);
     for (size_t i = 0; i < values.size(); ++i) {
@@ -110,6 +179,14 @@ static void PushNumberVector(lua_State *L, const std::vector<double> &values) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Push an audio observation as a Lua table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ * @param state Score or audio state to serialize into a Lua table.
+ *
+ * @note Adds one table containing type, frequency, MIDI pitch, observation index, and label.
+ */
 static void PushAudioState(lua_State *L, const Observation &state) {
     lua_createtable(L, 0, 5);
     lua_pushinteger(L, state.Type);
@@ -124,6 +201,14 @@ static void PushAudioState(lua_State *L, const Observation &state) {
     lua_setfield(L, -2, "label");
 }
 
+/**
+ * @brief Push audio observations as a Lua sequence table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ * @param observations Audio observations to serialize in their original order.
+ *
+ * @note Adds one table of serialized observations using one-based Lua indices.
+ */
 static void PushObservations(lua_State *L, const std::vector<Observation> &observations) {
     lua_createtable(L, static_cast<int>(observations.size()), 0);
     for (size_t i = 0; i < observations.size(); ++i) {
@@ -133,6 +218,14 @@ static void PushObservations(lua_State *L, const std::vector<Observation> &obser
 }
 
 // // ─────────────────────────────────────
+/**
+ * @brief Push an audio descriptor snapshot as a Lua table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ * @param desc Audio description snapshot to serialize.
+ *
+ * @note Copies selected scalar descriptors and magnitude, MFCC, and chroma arrays; adds one table to the stack.
+ */
 static void PushDescription(lua_State *L, const Description &desc) {
     lua_createtable(L, 0, 20);
 
@@ -186,6 +279,14 @@ static void PushDescription(lua_State *L, const Description &desc) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Push a score state and its runtime data as a Lua table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ * @param state Score or audio state to serialize into a Lua table.
+ *
+ * @note Includes timing, forward probabilities, audio observations, topology, and microstate data.
+ */
 static void PushMarkovState(lua_State *L, const ScoreState &state) {
     lua_createtable(L, 0, 15);
     lua_pushinteger(L, state.ScorePos);
@@ -242,6 +343,16 @@ static void PushMarkovState(lua_State *L, const ScoreState &state) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Bind internal event selection to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return Zero Lua return values.
+ *
+ * @note Reads an integer from argument 1 and resets the selected instance state.
+ * @warning Raises a Lua error for a missing instance or invalid argument type; selection resets decoding history.
+ */
 static int OpenScofoSetCurrentEvent(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -251,6 +362,16 @@ static int OpenScofoSetCurrentEvent(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Bind section selection to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: a boolean.
+ *
+ * @note Reads a section name from argument 1 and pushes the selection success flag.
+ * @warning Raises a Lua error for a missing instance or invalid argument type; selection resets decoding history.
+ */
 static int OpenScofoSetCurrentSection(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -260,6 +381,16 @@ static int OpenScofoSetCurrentSection(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Expose the current tempo estimate to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: tempo in BPM.
+ *
+ * @note Resolves the bound instance and pushes its BPM estimate.
+ * @warning Raises a Lua error when no instance pointer is available.
+ */
 static int OpenScofoGetLiveBPM(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -269,6 +400,16 @@ static int OpenScofoGetLiveBPM(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Expose the current public score position to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: the public score position.
+ *
+ * @note Pushes the public score position rather than the internal decoder state index.
+ * @warning Raises a Lua error when no instance pointer is available.
+ */
 static int OpenScofoGetEventIndex(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -278,6 +419,16 @@ static int OpenScofoGetEventIndex(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Expose score state snapshots as a Lua sequence.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: the score state table.
+ *
+ * @note Copies the current states and serializes each with one-based Lua table indices.
+ * @warning Raises a Lua error when no instance pointer is available.
+ */
 static int OpenScofoGetStates(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -293,6 +444,16 @@ static int OpenScofoGetStates(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Expose the latest audio description snapshot to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: the descriptor table.
+ *
+ * @note Copies the description and serializes its supported fields.
+ * @warning Raises a Lua error when no instance pointer is available.
+ */
 static int OpenScofoGetCurrentDescription(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -306,6 +467,16 @@ static int OpenScofoGetCurrentDescription(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Bind activation of all descriptors to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return Zero Lua return values.
+ *
+ * @note Enables optional stages, including ONNX when a model is loaded.
+ * @warning Raises a Lua error for a missing instance; activation can rebuild and allocate analysis resources.
+ */
 static int OpenScofoActivateAllDescriptors(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -315,6 +486,17 @@ static int OpenScofoActivateAllDescriptors(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Bind sample-clock callback scheduling to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: the nonzero timer identifier.
+ *
+ * @note Reads delay, callback, and optional data from arguments 1 through 3 and retains them in the Lua registry.
+ * @warning Invalid delays, callbacks, or exhausted timer ranges raise Lua errors; callbacks run during audio
+ * processing.
+ */
 static int OpenScofoSchedule(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -339,6 +521,16 @@ static int OpenScofoSchedule(lua_State *L) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Bind timer cancellation to Lua.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: whether a timer was cancelled.
+ *
+ * @note Reads an integer identifier and pushes false for nonpositive or unknown identifiers.
+ * @warning Raises a Lua error for a missing instance or invalid argument type.
+ */
 static int OpenScofoCancel(lua_State *L) {
     OpenScofo *self = GetCurrentOpenScofo(L);
     if (self == nullptr)
@@ -364,6 +556,15 @@ static const luaL_Reg oscofo_funcs[] = {
 };
 
 // ─────────────────────────────────────
+/**
+ * @brief Register the OpenScofo functions and return the Lua module table.
+ *
+ * @param L Lua state whose stack supplies arguments or receives results.
+ *
+ * @return One Lua return value: the OpenScofo module table.
+ *
+ * @note Reuses the _OpenScofo table when present and registers it in package.loaded when available.
+ */
 int luaopen_OpenScofo(lua_State *L) {
     lua_getglobal(L, "_OpenScofo");
     if (!lua_istable(L, -1)) {

@@ -6,6 +6,14 @@
     GNU General Public License v3.0 or later (GPL-3.0-or-later).
     See the LICENSE file for details.
 */
+
+/**
+ * @file forward.cpp
+ * @brief Online hybrid Markov/semi-Markov score inference and tempo tracking.
+ *
+ * @note Combines spectral pitch evidence, duration distributions, and optional ordered microstate chains.
+ * @warning The decoder owns mutable history and caches; serialize state changes and inference.
+ */
 #include "OpenScofo.hpp"
 #include <algorithm>
 
@@ -50,6 +58,11 @@ namespace OpenScofo {
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Initialize decoder defaults and synchronization lookup caches.
+ *
+ * @note Sets A4 to 440 Hz and precomputes the A2 table and inverse concentration cache.
+ */
 OnlineForward::OnlineForward() {
     m_SyncStrength = 0.5;
     m_PhaseCoupling = 0.5;
@@ -68,6 +81,15 @@ OnlineForward::OnlineForward() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Apply processing parameters and rebuild decoder resources.
+ *
+ * @param Config Audio, pitch-template, synchronization, and section configuration to apply.
+ *
+ * @note Clears template and duration caches, resizes probability histories, and rebuilds templates for loaded
+ * states.
+ * @warning Requires a positive sample rate; reallocates histories and must be serialized with inference.
+ */
 void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_Sr = Config.SR;
     m_FFTSize = Config.FFTSize;
@@ -103,17 +125,40 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the active internal score state index.
+ *
+ * @return Zero-based active state index.
+ *
+ * @note Includes boundary and inter-event silence states in the indexing.
+ */
 int OnlineForward::GetCurrentStateIndex() {
     return m_CurrentStateIndex;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Copy the actions for the active score state.
+ *
+ * @return Copy of the active state action list.
+ *
+ * @note Reads the state directly without removing any of its actions.
+ * @warning Requires a nonempty score and a valid current state index.
+ */
 EventActions OnlineForward::GetCurrentEventActions() {
     ScoreState State = m_States[m_CurrentStateIndex];
     return State.Actions;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Drain the pending audio-state-change action queue.
+ *
+ * @return Queued actions, in notification order.
+ *
+ * @note Preserves queue order while moving actions into the result.
+ * @warning Retrieval consumes the queued actions.
+ */
 EventActions OnlineForward::GetAudioStateChangeActions() {
     EventActions Actions;
     Actions.reserve(m_PendingAudioStateActions.size());
@@ -127,6 +172,13 @@ EventActions OnlineForward::GetAudioStateChangeActions() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Queue an action when the winning audio observation changes.
+ *
+ * @param StateIndex Zero-based index in the internal score state vector.
+ *
+ * @note Uses the configured receiver and suppresses repeated notifications for the same state and observation.
+ */
 void OnlineForward::NotifyAudioStateChange(int StateIndex) {
     if (m_AudioStateChangeReceiver.empty() || StateIndex < 0 || StateIndex >= static_cast<int>(m_States.size())) {
         return;
@@ -192,6 +244,12 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Clear decoder caches and microstate runtime history.
+ *
+ * @note Rehashes several maps to release storage and invalidates the active Markov context.
+ * @warning Can allocate or release memory; serialize with inference.
+ */
 void OnlineForward::ResetCaches() {
     m_ActiveMarkovScoreStateIndex = -1;
     for (ScoreState &State : m_States) {
@@ -217,6 +275,15 @@ void OnlineForward::ResetCaches() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Install score states and initialize decoder histories.
+ *
+ * @param ScoreStates Score states to install in the decoder.
+ *
+ * @note Ignores an empty input; otherwise initializes tempo from the starting state and precomputes pitch
+ * templates.
+ * @warning Replaces the current states and clears pending notifications; serialize with inference.
+ */
 void OnlineForward::SetScoreStates(States ScoreStates) {
     if (ScoreStates.size() == 0) {
         return;
@@ -274,6 +341,14 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
+/**
+ * @brief Cache a normalized harmonic spectral template for a pitch.
+ *
+ * @param Freq Pitch frequency in Hz.
+ *
+ * @note Uses stretched Gaussian harmonic peaks and a positive floor, keyed by the rounded fundamental FFT bin.
+ * @warning Requires positive audio configuration values; frequencies outside (0, Nyquist] are ignored.
+ */
 void OnlineForward::BuildPitchTemplate(double Freq) {
     const double m_MinHarmonicDecay = 0.2;
     const double m_MaxHarmonicDecay = 1.8;
@@ -365,6 +440,11 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
+/**
+ * @brief Rebuild pitch templates for the installed score.
+ *
+ * @note Scans note observations and microstate observations after clearing both template caches.
+ */
 void OnlineForward::UpdateAudioTemplate() {
     int StateSize = (int)m_States.size();
     m_PitchTemplates.clear();
@@ -390,6 +470,15 @@ void OnlineForward::UpdateAudioTemplate() {
 
 // ─────────────────────────────────────
 // GONG 2015 (adapted)
+/**
+ * @brief Retrieve a cached template, building it if needed.
+ *
+ * @param Freq Pitch frequency in Hz.
+ *
+ * @return Copy of the spectral template, or an empty vector if no template was built.
+ *
+ * @note Templates sharing a rounded fundamental FFT bin share the same cache entry.
+ */
 PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
     BuildPitchTemplate(Freq);
     double rootBinFreq = std::round(Freq / (m_Sr / m_FFTSize));
@@ -399,26 +488,60 @@ PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Remove all installed score states.
+ *
+ * @note Also invalidates the active Markov parent context.
+ * @warning Load new states before calling methods that index the score vector.
+ */
 void OnlineForward::ClearStates() {
     m_States.clear();
     m_ActiveMarkovScoreStateIndex = -1;
 }
 // ─────────────────────────────────────
+/**
+ * @brief Read the current tempo estimate.
+ *
+ * @return Tempo in beats per minute.
+ *
+ * @note Tempo is initialized from the score and updated on decoded event transitions.
+ */
 double OnlineForward::GetCurrentBPM() {
     return m_BPM;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the configured analysis hop duration.
+ *
+ * @return Analysis hop duration in seconds.
+ *
+ * @note Computed by UpdateConfiguration() from hop size and sampling rate.
+ */
 double OnlineForward::GetBlockDuration() {
     return m_BlockDur;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Set the reference A4 tuning frequency.
+ *
+ * @param Tunning Reference A4 tuning frequency in Hz.
+ *
+ * @note Assigns the tuning value without rebuilding existing templates.
+ */
 void OnlineForward::SetTunning(double Tunning) {
     m_Tunning = Tunning;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Store an audio description and invalidate frame evidence caches.
+ *
+ * @param Desc Audio description for the current analysis frame.
+ *
+ * @note Copies the description and resets pitch-probability and reverberation cache markers.
+ */
 void OnlineForward::SetDescription(const Description &Desc) {
     m_Desc = Desc;
     m_PitchProbabilityCache.clear();
@@ -427,26 +550,61 @@ void OnlineForward::SetDescription(const Description &Desc) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Set the harmonic count for future pitch templates.
+ *
+ * @param Harmonics Number of harmonics used when building pitch templates.
+ *
+ * @note Existing cached templates are retained until rebuilt.
+ */
 void OnlineForward::SetHarmonics(int Harmonics) {
     m_Harmonics = Harmonics;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Set the pitch-dependent harmonic decay exponent.
+ *
+ * @param decay Exponent shaping harmonic decay across the pitch range.
+ *
+ * @note The new exponent affects templates built after this call; existing templates remain cached.
+ */
 void OnlineForward::SetAmplitudeDecay(double decay) {
     m_PitchTemplateAmplitudeDecay = decay;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the circular slot for the current inference frame.
+ *
+ * @return Circular history buffer index.
+ *
+ * @note Computes the elapsed frame count modulo the history buffer size.
+ */
 int OnlineForward::GetCurrentBufferIndex() {
     return m_Tau % m_BufferSize;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the reference A4 tuning as an integer.
+ *
+ * @return Integer A4 tuning frequency in Hz.
+ *
+ * @note The stored tuning is floating point, but this accessor truncates it to int.
+ */
 int OnlineForward::GetTunning() {
     return m_Tunning;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Select an internal state and restart decoding there.
+ *
+ * @param Event Zero-based internal state index to select.
+ *
+ * @note Logs and ignores invalid indices or an empty score; a valid selection calls ResetDecoding().
+ */
 void OnlineForward::SetCurrentEvent(int Event) {
     spdlog::debug("Current event is {}", Event);
     if (m_States.size() == 0) {
@@ -463,6 +621,15 @@ void OnlineForward::SetCurrentEvent(int Event) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Select the first state matching a section and restart decoding.
+ *
+ * @param Section Section name without surrounding quotes.
+ *
+ * @return True if the section was selected; false otherwise.
+ *
+ * @note Logs an error and leaves the current index unchanged when no state matches.
+ */
 bool OnlineForward::SetCurrentSection(const std::string &Section) {
     auto State = std::find_if(m_States.begin(), m_States.end(),
                               [&](const ScoreState &Candidate) { return Candidate.Section == Section; });
@@ -477,26 +644,66 @@ bool OnlineForward::SetCurrentSection(const std::string &Section) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the number of installed internal states.
+ *
+ * @return Number of internal score states.
+ *
+ * @note Counts musical events as well as boundaries and inserted silence states.
+ */
 int OnlineForward::GetStatesSize() {
     return m_States.size();
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Append a score state to the decoder.
+ *
+ * @param State Score state to read or update.
+ *
+ * @note Copies the provided state without initializing its probability buffers or rebuilding templates.
+ * @warning The caller must prepare runtime buffers before using the appended state in inference.
+ */
 void OnlineForward::AddState(ScoreState State) {
     m_States.push_back(State);
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Copy an internal score state by index.
+ *
+ * @param Index Zero-based internal score state index.
+ *
+ * @return Copy of the selected state.
+ *
+ * @note Uses unchecked vector indexing.
+ * @warning Index must be within the installed score.
+ */
 ScoreState OnlineForward::GetState(int Index) {
     return m_States[Index];
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Access the mutable internal score vector.
+ *
+ * @return Reference to the installed states.
+ *
+ * @note Returns the decoder-owned container without copying it.
+ * @warning Mutations can invalidate references and decoder invariants; serialize with inference.
+ */
 std::vector<ScoreState> &OnlineForward::GetStates() {
     return m_States;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Set the width of future spectral pitch-template peaks.
+ *
+ * @param f Pitch-template peak width in semitones.
+ *
+ * @note Existing cached templates are not rebuilt by this setter.
+ */
 void OnlineForward::SetPitchTemplateSigma(double f) {
     m_PitchTemplateSigma = f;
 }
@@ -504,6 +711,12 @@ void OnlineForward::SetPitchTemplateSigma(double f) {
 // ╭─────────────────────────────────────╮
 // │            Time Decoding            │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Initialize timing from the first score state.
+ *
+ * @note Resets phase, synchronization, onset, tempo, and elapsed-frame counters.
+ * @warning Requires a nonempty score with a positive expected BPM in its first state.
+ */
 void OnlineForward::InitTimeDecoding(void) {
     double PsiK = 60 / m_States[0].BPMExpected;
     m_LastPsiN = PsiK;
@@ -520,6 +733,11 @@ void OnlineForward::InitTimeDecoding(void) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Reset timing and probabilities at the selected score state.
+ *
+ * @note Clears microstate histories and pending notifications; returns early when no states are installed.
+ */
 void OnlineForward::ResetDecoding() {
     m_ActiveMarkovScoreStateIndex = -1;
     if (m_States.empty()) {
@@ -588,6 +806,14 @@ void OnlineForward::ResetDecoding() {
 // This keeps normal rhythmic passages close to Cuvillier's Poisson model,
 // while allowing occasional unexpectedly long events (breaths, phrase
 // endings, expressive lengthening).
+/**
+ * @brief Cache occupancy and survivor laws for an expected duration.
+ *
+ * @param ExpectedFrames Expected event duration in analysis frames.
+ *
+ * @note Quantizes durations to tenths of a frame and adds an exponential right tail to the Poisson occupancy law.
+ * @warning The cached distribution is truncated to the available circular history length.
+ */
 void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     ExpectedFrames = std::max(ExpectedFrames, 1.0);
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
@@ -651,6 +877,15 @@ void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
+/**
+ * @brief Evaluate the circular concentration function I1(kappa)/I0(kappa).
+ *
+ * @param kappa Circular-distribution concentration parameter.
+ *
+ * @return Circular concentration function value.
+ *
+ * @note Uses an asymptotic approximation above kappa = 10 and returns zero for nonpositive kappa.
+ */
 double OnlineForward::CalculateA2(double kappa) {
     if (kappa <= 0.0) {
         return 0.0;
@@ -667,6 +902,11 @@ double OnlineForward::CalculateA2(double kappa) {
 
 // ─────────────────────────────────────
 // CONT (2010) and BATSCHELET (1981)
+/**
+ * @brief Populate the concentration lookup table once.
+ *
+ * @note Subsequent calls return immediately after initialization.
+ */
 void OnlineForward::InitializeA2Table() {
     if (m_A2TableInitialized) {
         return;
@@ -681,6 +921,15 @@ void OnlineForward::InitializeA2Table() {
 
 // ─────────────────────────────────────
 // CONT 2010
+/**
+ * @brief Read the concentration function from its lookup table.
+ *
+ * @param kappa Circular-distribution concentration parameter.
+ *
+ * @return Approximate A2 value.
+ *
+ * @note Rounds to the nearest table sample and clamps values outside the table range.
+ */
 double OnlineForward::A2(double kappa) {
     InitializeA2Table();
 
@@ -699,6 +948,15 @@ double OnlineForward::A2(double kappa) {
 
 // ─────────────────────────────────────
 // CONT 2010
+/**
+ * @brief Approximate concentration from synchronization strength.
+ *
+ * @param SyncStrength Synchronization strength, clamped to the interval [0, 1].
+ *
+ * @return Approximate concentration parameter.
+ *
+ * @note Caches quantized strengths and returns 10 for strengths above 0.95.
+ */
 double OnlineForward::InverseA2(double SyncStrength) {
     InitializeA2Table();
 
@@ -739,6 +997,17 @@ double OnlineForward::InverseA2(double SyncStrength) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
+/**
+ * @brief Evaluate the phase-coupling correction.
+ *
+ * @param phi Observed phase in cycles.
+ * @param phi_hat Expected phase in cycles.
+ * @param kappa Circular-distribution concentration parameter.
+ *
+ * @return Signed phase-coupling value.
+ *
+ * @note Uses a periodic phase difference and an exponential concentration term.
+ */
 double OnlineForward::CouplingFunction(double phi, double phi_hat, double kappa) {
     static constexpr double invTwoPi = 1.0 / (2.0 * std::numbers::pi);
     double diff = 2.0 * std::numbers::pi * (phi - phi_hat);
@@ -748,6 +1017,15 @@ double OnlineForward::CouplingFunction(double phi, double phi_hat, double kappa)
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 7.1)
+/**
+ * @brief Wrap a phase to the centered unit interval.
+ *
+ * @param Phase Phase in cycles.
+ *
+ * @return Wrapped phase in [-0.5, 0.5).
+ *
+ * @note Preserves phase equivalence modulo one cycle.
+ */
 double OnlineForward::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
     if (Phase < 0.0) {
@@ -758,6 +1036,14 @@ double OnlineForward::ModPhases(double Phase) {
 
 // ─────────────────────────────────────
 // CONT 2010 (Last § of section 4)
+/**
+ * @brief Copy upcoming states within the look-ahead horizon.
+ *
+ * @return Copy of the selected state range.
+ *
+ * @note Starts at the current state and accumulates durations until the configured horizon is exceeded.
+ * @warning Requires a valid current index in a nonempty score.
+ */
 States OnlineForward::GetStatesForProcessing() {
     double EventOnset = m_States[m_CurrentStateIndex].Duration - (m_TimeInPrevEvent + m_BlockDur);
     size_t begin = m_CurrentStateIndex;
@@ -775,6 +1061,12 @@ States OnlineForward::GetStatesForProcessing() {
 
 // ─────────────────────────────────────
 // CONT 2010 (Last § of section 4)
+/**
+ * @brief Determine the inclusive internal state range for inference.
+ *
+ * @note Uses all contiguous states of the current section when restricted, otherwise a centered event window.
+ * @warning Requires a valid current index in a nonempty score.
+ */
 void OnlineForward::GetDecodeWindow() {
     if (m_SectionRestrict) {
         const std::string &Section = m_States[static_cast<size_t>(m_CurrentStateIndex)].Section;
@@ -805,6 +1097,17 @@ void OnlineForward::GetDecodeWindow() {
 
 // ─────────────────────────────────────
 // CONT 2010 (Section 5, algorithm 1)
+/**
+ * @brief Advance frame time and update beat-period predictions on a state change.
+ *
+ * @param StateIndex Zero-based index in the internal score state vector.
+ *
+ * @return Predicted beat period in seconds.
+ *
+ * @note Inter-event silence does not drive tempo updates; musical transitions update future onsets and phase
+ * estimates.
+ * @warning StateIndex must identify an installed state.
+ */
 double OnlineForward::UpdatePsiN(int StateIndex) {
     m_TimeInPrevEvent += m_BlockDur;
     m_Tau += 1;
@@ -904,6 +1207,16 @@ double OnlineForward::UpdatePsiN(int StateIndex) {
 // ╭─────────────────────────────────────╮
 // │     Markov / Semi-Markov Core       │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Evaluate a single audio observation against the current frame.
+ *
+ * @param Obs Pitch, technique-label, onset, or silence observation to evaluate.
+ * @param AllowSilence Whether silence observations may contribute evidence.
+ *
+ * @return Raw observation evidence.
+ *
+ * @note Missing ONNX labels and disallowed silence return zero.
+ */
 double OnlineForward::GetObservationEvidence(const Observation &Obs, bool AllowSilence) {
     switch (Obs.Type) {
     case PITCH:
@@ -921,6 +1234,17 @@ double OnlineForward::GetObservationEvidence(const Observation &Obs, bool AllowS
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Select the strongest observation evidence for a microstate.
+ *
+ * @param MicroState Microstate whose observations and winning observation index are evaluated.
+ * @param AllowSilence Whether silence observations may contribute evidence.
+ * @param ApplyGates Whether to apply sound and technique gates to pitch and label evidence.
+ *
+ * @return Maximum microstate observation evidence.
+ *
+ * @note Records the winning observation index and optionally applies sound and technique gates.
+ */
 double OnlineForward::GetMicroStateEmission(MarkovMicroState &MicroState, bool AllowSilence, bool ApplyGates) {
     const double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     double best = 0.0;
@@ -944,6 +1268,12 @@ double OnlineForward::GetMicroStateEmission(MarkovMicroState &MicroState, bool A
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Update observation likelihoods within the decode window.
+ *
+ * @note Combines event and microstate evidence, records winners, and limits REST advancement during silence.
+ * @warning Requires initialized decode-window indices and probability history buffers.
+ */
 void OnlineForward::GetAudioObservations() {
     const double soundProb = std::max(0.0, 1.0 - m_Desc.SilenceProb);
     const double techWeight = m_Desc.ExtendedTechProb;
@@ -1126,6 +1456,15 @@ void OnlineForward::GetAudioObservations() {
 // CONT (2010) section 3.1;
 // CUVILLIER (2016) section 2.2.2;
 // GONG (2015)
+/**
+ * @brief Evaluate spectral pitch evidence using a cached harmonic template.
+ *
+ * @param Freq Pitch frequency in Hz.
+ *
+ * @return Pitch evidence, or the smallest positive double when the pitch or available spectrum is unusable.
+ *
+ * @note Uses exponential KL-divergence scoring with reverberation and spectral-deviation terms.
+ */
 double OnlineForward::GetPitchProbability(double Freq) {
     constexpr double minProb = std::numeric_limits<double>::min();
 
@@ -1194,6 +1533,12 @@ double OnlineForward::GetPitchProbability(double Freq) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Initialize score-state priors in the active decode window.
+ *
+ * @note Weights upcoming events by distance and accounts for zero-duration skips and optional silence branches.
+ * @warning Requires a valid decode window and positive beat look-ahead and block duration.
+ */
 void OnlineForward::GetInitialDistribution() {
     int Size = m_WinEnd - m_CurrentStateIndex + 1;
     std::vector<double> InitialProb(Size);
@@ -1262,6 +1607,16 @@ void OnlineForward::GetInitialDistribution() {
 
 // ─────────────────────────────────────
 // CUVILLIER and CONT (2014) section 2.1.
+/**
+ * @brief Read the allowed transition probability between score states.
+ *
+ * @param i Source state index.
+ * @param j Destination state index.
+ *
+ * @return Transition probability, or zero for invalid or forbidden transitions.
+ *
+ * @note Ordinary states advance to their successor; optional silence creates two branches with equal priors.
+ */
 double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
     if (i < 0 || j <= i || j >= static_cast<int>(m_States.size())) {
         return 0.0;
@@ -1276,6 +1631,13 @@ double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
 
 // ─────────────────────────────────────
 // OpenScofo duration policy, not a numerical prescription from Cont.
+/**
+ * @brief Distribute a parent duration among its microstates.
+ *
+ * @param Parent Parent score state containing microstates and duration weights.
+ *
+ * @note Uses nonnegative duration weights with equal shares as a fallback and at least one frame per microstate.
+ */
 void OnlineForward::PrepareMicroStateDurations(const ScoreState &Parent) {
     const size_t K = Parent.MicroStates.size();
     m_MicroExpectedFrames.assign(K, 1.0);
@@ -1301,6 +1663,16 @@ void OnlineForward::PrepareMicroStateDurations(const ScoreState &Parent) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read a transition within the active ordered microstate chain.
+ *
+ * @param i Source microstate index.
+ * @param j Destination microstate index.
+ *
+ * @return Transition probability, or zero without a valid ordered-chain context.
+ *
+ * @note Permits self-loops and single-step advancement; the last microstate is absorbing.
+ */
 double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
     if (m_ActiveMarkovScoreStateIndex < 0 || m_ActiveMarkovScoreStateIndex >= static_cast<int>(m_States.size())) {
         return 0.0;
@@ -1321,6 +1693,13 @@ double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Clear microstate emissions, winners, and age-conditioned history.
+ *
+ * @param State Score state to read or update.
+ *
+ * @note Retains the score-defined observations and microstate topology.
+ */
 void OnlineForward::ResetMicroStateRuntime(ScoreState &State) {
     State.MicroForwardLastFrame = -1;
     State.BestMicroStateIndex = -1;
@@ -1333,6 +1712,17 @@ void OnlineForward::ResetMicroStateRuntime(ScoreState &State) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Advance log forward histories for an ordered microstate chain.
+ *
+ * @param State Score state to read or update.
+ * @param StateIndex Zero-based index in the internal score state vector.
+ * @param MaxAge Maximum segment age to retain in analysis frames.
+ *
+ * @note Tracks each segment age separately and clears histories when the chain was not observed in the previous
+ * frame.
+ * @warning StateIndex must identify State in the installed score; emissions must be computed for the current frame.
+ */
 void OnlineForward::UpdateMicroStateForward(ScoreState &State, int StateIndex, int MaxAge) {
     if (State.MicroTopologyType != LEFT_RIGHT) {
         return;
@@ -1388,6 +1778,16 @@ void OnlineForward::UpdateMicroStateForward(ScoreState &State, int StateIndex, i
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
+/**
+ * @brief Read the probability of an event lasting u analysis frames.
+ *
+ * @param State Score state to read or update.
+ * @param u Event duration or age in analysis frames.
+ *
+ * @return Occupancy probability, or zero outside the cached duration range.
+ *
+ * @note Builds the quantized duration cache on demand from the predicted beat period.
+ */
 double OnlineForward::GetOccupancyDistribution(ScoreState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0) {
@@ -1407,6 +1807,16 @@ double OnlineForward::GetOccupancyDistribution(ScoreState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
+/**
+ * @brief Read the probability of an event surviving at least u frames.
+ *
+ * @param State Score state to read or update.
+ * @param u Event duration or age in analysis frames.
+ *
+ * @return Survivor probability, or zero outside the cached range.
+ *
+ * @note Uses the survivor law corresponding to the cached occupancy distribution.
+ */
 double OnlineForward::GetSurvivorDistribution(ScoreState &State, int u) {
     double ExpectedFrames = (m_PsiN1 * State.Duration) / m_BlockDur;
     if (ExpectedFrames < 1.0) {
@@ -1427,6 +1837,15 @@ double OnlineForward::GetSurvivorDistribution(ScoreState &State, int u) {
 // ─────────────────────────────────────
 // CUVILLIER (2015)
 // TODO: Needs review
+/**
+ * @brief Estimate a duration-history cap for a score state.
+ *
+ * @param StateJ Score state whose forward probabilities or duration are evaluated.
+ *
+ * @return Estimated maximum duration in analysis frames.
+ *
+ * @note Returns five times the expected duration, rounded up, with a minimum of one frame.
+ */
 int OnlineForward::GetMaxUForJ(ScoreState &StateJ) {
     double Expected_Frames = (m_PsiN1 * StateJ.Duration) / m_BlockDur;
     if (Expected_Frames < 1.0) {
@@ -1438,6 +1857,15 @@ int OnlineForward::GetMaxUForJ(ScoreState &StateJ) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
+/**
+ * @brief Update score-level Markov forward and exit probabilities.
+ *
+ * @param StateJ Score state whose forward probabilities or duration are evaluated.
+ * @param j Destination state index.
+ *
+ * @note Uses current evidence and predecessor exits; inserted silence states have equal stay and leave priors.
+ * @warning j must identify StateJ and all circular probability buffers must be initialized.
+ */
 void OnlineForward::Markov(ScoreState &StateJ, int j) {
     double Bj = StateJ.BestObs[m_CircularBufferIndex];
     double Fj;
@@ -1469,6 +1897,15 @@ void OnlineForward::Markov(ScoreState &StateJ, int j) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
+/**
+ * @brief Update duration-conditioned forward and exit probabilities.
+ *
+ * @param StateJ Score state whose forward probabilities or duration are evaluated.
+ * @param j Destination state index.
+ *
+ * @note Ordered microstates use age-conditioned log histories; other states use normalized observation products.
+ * @warning j must identify StateJ and all circular probability buffers must be initialized.
+ */
 void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     double Bj = StateJ.BestObs[m_CircularBufferIndex];
 
@@ -1564,6 +2001,15 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
 
 // ─────────────────────────────────────
 // GUÉDON (2005) + CUVILLIER (2016)
+/**
+ * @brief Advance and normalize the decode-window forward probabilities.
+ *
+ * @return Index of the best eligible internal state.
+ *
+ * @note Shares normalization with ordered microstate histories and chooses an eligible state without moving
+ * backward.
+ * @warning Requires current-frame evidence and initialized decoder history.
+ */
 int OnlineForward::GetAlphaT() {
     spdlog::debug("WinStart {:04d} | WinFinish {:04d} | BufferSize {:04d} | Tau {:06d} | Kappa {:.4f}", m_WinStart,
                   m_WinEnd, m_CircularBufferIndex, m_Tau, m_Kappa);
@@ -1648,6 +2094,16 @@ int OnlineForward::GetAlphaT() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Decode one audio frame and update the current event and tempo.
+ *
+ * @param Desc Audio description for the current analysis frame.
+ *
+ * @return Public score position of the winning internal state.
+ *
+ * @note Updates observation evidence, performs forward inference, and queues audio-state-change notifications.
+ * @warning Requires a nonempty initialized score and a valid current state index; serialize with state changes.
+ */
 int OnlineForward::GetEvent(Description &Desc) {
     spdlog::debug("Starting inference");
     m_Desc = Desc;

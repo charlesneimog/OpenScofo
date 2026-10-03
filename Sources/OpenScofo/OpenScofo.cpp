@@ -7,6 +7,14 @@
     See the LICENSE file for details.
 */
 
+/**
+ * @file OpenScofo.cpp
+ * @brief Public score-following API and audio processing pipeline.
+ *
+ * @note Coordinates score parsing, descriptor extraction, forward inference, and optional Lua execution.
+ * @warning Serialize configuration changes, score loading, and audio processing on each instance.
+ */
+
 #include <OpenScofo.hpp>
 #include <algorithm>
 
@@ -21,14 +29,14 @@ int luaopen_OpenScofo(lua_State *L);
 
 //  ─────────────────────────────────────
 /**
- * @brief Initialize OpenScofo processing pipeline.
+ * @brief Initialize the audio analysis and score-following pipeline.
  *
- * @param Sr Sampling rate (Hz)
- * @param FftSize FFT window size
- * @param HopSize Hop size (samples)
+ * @param Sr Sampling rate in Hz.
+ * @param FftSize Analysis window size in samples.
+ * @param HopSize Analysis hop size in samples.
  *
- * @note Initializes Forward model, MIR extractor, and score handler.
- * @note Configures global spdlog logger (overwrites default).
+ * @note Initializes optional Lua bindings, installs a logging sink, and applies the initial audio configuration.
+ * @warning Replaces the global default spdlog logger. Use a positive sample rate and supported FFT and hop sizes.
  */
 OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_Forward(), m_MIR(), m_Score() {
     m_States = States();
@@ -66,17 +74,12 @@ OpenScofo::OpenScofo(float Sr, float FftSize, float HopSize) : m_Forward(), m_MI
 
 //  ─────────────────────────────────────
 /**
- * @brief Update audio processing parameters.
+ * @brief Apply audio configuration and resize descriptor buffers.
  *
- * @param Sr Sampling rate (Hz)
- * @param FFTSize FFT window size
- * @param HopSize Hop size (samples)
+ * @param Config Audio and score-following configuration to apply.
  *
- * @note Propagates parameters to forward model, MIR extractor, and score.
- * @note Reallocates internal buffers and descriptor arrays if sizes change.
- * @note Resets input buffer and processing state.
- *
- * @warning Not thread-safe. Must not be called during audio processing.
+ * @note Updates the forward model and MIR extractor, clears the input window, and resets the hop counter.
+ * @warning Reallocates processing buffers; do not call concurrently with ProcessBlock().
  */
 void OpenScofo::UpdateConfiguration(Configuration &Config) {
     m_Config = Config;
@@ -106,16 +109,14 @@ void OpenScofo::UpdateConfiguration(Configuration &Config) {
 // │               Errors                │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Set callback for log/error messages.
+ * @brief Register the callback used to deliver log and error messages.
  *
- * @param cb Callback invoked on each log message
- * @param data User-defined pointer passed to the callback
+ * @param cb Callback invoked by the logging sink for each delivered log message.
+ * @param data Caller-owned context passed to the callback.
  *
- * @note The callback is triggered by the internal logging sink.
- * @note Updates the internal error flag (m_HasErrors) automatically.
- * @note Log level is set to debug (debug builds) or info (release builds).
- *
- * @warning Overwrites any previously registered callback.
+ * @note The logging sink also updates the error flag; release builds use info level and debug builds use debug
+ * level.
+ * @warning Replaces the previous callback. Keep its context valid while the callback is registered.
  */
 void OpenScofo::SetErrorCallback(std::function<void(const spdlog::details::log_msg &, void *data)> cb, void *data) {
     if (m_Log) {
@@ -132,11 +133,11 @@ void OpenScofo::SetErrorCallback(std::function<void(const spdlog::details::log_m
 
 // ─────────────────────────────────────
 /**
- * @brief Set logging verbosity level.
+ * @brief Set the minimum logging level.
  *
- * @param level spdlog log level
+ * @param level Minimum spdlog message level to emit.
  *
- * @note Affects the global default spdlog logger.
+ * @note Changes the global spdlog level, affecting other users of its default logger.
  */
 void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
     auto logger = spdlog::default_logger();
@@ -145,17 +146,27 @@ void OpenScofo::SetLogLevel(spdlog::level::level_enum level) {
 
 // ─────────────────────────────────────
 /**
- * @brief Apply configuration settings to the system.
+ * @brief Apply a new processing configuration.
  *
- * @param Config Configuration object
+ * @param Config Audio and score-following configuration to apply.
  *
- * @note Updates internal modules according to provided configuration.
+ * @note Delegates to UpdateConfiguration(), resetting the input window and rebuilding MIR resources.
+ * @warning Do not change configuration concurrently with audio processing.
  */
 void OpenScofo::SetConfiguration(Configuration &Config) {
     UpdateConfiguration(Config);
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Replace the set of enabled audio descriptors.
+ *
+ * @param Descriptors Descriptor set to enable.
+ *
+ * @note Removes INVALID entries and duplicates, sorts the set, and rebuilds MIR resources only when the set
+ * changes.
+ * @warning Changing the set can allocate memory and reset analysis history; serialize with audio processing.
+ */
 void OpenScofo::SetRequestedDescriptors(std::vector<Descriptors> Descriptors) {
     Descriptors.erase(std::remove(Descriptors.begin(), Descriptors.end(), INVALID), Descriptors.end());
     std::sort(Descriptors.begin(), Descriptors.end());
@@ -170,6 +181,12 @@ void OpenScofo::SetRequestedDescriptors(std::vector<Descriptors> Descriptors) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Enable every supported audio descriptor.
+ *
+ * @note Calls SetRequestedDescriptors() with the complete descriptor set, including ONNX.
+ * @warning ONNX inference still requires a loaded model. Enabling descriptors can rebuild analysis resources.
+ */
 void OpenScofo::ActivateAllDescriptors() {
     SetRequestedDescriptors({ODSONSET,
                              LOUDNESS,
@@ -206,6 +223,14 @@ void OpenScofo::ActivateAllDescriptors() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Enable a descriptor and refresh the current audio description.
+ *
+ * @param Descriptor Descriptor to enable.
+ *
+ * @note Ignores INVALID, avoids duplicate requests, and analyzes the current input window when it is available.
+ * @warning Can allocate memory, reset MIR history, and run analysis; serialize with audio processing.
+ */
 void OpenScofo::RequestDescriptor(Descriptors Descriptor) {
     if (Descriptor == INVALID) {
         return;
@@ -224,12 +249,10 @@ void OpenScofo::RequestDescriptor(Descriptors Descriptor) {
 
 // ─────────────────────────────────────
 /**
- * @brief Reset internal error state.
+ * @brief Clear a recoverable error status.
  *
- * @note Clears m_HasErrors unless a critical error was previously set.
- *
- * @warning If a critical error occurred, the state is not reset and recovery
- * is not possible without reinitializing the instance.
+ * @note Sets the stored status to info unless a critical error has already been recorded.
+ * @warning A critical status remains set; this method does not repair failed processing resources.
  */
 void OpenScofo::ClearErrors() {
     if (m_HasErrors == spdlog::level::critical) {
@@ -245,15 +268,13 @@ void OpenScofo::ClearErrors() {
 // │                ONNX                 │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Load an ONNX model for descriptor inference.
+ * @brief Load an ONNX classifier for audio descriptor inference.
  *
- * @param Model Path to .onnx model file
- * @param Descriptors List of descriptors expected by the model
+ * @param Model Path to an ONNX model file.
+ * @param Descriptors Descriptors to compute, or model inputs when loading an ONNX model.
  *
- * @note Only .onnx models are supported.
- * @note Delegates initialization to the MIR module.
- *
- * @warning Invalid file extension or incompatible descriptors will result in an error log.
+ * @note Requires the .onnx extension and delegates model initialization to the MIR extractor.
+ * @warning Invalid paths or incompatible models are reported through logging; serialize loading with processing.
  */
 void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors) {
     if (Model.extension() != ".onnx") {
@@ -269,11 +290,10 @@ void OpenScofo::LoadONNXModel(fs::path Model, std::vector<Descriptors> Descripto
 // ╰─────────────────────────────────────╯
 #if defined(OPENSCOFO_LUA)
 /**
- * @brief Initialize embedded Lua runtime and OpenScofo bindings.
+ * @brief Create the embedded Lua runtime and register OpenScofo bindings.
  *
- * @note Creates a new Lua state and opens standard libraries.
- * @note Exposes a global `_OpenScofo` table with a lightuserdata pointer to this instance.
- * @note Registers the OpenScofo Lua module via `luaL_requiref`.
+ * @note Opens standard libraries and stores this instance as lightuserdata in the global _OpenScofo table.
+ * @warning Closes any existing Lua runtime and releases its pending timers before creating a new one.
  */
 void OpenScofo::InitLuaModule() {
     CloseLuaModule();
@@ -289,15 +309,14 @@ void OpenScofo::InitLuaModule() {
 
 // ─────────────────────────────────────
 /**
- * @brief Register a Lua module into the current Lua state.
+ * @brief Register a module in the embedded Lua runtime.
  *
- * @param name Module name exposed to Lua
- * @param func Lua C function used to initialize the module
+ * @param name Name exposed in the Lua runtime.
+ * @param func Lua C function that opens the module.
  *
- * @return true if module was successfully registered, false otherwise
+ * @return True if a non-nil module was registered; false if the runtime is absent or the result is nil.
  *
- * @note Requires a valid Lua state (m_LuaState != nullptr).
- * @note Uses luaL_requiref, so the module may be cached by Lua.
+ * @note Uses luaL_requiref(), which caches loaded modules, and leaves the module value on the Lua stack.
  */
 bool OpenScofo::LuaAddModule(std::string name, lua_CFunction func) {
     if (m_LuaState == nullptr) {
@@ -312,11 +331,14 @@ bool OpenScofo::LuaAddModule(std::string name, lua_CFunction func) {
 
 // ─────────────────────────────────────
 /**
- * @brief Execute a Lua code string in the current Lua state.
+ * @brief Compile and execute Lua source in the embedded runtime.
  *
- * @param code Lua source code to execute
+ * @param code Lua source code to execute.
  *
- * @return true if execution succeeded, false on load/runtime error
+ * @return True on successful execution; false if no runtime exists or compilation or execution fails.
+ *
+ * @note Retains Lua results or the error object on the stack; LuaGetError() retrieves and pops an error.
+ * @warning Runs synchronously and may execute arbitrary registered callbacks; serialize access to the Lua state.
  */
 bool OpenScofo::LuaExecute(std::string code) {
     if (m_LuaState == nullptr) {
@@ -336,15 +358,15 @@ bool OpenScofo::LuaExecute(std::string code) {
 
 // ─────────────────────────────────────
 /**
- * @brief Expose a raw pointer to Lua as a global lightuserdata.
+ * @brief Expose a caller-owned pointer as a Lua global.
  *
- * @param pointer C/C++ pointer to expose
- * @param name Global variable name in Lua
+ * @param pointer Caller-owned pointer exposed as lightuserdata.
+ * @param name Name exposed in the Lua runtime.
  *
- * @return true if Lua state is valid and pointer was set, false otherwise
+ * @return True if the Lua runtime exists and the global was assigned; false otherwise.
  *
- * @note Stored as lightuserdata (no ownership or lifetime management).
- * @warning Lua code can access this pointer without safety checks.
+ * @note Stores lightuserdata without taking ownership or managing the pointed-to object.
+ * @warning Keep the pointed-to object alive for as long as Lua code can access it.
  */
 bool OpenScofo::LuaAddPointer(void *pointer, const char *name) {
     if (m_LuaState == nullptr) {
@@ -357,12 +379,12 @@ bool OpenScofo::LuaAddPointer(void *pointer, const char *name) {
 
 // ─────────────────────────────────────
 /**
- * @brief Extend Lua module search path.
+ * @brief Append a directory to the Lua module search path.
  *
- * @param path Directory to add to package.path
+ * @param path Directory to append to the Lua module search path.
  *
- * @note Appends a ".lua" search pattern for the given directory.
- * @note Modifies global Lua `package.path`.
+ * @note Adds a directory/?.lua pattern to package.path when the Lua runtime exists.
+ * @warning The directory path must not be empty.
  */
 void OpenScofo::LuaAddPath(std::string path) {
     if (m_LuaState == nullptr) {
@@ -384,12 +406,12 @@ void OpenScofo::LuaAddPath(std::string path) {
 
 // ─────────────────────────────────────
 /**
- * @brief Retrieve and pop the last Lua error message.
+ * @brief Retrieve and remove the top Lua stack value as an error message.
  *
- * @return Error string if present, otherwise a default message
+ * @return The error text or a fallback diagnostic.
  *
- * @note Reads error from the top of the Lua stack and removes it.
- * @note If no valid string is found, returns a generic error message.
+ * @note Returns a fallback message if no string value is available, or if the Lua runtime does not exist.
+ * @warning Pops the top stack value only if it can be converted to a string; other values remain on the stack.
  */
 std::string OpenScofo::LuaGetError() {
     if (m_LuaState == nullptr) {
@@ -408,12 +430,12 @@ std::string OpenScofo::LuaGetError() {
 // │            Set Functions            │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Set active score event and reset decoding state.
+ * @brief Select an internal score state and reset input analysis buffers.
  *
- * @param Event Event index in the loaded score (0 = reset)
+ * @param Event Zero-based internal score state index; zero selects the initial state.
  *
- * @note Resets forward model state, buffers, and descriptors.
- * @note Updates current score position based on event mapping if valid.
+ * @note Resets forward decoding for a valid index and maps that state to the public score position.
+ * @warning Invalid indices are logged by the forward model, but input buffers and the public position still reset.
  */
 void OpenScofo::SetCurrentEvent(int Event) {
     m_CurrentScorePosition = 0;
@@ -441,10 +463,14 @@ void OpenScofo::SetCurrentEvent(int Event) {
 
 // ─────────────────────────────────────
 /**
- * @brief Select a score section and reset decoding at its first state.
+ * @brief Restart decoding at the first state of a named section.
  *
- * @param Section Section identifier without quotes
- * @return true when the section exists, false otherwise
+ * @param Section Section name without surrounding quotes.
+ *
+ * @return True if the section was found and selected; false otherwise.
+ *
+ * @note A successful selection clears input and spectral buffers and refreshes the public score position.
+ * @warning Selecting a section resets decoding history; serialize with audio processing.
  */
 bool OpenScofo::SetCurrentSection(const std::string &Section) {
     if (!m_Forward.SetCurrentSection(Section)) {
@@ -469,9 +495,11 @@ bool OpenScofo::SetCurrentSection(const std::string &Section) {
 // │            Get Functions            │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Get current position in the score (following Antescofo, Rest does not count for this).
+ * @brief Read the current public score position.
  *
- * @return Score position index computed by the forward model.
+ * @return Current public score position.
+ *
+ * @note Returns the position last recorded by this API; rests do not advance the public event numbering.
  */
 int OpenScofo::GetCurrentScorePosition() {
     return m_CurrentScorePosition;
@@ -479,9 +507,11 @@ int OpenScofo::GetCurrentScorePosition() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get current state index from the forward model.
+ * @brief Read the active internal forward-model state index.
  *
- * @return Index of the active internal state.
+ * @return Zero-based index of the active internal state.
+ *
+ * @note Internal indices include boundary and silence states and can differ from public score positions.
  */
 int OpenScofo::GetCurrentStateIndex() {
     return m_Forward.GetCurrentStateIndex();
@@ -489,9 +519,11 @@ int OpenScofo::GetCurrentStateIndex() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get estimated current tempo.
+ * @brief Read the current tempo estimate.
  *
- * @return Current BPM estimate from the forward model.
+ * @return Estimated tempo in beats per minute.
+ *
+ * @note Delegates to the forward model; the initial estimate comes from the selected score state.
  */
 double OpenScofo::GetCurrentBPM() {
     return m_Forward.GetCurrentBPM();
@@ -499,11 +531,11 @@ double OpenScofo::GetCurrentBPM() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get actions associated with the current score event.
+ * @brief Copy the actions associated with the current score event.
  *
- * @return Event action list (empty if no score is loaded).
+ * @return Actions for the active event, or an empty list.
  *
- * @note Delegates to the forward model when a score is active.
+ * @note Returns an empty list when no score has been loaded; reading does not consume event actions.
  */
 EventActions OpenScofo::GetCurrentEventActions() {
     if (ScoreIsLoaded()) {
@@ -514,6 +546,14 @@ EventActions OpenScofo::GetCurrentEventActions() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Retrieve pending audio-state-change actions.
+ *
+ * @return Pending audio-state-change actions.
+ *
+ * @note Returns an empty list when no score is loaded; otherwise drains the forward-model action queue.
+ * @warning Each queued action is returned only once.
+ */
 EventActions OpenScofo::GetAudioStateChangeActions() {
     if (ScoreIsLoaded()) {
         return m_Forward.GetAudioStateChangeActions();
@@ -523,13 +563,13 @@ EventActions OpenScofo::GetAudioStateChangeActions() {
 
 // ─────────────────────────────────────
 /**
- * @brief Compute pitch probability for a given frequency.
+ * @brief Evaluate pitch evidence against the current audio frame.
  *
- * @param Freq Frequency in Hz
+ * @param Freq Target pitch frequency in Hz.
  *
- * @return Probability score from forward model
+ * @return Pitch evidence score from the forward model.
  *
- * @note Uses current description frame as input to the model.
+ * @note Copies the current description to the forward model before evaluating its spectral pitch template.
  */
 double OpenScofo::GetPitchProb(double Freq) {
     m_Forward.SetDescription(m_Desc);
@@ -538,9 +578,11 @@ double OpenScofo::GetPitchProb(double Freq) {
 
 // ─────────────────────────────────────
 /**
- * @brief Return Lua code string defined in global events using LUA {}.
+ * @brief Copy the global Lua source collected from the score.
  *
- * @return Lua script as a string
+ * @return Collected Lua source code.
+ *
+ * @note Returns source from score-level LUA blocks without executing it.
  */
 std::string OpenScofo::GetLuaCode() {
     return m_Score.GetLuaCode();
@@ -550,9 +592,11 @@ std::string OpenScofo::GetLuaCode() {
 // │          Helpers Functions          │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Check if a score is currently loaded.
+ * @brief Read the score parser loaded flag.
  *
- * @return true if score data is available, false otherwise
+ * @return True when the parser reports a loaded score; false otherwise.
+ *
+ * @note Reflects the parser status rather than independently validating decoder or ONNX readiness.
  */
 bool OpenScofo::ScoreIsLoaded() {
     return m_Score.ScoreIsLoaded();
@@ -560,11 +604,13 @@ bool OpenScofo::ScoreIsLoaded() {
 
 // ─────────────────────────────────────
 /**
- * @brief Convert descriptor enum to string identifier.
+ * @brief Convert a descriptor enum to its public identifier.
  *
- * @param d Descriptor enum value
+ * @param d Descriptor enum value.
  *
- * @return Human-readable identifier string (e.g. "mfcc", "chroma")
+ * @return Null-terminated descriptor identifier.
+ *
+ * @note Returns a string literal; unknown enum values map to "unknown".
  */
 const char *OpenScofo::GetDescriptionId(Descriptors d) {
     switch (d) {
@@ -639,13 +685,14 @@ const char *OpenScofo::GetDescriptionId(Descriptors d) {
 
 // ─────────────────────────────────────
 /**
- * @brief Convert string identifier to descriptor enum.
+ * @brief Convert a public descriptor identifier to its enum.
  *
- * @param s Descriptor name (e.g. "mfcc", "chroma")
+ * @param s Null-terminated descriptor identifier.
  *
- * @return Corresponding Descriptors enum value, or INVALID on failure
+ * @return Matching enum value, or INVALID for an unknown name.
  *
- * @note Logs an error if the string is not recognized.
+ * @note Accepts supported aliases and logs an error for unknown identifiers.
+ * @warning The identifier pointer must not be null.
  */
 Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
     if (strcmp(s, "mfcc") == 0) {
@@ -718,14 +765,14 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
 
 // ─────────────────────────────────────
 /**
- * @brief Extract scalar descriptor value from a Description.
+ * @brief Read a scalar value from an audio description.
  *
- * @param Desc Audio description container
- * @param d Descriptor type
+ * @param Desc Description containing the requested descriptor.
+ * @param d Descriptor enum value.
  *
- * @return Scalar value for the requested descriptor, or -1.0 on error / invalid type
+ * @return Requested scalar value, or -1.0 for an unsupported descriptor.
  *
- * @note Logs an error if the descriptor is vector-valued or invalid.
+ * @note Vector-valued and unsupported descriptors produce an error log and return -1.0.
  */
 double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
     switch (d) {
@@ -801,16 +848,15 @@ double OpenScofo::GetDescriptionFloat(Description &Desc, Descriptors d) {
 
 // ─────────────────────────────────────
 /**
- * @brief Access vector-valued descriptor data.
+ * @brief Access an array-valued descriptor in an audio description.
  *
- * @param Desc Audio description container
- * @param d Descriptor type (must be vector-valued)
+ * @param Desc Description containing the requested descriptor.
+ * @param d Descriptor enum value.
  *
- * @return Reference to internal descriptor array
+ * @return Mutable reference to the requested array, or the magnitude array as a fallback.
  *
- * @throws std::runtime_error if descriptor is not vector-valued
- *
- * @note Logs an error before throwing for invalid descriptor types.
+ * @note Supports MFCC, chroma, log-mel, power, and magnitude arrays.
+ * @warning Unsupported descriptors log a critical message and return Magnitude; no exception is thrown.
  */
 std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descriptors d) {
     switch (d) {
@@ -834,11 +880,12 @@ std::vector<double> &OpenScofo::GetDescriptionArray(Description &Desc, Descripto
 // │ Python Research and Test Functions  │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Access internal score state machine.
+ * @brief Access the mutable forward-model score states.
  *
- * @return Reference to forward model states container.
+ * @return Reference to the forward-model states.
  *
- * @note Exposes internal mutable state (no copy is made).
+ * @note Returns the actual state container rather than a copy.
+ * @warning Mutations can invalidate decoder assumptions or references; do not modify states during processing.
  */
 States &OpenScofo::GetStates() {
     return m_Forward.GetStates();
@@ -846,11 +893,13 @@ States &OpenScofo::GetStates() {
 
 // ─────────────────────────────────────
 /**
- * @brief Generate pitch template for a given frequency.
+ * @brief Build or retrieve a spectral pitch template.
  *
- * @param Freq Target frequency in Hz
+ * @param Freq Target pitch frequency in Hz.
  *
- * @return Pitch template vector computed by the forward model
+ * @return Pitch template bins; an unsupported frequency can produce an empty template.
+ *
+ * @note Delegates to the forward model and returns a copy of its cached template.
  */
 std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
     return m_Forward.GetPitchTemplate(Freq);
@@ -858,9 +907,11 @@ std::vector<double> OpenScofo::GetPitchTemplate(double Freq) {
 
 // ─────────────────────────────────────
 /**
- * @brief Get current sampling rate.
+ * @brief Read the configured sampling rate.
  *
- * @return Sampling rate in Hz
+ * @return Sampling rate in Hz.
+ *
+ * @note Reads the value stored in the current configuration.
  */
 double OpenScofo::GetSr() {
     return m_Config.SR;
@@ -868,9 +919,11 @@ double OpenScofo::GetSr() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get FFT window size.
+ * @brief Read the configured analysis window size.
  *
- * @return FFT size in samples
+ * @return FFT window size in samples.
+ *
+ * @note Reads the value stored in the current configuration.
  */
 double OpenScofo::GetFFTSize() {
     return m_Config.FFTSize;
@@ -878,9 +931,11 @@ double OpenScofo::GetFFTSize() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get hop size used for frame processing.
+ * @brief Read the configured analysis hop size.
  *
- * @return Hop size in samples
+ * @return Hop size in samples.
+ *
+ * @note Reads the value stored in the current configuration.
  */
 double OpenScofo::GetHopSize() {
     return m_Config.HOPSize;
@@ -888,9 +943,11 @@ double OpenScofo::GetHopSize() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get processing block duration in seconds.
+ * @brief Read the duration of one analysis hop.
  *
- * @return Block duration in seconds (derived from hop size and sampling rate)
+ * @return Hop duration in seconds.
+ *
+ * @note Delegates to the forward model, which computes hop size divided by sampling rate.
  */
 double OpenScofo::GetBlockDuration() {
     return m_Forward.GetBlockDuration();
@@ -900,11 +957,11 @@ double OpenScofo::GetBlockDuration() {
 // │           Main Functions            │
 // ╰─────────────────────────────────────╯
 /**
- * @brief Get current audio description frame.
+ * @brief Copy the most recent audio description.
  *
- * @return Copy of the current descriptor structure
+ * @return Copy of the current description.
  *
- * @note Returns by value (snapshot, not live reference).
+ * @note The returned value is a snapshot and does not track subsequent frames.
  */
 Description OpenScofo::GetDescription() {
     return m_Desc;
@@ -912,11 +969,11 @@ Description OpenScofo::GetDescription() {
 
 // ─────────────────────────────────────
 /**
- * @brief Retrieve current system configuration.
+ * @brief Copy the current processing configuration.
  *
- * @return Copy of the current configuration object
+ * @return Copy of the current configuration.
  *
- * @note Returned by value (snapshot, not a live reference).
+ * @note Changing the returned copy does not apply it; use SetConfiguration() to apply changes.
  */
 Configuration OpenScofo::GetConfiguration() {
     return m_Config;
@@ -924,9 +981,11 @@ Configuration OpenScofo::GetConfiguration() {
 
 // ─────────────────────────────────────
 /**
- * @brief Get current processing buffer index.
+ * @brief Read the forward-model circular history index.
  *
- * @return Current index within the analysis buffer (forward model state)
+ * @return Current slot in the forward-model history buffer.
+ *
+ * @note This index tracks inference frames, rather than the number of input samples buffered.
  */
 int OpenScofo::GetCurrentBufferIndex() {
     return m_Forward.GetCurrentBufferIndex();
@@ -934,14 +993,15 @@ int OpenScofo::GetCurrentBufferIndex() {
 
 // ─────────────────────────────────────
 /**
- * @brief Load and initialize a score from file.
+ * @brief Parse a score and initialize its analysis and decoding configuration.
  *
- * @param ScorePath Path to score file
+ * @param ScorePath Path to the score file.
  *
- * @return true if loading and initialization succeeded, false otherwise
+ * @return True if initialization completes without an error or critical log status; false otherwise.
  *
- * @note Resets internal state and reinitializes processing pipeline.
- * @note May load and validate an ONNX model if present in the score.
+ * @note Preserves requested descriptors, enables score-required features, and validates technique labels against
+ * ONNX.
+ * @warning Replaces score and processing state even when loading fails; serialize with audio processing.
  */
 bool OpenScofo::LoadScore(fs::path ScorePath) {
     ClearErrors();
@@ -1063,17 +1123,17 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
 
 // ─────────────────────────────────────
 /**
- * @brief Process an incoming audio block.
+ * @brief Append input samples and process an audio analysis frame when a hop is due.
  *
- * @tparam T Audio sample precision type (float/double)
- * @param AudioBuffer Input audio buffer
- * @param n Number of samples in buffer
+ * @tparam T Audio sample type, constrained to float or double.
+ * @param AudioBuffer Readable input samples in float or double precision.
+ * @param n Number of input samples; must not exceed the configured FFT window size.
  *
- * @return true if processing succeeded
+ * @return True after buffering or processing the block.
  *
- * @note Maintains internal circular buffer state.
- * @note Triggers analysis every hop size.
- * @note Updates descriptors and score position depending on mode.
+ * @note Shifts the input window and performs at most one analysis per call. Lua timers run on the calling thread.
+ * @warning AudioBuffer must cover n samples and n must fit the FFT window. Calls exceeding one hop do not process
+ * every hop.
  */
 template <OpenScofoPrecision T> bool OpenScofo::ProcessBlock(const T *AudioBuffer, size_t n) {
 #if defined(OPENSCOFO_LUA)

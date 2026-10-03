@@ -7,6 +7,14 @@
     See the LICENSE file for details.
 */
 
+/**
+ * @file onnx.cpp
+ * @brief ONNX classifier loading, metadata parsing, and descriptor inference.
+ *
+ * @note Uses ordered descriptor buffers and string labels to map classifier output into audio descriptions.
+ * @warning Model loading, reset, and inference share owned buffers and must be serialized.
+ */
+
 #include <onnx.h>
 
 #include "onnx.hpp"
@@ -23,11 +31,29 @@ namespace OpenScofo {
 const int ONNXModel::CurrentOpset = 24;
 
 // ─────────────────────────────────────
+/**
+ * @brief Release the owned ONNX context.
+ *
+ * @note Calls Reset() to clear model state and inference buffers.
+ */
 ONNXModel::~ONNXModel() {
     Reset();
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Load and validate a descriptor-based ONNX classifier.
+ *
+ * @param path Path to the ONNX model file.
+ * @param descriptors Ordered model input descriptors; metadata may replace them.
+ * @param configuration Audio and descriptor dimensions used to prepare and validate model inputs.
+ *
+ * @return True if the model is ready or the same path is already loaded; false on validation or loading failure.
+ *
+ * @note Reads metadata, checks opsets and labels, sizes input storage, and selects compatible tensors.
+ * @warning A different path resets the previous model before validation. Reloading the same path skips
+ * configuration changes.
+ */
 bool ONNXModel::Load(const std::filesystem::path &path, std::vector<Descriptors> descriptors,
                      const Configuration &configuration) {
     if (m_ModelLoaded && m_ModelPath == path) {
@@ -64,6 +90,15 @@ bool ONNXModel::Load(const std::filesystem::path &path, std::vector<Descriptors>
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Run classifier inference on an audio description.
+ *
+ * @param description Audio frame containing input descriptors and receiving label evidence.
+ *
+ * @note Flattens descriptors in model order and maps numeric output values to labels; clears ONNX results if
+ * unavailable.
+ * @warning Descriptor arrays must match the dimensions recorded at load time; serialize with Load() and Reset().
+ */
 void ONNXModel::Execute(Description &description) {
     if (!m_ModelLoaded || m_InputTensor == nullptr || m_OutputTensor == nullptr) {
         description.ONNX.clear();
@@ -107,6 +142,12 @@ void ONNXModel::Execute(Description &description) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Release the ONNX context and clear model configuration.
+ *
+ * @note Clears tensor pointers, descriptors, labels, model path, and flattened input storage.
+ * @warning Invalidates tensor pointers and elements referenced through the model descriptor or label containers.
+ */
 void ONNXModel::Reset() {
     if (m_Context != nullptr) {
         onnx_context_free(m_Context);
@@ -124,21 +165,55 @@ void ONNXModel::Reset() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Check whether model loading and validation completed.
+ *
+ * @return True if the model is ready; false otherwise.
+ *
+ * @note The flag is set only after descriptor storage and tensors are prepared.
+ */
 bool ONNXModel::IsLoaded() const {
     return m_ModelLoaded;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Access the loaded classifier label list.
+ *
+ * @return Const reference to the class labels.
+ *
+ * @note Returns model-owned storage without copying.
+ * @warning Reset() or loading a different model clears the contents and invalidates references to its elements.
+ */
 const std::vector<std::string> &ONNXModel::GetLabels() const {
     return m_Labels;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Access the ordered model input descriptor list.
+ *
+ * @return Const reference to the model input descriptors.
+ *
+ * @note The order determines how Execute() flattens each frame.
+ * @warning Reset() or loading a different model clears the contents and invalidates references to its elements.
+ */
 const std::vector<Descriptors> &ONNXModel::GetDescriptors() const {
     return m_Descriptors;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read OpenScofo training configuration, descriptor, and label metadata.
+ *
+ * @param descriptors Ordered model input descriptors; metadata may replace them.
+ * @param configuration Audio and descriptor dimensions used to prepare and validate model inputs.
+ * @param metadataLabels Output label list parsed from metadata when available.
+ *
+ * @note Valid descriptor metadata overrides caller inputs; mismatched training dimensions are logged as warnings.
+ * @warning Requires an allocated model context; malformed metadata falls back to caller descriptors or classifier
+ * labels.
+ */
 void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Configuration &configuration,
                              std::vector<std::string> &metadataLabels) {
 
@@ -179,6 +254,13 @@ void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Config
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Check that every graph node uses a supported opset.
+ *
+ * @return True when the graph exists and all opsets are supported; false otherwise.
+ *
+ * @note Rejects missing graphs and opsets newer than CurrentOpset with an error log.
+ */
 bool ONNXModel::ValidateOpsets() const {
     if (m_Context == nullptr || m_Context->g == nullptr) {
         spdlog::error("ONNX graph not found");
@@ -198,6 +280,16 @@ bool ONNXModel::ValidateOpsets() const {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Collect classifier labels from metadata or graph attributes.
+ *
+ * @param metadataLabels Class labels parsed from model metadata.
+ *
+ * @return True if a TreeEnsembleClassifier and a nonempty label list are found; false otherwise.
+ *
+ * @note Metadata labels take precedence over classlabels_strings attributes.
+ * @warning Requires an allocated graph; classifiers without string labels or supported metadata are rejected.
+ */
 bool ONNXModel::ReadLabelsFromModel(const std::vector<std::string> &metadataLabels) {
     bool classifierFound = false;
     struct onnx_graph_t *graph = m_Context->g;
@@ -244,6 +336,15 @@ bool ONNXModel::ReadLabelsFromModel(const std::vector<std::string> &metadataLabe
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Calculate model input width and allocate the flattened descriptor buffer.
+ *
+ * @param configuration Audio and descriptor dimensions used to prepare and validate model inputs.
+ *
+ * @return True when at least one input value is selected; false otherwise.
+ *
+ * @note Expands vector descriptors using configuration dimensions and ignores ONNX and INVALID entries.
+ */
 bool ONNXModel::PrepareDescriptorBuffer(const Configuration &configuration) {
     m_MFCCCount = configuration.MFCCCount;
     m_MFCCMels = configuration.MFCCMels;
@@ -276,6 +377,14 @@ bool ONNXModel::PrepareDescriptorBuffer(const Configuration &configuration) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Select numeric model input and probability-output tensors.
+ *
+ * @return True if both matching tensors are found; false otherwise.
+ *
+ * @note Matches input width to descriptor count and output width to label count using graph tensor names.
+ * @warning Requires model context, labels, and descriptor dimensions.
+ */
 bool ONNXModel::FindTensors() {
     Onnx__GraphProto *graph = m_Context->model == nullptr ? nullptr : m_Context->model->graph;
     if (graph == nullptr) {
@@ -313,6 +422,16 @@ bool ONNXModel::FindTensors() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Append a scalar or vector descriptor to the flattened float input.
+ *
+ * @param descriptor Descriptor to append to the input buffer.
+ * @param description Audio frame supplying descriptor values.
+ * @param output Writable float cursor, advanced past the appended descriptor values.
+ *
+ * @note Advances the caller cursor for every written value; ONNX and invalid descriptors add no values.
+ * @warning The cursor must have enough writable space and source arrays must match the recorded model dimensions.
+ */
 void ONNXModel::WriteDescriptor(Descriptors descriptor, const Description &description, float *&output) const {
     if (descriptor == MFCC) {
         for (int i = 0; i < m_MFCCCount; ++i) {
@@ -393,6 +512,14 @@ void ONNXModel::WriteDescriptor(Descriptors descriptor, const Description &descr
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Advance a text cursor past whitespace.
+ *
+ * @param text Source text to inspect.
+ * @param position Current text offset, advanced as characters are consumed.
+ *
+ * @note Stops at the first non-whitespace character or the end of the view.
+ */
 void ONNXModel::SkipWhitespace(std::string_view text, std::size_t &position) {
     while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position]))) {
         ++position;
@@ -400,6 +527,19 @@ void ONNXModel::SkipWhitespace(std::string_view text, std::size_t &position) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse a quoted JSON string at the current cursor.
+ *
+ * @param text Source text to inspect.
+ * @param position Current text offset, advanced as characters are consumed.
+ * @param output Decoded string output.
+ *
+ * @return True if a closing quote is found and all escapes are supported; false otherwise.
+ *
+ * @note Supports standard single-character escapes and skips leading whitespace.
+ * @warning Unicode escape sequences are unsupported; failed parsing may advance the cursor and leave partial
+ * output.
+ */
 bool ONNXModel::ParseJsonString(std::string_view text, std::size_t &position, std::string &output) {
     SkipWhitespace(text, position);
     if (position >= text.size() || text[position] != '"') {
@@ -443,6 +583,17 @@ bool ONNXModel::ParseJsonString(std::string_view text, std::size_t &position, st
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse metadata as an array of quoted strings.
+ *
+ * @param metadata Null-terminated metadata text, or null when the entry is absent.
+ * @param output Output list of decoded string values.
+ *
+ * @return True if the entire array is accepted; false for missing or malformed metadata.
+ *
+ * @note Clears the output initially and requires the complete text, apart from whitespace, to form an array.
+ * @warning Failed parsing can leave parsed elements when trailing text follows a closing bracket.
+ */
 bool ONNXModel::ParseJsonStringArray(const char *metadata, std::vector<std::string> &output) {
     output.clear();
     if (metadata == nullptr) {
@@ -494,6 +645,16 @@ bool ONNXModel::ParseJsonStringArray(const char *metadata, std::vector<std::stri
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse an integer metadata value after trimming whitespace.
+ *
+ * @param metadata Null-terminated metadata text, or null when the entry is absent.
+ * @param output Integer output, unchanged on failure.
+ *
+ * @return True for a valid in-range integer; false for missing or malformed metadata.
+ *
+ * @note Uses std::from_chars() and updates output only when the complete trimmed value parses.
+ */
 bool ONNXModel::ParseIntMetadata(const char *metadata, int &output) {
     if (metadata == nullptr) {
         return false;
@@ -522,6 +683,15 @@ bool ONNXModel::ParseIntMetadata(const char *metadata, int &output) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Map a metadata descriptor name to its enum.
+ *
+ * @param name Descriptor identifier stored in model metadata.
+ *
+ * @return Matching descriptor enum, or INVALID for an unknown name.
+ *
+ * @note Accepts supported canonical names and aliases without case conversion.
+ */
 Descriptors ONNXModel::DescriptorFromMetadataName(std::string_view name) {
     if (name == "mfcc")
         return MFCC;
@@ -591,6 +761,16 @@ Descriptors ONNXModel::DescriptorFromMetadataName(std::string_view name) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse an ordered descriptor-name array from metadata.
+ *
+ * @param metadata Null-terminated metadata text, or null when the entry is absent.
+ * @param output Output descriptors in metadata order; unchanged if array parsing fails, cleared for unknown names.
+ *
+ * @return True when the string array parses and every name is recognized; false otherwise.
+ *
+ * @note Converts every name and rejects the entire selection when a name is unsupported.
+ */
 bool ONNXModel::ParseDescriptorMetadata(const char *metadata, std::vector<Descriptors> &output) {
     std::vector<std::string> names;
     if (!ParseJsonStringArray(metadata, names)) {
@@ -611,6 +791,15 @@ bool ONNXModel::ParseDescriptorMetadata(const char *metadata, std::vector<Descri
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Check whether a tensor contains float32 or float64 values.
+ *
+ * @param tensor Tensor pointer to inspect; may be null.
+ *
+ * @return True for a floating-point tensor; false otherwise.
+ *
+ * @note Null pointers and non-floating tensor types are rejected.
+ */
 bool ONNXModel::IsFloatTensor(const struct onnx_tensor_t *tensor) {
     return tensor != nullptr && (tensor->type == ONNX_TENSOR_TYPE_FLOAT32 || tensor->type == ONNX_TENSOR_TYPE_FLOAT64);
 }

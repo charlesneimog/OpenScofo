@@ -7,6 +7,14 @@
     See the LICENSE file for details.
 */
 
+/**
+ * @file score.cpp
+ * @brief Tree-sitter score parsing, event construction, and action extraction.
+ *
+ * @note Builds internal score states, section boundaries, timing metadata, and global Lua source.
+ * @warning Parsing mutates the score object and logs recoverable syntax errors; serialize access to parser state.
+ */
+
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
@@ -20,6 +28,14 @@ namespace OpenScofo {
 extern "C" TSLanguage *tree_sitter_openscofo();
 
 // ─────────────────────────────────────
+/**
+ * @brief Print a syntax subtree recursively for debugging.
+ *
+ * @param node Tree-sitter node to inspect in the current score tree.
+ * @param indent Initial indentation width in spaces.
+ *
+ * @note Indents child nodes by four additional spaces and omits printing the root when indent is zero.
+ */
 void Score::PrintTreeSitterNode(TSNode node, int indent) {
     const char *type = ts_node_type(node);
     std::string text = ts_node_string(node);
@@ -33,6 +49,16 @@ void Score::PrintTreeSitterNode(TSNode node, int indent) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Find a child node by its Tree-sitter field name.
+ *
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ * @param s Tree-sitter field name to look up.
+ *
+ * @return Matching field node, or a null node if the field is absent.
+ *
+ * @note Delegates to ts_node_child_by_field_name().
+ */
 TSNode Score::GetField(TSNode Node, std::string s) {
     int strLen = s.length();
     TSNode field = ts_node_child_by_field_name(Node, s.c_str(), strLen);
@@ -40,16 +66,40 @@ TSNode Score::GetField(TSNode Node, std::string s) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Copy the Lua source collected from global score blocks.
+ *
+ * @return Collected global Lua source.
+ *
+ * @note The source is accumulated during Parse() and is not executed by the parser.
+ */
 std::string Score::GetLuaCode() {
     return m_LuaCode;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the parser loaded flag.
+ *
+ * @return True if the stored loaded flag is set; false otherwise.
+ *
+ * @note Set when Parse() reaches its final return; does not independently validate runtime readiness.
+ * @warning The flag does not guarantee an error-free score and is not reset at the start of a subsequent parse.
+ */
 bool Score::ScoreIsLoaded() {
     return m_ScoreLoaded;
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Check whether text is a complete floating-point literal.
+ *
+ * @param str Text to validate as a complete floating-point number.
+ *
+ * @return True if the complete text parses as float; false otherwise.
+ *
+ * @note Uses std::from_chars() and rejects empty text or trailing unparsed characters.
+ */
 bool Score::isNumber(const std::string &str) {
     if (str.empty()) {
         return false;
@@ -63,6 +113,16 @@ bool Score::isNumber(const std::string &str) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Decode a pitch node into frequency and MIDI pitch.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param node Tree-sitter node to inspect in the current score tree.
+ * @param State Audio observation receiving the decoded pitch and MIDI value.
+ *
+ * @note Applies configured A4 tuning and transposition to MIDI values or note names with accidentals.
+ * @warning Node offsets must correspond to ScoreStr; invalid pitches are logged and may leave the output unchanged.
+ */
 void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation &State) {
     TSNode pitch = node;
     std::string type = ts_node_type(pitch);
@@ -170,6 +230,15 @@ void Score::PitchNode2Freq(const std::string ScoreStr, TSNode node, Observation 
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Wrap an event phase to the centered unit interval.
+ *
+ * @param Phase Phase in cycles.
+ *
+ * @return Wrapped phase in [-0.5, 0.5).
+ *
+ * @note Preserves phase equivalence modulo one cycle.
+ */
 double Score::ModPhases(double Phase) {
     Phase = std::fmod(Phase + 0.5, 1.0);
     if (Phase < 0.0) {
@@ -181,6 +250,17 @@ double Score::ModPhases(double Phase) {
 // ╭─────────────────────────────────────╮
 // │       Parse File of the Score       │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Copy the source text covered by a syntax node.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Source substring covered by Node.
+ *
+ * @note Uses Tree-sitter start and end byte offsets to select the text.
+ * @warning Node must be valid and its byte range must lie within ScoreStr.
+ */
 std::string Score::GetCodeStr(const std::string &ScoreStr, TSNode Node) {
     int start = ts_node_start_byte(Node);
     int end = ts_node_end_byte(Node);
@@ -188,6 +268,17 @@ std::string Score::GetCodeStr(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read an event duration from a numeric syntax node.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Parsed duration in beats, or zero for an unsupported node structure.
+ *
+ * @note Accepts a number directly or as the sole child; logs unsupported structures.
+ * @warning Numeric conversion can throw for malformed or out-of-range text.
+ */
 double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
     std::string dur_type = ts_node_type(Node);
     if (dur_type == "number") {
@@ -211,6 +302,14 @@ double Score::GetDurationFromNode(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Insert an optional inter-event silence state when applicable.
+ *
+ * @param Next Next musical event, used to decide and time an optional silence state.
+ *
+ * @note Adds a zero-beat Markov REST after supported sounded events in the same section, preserving public score
+ * position.
+ */
 void Score::AddDummySilence(const ScoreState &Next) {
     if (m_ScoreStates.empty() || Next.Type == REST || Next.Type == FIRSTEVENT) {
         return;
@@ -245,6 +344,13 @@ void Score::AddDummySilence(const ScoreState &Next) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct an initial silence boundary state.
+ *
+ * @return Initial boundary state with one silence observation.
+ *
+ * @note Creates a zero-duration Markov FIRSTEVENT; timing and section metadata are assigned separately.
+ */
 ScoreState Score::GetFirstEvent() {
     ScoreState Event;
     Event.HSMMType = MARKOV;
@@ -265,6 +371,17 @@ ScoreState Score::GetFirstEvent() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a NOTE event from a syntax node.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed note event, or a default state for an invalid structure or pitch.
+ *
+ * @note Advances public score numbering, converts pitch, reads duration, and applies event timing.
+ * @warning Requires source-matched nodes; failed construction can still advance the parser score position.
+ */
 ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -328,6 +445,16 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a CHORD event from its pitch list and duration.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed chord event, or a default state for invalid structure or pitches.
+ *
+ * @note Advances public score numbering and places simultaneous pitch observations in one event.
+ */
 ScoreState Score::NewChordEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -367,6 +494,16 @@ ScoreState Score::NewChordEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a TRILL event with unordered pitch alternatives.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed trill event, or a default state for invalid structure or pitches.
+ *
+ * @note Creates one microstate per listed pitch and applies the parent duration and timing.
+ */
 ScoreState Score::NewTrillEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -408,6 +545,16 @@ ScoreState Score::NewTrillEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a GLISS event as an ordered pitch microstate chain.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed glissando event, or a default state for invalid structure or pitches.
+ *
+ * @note Interpolates intermediate pitches in half-semitone steps and skips duplicate adjacent endpoints.
+ */
 ScoreState Score::NewMultiEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -469,6 +616,16 @@ ScoreState Score::NewMultiEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a pitched extended-technique event.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed PTECH event, or a default state for invalid syntax, missing labels, or invalid pitch.
+ *
+ * @note Creates unordered technique-label and pitch alternatives with a shared parent duration.
+ */
 ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -543,6 +700,16 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct an unpitched extended-technique event.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed UTECH event, or a default state for invalid syntax or missing technique labels.
+ *
+ * @note Groups alternative technique labels in a single unordered microstate.
+ */
 ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
     m_ScorePosition++;
 
@@ -605,6 +772,18 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Construct a REST event without advancing public score numbering.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @return Constructed rest event, or a default state for an initial rest or invalid syntax.
+ *
+ * @note Uses a silence observation and semi-Markov duration.
+ * @warning Leading rests and their actions are skipped because they cannot be distinguished from pre-performance
+ * silence.
+ */
 ScoreState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
     if (m_ScorePosition == 0) {
         spdlog::warn("OpenScofo cannot detect the start of a piece when the first events are REST. "
@@ -647,6 +826,14 @@ ScoreState Score::NewRestEvent(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Assign section, expected onset, phase, and tempo to an event.
+ *
+ * @param Event Score event to populate or extend in place.
+ *
+ * @note Continues timing from the preceding state within a section and starts a new section at onset zero.
+ * @warning Event.Index must identify the next insertion point or another valid predecessor position.
+ */
 void Score::ProcessEventTime(ScoreState &Event) {
     Event.Section = m_CurrentSection;
 
@@ -679,6 +866,14 @@ void Score::ProcessEventTime(ScoreState &Event) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Record a section declaration and defer creation of its boundary.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ *
+ * @note Removes surrounding quotes and can attach the first section name to an existing leading boundary state.
+ */
 void Score::NewSection(const std::string &ScoreStr, TSNode Node) {
     TSNode NameNode = GetField(Node, "name");
     TSPoint Position = ts_node_start_point(Node);
@@ -718,6 +913,14 @@ void Score::NewSection(const std::string &ScoreStr, TSNode Node) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Create or refresh a pending section boundary before its first event.
+ *
+ * @param EventNode First event node of a pending section, used for source-line metadata.
+ * @param Config Score configuration to read or update.
+ *
+ * @note Copies the current tempo, tolerance, and synchronization configuration to a FIRSTEVENT state.
+ */
 void Score::EnsureSectionStart(TSNode EventNode, Configuration &Config) {
     if (!m_SectionStartPending) {
         return;
@@ -746,6 +949,17 @@ void Score::EnsureSectionStart(TSNode EventNode, Configuration &Config) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read child source text by field name or fallback node type.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param node Tree-sitter node to inspect in the current score tree.
+ * @param id Field name, fallback node type, or configuration key.
+ *
+ * @return Matching child text, or an empty string if no child matches.
+ *
+ * @note Tries a named field first, then inspects direct children for a matching type.
+ */
 std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode node, std::string id) {
     TSNode field = ts_node_child_by_field_name(node, id.c_str(), id.length());
     if (!ts_node_is_null(field)) {
@@ -764,6 +978,16 @@ std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode n
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse, validate, and append a score event and its actions.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ * @param Config Score configuration to read or update.
+ *
+ * @note Dispatches by event type, resolves synchronization settings, and inserts eligible optional silence states.
+ * @warning Updates parser state incrementally; failed events can leave numbering or boundary changes in place.
+ */
 void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Config) {
     EnsureSectionStart(Node, Config);
     ScoreState Event;
@@ -864,6 +1088,17 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read the first direct named child of a specified type.
+ *
+ * @param source Complete source text corresponding to the parent node byte offsets.
+ * @param parent Parent node whose named children are inspected.
+ * @param wanted_type Named child node type to find.
+ *
+ * @return Matching child source text, or an empty string if no child matches.
+ *
+ * @note Ignores unnamed children and extracts text using the matched child byte range.
+ */
 std::string Score::GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
     uint32_t count = ts_node_child_count(parent);
     for (uint32_t i = 0; i < count; ++i) {
@@ -882,6 +1117,20 @@ std::string Score::GetChildStringFromType(const std::string &source, TSNode pare
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse a numeric configuration value.
+ *
+ * @param id Field name, fallback node type, or configuration key.
+ * @param valueType Tree-sitter type of the configuration value.
+ * @param value Source text of the configuration value.
+ * @param pos Source position used for diagnostics.
+ * @param out Numeric output assigned on success.
+ *
+ * @return True when the value is accepted and assigned; false for the wrong syntax type.
+ *
+ * @note Logs and rejects values whose syntax type is not number.
+ * @warning std::stod() can throw for malformed or out-of-range text.
+ */
 bool Score::GetConfigNumber(const std::string &id, const std::string &valueType, const std::string &value, TSPoint pos,
                             double &out) {
     if (valueType != "number") {
@@ -894,6 +1143,19 @@ bool Score::GetConfigNumber(const std::string &id, const std::string &valueType,
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Parse a boolean configuration value and supported aliases.
+ *
+ * @param id Field name, fallback node type, or configuration key.
+ * @param valueType Tree-sitter type of the configuration value.
+ * @param value Source text of the configuration value.
+ * @param pos Source position used for diagnostics.
+ * @param out Boolean output, unchanged on failure.
+ *
+ * @return True if a supported value was assigned; false otherwise.
+ *
+ * @note Accepts case-insensitive true/false, on/off, yes/no, and numeric 1/0.
+ */
 bool Score::GetConfigBool(const std::string &id, const std::string &valueType, std::string value, TSPoint pos,
                           bool &out) {
     if (valueType != "identifier" && valueType != "number") {
@@ -918,6 +1180,16 @@ bool Score::GetConfigBool(const std::string &id, const std::string &valueType, s
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Apply a parsed score configuration declaration.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param node Tree-sitter node to inspect in the current score tree.
+ * @param Config Score configuration to read or update.
+ *
+ * @note Validates supported keys, updates parser timing state, and resolves model paths relative to the score file.
+ * @warning Some settings mutate parser state or append boundaries; numeric conversions can throw.
+ */
 void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &Config) {
     TSNode keyNode = GetField(node, "key");
     TSNode valueNode = GetField(node, "value");
@@ -1189,6 +1461,16 @@ void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &C
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Extract timed Lua or receiver commands and append event actions.
+ *
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ * @param Event Score event to populate or extend in place.
+ *
+ * @note Stores absolute delays in milliseconds and tempo-relative delays in beats, preserving command arguments.
+ * @warning Numeric conversions can throw; a malformed command can leave earlier actions already appended.
+ */
 void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, ScoreState &Event) {
     ScoreAction BaseAction;
     BaseAction.AbsoluteTime = true;
@@ -1305,6 +1587,16 @@ void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, ScoreState 
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Log missing tokens and unexpected source text in a syntax tree.
+ *
+ * @param Node Tree-sitter node to inspect in the current score tree.
+ * @param ScoreStr Complete score source corresponding to the node byte offsets.
+ * @param InsideError Whether an ancestor is already an error node, suppressing duplicate recovery messages.
+ *
+ * @note Traverses recursively, avoiding duplicate nested error messages and shortening recovery text to 80
+ * characters.
+ */
 void Score::FindErrors(TSNode Node, const std::string &ScoreStr, bool InsideError) {
     if (ts_node_is_null(Node)) {
         return;
@@ -1345,6 +1637,17 @@ void Score::FindErrors(TSNode Node, const std::string &ScoreStr, bool InsideErro
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Heuristically classify a file as text from its leading bytes.
+ *
+ * @param path Path to the file whose leading bytes are inspected.
+ *
+ * @return True if the sample appears textual; false for unreadable or apparently binary files.
+ *
+ * @note Samples up to 4096 bytes, accepts empty files, and rejects null bytes or a suspicious-byte ratio of at
+ * least 5%.
+ * @warning This byte heuristic is not a Unicode-aware validator and can reject non-ASCII text.
+ */
 bool Score::ScoreIsText(const std::string &path) {
     std::ifstream file(path, std::ios::binary);
     if (!file)
@@ -1380,6 +1683,17 @@ bool Score::ScoreIsText(const std::string &path) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Read a score file and build its configuration and internal state vector.
+ *
+ * @param ScoreFilePath Path to the score file to parse.
+ *
+ * @return Parsed configuration and states; a default pair on missing files, read failure, or events before BPM.
+ *
+ * @note Collects global Lua blocks and processes configurations, sections, and events in source order.
+ * @warning Clears previous states and Lua source before loading; syntax errors can be logged while returning
+ * partial results.
+ */
 std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
     m_ScoreStates.clear();
     m_LuaCode.clear();

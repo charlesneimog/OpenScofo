@@ -7,6 +7,14 @@
     See the LICENSE file for details.
 */
 
+/**
+ * @file mir.cpp
+ * @brief Audio descriptor extraction, spectral analysis, and classifier integration.
+ *
+ * @note Computes core frame features and enables optional analysis stages according to requested descriptors.
+ * @warning Analysis uses mutable FFT buffers and feature history; serialize processing and reconfiguration.
+ */
+
 #include "mir.hpp"
 #include <algorithm>
 #include <limits>
@@ -17,6 +25,12 @@ namespace OpenScofo {
 // ╭─────────────────────────────────────╮
 // │Constructor and Destructor Functions │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Release FFT and onset-detector resources.
+ *
+ * @note Destroys the FFT setup and frees its aligned buffers and onset storage.
+ * @warning Do not destroy the extractor while another thread is using its resources.
+ */
 MIR::~MIR() {
     if (m_FullFFTSetup != nullptr) {
         pffft_destroy_setup(m_FullFFTSetup);
@@ -47,6 +61,15 @@ MIR::~MIR() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Rebuild audio analysis resources for a configuration.
+ *
+ * @param Config Configuration containing audio dimensions and requested descriptor settings.
+ *
+ * @note Resets spectral history and initializes requested optional descriptors and loudness filters.
+ * @warning FFT sizes below 512 are rejected. Use a PFFFT-supported size and positive sample rate; serialize
+ * processing.
+ */
 void MIR::UpdateConfiguration(const Configuration &Config) {
     m_Config = Config;
     UpdateDescriptorFlags();
@@ -100,12 +123,26 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Check whether a descriptor was explicitly requested.
+ *
+ * @param Descriptor Descriptor enum to search for in the request list.
+ *
+ * @return True if the descriptor is present in the request list; false otherwise.
+ *
+ * @note Searches the configured request list without expanding feature dependencies.
+ */
 bool MIR::DescriptorRequested(Descriptors Descriptor) const {
     return std::find(m_Config.RequestedDescriptors.begin(), m_Config.RequestedDescriptors.end(), Descriptor) !=
            m_Config.RequestedDescriptors.end();
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Resolve which optional analysis stages are required.
+ *
+ * @note Includes dependencies of extended-technique analysis and the loaded ONNX model when ONNX is requested.
+ */
 void MIR::UpdateDescriptorFlags() {
     m_NeedYIN =
         DescriptorRequested(YIN) || DescriptorRequested(YINCONFIDENCE) || DescriptorRequested(EXTENDEDTECHNIQUE);
@@ -154,6 +191,12 @@ void MIR::UpdateDescriptorFlags() {
 // ╭─────────────────────────────────────╮
 // │          Set|Get Functions          │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Allocate a real FFT setup and its aligned working buffers.
+ *
+ * @note Precomputes a periodic Hann window and reports allocation failures as critical logs.
+ * @warning Requires a supported configured FFT size and previously released FFT resources.
+ */
 void MIR::FFTInit() {
     const size_t fftSize = static_cast<size_t>(m_Config.FFTSize);
     m_FullFFTSetup = pffft_new_setup(static_cast<int>(fftSize), PFFFT_REAL);
@@ -194,6 +237,16 @@ void MIR::FFTInit() {
 // ╭─────────────────────────────────────╮
 // │          Machine Learning           │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Load a classifier and initialize its audio feature dependencies.
+ *
+ * @param path Path to an ONNX classifier file.
+ * @param Descriptors Ordered model input descriptors.
+ *
+ * @note Returns early when loading fails; successful loading refreshes flags and required optional analysis
+ * resources.
+ * @warning Model loading and feature initialization can allocate memory; serialize with processing.
+ */
 void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
     if (!m_ONNXModel.Load(path, std::move(Descriptors), m_Config)) {
         return;
@@ -218,6 +271,13 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Copy the class labels of the loaded ONNX model.
+ *
+ * @return Copy of the classifier labels.
+ *
+ * @note Delegates to the model label list; an unloaded model has no labels.
+ */
 std::vector<std::string> MIR::GetONNXLabels() {
     return m_ONNXModel.GetLabels();
 }
@@ -225,6 +285,11 @@ std::vector<std::string> MIR::GetONNXLabels() {
 // ╭─────────────────────────────────────╮
 // │           Onset Detector            │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Allocate and initialize the onset detector.
+ *
+ * @note Replaces existing detector storage and prepares an interleaved complex FFT frame for OnsetsDS.
+ */
 void MIR::OnsetInit() {
     m_OnsetInit = false;
 
@@ -248,6 +313,14 @@ void MIR::OnsetInit() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Update onset evidence from the current FFT output.
+ *
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Converts PFFFT output to the OnsetsDS format and stores its postprocessed detection-function value.
+ * @warning Requires a current FFT frame; returns without updating Desc if the detector is not initialized.
+ */
 void MIR::OnsetExec(Description &Desc) {
     if (!m_OnsetInit)
         return;
@@ -279,6 +352,14 @@ void MIR::OnsetExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │        Percussive Technique         │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Estimate extended-technique evidence from flux and pitch confidence.
+ *
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Applies a sigmoid to spectral flux weighted by the complement of pitch confidence.
+ * @warning Compute spectral flux and YIN pitch confidence before calling this stage.
+ */
 void MIR::ExtendedTechExec(Description &Desc) {
     // Desc.ExtendedTechProb = (1.0f - Desc.Harmonicity);
     Desc.ExtendedTechProb = Desc.SpectralFlux;
@@ -295,6 +376,12 @@ void MIR::ExtendedTechExec(Description &Desc) {
 // │         Power and Amplitude         │
 // ╰─────────────────────────────────────╯
 // Check https://github.com/klangfreund/LUFSMeter (use MIT)
+/**
+ * @brief Adapt the two loudness-weighting filter stages to the sample rate.
+ *
+ * @note Derives shelving and high-pass coefficients from the stored 48 kHz reference coefficients.
+ * @warning Requires a positive configured sample rate.
+ */
 void MIR::InitITURFilters() {
     // Stage 1: shelving filter
     double KoverQ1 = (2.0 - 2.0 * m_48kA1[2]) / (m_48kA1[2] - m_48kA1[1] + 1.0);
@@ -336,6 +423,15 @@ void MIR::InitITURFilters() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Compute RMS, decibel level, weighted loudness, and silence evidence.
+ *
+ * @param In Input audio frame containing the configured FFT window samples.
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Resets filter delay values for each frame and floors silent decibel and loudness values to -100.
+ * @warning In must be nonempty and loudness filter coefficients must be initialized.
+ */
 void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
     double x1_1 = 0.0, x2_1 = 0.0;
     double y1_1 = 0.0, y2_1 = 0.0;
@@ -388,6 +484,11 @@ void MIR::GetSignalPower(const std::vector<double> &In, Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │                Pitch                │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Allocate YIN difference and normalization scratch arrays.
+ *
+ * @note Sizes the arrays from half the configured FFT window plus interpolation padding.
+ */
 void MIR::YINInit() {
     const size_t frameSize = static_cast<size_t>(std::max(2.0f, m_Config.FFTSize));
     const size_t half = frameSize / 2;
@@ -397,6 +498,16 @@ void MIR::YINInit() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Estimate fundamental frequency and confidence using YIN.
+ *
+ * @param In Input audio frame containing the configured FFT window samples.
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Uses a normalized difference function and parabolic refinement; unusable estimates produce zero pitch and
+ * confidence.
+ * @warning Initialize YIN scratch arrays and use a positive sample rate and valid positive frequency bounds.
+ */
 void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
 
@@ -553,6 +664,17 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │              SPECTRAL               │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Finalize scalar spectral features from accumulated moments.
+ *
+ * @param Desc Audio description to populate or update in place.
+ * @param acc Spectral sums and moments accumulated over the current FFT bins.
+ * @param NHalf Number of nonnegative-frequency bins, including DC and Nyquist.
+ *
+ * @note Updates centroid history, spread, shape, irregularity, crest, flatness, harmonicity, and high-frequency
+ * ratio.
+ * @warning NHalf must be positive and the accumulators must describe the current frame.
+ */
 void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &acc, size_t NHalf) {
     Desc.SpectralFlux = std::sqrt(Desc.SpectralFlux);
 
@@ -613,6 +735,14 @@ void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &a
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Transform the windowed input and compute spectral descriptors.
+ *
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Produces magnitude, power, normalized spectra, and scalar features while updating inter-frame flux history.
+ * @warning Requires initialized FFT resources and descriptor arrays sized to FFTSize / 2 + 1.
+ */
 void MIR::GetSpectralDescriptions(Description &Desc) {
     const int NHalf = m_Config.FFTSize / 2 + 1;
     const double binWidth = static_cast<double>(m_Config.SR) / static_cast<double>(m_Config.FFTSize);
@@ -785,6 +915,12 @@ void MIR::GetSpectralDescriptions(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │                MFCC                 │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Precompute the mel filterbank and orthonormal DCT-II basis.
+ *
+ * @note Uses Slaney mel spacing and area normalization, recording active FFT bin ranges for each filter.
+ * @warning Requires positive sample rate, FFT size, mel count, and MFCC count.
+ */
 void MIR::MFCCInit() {
     const int FFTSize = m_Config.FFTSize;
     const int NumBins = FFTSize / 2 + 1;
@@ -886,6 +1022,14 @@ void MIR::MFCCInit() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Compute log-mel energies and MFCC coefficients from the power spectrum.
+ *
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Floors mel power at 1e-10, clips log-mel values to an 80 dB range, and applies the precomputed DCT-II.
+ * @warning Initialize the filterbank and size Power, LogMelSpectrum, and MFCC arrays before calling.
+ */
 void MIR::MFCCExec(Description &Desc) {
     constexpr double kAmin = 1e-10;
     constexpr double kTopDb = 80.0;
@@ -931,12 +1075,35 @@ void MIR::MFCCExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │               Chroma                │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Convert frequency to octaves relative to the adjusted A4 reference.
+ *
+ * @param frequency Positive frequency in Hz.
+ * @param tuning Tuning offset measured in chroma bins.
+ * @param binsPerOctave Positive number of chroma bins per octave.
+ *
+ * @return Octave coordinate relative to adjusted A4 / 16.
+ *
+ * @note Uses configured A4 tuning and a chroma-bin tuning offset.
+ * @warning Frequency, A4 tuning, and binsPerOctave must be positive.
+ */
 double MIR::HzToOcts(double frequency, double tuning, int binsPerOctave) const {
     const double a440 = m_Config.TuningA4 * std::pow(2.0, tuning / static_cast<double>(binsPerOctave));
     return std::log2(frequency / (a440 / 16.0));
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Wrap a value to a nonnegative remainder.
+ *
+ * @param value Value to wrap.
+ * @param modulus Positive period of the remainder.
+ *
+ * @return Remainder in [0, modulus).
+ *
+ * @note Adds the modulus when std::fmod() returns a negative value.
+ * @warning The modulus must be positive.
+ */
 double MIR::PositiveRemainder(double value, double modulus) const {
     double result = std::fmod(value, modulus);
     if (result < 0.0) {
@@ -946,6 +1113,12 @@ double MIR::PositiveRemainder(double value, double modulus) const {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Build the tuned spectral chroma filterbank.
+ *
+ * @note Normalizes frequency columns, applies octave weighting, and rotates the pitch-class origin toward C.
+ * @warning Requires positive chroma dimensions and octave width and an FFT window with at least two samples.
+ */
 void MIR::SpectralChromaInit() {
     const size_t nHalf = m_Config.FFTSize / 2 + 1;
     m_ChromaFilter.assign(m_Config.ChromaSize, std::vector<double>(nHalf, 0.0));
@@ -1010,6 +1183,14 @@ void MIR::SpectralChromaInit() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Project power-spectrum bins onto the chroma filterbank.
+ *
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Clears the output and accumulates unnormalized energy for each chroma bin.
+ * @warning Requires an initialized nonempty filterbank and a Chroma array sized to the configured chroma count.
+ */
 void MIR::SpectralChromaExec(Description &Desc) {
     std::fill(Desc.Chroma.begin(), Desc.Chroma.end(), 0.0);
     const size_t nHalf = std::min(Desc.Power.size(), m_ChromaFilter[0].size());
@@ -1027,6 +1208,11 @@ void MIR::SpectralChromaExec(Description &Desc) {
 // ╭─────────────────────────────────────╮
 // │         Zero Crossing Rate          │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Allocate scratch storage for zero-crossing analysis.
+ *
+ * @note Reserves extra edge-padding space when centered analysis is enabled.
+ */
 void MIR::ZeroCrossingRateInit() {
     const size_t frame = static_cast<size_t>(std::max(1.0f, m_Config.FFTSize));
     const size_t pad = m_Config.ZCRCenter ? (frame / 2) : 0;
@@ -1034,6 +1220,15 @@ void MIR::ZeroCrossingRateInit() {
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Compute the configured zero-crossing rate.
+ *
+ * @param In Input audio frame containing the configured FFT window samples.
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Applies threshold, zero-sign, padding, and centering options and divides the crossing count by FFTSize.
+ * @warning Requires a nonempty full-sized input frame and initialized scratch storage when centering is enabled.
+ */
 void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc) {
     const double *yData = nullptr;
     if (m_Config.ZCRCenter) {
@@ -1092,6 +1287,15 @@ void MIR::ZeroCrossingRateExec(const std::vector<double> &In, Description &Desc)
 }
 
 // ─────────────────────────────────────
+/**
+ * @brief Clear the reverberation spectrum used by pitch evidence.
+ *
+ * @param Desc Audio description to populate or update in place.
+ * @param decay Reserved reverberation decay parameter; currently ignored.
+ *
+ * @note Reverberation accumulation is currently disabled; the decay argument is ignored.
+ * @warning ReverbSpectralPower must cover every bin in SpectralMagnitudeFrameNorm.
+ */
 void MIR::AddReverb(Description &Desc, double decay) {
     (void)decay;
     for (size_t i = 0; i < Desc.SpectralMagnitudeFrameNorm.size(); i++) {
@@ -1103,6 +1307,16 @@ void MIR::AddReverb(Description &Desc, double decay) {
 // ╭─────────────────────────────────────╮
 // │            Main Function            │
 // ╰─────────────────────────────────────╯
+/**
+ * @brief Analyze an audio frame and update its requested descriptors.
+ *
+ * @param In Input audio frame containing the configured FFT window samples.
+ * @param Desc Audio description to populate or update in place.
+ *
+ * @note Always computes signal power and spectral features, then runs enabled optional stages and ONNX inference.
+ * @warning Requires initialized processing resources, a full FFT window, and descriptor arrays matching
+ * configuration.
+ */
 void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     // 1. Temporal Domain
     GetSignalPower(In, Desc);
