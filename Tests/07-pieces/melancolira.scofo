@@ -1,0 +1,18 @@
+BPM 60
+
+// Measure 1
+NOTE G+4 3 @percussive
+
+// Measure 2
+NOTE A6 0.5 @percussive
+NOTE G4 4 @percussive
+
+// Measure 3
+NOTE G+4 3
+
+// Measure 4
+NOTE G#6 1
+NOTE G4 4
+
+// Measure 5
+TRILL (B3 B-3) 1

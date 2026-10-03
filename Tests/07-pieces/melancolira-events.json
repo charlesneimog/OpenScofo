@@ -1,0 +1,30 @@
+{
+  "audio": "Melancolira.wav",
+  "duration_seconds": 225.341187,
+  "events": [
+    {
+      "event": 1,
+      "timestamp_seconds": 0.034296
+    },
+    {
+      "event": 2,
+      "timestamp_seconds": 3.656608
+    },
+    {
+      "event": 3,
+      "timestamp_seconds": 4.329986
+    },
+    {
+      "event": 4,
+      "timestamp_seconds": 9.806992
+    },
+    {
+      "event": 5,
+      "timestamp_seconds": 13.568625
+    },
+    {
+      "event": 6,
+      "timestamp_seconds": 15.060507
+    }
+  ]
+}
