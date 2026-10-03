@@ -11,13 +11,19 @@ tags:
   .md-content__button {
     display: none;
   }
+
+  @media (max-width: 767px) {
+    .md-typeset .home-logo {
+      width: 40%;
+    }
+  }
 </style>
 
 # OpenScofo
 
 <p align="center" markdown>
-  ![OpenScofo logo](./assets/logo.svg#only-light){ width="15%" }
-  ![OpenScofo logo](./assets/logo-dark.svg#only-dark){ width="15%" }
+  ![OpenScofo logo](./assets/logo.svg#only-light){ .home-logo width="15%" }
+  ![OpenScofo logo](./assets/logo-dark.svg#only-dark){ .home-logo width="15%" }
 </p>
 
 <h4 latex="false" align="center"><i>Score following for contemporary music.</i></h4>
@@ -86,4 +92,3 @@ tags:
 <release latex="false" interface="All"><i>Loading Releases</i></release>
 
 See also: [Computer Actions](../score/actions/#examples).
-
