@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <limits>
 #include <string>
 #include <vector>
 #include <variant>
@@ -128,13 +129,15 @@ enum MicroTopology { NO_MICROSTATES, UNORDERED, LEFT_RIGHT };
 
 struct MarkovMicroState {
     std::vector<Observation> Observations;
-    double DurationWeight = 1.0;
 
     // Runtime. UNORDERED states only use the current emission and its winner.
     double CurrentEmission = 0.0;
     int BestObservationIndex = -1;
-    // LEFT_RIGHT log(alpha[u][k]), scaled by the score-level normalization.
-    // Age zero is unused; -numeric_limits<double>::max() denotes zero probability.
+    // LEFT_RIGHT: log of the summed observation weights of monotonic paths
+    // ending in this microstate for a parent segment of age u. Each history
+    // carries the shared score-level normalization. Dividing by C(u, K)
+    // gives this endpoint's contribution to the conditional segment likelihood.
+    // Age zero is unused; -numeric_limits<double>::max() denotes zero weight.
     std::vector<double> LogForwardByAge;
 };
 

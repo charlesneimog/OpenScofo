@@ -172,8 +172,7 @@ NB_MODULE(_OpenScofo, m) {
 
     nb::class_<OpenScofo::MarkovMicroState>(m, "MarkovMicroState")
         .def(nb::init<>())
-        .def_rw("observations", &OpenScofo::MarkovMicroState::Observations)
-        .def_rw("duration_weight", &OpenScofo::MarkovMicroState::DurationWeight);
+        .def_rw("observations", &OpenScofo::MarkovMicroState::Observations);
 
     // Description Class
     nb::class_<OpenScofo::Description>(m, "Description")

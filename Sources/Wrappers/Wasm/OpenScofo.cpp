@@ -69,8 +69,7 @@ EMSCRIPTEN_BINDINGS(OpenScofo_module) {
     register_vector<OpenScofo::Observation>("VectorObservation");
     class_<OpenScofo::MarkovMicroState>("MarkovMicroState")
         .constructor<>()
-        .property("observations", &OpenScofo::MarkovMicroState::Observations)
-        .property("duration_weight", &OpenScofo::MarkovMicroState::DurationWeight);
+        .property("observations", &OpenScofo::MarkovMicroState::Observations);
     register_vector<OpenScofo::MarkovMicroState>("VectorMarkovMicroState");
 
     // Description

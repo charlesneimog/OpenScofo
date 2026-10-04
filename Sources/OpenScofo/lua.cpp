@@ -332,11 +332,9 @@ static void PushMarkovState(lua_State *L, const ScoreState &state) {
     lua_setfield(L, -2, "best_microstate_index");
     lua_createtable(L, static_cast<int>(state.MicroStates.size()), 0);
     for (size_t i = 0; i < state.MicroStates.size(); ++i) {
-        lua_createtable(L, 0, 2);
+        lua_createtable(L, 0, 1);
         PushObservations(L, state.MicroStates[i].Observations);
         lua_setfield(L, -2, "observations");
-        lua_pushnumber(L, state.MicroStates[i].DurationWeight);
-        lua_setfield(L, -2, "duration_weight");
         lua_rawseti(L, -2, static_cast<int>(i + 1));
     }
     lua_setfield(L, -2, "microstates");

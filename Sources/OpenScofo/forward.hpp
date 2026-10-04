@@ -36,7 +36,7 @@ class OnlineForward {
     OnlineForward();
     void UpdateConfiguration(Configuration &Config);
     void SetScoreStates(States States);
-    void UpdateAudioTemplate();
+    void UpdatePitchTemplate();
     void ResetDecoding();
 
     // Set
@@ -96,9 +96,13 @@ class OnlineForward {
 
     // Markov and Probabilities
     double GetSemiMarkovTransitionProbability(int i, int j);
-    double GetMarkovTransitionProbability(int i, int j);
-    void PrepareMicroStateDurations(const ScoreState &Parent);
-    void UpdateMicroStateForward(ScoreState &State, int StateIndex, int MaxAge);
+    void UpdateMicroStateForward(ScoreState &State);
+    void PrepareSegmentLikelihoods(ScoreState &State, int MaxAge);
+    void PrepareOrdinarySegmentLikelihoods(const ScoreState &State, int MaxAge);
+    void PrepareInternalMarkovSegmentLikelihoods(ScoreState &State, int MaxAge);
+    const std::vector<double> &GetInternalLogPathCounts(size_t MicroStateCount, int MaxAge);
+    double GetSegmentLikelihood(int Age, double IncomingProbability) const;
+    void UpdateMicroStatePosterior(ScoreState &State);
     void ResetMicroStateRuntime(ScoreState &State);
     void GetInitialDistribution();
     int GetMaxUForJ(ScoreState &StateJ);
@@ -131,13 +135,13 @@ class OnlineForward {
 
     int m_BestAudioStateStateIndex;
     int m_BestAudioStateIndex;
-    int m_ActiveMarkovScoreStateIndex = -1;
-    // Reused scratch space for one active LEFT_RIGHT parent at a time.
-    std::vector<double> m_MicroExpectedFrames;
-    std::vector<double> m_MicroLogEmission;
-    std::vector<double> m_MicroLogSelfProb;
-    std::vector<double> m_MicroLogAdvanceProb;
-    std::vector<double> m_MicroPosterior;
+    // Reused for one semi-Markov state at a time, before current-frame normalization.
+    std::vector<double> m_SegmentLogLikelihoods;
+    // Outer survivor/entry weights for reporting simultaneous entry hypotheses.
+    std::vector<double> m_SegmentLogForwardWeights;
+    double m_SegmentProbabilityFloor = 0.0;
+    // C(u, K) depends only on segment length and ordered topology, never tempo/duration.
+    std::unordered_map<size_t, std::vector<double>> m_InternalLogPathCountCache;
 
     // Config
     double m_MinEntropy = 0;

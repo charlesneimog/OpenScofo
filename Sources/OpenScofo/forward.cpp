@@ -109,6 +109,7 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
     m_PitchCQTTemplates.clear();
     m_OccupancyPMFCache.clear();
     m_SurvivorCache.clear();
+    m_InternalLogPathCountCache.clear();
 
     m_Normalization.assign(static_cast<size_t>(m_BufferSize + 1), 1.0);
     for (ScoreState &State : m_States) {
@@ -117,10 +118,9 @@ void OnlineForward::UpdateConfiguration(Configuration &Config) {
         State.BestObs.assign(static_cast<size_t>(m_BufferSize + 1), std::numeric_limits<double>::min());
         ResetMicroStateRuntime(State);
     }
-    m_ActiveMarkovScoreStateIndex = -1;
 
     if (!m_States.empty()) {
-        UpdateAudioTemplate();
+        UpdatePitchTemplate();
     }
 }
 
@@ -247,11 +247,10 @@ void OnlineForward::NotifyAudioStateChange(int StateIndex) {
 /**
  * @brief Clear decoder caches and microstate runtime history.
  *
- * @note Rehashes several maps to release storage and invalidates the active Markov context.
+ * @note Rehashes several maps to release storage and clears microstate paths.
  * @warning Can allocate or release memory; serialize with inference.
  */
 void OnlineForward::ResetCaches() {
-    m_ActiveMarkovScoreStateIndex = -1;
     for (ScoreState &State : m_States) {
         ResetMicroStateRuntime(State);
     }
@@ -261,6 +260,7 @@ void OnlineForward::ResetCaches() {
     m_PitchProbabilityCache.clear();
     m_OccupancyPMFCache.clear();
     m_SurvivorCache.clear();
+    m_InternalLogPathCountCache.clear();
     m_KappaCache.clear();
 
     // Rehash/compact the maps to free memory
@@ -336,7 +336,7 @@ void OnlineForward::SetScoreStates(States ScoreStates) {
     m_SyncStrength = InitialState.SyncStrength;
     m_PhaseCoupling = InitialState.PhaseCoupling;
 
-    UpdateAudioTemplate();
+    UpdatePitchTemplate();
 }
 
 // ─────────────────────────────────────
@@ -445,7 +445,7 @@ void OnlineForward::BuildPitchTemplate(double Freq) {
  *
  * @note Scans note observations and microstate observations after clearing both template caches.
  */
-void OnlineForward::UpdateAudioTemplate() {
+void OnlineForward::UpdatePitchTemplate() {
     int StateSize = (int)m_States.size();
     m_PitchTemplates.clear();
     m_PitchTemplatesPrecomputed.clear();
@@ -491,12 +491,10 @@ PitchTemplateArray OnlineForward::GetPitchTemplate(double Freq) {
 /**
  * @brief Remove all installed score states.
  *
- * @note Also invalidates the active Markov parent context.
  * @warning Load new states before calling methods that index the score vector.
  */
 void OnlineForward::ClearStates() {
     m_States.clear();
-    m_ActiveMarkovScoreStateIndex = -1;
 }
 // ─────────────────────────────────────
 /**
@@ -739,7 +737,6 @@ void OnlineForward::InitTimeDecoding(void) {
  * @note Clears microstate histories and pending notifications; returns early when no states are installed.
  */
 void OnlineForward::ResetDecoding() {
-    m_ActiveMarkovScoreStateIndex = -1;
     if (m_States.empty()) {
         return;
     }
@@ -1078,7 +1075,8 @@ void OnlineForward::GetDecodeWindow() {
         m_WinEnd = m_CurrentStateIndex;
         while (m_WinEnd + 1 < static_cast<int>(m_States.size()) &&
                m_States[static_cast<size_t>(m_WinEnd + 1)].Section == Section) {
-            ++m_WinEnd;
+
+            m_WinEnd++;
         }
         return;
     }
@@ -1357,7 +1355,7 @@ void OnlineForward::GetAudioObservations() {
         double stateLikelihood = 0.0;
         if (state.MicroTopologyType != NO_MICROSTATES) {
             // For LEFT_RIGHT this scalar is diagnostic/silence evidence only.
-            // SemiMarkov uses age-conditioned LogForwardByAge segment likelihoods.
+            // SemiMarkov uses the ordered path for each segment age.
             stateLikelihood = bestMicroLikelihood;
             if (state.Type == TRILL) {
                 stateLikelihood = std::max(bestMicroLikelihood * soundProb, bestSilence);
@@ -1621,75 +1619,18 @@ double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
     if (i < 0 || j <= i || j >= static_cast<int>(m_States.size())) {
         return 0.0;
     }
-    // Optional atemporal silence (Cont's hybrid topology). These equal branch
-    // priors are OpenScofo policy, not numerical parameters from the paper.
+
+    // Inter-event silence is optional: the decoder may either enter the
+    // silence state or skip directly to the next musical event.
+    //
+    // Ideally this prior could be controlled by score information, e.g.
+    // articulation/legato. Since OpenScofo currently has no such parameter,
+    // assign equal prior probability (0.5) to both paths. The observation
+    // likelihoods will subsequently determine which path is favored.
     if (i + 1 < static_cast<int>(m_States.size()) && m_States[i + 1].IsInterEventSilence) {
         return (j == i + 1 || j == i + 2) ? 0.5 : 0.0;
     }
     return j == i + 1 ? 1.0 : 0.0;
-}
-
-// ─────────────────────────────────────
-// OpenScofo duration policy, not a numerical prescription from Cont.
-/**
- * @brief Distribute a parent duration among its microstates.
- *
- * @param Parent Parent score state containing microstates and duration weights.
- *
- * @note Uses nonnegative duration weights with equal shares as a fallback and at least one frame per microstate.
- */
-void OnlineForward::PrepareMicroStateDurations(const ScoreState &Parent) {
-    const size_t K = Parent.MicroStates.size();
-    m_MicroExpectedFrames.assign(K, 1.0);
-    if (K == 0 || !(m_BlockDur > 0.0)) {
-        return;
-    }
-    const double expectedFrames = std::max(1.0, (m_PsiN1 * Parent.Duration) / m_BlockDur);
-    const size_t first = 0;
-    const size_t end = K;
-    const double available = expectedFrames;
-    if (available <= static_cast<double>(end - first)) {
-        return; // A chain shorter than its phase count still needs one frame per phase.
-    }
-    double totalWeight = 0.0;
-    for (size_t k = first; k < end; ++k) {
-        totalWeight += std::max(0.0, Parent.MicroStates[k].DurationWeight);
-    }
-    for (size_t k = first; k < end; ++k) {
-        const double share = totalWeight > 0.0 ? std::max(0.0, Parent.MicroStates[k].DurationWeight) / totalWeight
-                                               : 1.0 / static_cast<double>(end - first);
-        m_MicroExpectedFrames[k] = std::max(1.0, available * share);
-    }
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Read a transition within the active ordered microstate chain.
- *
- * @param i Source microstate index.
- * @param j Destination microstate index.
- *
- * @return Transition probability, or zero without a valid ordered-chain context.
- *
- * @note Permits self-loops and single-step advancement; the last microstate is absorbing.
- */
-double OnlineForward::GetMarkovTransitionProbability(int i, int j) {
-    if (m_ActiveMarkovScoreStateIndex < 0 || m_ActiveMarkovScoreStateIndex >= static_cast<int>(m_States.size())) {
-        return 0.0;
-    }
-    const ScoreState &Parent = m_States[m_ActiveMarkovScoreStateIndex];
-    const int K = static_cast<int>(Parent.MicroStates.size());
-    if (Parent.MicroTopologyType != LEFT_RIGHT || i < 0 || j < 0 || i >= K || j >= K) {
-        return 0.0;
-    }
-    if (i == K - 1) {
-        return j == i ? 1.0 : 0.0;
-    }
-    if (i >= static_cast<int>(m_MicroExpectedFrames.size())) {
-        return 0.0;
-    }
-    const double advance = std::clamp(1.0 / std::max(1.0, m_MicroExpectedFrames[i]), 0.0, 1.0);
-    return j == i ? 1.0 - advance : (j == i + 1 ? advance : 0.0);
 }
 
 // ─────────────────────────────────────
@@ -1713,65 +1654,189 @@ void OnlineForward::ResetMicroStateRuntime(ScoreState &State) {
 
 // ─────────────────────────────────────
 /**
- * @brief Advance log forward histories for an ordered microstate chain.
+ * @brief Advance the internal monotonic path sums for every parent entry time.
  *
- * @param State Score state to read or update.
- * @param StateIndex Zero-based index in the internal score state vector.
- * @param MaxAge Maximum segment age to retain in analysis frames.
- *
- * @note Tracks each segment age separately and clears histories when the chain was not observed in the previous
- * frame.
- * @warning StateIndex must identify State in the installed score; emissions must be computed for the current frame.
+ * @note Cont (2010), section 5.2.2, specifies the MULTI hierarchy and ordering.
+ * OpenScofo's conditional path model assigns unit topological weights to staying
+ * and advancing one microstate; these are not transition probabilities. The
+ * forward sum-product structure is that of Guédon (2005), equation (7).
+ * Histories retain outer frame scaling and no parent duration or tempo enters
+ * this update. Descending microstates and ages preserve previous-frame inputs.
  */
-void OnlineForward::UpdateMicroStateForward(ScoreState &State, int StateIndex, int MaxAge) {
+void OnlineForward::UpdateMicroStateForward(ScoreState &State) {
     if (State.MicroTopologyType != LEFT_RIGHT) {
         return;
     }
-    MaxAge = std::max(0, MaxAge);
-    const size_t K = State.MicroStates.size();
+    // Retain the decoder's available history independently of the current
+    // occupancy support, so later duration/tempo changes can reuse older ages.
+    const int MaxAge = std::min(m_Tau + 1, m_BufferSize - 1);
     for (MarkovMicroState &Micro : State.MicroStates) {
-        // A newly visible chain cannot inherit a trajectory across unobserved frames.
         if (State.MicroForwardLastFrame != m_Tau - 1) {
             Micro.LogForwardByAge.clear();
         }
-        Micro.LogForwardByAge.resize(static_cast<size_t>(MaxAge + 1), -std::numeric_limits<double>::max());
+        Micro.LogForwardByAge.resize(static_cast<size_t>(MaxAge + 1), LogZero);
     }
-    State.MicroForwardLastFrame = m_Tau;
-    if (K == 0 || MaxAge == 0) {
-        return;
-    }
-
-    const int previousContext = m_ActiveMarkovScoreStateIndex;
-    m_ActiveMarkovScoreStateIndex = StateIndex;
-    PrepareMicroStateDurations(State);
-    m_MicroLogSelfProb.resize(K);
-    m_MicroLogAdvanceProb.resize(K);
-    for (size_t k = 0; k < K; ++k) {
-        m_MicroLogSelfProb[k] =
-            LogProbability(GetMarkovTransitionProbability(static_cast<int>(k), static_cast<int>(k)));
-        m_MicroLogAdvanceProb[k] =
-            LogProbability(GetMarkovTransitionProbability(static_cast<int>(k), static_cast<int>(k) + 1));
-    }
-    m_ActiveMarkovScoreStateIndex = previousContext;
-
-    m_MicroLogEmission.resize(K);
-    for (size_t k = 0; k < K; ++k) {
-        m_MicroLogEmission[k] = LogProbability(State.MicroStates[k].CurrentEmission);
-    }
-    const int oldestAge = std::min(MaxAge, m_Tau + 1);
-    for (int u = oldestAge; u >= 2; --u) {
-        for (size_t k = 0; k < K; ++k) {
-            MarkovMicroState &Micro = State.MicroStates[k];
-            double incoming = LogMultiply(m_MicroLogSelfProb[k], Micro.LogForwardByAge[u - 1]);
-            if (k > 0) {
-                incoming = LogAdd(incoming, LogMultiply(m_MicroLogAdvanceProb[k - 1],
-                                                        State.MicroStates[k - 1].LogForwardByAge[u - 1]));
+    for (size_t k = State.MicroStates.size(); k-- > 0;) {
+        MarkovMicroState &Micro = State.MicroStates[k];
+        const double logEmission = LogProbability(Micro.CurrentEmission);
+        for (int u = MaxAge; u >= 1; --u) {
+            double incoming = k == 0 ? 0.0 : LogZero; // Entry is always at microstate zero.
+            if (u > 1) {
+                incoming = Micro.LogForwardByAge[u - 1]; // Stay, including at the final microstate.
+                if (k > 0) {
+                    incoming = LogAdd(incoming, State.MicroStates[k - 1].LogForwardByAge[u - 1]);
+                }
             }
-            Micro.LogForwardByAge[u] = LogMultiply(m_MicroLogEmission[k], incoming);
+            Micro.LogForwardByAge[u] = LogMultiply(logEmission, incoming);
         }
     }
-    for (size_t k = 0; k < K; ++k) {
-        State.MicroStates[k].LogForwardByAge[1] = k == 0 ? m_MicroLogEmission[k] : -std::numeric_limits<double>::max();
+    State.MicroForwardLastFrame = m_Tau;
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Prepare normalized observation likelihoods for each observed segment age.
+ *
+ * @note Includes the current emission exactly once. Past ordinary observations use
+ * stored frame normalization; ordered histories already carry that same scaling.
+ * Only the observation model dispatches on microstate topology.
+ */
+void OnlineForward::PrepareSegmentLikelihoods(ScoreState &State, int MaxAge) {
+    m_SegmentLogLikelihoods.assign(static_cast<size_t>(MaxAge + 1), LogZero);
+    m_SegmentLogForwardWeights.assign(static_cast<size_t>(MaxAge + 1), LogZero);
+    m_SegmentProbabilityFloor = 0.0;
+
+    if (State.MicroTopologyType == LEFT_RIGHT) {
+        PrepareInternalMarkovSegmentLikelihoods(State, MaxAge);
+    } else {
+        PrepareOrdinarySegmentLikelihoods(State, MaxAge);
+    }
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Prepare the stationary observation product with existing outer scaling.
+ */
+void OnlineForward::PrepareOrdinarySegmentLikelihoods(const ScoreState &State, int MaxAge) {
+    const double Bj = State.BestObs[m_CircularBufferIndex];
+    const double logBj = LogProbability(Bj);
+    // Preserve the ordinary recurrence's Bj * min() numerical floor.
+    m_SegmentProbabilityFloor = Bj * std::numeric_limits<double>::min();
+    double ObsProd = 1.0;
+    for (int u = 1; u <= MaxAge; ++u) {
+        m_SegmentLogLikelihoods[u] = LogMultiply(logBj, LogProbability(ObsProd));
+        if (u == MaxAge) {
+            break;
+        }
+        const int PreviousBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
+        const double previousNormalization = m_Normalization[PreviousBuf];
+        if (previousNormalization > std::numeric_limits<double>::min()) {
+            ObsProd *= State.BestObs[PreviousBuf] / previousNormalization;
+        } else {
+            ObsProd = 0.0;
+        }
+        if (ObsProd == 0.0) {
+            break;
+        }
+    }
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Cache log C(u, K) for the conditional monotonic path model.
+ *
+ * @note OpenScofo implementation choice: average uniformly over all admissible
+ * paths for the candidate segment length. C(u, K) = sum_r binomial(u-1, r),
+ * 0 <= r <= min(K-1, u-1). This is not specified by the three reference papers.
+ * Counts never use emissions, score normalization, parent duration, or tempo.
+ */
+const std::vector<double> &OnlineForward::GetInternalLogPathCounts(size_t MicroStateCount, int MaxAge) {
+    auto &counts = m_InternalLogPathCountCache[MicroStateCount];
+    if (counts.empty()) {
+        counts.push_back(LogZero); // Age zero is unused.
+    }
+    for (int u = static_cast<int>(counts.size()); u <= MaxAge; ++u) {
+        double logCount = LogZero;
+        double logBinomial = 0.0;
+        for (size_t r = 0; r < MicroStateCount && r < static_cast<size_t>(u); ++r) {
+            if (r > 0) {
+                logBinomial += std::log(static_cast<double>(u - r)) - std::log(static_cast<double>(r));
+            }
+            logCount = LogAdd(logCount, logBinomial);
+        }
+        counts.push_back(logCount);
+    }
+    return counts;
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Prepare MULTI segment likelihoods by averaging over monotonic paths.
+ *
+ * @note OpenScofo's endpoint policy permits ending in any current microstate
+ * for both parent occupancy and exit. Divide the summed forward weights by
+ * C(u, K), not by their observation-dependent sum: likelihood magnitude must
+ * remain available to the outer HSMM. Unit emissions therefore give unit
+ * conditional likelihood at every age, regardless of the number of paths.
+ */
+void OnlineForward::PrepareInternalMarkovSegmentLikelihoods(ScoreState &State, int MaxAge) {
+    UpdateMicroStateForward(State);
+    if (State.MicroStates.empty()) {
+        return;
+    }
+    const auto &counts = GetInternalLogPathCounts(State.MicroStates.size(), MaxAge);
+    for (int u = 1; u <= MaxAge; ++u) {
+        double logLikelihood = LogZero;
+        for (const MarkovMicroState &Micro : State.MicroStates) {
+            logLikelihood = LogAdd(logLikelihood, Micro.LogForwardByAge[u]);
+        }
+        if (logLikelihood != LogZero) {
+            m_SegmentLogLikelihoods[u] = logLikelihood - counts[u];
+        }
+    }
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Weight a prepared segment likelihood by its entry probability.
+ *
+ * @note Combines entry mass before exponentiation so scaled microstate histories
+ * need not be representable as standalone linear probabilities.
+ */
+double OnlineForward::GetSegmentLikelihood(int Age, double IncomingProbability) const {
+    return std::exp(LogMultiply(m_SegmentLogLikelihoods[Age], LogProbability(IncomingProbability)));
+}
+
+// ─────────────────────────────────────
+/**
+ * @brief Select the ordered microstate winner from the outer HSMM occupancy mass.
+ *
+ * @note Marginalizes each endpoint over all parent entry hypotheses, using
+ * the same path-count divisor, survivor and incoming mass as SemiMarkov.
+ * Comparing log masses affects only reporting, never inference.
+ */
+void OnlineForward::UpdateMicroStatePosterior(ScoreState &State) {
+    if (State.MicroTopologyType != LEFT_RIGHT) {
+        return;
+    }
+    State.BestMicroStateIndex = -1;
+    State.BestMicroObservationIndex = -1;
+    const int MaxAge = static_cast<int>(m_SegmentLogForwardWeights.size()) - 1;
+    const auto &counts = GetInternalLogPathCounts(State.MicroStates.size(), MaxAge);
+    double best = LogZero;
+    for (size_t k = 0; k < State.MicroStates.size(); ++k) {
+        double mass = LogZero;
+        for (int u = 1; u <= MaxAge; ++u) {
+            double contribution = LogMultiply(State.MicroStates[k].LogForwardByAge[u], m_SegmentLogForwardWeights[u]);
+            if (contribution != LogZero) {
+                mass = LogAdd(mass, contribution - counts[u]);
+            }
+        }
+        if (mass > best) {
+            best = mass;
+            State.BestMicroStateIndex = static_cast<int>(k);
+            State.BestMicroObservationIndex = State.MicroStates[k].BestObservationIndex;
+        }
     }
 }
 
@@ -1903,100 +1968,47 @@ void OnlineForward::Markov(ScoreState &StateJ, int j) {
  * @param StateJ Score state whose forward probabilities or duration are evaluated.
  * @param j Destination state index.
  *
- * @note Ordered microstates use age-conditioned log histories; other states use normalized observation products.
+ * @note Uses prepared segment likelihoods for both predecessor entries and the initial segment.
  * @warning j must identify StateJ and all circular probability buffers must be initialized.
  */
 void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
-    double Bj = StateJ.BestObs[m_CircularBufferIndex];
-
-    double FTildeJ = 0.0;
-    double FTildeJo = 0.0;
-    double ObsProd = 1.0;
-
-    double ExpectedFrames = std::max(1.0, (m_PsiN1 * StateJ.Duration) / m_BlockDur);
+    const double ExpectedFrames = std::max(1.0, (m_PsiN1 * StateJ.Duration) / m_BlockDur);
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
     const auto &surv_cache = m_SurvivorCache[key];
     const auto &occ_cache = m_OccupancyPMFCache[key];
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
+    PrepareSegmentLikelihoods(StateJ, std::min(m_Tau + 1, maxU));
 
-    if (StateJ.MicroTopologyType == LEFT_RIGHT) {
-        UpdateMicroStateForward(StateJ, j, maxU);
-        m_MicroPosterior.assign(StateJ.MicroStates.size(), 0.0);
-        // Each age is a distinct entry-time hypothesis. The current emission is
-        // already in alpha, so there is no extra Bj factor in this branch.
-        for (int u = 1; u <= observedHistory; ++u) {
-            const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-            double incoming = 0.0;
-            for (int i = std::max(m_WinStart, j - 2); i < j; ++i) {
-                incoming += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
-            }
-            for (size_t k = 0; k < StateJ.MicroStates.size(); ++k) {
-                const double path =
-                    incoming > 0.0 ? std::exp(StateJ.MicroStates[k].LogForwardByAge[u] + std::log(incoming)) : 0.0;
-                const double occupancy = surv_cache[u] * path;
-                FTildeJ += occupancy;
-                FTildeJo += occ_cache[u] * path;
-                m_MicroPosterior[k] += occupancy;
-            }
-        }
-        const int initialDuration = m_Tau + 1;
-        if (initialDuration <= maxU) {
-            for (size_t k = 0; k < StateJ.MicroStates.size(); ++k) {
-                const double path =
-                    StateJ.InitProb > 0.0
-                        ? std::exp(StateJ.MicroStates[k].LogForwardByAge[initialDuration] + std::log(StateJ.InitProb))
-                        : 0.0;
-                const double occupancy = surv_cache[initialDuration] * path;
-                FTildeJ += occupancy;
-                FTildeJo += occ_cache[initialDuration] * path;
-                m_MicroPosterior[k] += occupancy;
-            }
-        }
-        StateJ.Forward[m_CircularBufferIndex] = FTildeJ;
-        StateJ.ExitProb[m_CircularBufferIndex] = FTildeJo;
-        StateJ.BestMicroStateIndex = -1;
-        StateJ.BestMicroObservationIndex = -1;
-        double best = 0.0;
-        for (size_t k = 0; k < m_MicroPosterior.size(); ++k) {
-            if (m_MicroPosterior[k] > best) {
-                best = m_MicroPosterior[k];
-                StateJ.BestMicroStateIndex = static_cast<int>(k);
-                StateJ.BestMicroObservationIndex = StateJ.MicroStates[k].BestObservationIndex;
-            }
-        }
-        return;
-    }
-
+    double FTildeJ = 0.0;
+    double FTildeJo = 0.0;
     for (int u = 1; u <= observedHistory; ++u) {
-        const double Dju = surv_cache[u];
-        const double dju = occ_cache[u];
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-        double TransSum = 0.0;
-        for (int i = m_WinStart; i < j; ++i)
-            TransSum += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
-        FTildeJ += Dju * ObsProd * TransSum;
-        FTildeJo += dju * ObsProd * TransSum;
+        double incoming = 0.0;
 
-        const double prevObs = StateJ.BestObs[EntryBuf];
-        const double prevNorm = m_Normalization[EntryBuf];
-        if (prevNorm > std::numeric_limits<double>::min())
-            ObsProd *= prevObs / prevNorm;
-        else
-            ObsProd = 0.0;
-        if (ObsProd == 0.0)
-            break;
+        for (int i = m_WinStart; i < j; ++i) {
+            incoming += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
+        }
+
+        const double segment = GetSegmentLikelihood(u, incoming);
+        FTildeJ += surv_cache[u] * segment;
+        FTildeJo += occ_cache[u] * segment;
+        m_SegmentLogForwardWeights[u] = LogMultiply(LogProbability(surv_cache[u]), LogProbability(incoming));
     }
 
+    // A state already active at the start of decoding uses the same observation model.
     const int initialDuration = m_Tau + 1;
     if (initialDuration <= maxU) {
-        FTildeJ += surv_cache[initialDuration] * ObsProd * StateJ.InitProb;
-        FTildeJo += occ_cache[initialDuration] * ObsProd * StateJ.InitProb;
+        const double segment = GetSegmentLikelihood(initialDuration, StateJ.InitProb);
+        FTildeJ += surv_cache[initialDuration] * segment;
+        FTildeJo += occ_cache[initialDuration] * segment;
+        m_SegmentLogForwardWeights[initialDuration] =
+            LogMultiply(LogProbability(surv_cache[initialDuration]), LogProbability(StateJ.InitProb));
     }
 
-    StateJ.Forward[m_CircularBufferIndex] = Bj * (FTildeJ + std::numeric_limits<double>::min());
-    StateJ.ExitProb[m_CircularBufferIndex] = Bj * (FTildeJo + std::numeric_limits<double>::min());
+    StateJ.Forward[m_CircularBufferIndex] = FTildeJ + m_SegmentProbabilityFloor;
+    StateJ.ExitProb[m_CircularBufferIndex] = FTildeJo + m_SegmentProbabilityFloor;
 }
 
 // ─────────────────────────────────────
@@ -2019,6 +2031,7 @@ int OnlineForward::GetAlphaT() {
         switch (StateJ.HSMMType) {
         case SEMIMARKOV:
             SemiMarkov(StateJ, j);
+            UpdateMicroStatePosterior(StateJ);
             break;
         case MARKOV:
             Markov(StateJ, j);
@@ -2046,11 +2059,11 @@ int OnlineForward::GetAlphaT() {
         m_States[j].ExitProb[m_CircularBufferIndex] /= N;
         m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
         if (m_States[j].MicroTopologyType == LEFT_RIGHT) {
-            // Shared score-level scaling: never normalize individual age vectors
-            // to unit mass. At the next frame alpha carries all previous Ns.
+            // Shared score-level scaling: each path retains the normalization
+            // of its segment history for the next HSMM update.
             for (MarkovMicroState &Micro : m_States[j].MicroStates) {
                 for (double &LogAlpha : Micro.LogForwardByAge) {
-                    if (LogAlpha != -std::numeric_limits<double>::max()) {
+                    if (LogAlpha != LogZero) {
                         LogAlpha -= logN;
                     }
                 }
