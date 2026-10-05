@@ -19,6 +19,8 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
+            - name: Validate descriptor WebAssembly
+              run: node -e 'new WebAssembly.Module(require("node:fs").readFileSync("Documentation/descriptors/testing/OpenScofo.wasm"))'
             - run: npm install --ignore-scripts --no-audit --no-fund && npm run build:css
               working-directory: ./Resources/Score-Editor
             - uses: actions/setup-python@v5

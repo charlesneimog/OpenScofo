@@ -6,8 +6,8 @@
         <title>OpenScofo Descriptors</title>
 
         <script src="OpenScofo.js"></script>
-        <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
-        <script src="https://unpkg.com/wavesurfer.js@7"></script>
+        <script src="https://cdn.plot.ly/plotly-2.30.0.min.js" crossorigin="anonymous"></script>
+        <script src="https://unpkg.com/wavesurfer.js@7" crossorigin="anonymous"></script>
 
         <style>
             :root {
@@ -55,6 +55,11 @@
                 color: var(--text-color);
                 border: 1px solid var(--border-color);
                 border-radius: 4px;
+            }
+
+            .upload-btn:has(input:disabled) {
+                opacity: 0.5;
+                cursor: default;
             }
 
             .legend-group {
@@ -154,7 +159,7 @@
             <h1>OpenScofo Descriptors</h1>
             <label class="upload-btn">
                 Upload Audio File
-                <input type="file" id="audioUpload" accept="audio/*" hidden />
+                <input type="file" id="audioUpload" accept="audio/*" hidden disabled />
             </label>
         </div>
 
@@ -174,7 +179,7 @@
             <span id="timeDisplay">0:00.00</span>
         </div>
 
-        <span id="status">Initializing WebGL Engine...</span>
+        <span id="status" role="status">Initializing audio engine...</span>
 
         <script>
             let wasmModule = null;
@@ -183,6 +188,8 @@
             let analyzedData = [];
             let currentAudioTime = null;
             let isAnalyzing = false;
+            const audioUpload = document.getElementById("audioUpload");
+            const status = document.getElementById("status");
 
             const descriptorRanges = {
                 onset: { min: 0, max: 1 },
@@ -267,17 +274,6 @@
             });
 
             const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-            wavesurfer = WaveSurfer.create({
-                container: "#waveform",
-                waveColor: isDarkMode ? "#444" : "#ccc",
-                progressColor: isDarkMode ? "#888" : "#555",
-                height: 60,
-                barWidth: 2,
-            });
-
-            wavesurfer.on("audioprocess", (t) => updateCursor(t));
-            wavesurfer.on("seeking", () => updateCursor(wavesurfer.getCurrentTime()));
 
             function updatePlot() {
                 if (!analyzedData.length) return;
@@ -395,7 +391,7 @@
                     doubleClick: "reset",
                 };
 
-                Plotly.react("myChart", traces, layout, config);
+                return Plotly.react("myChart", traces, layout, config);
             }
 
             function updateCursor(time) {
@@ -407,65 +403,140 @@
             }
 
             async function analyzeAudio(arrayBuffer, type) {
+                if (!wasmModule || !wavesurfer || isAnalyzing) return;
+
                 isAnalyzing = true;
-                const status = document.getElementById("status");
+                audioUpload.disabled = true;
+                document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = true));
+                wavesurfer.pause();
                 const overlay = document.getElementById("analysisOverlay");
                 analyzedData = [];
+                currentAudioTime = null;
+                let audioCtx;
+                let audioUrl;
+                let succeeded = false;
 
                 overlay.style.display = "block";
                 overlay.innerText = "Reading Audio...";
                 status.innerText = "";
 
-                const blob = new Blob([arrayBuffer], { type });
-                wavesurfer.load(URL.createObjectURL(blob));
-
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
-                const channelData = audioBuffer.getChannelData(0);
-
-                if (audioBuffer.sampleRate !== 44100)
-                    oscofo = new wasmModule.OpenScofo(audioBuffer.sampleRate, 2048, 512);
-
-                const windowSize = 2048,
-                    hopSize = 512;
-                for (let i = 0; i < channelData.length - windowSize; i += hopSize) {
-                    const vec = new wasmModule.VectorDouble();
-                    for (let j = 0; j < windowSize; j++) vec.push_back(channelData[i + j]);
-
-                    const desc = oscofo.get_audio_description(vec);
-                    const frame = { time: i / audioBuffer.sampleRate };
-                    descriptorList.forEach((k) => (frame[k] = desc[k]));
-                    analyzedData.push(frame);
-                    vec.delete();
-
-                    if (analyzedData.length % 50 === 0) {
-                        overlay.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
-                        updatePlot();
-                        await new Promise((r) => setTimeout(r, 0));
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+                    const channelData = audioBuffer.getChannelData(0);
+                    const windowSize = 2048,
+                        hopSize = 512;
+                    if (channelData.length < windowSize) {
+                        throw new Error(`Audio must contain at least ${windowSize} samples.`);
                     }
+
+                    audioUrl = URL.createObjectURL(new Blob([arrayBuffer], { type }));
+                    await wavesurfer.load(audioUrl);
+
+                    if (oscofo) oscofo.delete();
+                    oscofo = new wasmModule.OpenScofo(audioBuffer.sampleRate, 2048, 512);
+                    for (let i = 0; i <= channelData.length - windowSize; i += hopSize) {
+                        const vec = new wasmModule.VectorDouble();
+                        let desc;
+                        try {
+                            for (let j = 0; j < windowSize; j++) vec.push_back(channelData[i + j]);
+                            desc = oscofo.get_audio_description(vec);
+                            const frame = { time: i / audioBuffer.sampleRate };
+                            descriptorList.forEach((k) => (frame[k] = desc[k]));
+                            analyzedData.push(frame);
+                        } finally {
+                            if (desc) desc.delete();
+                            vec.delete();
+                        }
+
+                        if (analyzedData.length % 50 === 0) {
+                            overlay.innerText = `Analyzing... ${((i / channelData.length) * 100).toFixed(0)}%`;
+                            await updatePlot();
+                            await new Promise((r) => setTimeout(r, 0));
+                        }
+                    }
+
+                    isAnalyzing = false;
+                    await updatePlot();
+                    status.innerText = "Ready.";
+                    succeeded = true;
+                } catch (error) {
+                    status.innerText = `Could not analyze audio: ${error.message}`;
+                    console.error("Audio analysis failed:", error);
+                } finally {
+                    isAnalyzing = false;
+                    overlay.style.display = "none";
+                    audioUpload.disabled = false;
+                    document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = !succeeded));
+                    if (audioCtx) await audioCtx.close();
+                    if (audioUrl) URL.revokeObjectURL(audioUrl);
                 }
-
-                isAnalyzing = false;
-                overlay.style.display = "none";
-                status.innerText = "Ready.";
-                document.querySelectorAll(".ctrl-btn").forEach((b) => (b.disabled = false));
-
-                updatePlot();
             }
 
-            OpenScofo().then(async (mod) => {
-                wasmModule = mod;
-                oscofo = new mod.OpenScofo(44100, 2048, 512);
-                document.getElementById("status").innerText = "Loading Canticos...";
+            async function initialize() {
+                try {
+                    // The threaded module needs isolation even when this page is opened directly.
+                    const isolationKey = "openscofo-descriptor-isolation";
+                    if (!window.crossOriginIsolated) {
+                        if (!window.isSecureContext || !navigator.serviceWorker) {
+                            throw new Error("This page needs HTTPS and service worker support.");
+                        }
+                        if (sessionStorage.getItem(isolationKey)) {
+                            sessionStorage.removeItem(isolationKey);
+                            throw new Error("Allow service workers and reload the page to enable audio.");
+                        }
+                        status.innerText = "Enabling audio engine...";
+                        await navigator.serviceWorker.register("../../pd4web-isolation.js");
+                        await navigator.serviceWorker.ready;
+                        if (!navigator.serviceWorker.controller) {
+                            await new Promise((resolve) => {
+                                navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+                                if (navigator.serviceWorker.controller) resolve();
+                            });
+                        }
+                        sessionStorage.setItem(isolationKey, "1");
+                        window.location.reload();
+                        return;
+                    }
+                    sessionStorage.removeItem(isolationKey);
+                    if (typeof Plotly === "undefined" || typeof WaveSurfer === "undefined") {
+                        throw new Error("Could not load the chart or waveform library. Reload the page to retry.");
+                    }
+                    wavesurfer = WaveSurfer.create({
+                        container: "#waveform",
+                        waveColor: isDarkMode ? "#444" : "#ccc",
+                        progressColor: isDarkMode ? "#888" : "#555",
+                        height: 60,
+                        barWidth: 2,
+                    });
+                    wavesurfer.on("audioprocess", (t) => updateCursor(t));
+                    wavesurfer.on("seeking", () => updateCursor(wavesurfer.getCurrentTime()));
 
-                const res = await fetch("./canticos.mp3");
-                const buffer = await res.arrayBuffer();
-                analyzeAudio(buffer, "audio/mp3");
-            });
+                    wasmModule = await OpenScofo();
+                    status.innerText = "Loading Canticos...";
+                    const res = await fetch("./canticos.mp3");
+                    if (!res.ok) throw new Error(`Could not load Canticos (HTTP ${res.status}).`);
+                    await analyzeAudio(await res.arrayBuffer(), "audio/mpeg");
+                } catch (error) {
+                    status.innerText = `Could not initialize audio: ${error.message}`;
+                    audioUpload.disabled = !wasmModule;
+                    console.error("Audio initialization failed:", error);
+                }
+            }
 
-            document.getElementById("audioUpload").addEventListener("change", async (e) => {
+            initialize();
+
+            audioUpload.addEventListener("change", async (e) => {
                 const file = e.target.files[0];
-                if (file) analyzeAudio(await file.arrayBuffer(), file.type);
+                if (!file || !wasmModule || isAnalyzing) return;
+                try {
+                    await analyzeAudio(await file.arrayBuffer(), file.type);
+                } catch (error) {
+                    status.innerText = `Could not read audio file: ${error.message}`;
+                    console.error("Audio upload failed:", error);
+                } finally {
+                    e.target.value = "";
+                }
             });
 
             function togglePlay() {
