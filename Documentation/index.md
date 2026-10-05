@@ -34,9 +34,13 @@ tags:
 
 ---
 
+
 <div class="score-demo" data-score-demo markdown="1">
   <h2 align="center">Listen and follow the score</h2>
+
+
   <p>This demo plays a microphone recording of Cassia Carrascoza’s performance. OpenScofo processes the recording live as it plays and follows the score in real time. Everything runs in your browser using <a href="https://charlesneimog.github.io/pd4web/">pd4web</a>, which runs Pure Data on the web.</p>
+
 
   --- 
 
@@ -49,6 +53,8 @@ tags:
     <strong>Note:</strong> <span data-demo-status role="status">Loading the interactive player…</span>
   </aside>
 
+!!! info "Flute player?"
+    Play these Miniaturas online using the [link](./pieces){target="_blank"}.
   
 
   <div class="score-demo__layout" markdown="1">
