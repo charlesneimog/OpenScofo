@@ -161,16 +161,35 @@ module.exports = grammar({
                 optional(field("attribute", $.attribute)),
             ),
 
-        rest_event: ($) => seq("REST", field("duration", $.number)),
-        chord_event: ($) => seq("CHORD", field("pitches", $.pitch_group), field("duration", $.number)),
-        trill_event: ($) => seq("TRILL", field("pitches", $.pitch_group), field("duration", $.number)),
-        multi_event: ($) => seq("GLISS", field("pitches", $.pitch_group), field("duration", $.number)),
+        rest_event: ($) => seq("REST", field("duration", $.number), optional(field("attribute", $.attribute))),
+        chord_event: ($) =>
+            seq(
+                "CHORD",
+                field("pitches", $.pitch_group),
+                field("duration", $.number),
+                optional(field("attribute", $.attribute)),
+            ),
+        trill_event: ($) =>
+            seq(
+                "TRILL",
+                field("pitches", $.pitch_group),
+                field("duration", $.number),
+                optional(field("attribute", $.attribute)),
+            ),
+        multi_event: ($) =>
+            seq(
+                "GLISS",
+                field("pitches", $.pitch_group),
+                field("duration", $.number),
+                optional(field("attribute", $.attribute)),
+            ),
         ptech_event: ($) =>
             seq(
                 "PTECH",
                 choice(field("technique", $.identifier), field("techniques", $.technique_group)),
                 field("pitch", $.pitch),
                 field("duration", $.number),
+                optional(field("attribute", $.attribute)),
             ),
 
         utech_event: ($) =>
@@ -178,6 +197,7 @@ module.exports = grammar({
                 "UTECH",
                 choice(field("technique", $.identifier), field("techniques", $.technique_group)),
                 field("duration", $.number),
+                optional(field("attribute", $.attribute)),
             ),
 
         lua_event: ($) => seq("LUAEVENT", field("luacall", $.lua_call), field("duration", $.number)),
