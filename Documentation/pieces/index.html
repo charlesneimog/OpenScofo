@@ -1,13 +1,11 @@
-<!doctype html>
-<html lang="en">
-    <head>
-        <title>Pd4Web</title>
-        <meta charset="UTF-8" />
-        <link rel="manifest" href="manifest.json" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="apple-touch-icon" href="icon-192.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
+<!DOCTYPE html><html lang="en"><head>
+        <title>.</title>
+        <meta charset="UTF-8">
+        <link rel="manifest" href="manifest.json">
+        <meta name="theme-color" content="#000000">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="apple-touch-icon" href="icon-192.png">
+        <meta name="mobile-web-app-capable" content="yes">
 
         <script src="./pd4web.threads.js"></script>
         <script src="./pd4web.js"></script>
@@ -153,12 +151,9 @@
     <body>
         <div class="app-container">
             <div class="controls-container">
-                <div class="score-buttons" role="group" aria-label="Choose a score">
-                    <button type="button" data-score="1" aria-pressed="false" disabled>Score 1</button>
-                    <button type="button" data-score="2" aria-pressed="false" disabled>Score 2</button>
-                </div>
                 <p id="status" role="status"></p>
                 <span class="pd4web-sound-switch" id="Pd4WebAudioSwitch"></span>
+                <hr>
                 <canvas tabindex="0" class="pd4web-patch-canvas" id="Pd4WebCanvas"></canvas>
             </div>
 
@@ -244,6 +239,36 @@
                     });
 
                     if (Pd4Web) {
+                        let scoreRequest = 0;
+
+                        Pd4Web.onFloatReceived("miniatura", async (r, f) => {
+                            const piece = Number(f);
+                            const request = ++scoreRequest;
+                            try {
+                                const response = await fetch(`score${piece}.svg`);
+                                if (!response.ok) {
+                                    throw new Error(`Failed to load score ${piece}: ${response.status}`);
+                                }
+                                const svgText = await response.text();
+
+                                // A slower response must not replace a more recent selection.
+                                if (request !== scoreRequest) return;
+                                ui.score.innerHTML = svgText;
+                                ui.viewport.scrollTo({
+                                    top: 0,
+                                    left: 0,
+                                    behavior: "instant",
+                                });
+                                scoreButtons.forEach((button) => {
+                                    button.setAttribute("aria-pressed", String(Number(button.dataset.score) === piece));
+                                });
+                                ui.status.textContent = "";
+                            } catch (error) {
+                                console.error(error);
+                                ui.status.textContent = `Failed to load score ${piece}`;
+                            }
+                        });
+
                         Pd4Web.onFloatReceived("scoreevent", (r, f) => {
                             // Event 0: Reset the score
                             if (f === 0) {
@@ -272,12 +297,15 @@
                             }
                         });
                     }
-                    scoreButtons.forEach((button) => { button.disabled = false; });
+                    scoreButtons.forEach((button) => {
+                        button.disabled = false;
+                    });
                 } catch (error) {
                     ui.status.textContent = "Failed to load WASM.";
                     console.error(error);
                 }
             })();
         </script>
-    </body>
-</html>
+    
+
+</body></html>
