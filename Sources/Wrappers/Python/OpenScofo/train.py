@@ -19,7 +19,7 @@ from typing import List
 import numpy as np
 from catboost import CatBoostClassifier
 from scipy.signal import fftconvolve, resample
-from ._OpenScofo import OpenScofo
+from ._OpenScofo import Descriptors, OpenScofo
 
 
 class ExtendedTechniqueClassifier:
@@ -53,7 +53,9 @@ class ExtendedTechniqueClassifier:
         self.random_state = 80
         self.test_fraction = 0.1
         self.min_db = -60.0
+        self.max_pitch_confidence = 0.8
         self.oscofo: OpenScofo = OpenScofo(sample_rate, fft_size, hop_size)
+        self.oscofo.request_descriptor(Descriptors.YINCONFIDENCE)
         self._oscofos = {sample_rate: self.oscofo}
         self.max_augmentation_loops = 128
         self.balanced_augmentation_factor = 1.0
@@ -109,6 +111,7 @@ class ExtendedTechniqueClassifier:
             self._oscofos[sample_rate] = OpenScofo(
                 sample_rate, self.fft_size, self.hop_size
             )
+            self._oscofos[sample_rate].request_descriptor(Descriptors.YINCONFIDENCE)
         return self._oscofos[sample_rate]
 
     def resolve_trainfolder(self, path):
@@ -155,6 +158,12 @@ class ExtendedTechniqueClassifier:
         if factor < 1.0:
             raise ValueError("balanced_augmentation_factor must be >= 1")
         self.balanced_augmentation_factor = factor
+
+    def set_max_pitch_confidence(self, confidence):
+        confidence = float(confidence)
+        if confidence < 0.0 or confidence > 1.0:
+            raise ValueError("max_pitch_confidence must be between 0 and 1")
+        self.max_pitch_confidence = confidence
 
     def _split_train_test(self, files):
         if not files:
@@ -423,7 +432,10 @@ class ExtendedTechniqueClassifier:
             window = np.asarray(y[idx : idx + self.fft_size], dtype=np.float32)
             oscofo.process_block(window)
             desc = oscofo.get_description()
-            if desc.db >= self.min_db:
+            if (
+                desc.db >= self.min_db
+                and desc.pitch_confidence < self.max_pitch_confidence
+            ):
                 return desc
             idx += self.hop_size
         return None
@@ -468,6 +480,13 @@ class ExtendedTechniqueClassifier:
                 idx += self.hop_size
                 continue
 
+            if (
+                mode == "traindata"
+                and desc.pitch_confidence >= self.max_pitch_confidence
+            ):
+                idx += self.hop_size
+                continue
+
             if self._append_sample_from_description(desc, label, target_list):
                 appended_count += 1
                 if max_samples is not None and appended_count >= max_samples:
@@ -490,8 +509,8 @@ class ExtendedTechniqueClassifier:
                 )
             else:
                 self.print(
-                    f"Class {label}: no non-silent fallback window found in "
-                    f"{os.path.basename(filepath)}"
+                    f"Class {label}: no fallback window passed the silence and "
+                    f"pitch confidence filters in {os.path.basename(filepath)}"
                 )
 
         return appended_count
@@ -832,6 +851,7 @@ class ExtendedTechniqueClassifier:
             ),
             "audio_files": self._audio_file_signature() if self.folders else [],
             "min_db": float(self.min_db),
+            "max_pitch_confidence": float(self.max_pitch_confidence),
             "test_fraction": float(self.test_fraction),
             "single_file_class_window_split": bool(self.single_file_class_window_split),
             "max_augmentation_loops": int(self.max_augmentation_loops),
