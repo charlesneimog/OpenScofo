@@ -164,3 +164,5 @@ TEST(Inference, Canticos) {
     std::cout << "Canticos: " << Percentage << "%\n";
     EXPECT_GE(Percentage, 97.56);
 }
+
+// ─────────────────────────────────────
