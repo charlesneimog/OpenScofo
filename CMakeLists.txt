@@ -280,10 +280,31 @@ target_compile_definitions(spdlog PUBLIC SPDLOG_NO_EXCEPTIONS)
 # ╭──────────────────────────────────────╮
 # │                OpenScofo             │
 # ╰──────────────────────────────────────╯
-list(APPEND ScofoSrc Sources/OpenScofo/forward.cpp)
-list(APPEND ScofoSrc Sources/OpenScofo/mir.cpp)
+add_library(
+    openscofo_forward STATIC
+    Sources/OpenScofo/forward/forward.cpp Sources/OpenScofo/forward/inference.cpp
+    Sources/OpenScofo/forward/observation.cpp Sources/OpenScofo/forward/pitch.cpp Sources/OpenScofo/forward/tempo.cpp
+    Sources/OpenScofo/forward/microstates.cpp)
+
+add_library(
+    openscofo_mir STATIC
+    Sources/OpenScofo/mir/mir.cpp Sources/OpenScofo/mir/spectral.cpp Sources/OpenScofo/mir/pitch.cpp
+    Sources/OpenScofo/mir/features.cpp Sources/OpenScofo/mir/classification.cpp)
+
+add_library(
+    openscofo_score STATIC
+    Sources/OpenScofo/score/score.cpp Sources/OpenScofo/score/parser.cpp Sources/OpenScofo/score/events.cpp
+    Sources/OpenScofo/score/config.cpp Sources/OpenScofo/score/actions.cpp)
+
+target_include_directories(openscofo_forward PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
+target_include_directories(openscofo_mir PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
+target_include_directories(openscofo_score PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources/OpenScofo")
+
+target_link_libraries(openscofo_forward PRIVATE tree-sitter spdlog onsetsds PFFFT::PFFFT)
+target_link_libraries(openscofo_mir PRIVATE spdlog onsetsds PFFFT::PFFFT)
+target_link_libraries(openscofo_score PRIVATE tree-sitter score_parser spdlog onsetsds PFFFT::PFFFT)
+
 list(APPEND ScofoSrc Sources/OpenScofo/onnx.cpp)
-list(APPEND ScofoSrc Sources/OpenScofo/score.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/lua.cpp)
 list(APPEND ScofoSrc Sources/OpenScofo/OpenScofo.cpp)
 add_library(OpenScofo STATIC ${ScofoSrc})
@@ -293,7 +314,10 @@ target_include_directories(OpenScofo PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Sources
 set_target_properties(OpenScofo PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(
     OpenScofo
-    PUBLIC # score parser
+    PUBLIC openscofo_forward
+           openscofo_mir
+           openscofo_score
+           # score parser
            tree-sitter
            score_parser
            # logging
@@ -303,7 +327,15 @@ target_link_libraries(
            onnx
            PFFFT::PFFFT)
 
+# MIR owns an ONNXModel, whose implementation remains in ai.cpp inside the main archive. Include the main archive's
+# three object files when linking final binaries so ai.cpp is available before MIR's ONNX references, without a target
+# dependency cycle or duplicate compilation.
+set_property(TARGET OpenScofo PROPERTY INTERFACE_LINK_LIBRARIES_DIRECT
+                                       "$<LINK_LIBRARY:WHOLE_ARCHIVE,$<TARGET_FILE:OpenScofo>>")
+
 if(OPENSCOFO_BUILD_WITH_LUA)
+    target_link_libraries(openscofo_forward PRIVATE OpenScofo_Lua)
+    target_link_libraries(openscofo_score PRIVATE OpenScofo_Lua)
     target_link_libraries(OpenScofo PUBLIC OpenScofo_Lua)
 endif()
 
@@ -365,7 +397,9 @@ elseif(WIN32)
 elseif(APPLE)
     find_package(Boost REQUIRED)
     target_link_libraries(OpenScofo PRIVATE Boost::headers)
+    target_link_libraries(openscofo_forward PRIVATE Boost::headers)
     target_compile_definitions(OpenScofo PRIVATE USE_BOOST_BESSEL)
+    target_compile_definitions(openscofo_forward PRIVATE USE_BOOST_BESSEL)
     target_compile_options(
         OpenScofo
         PUBLIC -Wall
@@ -426,6 +460,12 @@ elseif(LINUX) # Linux (GCC or Clang)
 else() # Linux (GCC or Clang)
     message(FATAL_ERROR "I don't know what to do")
 endif()
+
+# These sources previously inherited OpenScofo's target-specific compile options while they were compiled directly into
+# that target. Preserve those options after moving them into internal static libraries.
+target_compile_options(openscofo_forward PRIVATE "$<TARGET_PROPERTY:OpenScofo,COMPILE_OPTIONS>")
+target_compile_options(openscofo_mir PRIVATE "$<TARGET_PROPERTY:OpenScofo,COMPILE_OPTIONS>")
+target_compile_options(openscofo_score PRIVATE "$<TARGET_PROPERTY:OpenScofo,COMPILE_OPTIONS>")
 
 # ╭──────────────────────────────────────╮
 # │               Language               │
