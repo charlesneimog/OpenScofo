@@ -1,18 +1,27 @@
 BPM 60
+FFTSIZE 4096
+
+ONNXMODEL ./../guitar.onnx
 
 // Measure 1
-NOTE G+4 3 @percussive
+PTECH ordinario G+3 3 
 
 // Measure 2
-NOTE A6 0.5 @percussive
-NOTE G4 4 @percussive
+PTECH harmonic A4 0.5 @percussive
+PTECH ordinario G3 4 
 
 // Measure 3
-NOTE G+4 3
+PTECH ordinario G+3 3 
 
 // Measure 4
-NOTE G#6 1
-NOTE G4 4
+PTECH harmonic E4 1 @percussive
+PTECH ordinario G3 4 
 
 // Measure 5
-TRILL (B3 B-3) 1
+TRILL (B3 B-3) 4
+
+// Measure 6
+PTECH ordinario G+3 0.5
+CHORD (G+3 G3) 1.5
+PTECH harmonic G5 1.5
+
