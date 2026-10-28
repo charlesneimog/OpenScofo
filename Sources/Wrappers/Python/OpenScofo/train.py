@@ -53,7 +53,7 @@ class ExtendedTechniqueClassifier:
         self.random_state = 80
         self.test_fraction = 0.1
         self.min_db = -60.0
-        self.max_pitch_confidence = 0.8
+        self.max_pitch_confidence = 0.9
         self.oscofo: OpenScofo = OpenScofo(sample_rate, fft_size, hop_size)
         self.oscofo.request_descriptor(Descriptors.YINCONFIDENCE)
         self._oscofos = {sample_rate: self.oscofo}
