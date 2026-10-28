@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "forward.hpp"
-#include "mir.hpp"
-#include "score.hpp"
+#include "forward/forward.hpp"
+#include "mir/mir.hpp"
+#include "score/score.hpp"
 #include "states.hpp"
 #include "log.hpp"
 

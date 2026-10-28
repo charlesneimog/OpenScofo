@@ -8,74 +8,18 @@
 */
 
 /**
- * @file score.cpp
- * @brief Tree-sitter score parsing, event construction, and action extraction.
- *
- * @note Builds internal score states, section boundaries, timing metadata, and global Lua source.
- * @warning Parsing mutates the score object and logs recoverable syntax errors; serialize access to parser state.
+ * @file events.cpp
+ * @brief Score event construction, timing, sections, and microstates.
  */
 
 #include "OpenScofo.hpp"
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
+#include <cmath>
 #include <utility>
-#include <algorithm>
 #include <tree_sitter/api.h>
 
 namespace OpenScofo {
-
-extern "C" TSLanguage *tree_sitter_openscofo();
-
-// ─────────────────────────────────────
-/**
- * @brief Print a syntax subtree recursively for debugging.
- *
- * @param node Tree-sitter node to inspect in the current score tree.
- * @param indent Initial indentation width in spaces.
- *
- * @note Indents child nodes by four additional spaces and omits printing the root when indent is zero.
- */
-void Score::PrintTreeSitterNode(TSNode node, int indent) {
-    const char *type = ts_node_type(node);
-    std::string text = ts_node_string(node);
-    if (indent != 0) {
-        std::cout << std::string(indent, ' ') << type << ": " << text << std::endl;
-    }
-    uint32_t child_count = ts_node_child_count(node);
-    for (uint32_t i = 0; i < child_count; i++) {
-        PrintTreeSitterNode(ts_node_child(node, i), indent + 4);
-    }
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Find a child node by its Tree-sitter field name.
- *
- * @param Node Tree-sitter node to inspect in the current score tree.
- * @param s Tree-sitter field name to look up.
- *
- * @return Matching field node, or a null node if the field is absent.
- *
- * @note Delegates to ts_node_child_by_field_name().
- */
-TSNode Score::GetField(TSNode Node, std::string s) {
-    int strLen = s.length();
-    TSNode field = ts_node_child_by_field_name(Node, s.c_str(), strLen);
-    return field;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Copy the Lua source collected from global score blocks.
- *
- * @return Collected global Lua source.
- *
- * @note The source is accumulated during Parse() and is not executed by the parser.
- */
-std::string Score::GetLuaCode() {
-    return m_LuaCode;
-}
 
 // ─────────────────────────────────────
 /**
@@ -86,30 +30,13 @@ std::string Score::GetLuaCode() {
  * @note Set when Parse() reaches its final return; does not independently validate runtime readiness.
  * @warning The flag does not guarantee an error-free score and is not reset at the start of a subsequent parse.
  */
-bool Score::ScoreIsLoaded() {
-    return m_ScoreLoaded;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Check whether text is a complete floating-point literal.
- *
- * @param str Text to validate as a complete floating-point number.
- *
- * @return True if the complete text parses as float; false otherwise.
- *
- * @note Uses std::from_chars() and rejects empty text or trailing unparsed characters.
- */
-bool Score::isNumber(const std::string &str) {
-    if (str.empty()) {
-        return false;
+bool Score::GetAttribute(const std::string ScoreStr, TSNode Node, const std::string &attr) {
+    TSNode AttributeNode = ts_node_child_by_field_name(Node, "attribute", 9);
+    if (!ts_node_is_null(AttributeNode)) {
+        std::string attr_type = GetChildStringFromField(ScoreStr, AttributeNode, "type");
+        return (attr_type == attr);
     }
-
-    float value = 0.0f;
-    const char *begin = str.data();
-    const char *end = begin + str.size();
-    auto [ptr, ec] = std::from_chars(begin, end, value);
-    return ec == std::errc{} && ptr == end;
+    return false;
 }
 
 // ─────────────────────────────────────
@@ -247,26 +174,6 @@ double Score::ModPhases(double Phase) {
     return Phase - 0.5;
 }
 
-// ╭─────────────────────────────────────╮
-// │       Parse File of the Score       │
-// ╰─────────────────────────────────────╯
-/**
- * @brief Copy the source text covered by a syntax node.
- *
- * @param ScoreStr Complete score source corresponding to the node byte offsets.
- * @param Node Tree-sitter node to inspect in the current score tree.
- *
- * @return Source substring covered by Node.
- *
- * @note Uses Tree-sitter start and end byte offsets to select the text.
- * @warning Node must be valid and its byte range must lie within ScoreStr.
- */
-std::string Score::GetCodeStr(const std::string &ScoreStr, TSNode Node) {
-    int start = ts_node_start_byte(Node);
-    int end = ts_node_end_byte(Node);
-    return std::string(std::string_view(ScoreStr.data() + start, end - start));
-}
-
 // ─────────────────────────────────────
 /**
  * @brief Read an event duration from a numeric syntax node.
@@ -399,13 +306,6 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
 
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
     TSNode DurationNode = ts_node_child_by_field_name(Node, "duration", 8);
-    TSNode AttributeNode = ts_node_child_by_field_name(Node, "attribute", 9);
-
-    bool Percussive = false;
-    if (!ts_node_is_null(AttributeNode)) {
-        std::string attr_type = GetChildStringFromField(ScoreStr, AttributeNode, "type");
-        Percussive = (attr_type == "percussive");
-    }
 
     if (ts_node_is_null(PitchNode) || ts_node_is_null(DurationNode)) {
         TSPoint Init = ts_node_start_point(Node);
@@ -429,8 +329,8 @@ ScoreState Score::NewPitchEvent(const std::string &ScoreStr, TSNode Node) {
     }
     Event.Observations.push_back(SubState);
 
+    bool Percussive = GetAttribute(ScoreStr, Node, "percussive");
     if (Percussive) {
-        // TODO: need tests
         Observation Onset;
         Onset.Type = ONSET;
         Event.Observations.push_back(Onset);
@@ -644,7 +544,7 @@ ScoreState Score::NewPTechEvent(const std::string &ScoreStr, TSNode Node) {
     TSNode PitchNode = ts_node_child_by_field_name(Node, "pitch", 5);
 
     Event.Type = PTECH;
-    Event.MicroTopologyType = UNORDERED;
+    Event.MicroTopologyType = LEFT_RIGHT;
 
     // Sounded alternatives: technique labels or pitch.
     Event.MicroStates.resize(2);
@@ -760,6 +660,13 @@ ScoreState Score::NewUTechEvent(const std::string &ScoreStr, TSNode Node) {
         TSPoint Init = ts_node_start_point(Node);
         spdlog::error("UTECH event without technique on line {}", Init.row + 1);
         return {};
+    }
+
+    bool Percussive = GetAttribute(ScoreStr, Node, "percussive");
+    if (Percussive) {
+        Observation Onset;
+        Onset.Type = ONSET;
+        Event.Observations.push_back(Onset);
     }
 
     // Duration
@@ -950,35 +857,6 @@ void Score::EnsureSectionStart(TSNode EventNode, Configuration &Config) {
 
 // ─────────────────────────────────────
 /**
- * @brief Read child source text by field name or fallback node type.
- *
- * @param ScoreStr Complete score source corresponding to the node byte offsets.
- * @param node Tree-sitter node to inspect in the current score tree.
- * @param id Field name, fallback node type, or configuration key.
- *
- * @return Matching child text, or an empty string if no child matches.
- *
- * @note Tries a named field first, then inspects direct children for a matching type.
- */
-std::string Score::GetChildStringFromField(const std::string &ScoreStr, TSNode node, std::string id) {
-    TSNode field = ts_node_child_by_field_name(node, id.c_str(), id.length());
-    if (!ts_node_is_null(field)) {
-        return GetCodeStr(ScoreStr, field);
-    }
-
-    int child_count = ts_node_child_count(node);
-    for (int i = 0; i < child_count; i++) {
-        TSNode child = ts_node_child(node, i);
-        const char *type = ts_node_type(child);
-        if (id == type) {
-            return GetCodeStr(ScoreStr, child);
-        }
-    }
-    return "";
-}
-
-// ─────────────────────────────────────
-/**
  * @brief Parse, validate, and append a score event and its actions.
  *
  * @param ScoreStr Complete score source corresponding to the node byte offsets.
@@ -1030,30 +908,20 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     }
 
     if (Event.Type == TRILL || Event.Type == GLISS || Event.Type == UTECH || Event.Type == PTECH) {
-        const bool Technique = Event.Type == UTECH || Event.Type == PTECH;
-        const size_t ExpectedMicroStates = Event.Type == PTECH ? 2 : 1;
-        if (!Event.Observations.empty() || Event.MicroStates.empty() ||
-            (Technique && Event.MicroStates.size() != ExpectedMicroStates)) {
+        if (!Event.Observations.empty() || Event.MicroStates.empty()) {
             spdlog::error("Invalid microstate structure on line {}", Event.Line);
             return;
         }
 
         for (size_t k = 0; k < Event.MicroStates.size(); ++k) {
             AudioDescType Expected = PITCH;
-
             if (Event.Type == PTECH) {
-                // Unordered technique and pitch alternatives.
                 Expected = k == 0 ? LABEL : PITCH;
             } else if (Event.Type == UTECH) {
                 Expected = LABEL;
             }
 
             const auto &Observations = Event.MicroStates[k].Observations;
-
-            if (Expected != LABEL && Observations.size() != 1) {
-                spdlog::error("Invalid microstate observations on line {}", Event.Line);
-                return;
-            }
 
             for (const Observation &Obs : Observations) {
                 if (Obs.Type != Expected || (Expected == LABEL && Obs.Label.empty()) ||
@@ -1087,689 +955,4 @@ void Score::NewEvent(const std::string &ScoreStr, TSNode Node, Configuration &Co
     m_ScoreStates.emplace_back(std::move(Event));
 }
 
-// ─────────────────────────────────────
-/**
- * @brief Read the first direct named child of a specified type.
- *
- * @param source Complete source text corresponding to the parent node byte offsets.
- * @param parent Parent node whose named children are inspected.
- * @param wanted_type Named child node type to find.
- *
- * @return Matching child source text, or an empty string if no child matches.
- *
- * @note Ignores unnamed children and extracts text using the matched child byte range.
- */
-std::string Score::GetChildStringFromType(const std::string &source, TSNode parent, const std::string &wanted_type) {
-    uint32_t count = ts_node_child_count(parent);
-    for (uint32_t i = 0; i < count; ++i) {
-        TSNode child = ts_node_child(parent, i);
-
-        if (!ts_node_is_named(child))
-            continue;
-
-        if (wanted_type == ts_node_type(child)) {
-            uint32_t start = ts_node_start_byte(child);
-            uint32_t end = ts_node_end_byte(child);
-            return source.substr(start, end - start);
-        }
-    }
-    return {};
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Parse a numeric configuration value.
- *
- * @param id Field name, fallback node type, or configuration key.
- * @param valueType Tree-sitter type of the configuration value.
- * @param value Source text of the configuration value.
- * @param pos Source position used for diagnostics.
- * @param out Numeric output assigned on success.
- *
- * @return True when the value is accepted and assigned; false for the wrong syntax type.
- *
- * @note Logs and rejects values whose syntax type is not number.
- * @warning std::stod() can throw for malformed or out-of-range text.
- */
-bool Score::GetConfigNumber(const std::string &id, const std::string &valueType, const std::string &value, TSPoint pos,
-                            double &out) {
-    if (valueType != "number") {
-        spdlog::error("Invalid numeric value for {} on line {}.", id, pos.row + 1);
-        return false;
-    }
-
-    out = std::stod(value);
-    return true;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Parse a boolean configuration value and supported aliases.
- *
- * @param id Field name, fallback node type, or configuration key.
- * @param valueType Tree-sitter type of the configuration value.
- * @param value Source text of the configuration value.
- * @param pos Source position used for diagnostics.
- * @param out Boolean output, unchanged on failure.
- *
- * @return True if a supported value was assigned; false otherwise.
- *
- * @note Accepts case-insensitive true/false, on/off, yes/no, and numeric 1/0.
- */
-bool Score::GetConfigBool(const std::string &id, const std::string &valueType, std::string value, TSPoint pos,
-                          bool &out) {
-    if (valueType != "identifier" && valueType != "number") {
-        spdlog::error("Invalid boolean value for {} on line {}.", id, pos.row + 1);
-        return false;
-    }
-
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-    if (value == "true" || value == "on" || value == "yes" || value == "1") {
-        out = true;
-        return true;
-    }
-    if (value == "false" || value == "off" || value == "no" || value == "0") {
-        out = false;
-        return true;
-    }
-
-    spdlog::error("Invalid boolean value for {} on line {}.", id, pos.row + 1);
-    return false;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Apply a parsed score configuration declaration.
- *
- * @param ScoreStr Complete score source corresponding to the node byte offsets.
- * @param node Tree-sitter node to inspect in the current score tree.
- * @param Config Score configuration to read or update.
- *
- * @note Validates supported keys, updates parser timing state, and resolves model paths relative to the score file.
- * @warning Some settings mutate parser state or append boundaries; numeric conversions can throw.
- */
-void Score::NewConfig(const std::string &ScoreStr, TSNode node, Configuration &Config) {
-    TSNode keyNode = GetField(node, "key");
-    TSNode valueNode = GetField(node, "value");
-    TSPoint pos = ts_node_start_point(node);
-
-    if (ts_node_is_null(keyNode) || ts_node_is_null(valueNode)) {
-        spdlog::error("Invalid CONFIG on line {}.", pos.row + 1);
-        return;
-    }
-
-    std::string id = GetCodeStr(ScoreStr, keyNode);
-    std::string valueType = ts_node_type(valueNode);
-    std::string value = GetCodeStr(ScoreStr, valueNode);
-
-    if (id == "BPM" || id == "TRANSPOSE" || id == "SR" || id == "FFTSIZE" || id == "HOPSIZE" || id == "TUNINGA4" ||
-        id == "PHASECOUPLING" || id == "SYNCSTRENGTH" || id == "PITCHTEMPLATESIGMA" || id == "PITCHTEMPLATEHARMONICS" ||
-        id == "MFCCMELS" || id == "MFCCCOUNT" || id == "MEDSPAN" || id == "DBTRESHOLD" || id == "DBTHRESHOLD" ||
-        id == "SPECTRALROLLOFFCUTOFF" || id == "YINTHRESHOLD" || id == "YINMINFREQUENCY" || id == "YINMAXFREQUENCY" ||
-        id == "CHROMASIZE" || id == "CHROMACENTEROCTAVE" || id == "CHROMAOCTAVEWIDTH" || id == "ZCRTHRESHOLD" ||
-        id == "TIMETOLERANCE") {
-        double v = 0.0;
-        if (!GetConfigNumber(id, valueType, value, pos, v)) {
-            return;
-        }
-
-        if (id == "BPM") {
-            m_CurrentBPM = v;
-            if (m_CurrentBPM < 1) {
-                spdlog::error("BPM must be bigger than 0");
-                m_CurrentBPM = 1;
-            }
-
-            ScoreState Begin = GetFirstEvent();
-            ProcessEventTime(Begin);
-            Begin.BPMExpected = v;
-            m_ScoreStates.emplace_back(Begin);
-        } else if (id == "TRANSPOSE") {
-            if (v < -36 || v > 36) {
-                spdlog::warn("Weird transpose value on line {}.", pos.row + 1);
-            }
-            m_Transpose = v;
-        } else if (id == "PHASECOUPLING") {
-            if (v < 0 || v > 2) {
-                spdlog::error("Invalid value for PHASECOUPLING on line {}.", pos.row + 1);
-            } else {
-                Config.PhaseCoupling = v;
-            }
-        } else if (id == "SYNCSTRENGTH") {
-            if (v < 0 || v > 1) {
-                spdlog::error("Invalid value for SYNCSTRENGTH on line {}.", pos.row + 1);
-            } else {
-                Config.SyncStrength = v;
-            }
-        } else if (id == "TIMETOLERANCE") {
-            double tolerance = std::clamp(v, 0.0, 1.0);
-            double r = 64.0 - tolerance * 60.0;
-            m_TimeTolerance = r;
-        } else if (id == "PITCHTEMPLATESIGMA") {
-            if (v < 0 || v > 1) {
-                spdlog::error("Invalid value for PITCHTEMPLATESIGMA on line {}.", pos.row + 1);
-            } else {
-                Config.PitchTemplateSigma = v;
-            }
-        } else if (id == "PITCHTEMPLATEHARMONICS") {
-            int harmonics = static_cast<int>(v);
-            if (harmonics > 0) {
-                Config.PitchTemplateHarmonics = harmonics;
-            } else {
-                spdlog::error("PITCHTEMPLATEHARMONICS must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "SR") {
-            int sr = static_cast<int>(v);
-            if (sr > 0) {
-                Config.SR = sr;
-            } else {
-                spdlog::error("SR must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "FFTSIZE") {
-            int fft = static_cast<int>(v);
-            if (fft > 0 && (fft & (fft - 1)) == 0) {
-                Config.FFTSize = fft;
-            } else {
-                spdlog::error("FFTSIZE must be a power of two.");
-            }
-        } else if (id == "HOPSIZE") {
-            int hop = static_cast<int>(v);
-            if (hop > 0 && (hop & (hop - 1)) == 0) {
-                Config.HOPSize = hop;
-            } else {
-                spdlog::error("HOPSIZE must be a power of two.");
-            }
-        } else if (id == "TUNINGA4") {
-            if (v > 0) {
-                Config.TuningA4 = v;
-                m_Tunning = v;
-            } else {
-                spdlog::error("{} must be bigger than 0 on line {}.", id, pos.row + 1);
-            }
-        } else if (id == "MFCCMELS") {
-            int mels = static_cast<int>(v);
-            if (mels > 0) {
-                Config.MFCCMels = mels;
-            } else {
-                spdlog::error("MFCCMELS must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "MFCCCOUNT") {
-            int count = static_cast<int>(v);
-            if (count > 0) {
-                Config.MFCCCount = count;
-            } else {
-                spdlog::error("MFCCCOUNT must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "MEDSPAN") {
-            int medSpan = static_cast<int>(v);
-            if (medSpan > 0) {
-                Config.MedSpan = medSpan;
-            } else {
-                spdlog::error("MEDSPAN must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "DBTRESHOLD" || id == "DBTHRESHOLD") {
-            Config.dBTreshold = v;
-        } else if (id == "SPECTRALROLLOFFCUTOFF") {
-            if (v >= 0 && v <= 1) {
-                Config.SpectralRolloffCutoff = v;
-            } else {
-                spdlog::error("SPECTRALROLLOFFCUTOFF must be between 0 and 1 on line {}.", pos.row + 1);
-            }
-        } else if (id == "YINTHRESHOLD") {
-            if (v >= 0 && v <= 1) {
-                Config.YINThreshold = v;
-            } else {
-                spdlog::error("YINTHRESHOLD must be between 0 and 1 on line {}.", pos.row + 1);
-            }
-        } else if (id == "YINMINFREQUENCY") {
-            if (v > 0) {
-                Config.YINMinFrequency = v;
-            } else {
-                spdlog::error("YINMINFREQUENCY must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "YINMAXFREQUENCY") {
-            if (v > 0) {
-                Config.YINMaxFrequency = v;
-            } else {
-                spdlog::error("YINMAXFREQUENCY must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "CHROMASIZE") {
-            int size = static_cast<int>(v);
-            if (size > 0) {
-                Config.ChromaSize = size;
-            } else {
-                spdlog::error("CHROMASIZE must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "CHROMACENTEROCTAVE") {
-            Config.ChromaCenterOctave = v;
-        } else if (id == "CHROMAOCTAVEWIDTH") {
-            if (v > 0) {
-                Config.ChromaOctaveWidth = v;
-            } else {
-                spdlog::error("CHROMAOCTAVEWIDTH must be bigger than 0 on line {}.", pos.row + 1);
-            }
-        } else if (id == "ZCRTHRESHOLD") {
-            if (v >= 0) {
-                Config.ZCRThreshold = v;
-            } else {
-                spdlog::error("ZCRTHRESHOLD must be non-negative on line {}.", pos.row + 1);
-            }
-        } else {
-            spdlog::error("Unrecognized variable " + id);
-            return;
-        }
-        return;
-    }
-
-    if (id == "SECTIONRESTRICT") {
-        if (valueType != "identifier") {
-            spdlog::error("{} must be ON or OFF on line {}.", id, pos.row + 1);
-            return;
-        }
-
-        std::transform(value.begin(), value.end(), value.begin(),
-                       [](unsigned char Character) { return static_cast<char>(std::toupper(Character)); });
-        if (value != "ON" && value != "OFF") {
-            spdlog::error("{} must be ON or OFF on line {}.", id, pos.row + 1);
-            return;
-        }
-        Config.SectionRestrict = value == "ON";
-        return;
-    }
-
-    if (id == "ZCRCENTER" || id == "ZCRPAD" || id == "ZCRZEROPOS") {
-        bool v = false;
-        if (!GetConfigBool(id, valueType, value, pos, v)) {
-            return;
-        }
-
-        if (id == "ZCRCENTER") {
-            Config.ZCRCenter = v;
-        } else if (id == "ZCRPAD") {
-            Config.ZCRPad = v;
-        } else if (id == "ZCRZEROPOS") {
-            Config.ZCRZeroPos = v;
-        }
-        return;
-    }
-
-    if (id == "ONSETFUNCTION") {
-        if (valueType != "onset_function" && valueType != "identifier") {
-            spdlog::error("Invalid onset function value for {} on line {}.", id, pos.row + 1);
-            return;
-        }
-
-        if (value == "pow") {
-            Config.OnsetType = ODS_ODF_POWER;
-        } else if (value == "sf" || value == "hfc") {
-            Config.OnsetType = ODS_ODF_MAGSUM;
-        } else if (value == "cd") {
-            Config.OnsetType = ODS_ODF_COMPLEX;
-        } else if (value == "rcd") {
-            Config.OnsetType = ODS_ODF_RCOMPLEX;
-        } else if (value == "pd") {
-            Config.OnsetType = ODS_ODF_PHASE;
-        } else if (value == "wpd") {
-            Config.OnsetType = ODS_ODF_WPHASE;
-        } else if (value == "mkl") {
-            Config.OnsetType = ODS_ODF_MKL;
-        } else {
-            spdlog::error("Invalid onset function {} on line {}.", value, pos.row + 1);
-        }
-        return;
-    }
-
-    if (id == "ONNXMODEL" || id == "TIMBREMODEL") {
-        if (valueType != "path") {
-            spdlog::error("Invalid path value for {} on line {}.", id, pos.row + 1);
-            return;
-        }
-
-        std::string path = value;
-        if (!path.empty() && path.front() == '"' && path.size() >= 2 && path.back() == '"') {
-            path = path.substr(1, path.size() - 2);
-        }
-
-        Config.TimbreONNXModel = m_ScoreRootPath / fs::path(path);
-        if (!fs::exists(Config.TimbreONNXModel)) {
-            spdlog::error("Model path not found: {}", Config.TimbreONNXModel.string());
-        }
-        return;
-    }
-
-    if (id == "ONAUDIOSTATECHANGE") {
-        if (valueType != "identifier" && valueType != "number") {
-            spdlog::error("Invalid receiver for {} on line {}.", id, pos.row + 1);
-            return;
-        }
-        Config.AudioStateChangeReceiver = value;
-        return;
-    }
-
-    if (id == "ONNXDESCRIPTORS") {
-        Config.ONNXDescriptors.clear();
-        uint32_t count = ts_node_named_child_count(valueNode);
-        for (uint32_t i = 0; i < count; ++i) {
-            TSNode child = ts_node_named_child(valueNode, i);
-            std::string d = GetCodeStr(ScoreStr, child);
-            Config.ONNXDescriptors.push_back(d);
-        }
-        return;
-    }
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Extract timed Lua or receiver commands and append event actions.
- *
- * @param ScoreStr Complete score source corresponding to the node byte offsets.
- * @param Node Tree-sitter node to inspect in the current score tree.
- * @param Event Score event to populate or extend in place.
- *
- * @note Stores absolute delays in milliseconds and tempo-relative delays in beats, preserving command arguments.
- * @warning Numeric conversions can throw; a malformed command can leave earlier actions already appended.
- */
-void Score::NewEventAction(const std::string &ScoreStr, TSNode Node, ScoreState &Event) {
-    ScoreAction BaseAction;
-    BaseAction.AbsoluteTime = true;
-    BaseAction.Time = 0;
-
-    TSNode timingNode = GetField(Node, "timing");
-    if (!ts_node_is_null(timingNode)) {
-        TSNode amountNode = GetField(timingNode, "amount");
-        TSNode unitNode = GetField(timingNode, "unit");
-
-        if (!ts_node_is_null(amountNode)) {
-            BaseAction.Time = std::stof(GetCodeStr(ScoreStr, amountNode));
-        }
-
-        if (!ts_node_is_null(unitNode)) {
-            std::string unit = GetCodeStr(ScoreStr, unitNode);
-            if (unit == "sec") {
-                BaseAction.Time *= 1000.0;
-                BaseAction.AbsoluteTime = true;
-            } else if (unit == "ms") {
-                BaseAction.AbsoluteTime = true;
-            } else if (unit == "tempo") {
-                BaseAction.AbsoluteTime = false;
-            }
-        }
-    }
-
-    uint32_t childCount = ts_node_child_count(Node);
-    for (uint32_t i = 0; i < childCount; ++i) {
-        const char *fieldName = ts_node_field_name_for_child(Node, i);
-        if (fieldName == nullptr || std::string(fieldName) != "command") {
-            continue;
-        }
-
-        TSNode execNode = ts_node_child(Node, i);
-        if (std::string(ts_node_type(execNode)) != "exec") {
-            continue;
-        }
-
-        ScoreAction NewAction = BaseAction;
-
-        TSNode luaNode = GetField(execNode, "lua");
-        TSNode receiverNode = GetField(execNode, "receiver");
-
-        if (!ts_node_is_null(luaNode)) {
-            NewAction.Lua = GetCodeStr(ScoreStr, luaNode);
-            NewAction.isLua = true;
-        } else if (!ts_node_is_null(receiverNode)) {
-            NewAction.Receiver = GetCodeStr(ScoreStr, receiverNode);
-            NewAction.isLua = false;
-
-            TSNode args = GetField(execNode, "args");
-            if (!ts_node_is_null(args)) {
-                uint32_t argsCount = ts_node_child_count(args);
-                std::string pendingErrorPrefix;
-                for (uint32_t j = 0; j < argsCount; j++) {
-                    TSNode arg = ts_node_child(args, j);
-                    std::string argType = ts_node_type(arg);
-
-                    if (argType == "ERROR") {
-                        std::string token = GetCodeStr(ScoreStr, arg);
-                        token.erase(
-                            std::remove_if(token.begin(), token.end(), [](unsigned char c) { return std::isspace(c); }),
-                            token.end());
-                        pendingErrorPrefix += token;
-                        continue;
-                    }
-
-                    if (argType != "pdarg") {
-                        continue;
-                    }
-
-                    TSNode pdarg = ts_node_child(arg, 0);
-                    if (ts_node_is_null(pdarg)) {
-                        continue;
-                    }
-
-                    std::string pdargType = ts_node_type(pdarg);
-                    std::string token = GetCodeStr(ScoreStr, pdarg);
-                    if (!pendingErrorPrefix.empty()) {
-                        token = pendingErrorPrefix + token;
-                        pendingErrorPrefix.clear();
-                    }
-
-                    if (pdargType == "number") {
-                        if (isNumber(token)) {
-                            float f = std::stof(token);
-                            NewAction.Args.emplace_back(f);
-                        } else {
-                            spdlog::error("Invalid number argument on line {}.", ts_node_start_point(pdarg).row + 1);
-                            return;
-                        }
-                    } else if (pdargType == "identifier" || pdargType == "symbol") {
-                        std::string s = token;
-                        NewAction.Args.emplace_back(s);
-                    } else if (!token.empty()) {
-                        std::string s = token;
-                        NewAction.Args.emplace_back(s);
-                    }
-                }
-
-                if (!pendingErrorPrefix.empty()) {
-                    NewAction.Args.push_back(pendingErrorPrefix);
-                }
-            }
-        } else {
-            TSPoint Pos = ts_node_start_point(execNode);
-            spdlog::error("Invalid action command on line {}.", Pos.row + 1);
-            continue;
-        }
-
-        Event.Actions.push_back(NewAction);
-    }
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Log missing tokens and unexpected source text in a syntax tree.
- *
- * @param Node Tree-sitter node to inspect in the current score tree.
- * @param ScoreStr Complete score source corresponding to the node byte offsets.
- * @param InsideError Whether an ancestor is already an error node, suppressing duplicate recovery messages.
- *
- * @note Traverses recursively, avoiding duplicate nested error messages and shortening recovery text to 80
- * characters.
- */
-void Score::FindErrors(TSNode Node, const std::string &ScoreStr, bool InsideError) {
-    if (ts_node_is_null(Node)) {
-        return;
-    }
-
-    const TSPoint Position = ts_node_start_point(Node);
-    if (ts_node_is_missing(Node)) {
-        std::string Label = ts_node_type(Node);
-        const TSNode Parent = ts_node_parent(Node);
-        if (Label == "number" && !ts_node_is_null(Parent)) {
-            for (const std::string Field : {"duration", "amount"}) {
-                const TSNode Value = ts_node_child_by_field_name(Parent, Field.c_str(), Field.size());
-                if (!ts_node_is_null(Value) && ts_node_eq(Value, Node)) {
-                    Label = Field;
-                    break;
-                }
-            }
-        }
-        if (!ts_node_is_named(Node)) {
-            Label = "\"" + Label + "\"";
-        }
-        spdlog::error("Missing {} at line {}, column {}", Label, Position.row + 1, Position.column + 1);
-    } else if (ts_node_is_error(Node) && !InsideError) {
-        const uint32_t Start = ts_node_start_byte(Node);
-        std::string Text = ScoreStr.substr(Start, ts_node_end_byte(Node) - Start);
-        // Keep multi-line recovery nodes readable in host consoles.
-        std::replace_if(Text.begin(), Text.end(), [](unsigned char C) { return std::isspace(C); }, ' ');
-        if (Text.size() > 80) {
-            Text = Text.substr(0, 80) + "…";
-        }
-        spdlog::error("Unexpected text '{}' at line {}, column {}", Text, Position.row + 1, Position.column + 1);
-    }
-
-    // has_error also marks ancestors; only the actual ERROR/MISSING nodes get messages.
-    for (uint32_t Index = 0; Index < ts_node_child_count(Node); ++Index) {
-        FindErrors(ts_node_child(Node, Index), ScoreStr, InsideError || ts_node_is_error(Node));
-    }
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Heuristically classify a file as text from its leading bytes.
- *
- * @param path Path to the file whose leading bytes are inspected.
- *
- * @return True if the sample appears textual; false for unreadable or apparently binary files.
- *
- * @note Samples up to 4096 bytes, accepts empty files, and rejects null bytes or a suspicious-byte ratio of at
- * least 5%.
- * @warning This byte heuristic is not a Unicode-aware validator and can reject non-ASCII text.
- */
-bool Score::ScoreIsText(const std::string &path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-        return false;
-
-    constexpr std::size_t SampleSize = 4096;
-    std::vector<unsigned char> buffer(SampleSize);
-
-    file.read(reinterpret_cast<char *>(buffer.data()), SampleSize);
-    std::size_t bytesRead = static_cast<std::size_t>(file.gcount());
-
-    if (bytesRead == 0)
-        return true; // empty file → treat as text
-
-    std::size_t suspicious = 0;
-
-    for (std::size_t i = 0; i < bytesRead; ++i) {
-        unsigned char c = buffer[i];
-
-        // Null byte strongly indicates binary
-        if (c == 0)
-            return false;
-
-        // Allow printable ASCII and common whitespace
-        if (!(std::isprint(c) || c == '\n' || c == '\r' || c == '\t'))
-            suspicious++;
-    }
-
-    double ratio = static_cast<double>(suspicious) / bytesRead;
-
-    // Threshold: >5% suspicious bytes → likely binary
-    return ratio < 0.05;
-}
-
-// ─────────────────────────────────────
-/**
- * @brief Read a score file and build its configuration and internal state vector.
- *
- * @param ScoreFilePath Path to the score file to parse.
- *
- * @return Parsed configuration and states; a default pair on missing files, read failure, or events before BPM.
- *
- * @note Collects global Lua blocks and processes configurations, sections, and events in source order.
- * @warning Clears previous states and Lua source before loading; syntax errors can be logged while returning
- * partial results.
- */
-std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
-    m_ScoreStates.clear();
-    m_LuaCode.clear();
-    Configuration Config = Configuration();
-
-    if (fs::exists(ScoreFilePath) == false) {
-        spdlog::error("Score File not found");
-        return {};
-    }
-    m_ScoreRootPath = ScoreFilePath.parent_path();
-
-    // Open the score file for reading
-    std::ifstream File(ScoreFilePath, std::ios::binary);
-    if (File.is_open() == false) {
-        spdlog::error("Not possible to open score file");
-        return {};
-    }
-
-    File.clear(); // Clear error flags
-
-    std::ostringstream Buffer;
-    Buffer << File.rdbuf(); // Safely read the entire file
-    std::string ScoreStr = Buffer.str();
-
-    // Proceed with parsing ScoreStr...
-    m_LineCount = 0;
-    m_MarkovIndex = 0;
-    m_LastOnset = 0;
-    m_PrevDuration = 0;
-    m_CurrentBPM = -1;
-    m_Transpose = 0;
-    m_CurrentSection.clear();
-    m_HasSection = false;
-    m_SectionStartPending = false;
-    m_ScorePosition = 0;
-    std::string Line;
-
-    // read and process score
-    TSParser *parser = ts_parser_new();
-    ts_parser_set_language(parser, tree_sitter_openscofo());
-    TSTree *tree = ts_parser_parse_string(parser, nullptr, ScoreStr.c_str(), ScoreStr.size());
-    TSNode rootNode = ts_tree_root_node(tree);
-
-    if (ts_node_has_error(rootNode)) {
-        FindErrors(rootNode, ScoreStr);
-    }
-
-    uint32_t child_count = ts_node_child_count(rootNode);
-    for (uint32_t i = 0; i < child_count; i++) {
-        TSNode Child = ts_node_child(rootNode, i);
-        std::string type = ts_node_type(Child);
-        if (type == "EVENT") {
-            if (m_CurrentBPM == -1) {
-                spdlog::error("BPM is not defined");
-                return {};
-            }
-            NewEvent(ScoreStr, Child, Config);
-        } else if (type == "CONFIG") {
-            NewConfig(ScoreStr, Child, Config);
-        } else if (type == "SECTION") {
-            NewSection(ScoreStr, Child);
-        } else if (type == "LUA") {
-            std::string lua_body = GetChildStringFromField(ScoreStr, Child, "lua_body");
-            m_LuaCode += lua_body;
-        } else if (type == "comment") {
-            // ignore
-        } else {
-            spdlog::error("Not recognized {}", type);
-        }
-    }
-
-    // Cleanup
-    ts_tree_delete(tree);
-    ts_parser_delete(parser);
-
-    m_ScoreLoaded = true;
-    return {Config, m_ScoreStates};
-}
 } // namespace OpenScofo

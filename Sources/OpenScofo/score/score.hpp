@@ -76,6 +76,9 @@ class Score {
     ScoreState NewPTechEvent(const std::string &ScoreStr, TSNode Node);
     ScoreState NewUTechEvent(const std::string &ScoreStr, TSNode Node);
 
+    // Attribute
+    bool GetAttribute(const std::string ScoreStr, TSNode Node, const std::string &attr);
+
     // Add events
     ScoreState GetFirstEvent();
     ScoreState AddDumpSilence();

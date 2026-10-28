@@ -60,7 +60,9 @@ class MIR {
     double PositiveRemainder(double value, double modulus) const;
     bool DescriptorRequested(Descriptors Descriptor) const;
     void UpdateDescriptorFlags();
-    void ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &acc, size_t NHalf);
+    void ComputeSpectrum(Description &Desc, SpectralAccumulators &Sums, int BinCount);
+    void ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &Sums, int BinCount);
+    void NormalizeSpectrum(Description &Desc, const SpectralAccumulators &Sums, int BinCount);
     void GetSpectralDescriptions(Description &Desc);
 
     // MFCC
@@ -135,7 +137,7 @@ class MIR {
     std::array<double, 3> m_A2;
 
     // Audio
-    std::vector<double> m_PreviousSpectralPower;
+    std::vector<double> m_PreviousSpectralMagnitude;
     std::vector<double> m_SpectralPrefix;
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;

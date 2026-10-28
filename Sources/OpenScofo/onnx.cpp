@@ -8,7 +8,7 @@
 */
 
 /**
- * @file onnx.cpp
+ * @file ai.cpp
  * @brief ONNX classifier loading, metadata parsing, and descriptor inference.
  *
  * @note Uses ordered descriptor buffers and string labels to map classifier output into audio descriptions.
@@ -225,31 +225,31 @@ void ONNXModel::ReadMetadata(std::vector<Descriptors> &descriptors, const Config
 
     int metadataSampleRate = 0;
     if (ParseIntMetadata(sampleRateMetadata, metadataSampleRate) && metadataSampleRate != configuration.SR) {
-        spdlog::warn("ONNX model was trained at {} Hz, but OpenScofo is running at {} Hz.", metadataSampleRate,
-                     configuration.SR);
+        spdlog::error("ONNX model was trained at {} Hz, but OpenScofo is running at {} Hz.", metadataSampleRate,
+                      configuration.SR);
     }
 
     int metadataFFTSize = 0;
     if (ParseIntMetadata(fftSizeMetadata, metadataFFTSize) && metadataFFTSize != configuration.FFTSize) {
-        spdlog::warn("ONNX model was trained at FFT Size of {}, but OpenScofo is running FFT Size {}.", metadataFFTSize,
-                     configuration.FFTSize);
+        spdlog::error("ONNX model was trained at FFT Size of {}, but OpenScofo is running FFT Size {}.",
+                      metadataFFTSize, configuration.FFTSize);
     }
 
     int metadataHopSize = 0;
     if (ParseIntMetadata(hopSizeMetadata, metadataHopSize) && metadataHopSize != configuration.HOPSize) {
-        spdlog::warn("ONNX model was trained at Hop Size of {}, but OpenScofo is running Hop Size {}.", metadataHopSize,
-                     configuration.HOPSize);
+        spdlog::error("ONNX model was trained at Hop Size of {}, but OpenScofo is running Hop Size {}.",
+                      metadataHopSize, configuration.HOPSize);
     }
 
     std::vector<Descriptors> metadataDescriptors;
     if (ParseDescriptorMetadata(descriptorMetadata, metadataDescriptors) && !metadataDescriptors.empty()) {
         descriptors = std::move(metadataDescriptors);
     } else if (descriptorMetadata != nullptr) {
-        spdlog::warn("Could not parse ONNX descriptor metadata, using descriptors supplied by the score/API.");
+        spdlog::error("Could not parse ONNX descriptor metadata, using descriptors supplied by the score/API.");
     }
 
     if (!ParseJsonStringArray(labelMetadata, metadataLabels) && labelMetadata != nullptr) {
-        spdlog::warn("Could not parse ONNX label metadata, falling back to TreeEnsembleClassifier labels.");
+        spdlog::error("Could not parse ONNX label metadata, falling back to TreeEnsembleClassifier labels.");
     }
 }
 
