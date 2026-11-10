@@ -39,4 +39,4 @@ NOTE D5 1
 
 Here the named notes are followed one octave below their written pitches, using A4 = 442 Hz.
 
-YIN pitch estimation and spectral rolloff are separate [descriptor settings](descriptors.md#yin-pitch-estimation). They do not set the width of the follower's harmonic pitch templates. For analysis window and update sizes, see [Audio analysis](descriptors.md#audio-analysis).
+Sigmund pitch estimation and spectral rolloff are separate [descriptor settings](descriptors.md#sigmund-pitch-estimation). They do not set the width of the follower's harmonic pitch templates. For analysis window and update sizes, see [Audio analysis](descriptors.md#audio-analysis).

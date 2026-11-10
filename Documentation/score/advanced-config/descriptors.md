@@ -51,15 +51,15 @@ Test onset changes with the exact articulation that fails. Compare attack detect
 
 These settings change model input dimensions. Match the trained feature extraction setup; changing them is not a general remedy for poor technique recognition.
 
-## YIN pitch estimation
+## Sigmund pitch estimation
 
 | Keyword | Default | Accepted value | Effect |
 | --- | --- | --- | --- |
-| `YINTHRESHOLD` | `0.15` | `0` to `1`, inclusive | Threshold for the first candidate minimum in YIN's normalized difference function. |
+| `YINTHRESHOLD` | `0.15` | `0` to `1`, inclusive | Legacy compatibility setting; it is parsed but does not alter the Sigmund detector. |
 | `YINMINFREQUENCY` | `50` Hz | Positive number | Lower frequency limit for estimated pitch. |
 | `YINMAXFREQUENCY` | `2000` Hz | Positive number | Upper frequency limit for estimated pitch. |
 
-Choose a minimum below the maximum and a range supported by the sample rate and window size. The parser checks positivity separately, without enforcing the relationship between the limits. YIN supplies pitch descriptors; harmonic template matching has its own [Pitch Following](pitch-following.md) settings.
+Choose a minimum below the maximum and a range supported by the sample rate and window size. The parser checks positivity separately, without enforcing the relationship between the limits. Sigmund supplies the legacy `yin` and `yin_confidence` descriptors; harmonic template matching has its own [Pitch Following](pitch-following.md) settings.
 
 ## Spectral rolloff and chroma
 
