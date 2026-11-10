@@ -279,11 +279,11 @@ TEST(InitialDistribution, UsesScoreDistancePriorDirectly) {
     EXPECT_NEAR(Forward.GetStates()[2].InitProb, nextWeight / sum, 1e-14);
 }
 
-TEST(InterEventSilence, LinearTransitionsAndGeometricOccupancy) {
+TEST(InterEventSilence, OptionalSilenceAndDirectSkipHaveEqualPrior) {
     OnlineForward Forward;
     Access::Setup(Forward, GapChain());
-    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 1), 1.0);
-    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 2), 0.0);
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 1), 0.5);
+    EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 0, 2), 0.5);
     EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 1, 2), 1.0);
     EXPECT_DOUBLE_EQ(Access::ScoreTransition(Forward, 2, 0), 0.0);
     Forward.GetStates()[1].InitProb = 1.0;
@@ -299,7 +299,7 @@ TEST(InterEventSilence, LinearTransitionsAndGeometricOccupancy) {
     }
 }
 
-TEST(InterEventSilence, BothSegmentModelsUseAdjacentSilenceExit) {
+TEST(InterEventSilence, BothSegmentModelsCombineSilenceAndDirectSkipPaths) {
     for (bool Nested : {false, true}) {
         OnlineForward Forward;
         Access::Setup(Forward, GapChain(Nested));
@@ -309,8 +309,8 @@ TEST(InterEventSilence, BothSegmentModelsUseAdjacentSilenceExit) {
         Forward.GetStates()[2].BestObs[1] = 0.7;
         if (Nested) Access::Emissions(Forward, 2, {0.7});
         Access::SemiMarkov(Forward, 2);
-        EXPECT_NEAR(Forward.GetStates()[2].Forward[1],
-                    Access::Occupancy(Forward, 2, 1, true) * 0.4 * 0.7, 1e-14);
+        const double Incoming = 0.5 * 0.8 + 1.0 * 0.4;
+        EXPECT_NEAR(Forward.GetStates()[2].Forward[1], Access::Occupancy(Forward, 2, 1, true) * Incoming * 0.7, 1e-14);
     }
 }
 
