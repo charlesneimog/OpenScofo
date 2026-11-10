@@ -349,39 +349,64 @@ void OnlineForward::Markov(ScoreState &StateJ, int j) {
  */
 void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     const double ExpectedFrames = std::max(1.0, (m_PsiN1 * StateJ.Duration) / m_BlockDur);
+
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
 
     const auto &surv_cache = m_SurvivorCache[key];
     const auto &occ_cache = m_OccupancyPMFCache[key];
+
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
+
     PrepareSegmentLikelihoods(StateJ, std::min(m_Tau + 1, maxU));
+
+    // Precompute the only two possible predecessor transitions.
+    const int Prev1 = j - 1;
+    const int Prev2 = j - 2;
+
+    const double P1 = Prev1 >= m_WinStart ? GetSemiMarkovTransitionProbability(Prev1, j) : 0.0;
+    const double P2 = Prev2 >= m_WinStart ? GetSemiMarkovTransitionProbability(Prev2, j) : 0.0;
 
     double FTildeJ = 0.0;
     double FTildeJo = 0.0;
+    const bool IsLeftRight = StateJ.MicroTopologyType == LEFT_RIGHT;
+
+    // This is a optimization, once that we
     for (int u = 1; u <= observedHistory; ++u) {
         const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
-        double incoming = 0.0;
+        double Incoming = 0.0;
 
-        for (int i = m_WinStart; i < j; ++i) {
-            incoming += GetSemiMarkovTransitionProbability(i, j) * m_States[i].ExitProb[EntryBuf];
+        if (P2 != 0.0) {
+            Incoming += P2 * m_States[Prev2].ExitProb[EntryBuf];
         }
 
-        const double segment = GetSegmentLikelihood(u, incoming);
+        if (P1 != 0.0) {
+            Incoming += P1 * m_States[Prev1].ExitProb[EntryBuf];
+        }
+
+        const double segment = GetSegmentLikelihood(u, Incoming);
         FTildeJ += surv_cache[u] * segment;
         FTildeJo += occ_cache[u] * segment;
-        m_SegmentLogForwardWeights[u] = LogMultiply(LogProbability(surv_cache[u]), LogProbability(incoming));
+
+        if (IsLeftRight) {
+            m_SegmentLogForwardWeights[u] = LogMultiply(LogProbability(surv_cache[u]), LogProbability(Incoming));
+        }
     }
 
-    // A state already active at the start of decoding uses the same observation model.
-    const int initialDuration = m_Tau + 1;
-    if (initialDuration <= maxU) {
-        const double segment = GetSegmentLikelihood(initialDuration, StateJ.InitProb);
-        FTildeJ += surv_cache[initialDuration] * segment;
-        FTildeJo += occ_cache[initialDuration] * segment;
-        m_SegmentLogForwardWeights[initialDuration] =
-            LogMultiply(LogProbability(surv_cache[initialDuration]), LogProbability(StateJ.InitProb));
+    // A state already active at the start of decoding
+    // uses the same observation model.
+    const int InitDur = m_Tau + 1;
+
+    if (InitDur <= maxU) {
+        const double segment = GetSegmentLikelihood(InitDur, StateJ.InitProb);
+        FTildeJ += surv_cache[InitDur] * segment;
+        FTildeJo += occ_cache[InitDur] * segment;
+
+        if (IsLeftRight) {
+            m_SegmentLogForwardWeights[InitDur] =
+                LogMultiply(LogProbability(surv_cache[InitDur]), LogProbability(StateJ.InitProb));
+        }
     }
 
     StateJ.Forward[m_CircularBufferIndex] = FTildeJ + m_SegmentProbabilityFloor;

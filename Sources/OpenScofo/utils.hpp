@@ -29,7 +29,7 @@ inline bool ParseFloat(std::string_view text, float &value) {
 // ╭─────────────────────────────────────╮
 // │                Math                 │
 // ╰─────────────────────────────────────╯
-inline constexpr double LogZero = -std::numeric_limits<double>::max();
+inline constexpr double LogZero = -std::numeric_limits<double>::infinity();
 
 // ─────────────────────────────────────
 inline double LogProbability(double Probability) {
@@ -38,7 +38,7 @@ inline double LogProbability(double Probability) {
 
 // ─────────────────────────────────────
 inline double LogMultiply(double A, double B) {
-    return A == LogZero || B == LogZero ? LogZero : A + B;
+    return A + B;
 }
 
 // ─────────────────────────────────────
