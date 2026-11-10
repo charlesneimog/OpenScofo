@@ -21,9 +21,16 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
 set(BUILD_EXAMPLES OFF)
-set(TREE_SITTER_VERSION "v0.27.0")
 
-include(FetchContent)
+# ╭──────────────────────────────────────╮
+# │          Libraries Versions          │
+# ╰──────────────────────────────────────╯
+set(TREE_SITTER_VERSION "v0.27.2")
+set(PFFFT_VERSION "v1.1.0")
+set(SPDLOG_VERSION "v1.17.0")
+set(MIPP_VERSION "")
+set(LUA_VERSION "v5.5.0")
+set(PDCMAKE_VERSION "v2.0.19")
 
 # ╭──────────────────────────────────────╮
 # │               Options                │
@@ -76,8 +83,9 @@ endif()
 # ╭──────────────────────────────────────╮
 # │               PD CMAKE               │
 # ╰──────────────────────────────────────╯
+include(FetchContent)
+
 set(PDCMAKE_FILE "${CMAKE_BINARY_DIR}/pd.cmake")
-set(PDCMAKE_VERSION "v2.0.19")
 
 if(NOT EXISTS "${PDCMAKE_FILE}")
     file(
@@ -214,7 +222,7 @@ if(OPENSCOFO_BUILD_WITH_LUA)
     FetchContent_Declare(
         lua
         GIT_REPOSITORY https://github.com/lua/lua.git
-        GIT_TAG v5.5.0)
+        GIT_TAG ${LUA_VERSION})
     FetchContent_MakeAvailable(lua)
 
     file(GLOB lua_sources ${lua_SOURCE_DIR}/*.c)
@@ -250,7 +258,7 @@ set(MIPP_INCLUDE_DIRS "${mipp_SOURCE_DIR}/include")
 FetchContent_Declare(
     pffft
     GIT_REPOSITORY https://github.com/marton78/pffft.git
-    GIT_TAG v1.1.0)
+    GIT_TAG ${PFFFT_VERSION})
 FetchContent_MakeAvailable(pffft)
 
 # onsetsds
@@ -264,7 +272,7 @@ FetchContent_MakeAvailable(onsetsds_tilde)
 FetchContent_Declare(
     spdlog
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG v1.17.0)
+    GIT_TAG ${SPDLOG_VERSION})
 FetchContent_MakeAvailable(spdlog)
 
 # libonnx
@@ -289,7 +297,7 @@ add_library(
 add_library(
     openscofo_mir STATIC
     Sources/OpenScofo/mir/mir.cpp Sources/OpenScofo/mir/spectral.cpp Sources/OpenScofo/mir/pitch.cpp
-    Sources/OpenScofo/mir/features.cpp Sources/OpenScofo/mir/classification.cpp)
+    Sources/OpenScofo/mir/sigmund.cpp Sources/OpenScofo/mir/features.cpp Sources/OpenScofo/mir/classification.cpp)
 
 add_library(
     openscofo_score STATIC
