@@ -20,12 +20,6 @@ extern "C" {
 
 #include <OpenScofo.hpp>
 
-#if defined(_WIN32)
-#define OPENSCOFO_PD_EXPORT __declspec(dllexport)
-#else
-#define OPENSCOFO_PD_EXPORT __attribute__((visibility("default")))
-#endif
-
 static t_class *OpenScofoObj;
 
 #ifdef OPENSCOFO_LUA
@@ -643,7 +637,7 @@ static void openscofo_free(PdOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-extern "C" OPENSCOFO_PD_EXPORT void openscofo_tilde_setup(void) {
+extern "C" void openscofo_tilde_setup(void) {
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)openscofo_new, (t_method)openscofo_free,
                              sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
@@ -661,3 +655,7 @@ extern "C" OPENSCOFO_PD_EXPORT void openscofo_tilde_setup(void) {
     CLASS_MAINSIGNALIN(OpenScofoObj, PdOpenScofo, Sample);
     class_addmethod(OpenScofoObj, (t_method)openscofo_adddsp, gensym("dsp"), A_CANT, 0);
 }
+
+#ifdef __WIN64
+__declspec(dllexport) void openscofo_tilde_setup(void);
+#endif
