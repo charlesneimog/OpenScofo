@@ -53,6 +53,7 @@ option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
 option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supported" ON)
+option(OPENSCOFO_USE_YIN "Choose between Yin and Sigmund (sigmund~ pd object)" OFF)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
