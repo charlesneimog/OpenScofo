@@ -91,6 +91,8 @@ class MIR {
     void GetSpectralFlux(Description &Desc);
     void YINInit();
     void YINExec(const std::vector<double> &In, Description &Desc);
+    void SigmundInit();
+    void SigmundExec(Description &Desc);
 
   private:
     // FFT
@@ -141,6 +143,11 @@ class MIR {
     std::vector<double> m_SpectralPrefix;
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;
+
+    // Sigmund reuses the current Hann-windowed spectrum from the main FFT.
+    std::vector<double> m_SigmundMask;
+    std::vector<std::array<float, 2>> m_SigmundPitchPoints;
+    std::array<float, 16> m_SigmundHarmonicWeights{};
     double m_PrevCentroid = 0.0;
 
     bool m_NeedYIN = false;

@@ -113,7 +113,7 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
         ZeroCrossingRateInit();
     }
     if (m_NeedYIN) {
-        YINInit();
+        SigmundInit();
     }
     InitITURFilters();
 
@@ -209,13 +209,6 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
         Desc.ZeroCrossingRate = 0.0;
     }
 
-    if (m_NeedYIN) {
-        YINExec(In, Desc);
-    } else {
-        Desc.Pitch = 0.0;
-        Desc.PitchConfidence = 0.0;
-    }
-
     // 2. Frequency Domain (windowing + FFT)
     const double *x = In.data();
     const double *w = m_FullWindowingFunc.data();
@@ -224,6 +217,13 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
     }
 
     GetSpectralDescriptions(Desc);
+
+    if (m_NeedYIN) {
+        SigmundExec(Desc);
+    } else {
+        Desc.Pitch = 0.0;
+        Desc.PitchConfidence = 0.0;
+    }
 
     if (m_NeedOnset) {
         OnsetExec(Desc);

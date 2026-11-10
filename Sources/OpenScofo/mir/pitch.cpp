@@ -78,6 +78,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     //
     // Keep tau as the inner loop because both diff[tau]
     // and data[i + tau] are then accessed sequentially.
+    // TODO: LOOP
     for (size_t i = 0; i + minTau < frame; ++i) {
         const double x = data[i];
 
@@ -87,6 +88,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
         const double *lag = data + i + minTau;
         const double *const lagEnd = data + i + limit + 1;
 
+        // TODO: LOOP
         while (lag < lagEnd) {
             const double delta = x - *lag++;
             *d++ += delta * delta;
@@ -105,7 +107,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     }
 
     double cumulative = 0.0;
-
+    // TODO: LOOP
     for (size_t tau = minTau; tau <= maxTau; ++tau) {
         cumulative += diff[tau];
         if (cumulative <= 0.0) {
@@ -123,6 +125,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     size_t tauEstimate = 0;
     double bestValue = std::numeric_limits<double>::infinity();
 
+    // TODO: LOOP
     for (size_t tau = minTau; tau <= maxTau; ++tau) {
         const double value = cmndf[tau];
 
@@ -130,8 +133,9 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
             tauEstimate = tau;
             bestValue = value;
 
+            // TODO: LOOP
             while (tau + 1 <= maxTau && cmndf[tau + 1] < bestValue) {
-                ++tau;
+                tau++;
                 tauEstimate = tau;
                 bestValue = cmndf[tau];
             }
@@ -143,6 +147,7 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
     // No threshold crossing: fall back to the global minimum,
     // exactly as the previous implementation did.
     if (tauEstimate == 0) {
+        // TODO: LOOP
         for (size_t tau = minTau; tau <= maxTau; ++tau) {
             const double value = cmndf[tau];
 
@@ -161,42 +166,34 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 
     // ─────────────────────────────────────
     // Parabolic interpolation
-    double refinedTau = static_cast<double>(tauEstimate);
-
+    double RefinedTau = static_cast<double>(tauEstimate);
     if (tauEstimate > minTau && tauEstimate + 1 <= maxTau) {
-
         const double left = cmndf[tauEstimate - 1];
         const double center = cmndf[tauEstimate];
         const double right = cmndf[tauEstimate + 1];
-
         const double denominator = left - 2.0 * center + right;
-
         if (std::abs(denominator) > 1e-12) {
             const double offset = 0.5 * (left - right) / denominator;
-
-            refinedTau += std::clamp(offset, -1.0, 1.0);
+            RefinedTau += std::clamp(offset, -1.0, 1.0);
         }
     }
 
-    const double confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
-
-    if (refinedTau <= 0.0 || confidence <= 0.0) {
+    const double Confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
+    if (RefinedTau <= 0.0 || Confidence <= 0.0) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    const double pitch = m_Config.SR / refinedTau;
-
-    if (pitch < m_Config.YINMinFrequency || pitch > m_Config.YINMaxFrequency) {
-
+    const double Pitch = m_Config.SR / RefinedTau;
+    if (Pitch < m_Config.YINMinFrequency || Pitch > m_Config.YINMaxFrequency) {
         Desc.Pitch = 0.0;
         Desc.PitchConfidence = 0.0;
         return;
     }
 
-    Desc.Pitch = pitch;
-    Desc.PitchConfidence = confidence;
+    Desc.Pitch = Pitch;
+    Desc.PitchConfidence = Confidence;
 }
 
 } // namespace OpenScofo
