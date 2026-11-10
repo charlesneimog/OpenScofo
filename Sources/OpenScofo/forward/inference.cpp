@@ -42,7 +42,7 @@ inline void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
     }
     const double lambda = static_cast<double>(key) * 0.1;
 
-    // TODO: This is a score parameter
+    // TODO: Should this be a score parameter?
     constexpr double timeTolerance = 0.03;
 
     const double tailScale = std::max(2.0, lambda);
@@ -90,6 +90,7 @@ inline void OnlineForward::BuildDistributionCache(double ExpectedFrames) {
         cumulative += pmf[static_cast<size_t>(u)];
         survivor[static_cast<size_t>(u)] = cumulative;
     }
+
     survivor[0] = 1.0;
     m_OccupancyPMFCache.emplace(key, std::move(pmf));
     m_SurvivorCache.emplace(key, std::move(survivor));
@@ -158,7 +159,11 @@ void OnlineForward::GetDecodeWindow() {
 }
 
 // ─────────────────────────────────────
-// Initialize the score-position prior in the active window.
+/**
+ * @brief Initialize the score-position prior in the active window.
+ *
+ * @note This is a OpenScofo implementation
+ */
 void OnlineForward::GetInitialDistribution() {
     double duration = 0.0;
     double sum = 0.0;
@@ -185,14 +190,28 @@ void OnlineForward::GetInitialDistribution() {
 }
 
 // ─────────────────────────────────────
-// Use a linear left-to-right score topology.
+/**
+ * @brief Use a linear kind of left-to-right score topology.
+ *
+ * @note Initialize the score-position prior in the active window. This is just difference because I believe that should
+ * be 50% have silence (on non-legato)
+ */
 double OnlineForward::GetSemiMarkovTransitionProbability(int i, int j) {
-    int size = static_cast<int>(m_States.size());
-
-    if (i < 0 || j < 0 || i >= size || j >= size) {
+    if (i < 0 || j <= i || j >= static_cast<int>(m_States.size())) {
         return 0.0;
     }
 
+    // Inter-event silence is optional: the decoder may either enter the
+    // silence state or skip directly to the next musical event.
+    //
+    // Ideally this prior could be controlled by score information, e.g.
+    // articulation/legato. Since OpenScofo currently has no such parameter,
+    // assign equal prior probability (0.5) to both paths. The observation
+    // likelihoods will subsequently determine which path is favored.
+    // This is something that is implemented different from Antescofo
+    if (i + 1 < static_cast<int>(m_States.size()) && m_States[i + 1].IsInterEventSilence) {
+        return (j == i + 1 || j == i + 2) ? 0.5 : 0.0;
+    }
     return j == i + 1 ? 1.0 : 0.0;
 }
 
@@ -332,6 +351,7 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     const double ExpectedFrames = std::max(1.0, (m_PsiN1 * StateJ.Duration) / m_BlockDur);
     const int key = static_cast<int>(ExpectedFrames * 10.0 + 0.5);
     BuildDistributionCache(ExpectedFrames);
+
     const auto &surv_cache = m_SurvivorCache[key];
     const auto &occ_cache = m_OccupancyPMFCache[key];
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
@@ -415,6 +435,7 @@ int OnlineForward::GetAlphaT() {
         m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
         m_States[j].ExitProb[m_CircularBufferIndex] /= N;
         m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+
         if (m_States[j].MicroTopologyType == LEFT_RIGHT) {
             // Shared score-level scaling: each path retains the normalization
             // of its segment history for the next HSMM update.

@@ -205,6 +205,7 @@ void OnlineForward::UpdateMicroStatePosterior(ScoreState &State) {
     if (State.MicroTopologyType != LEFT_RIGHT) {
         return;
     }
+
     State.BestMicroStateIndex = -1;
     State.BestMicroObservationIndex = -1;
     const int MaxAge = static_cast<int>(m_SegmentLogForwardWeights.size()) - 1;
