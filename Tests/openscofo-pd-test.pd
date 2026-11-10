@@ -1,4 +1,4 @@
-#N canvas 0 0 1120 1136 10;
+#N canvas 0 0 466 568 10;
 #X declare -lib xlab;
 #X declare -path ./../build/Sources/Wrappers/PureData;
 #X obj 207 27 x.cpuuse;
@@ -7,7 +7,7 @@
 #X obj 337 60 declare -lib xlab;
 #X obj 30 60 declare -path ./../build/Sources/Wrappers/PureData;
 #X restore 3 3 pd config;
-#N canvas 0 0 932 1136 /*patcherized*/ 0;
+#N canvas 0 0 466 568 /*patcherized*/ 0;
 #X obj 205 302 nbx 5 16 -1e+37 1e+37 0 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000 0 256;
 #X obj 205 183 snake~ out 1;
 #X obj 238 155 dac~;
@@ -48,8 +48,8 @@
 #X obj 255 222 r peca, f 8;
 #X obj 3 110 bng 18 250 50 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000;
 #X text 22 109 Melancolira;
-#X obj 322 300 outlet;
-#X obj 205 222 *~ 4;
+#X obj 325 339 outlet;
+#X obj 205 222 *~ 1;
 #X obj 205 280 openscofo~ onset yin onnx;
 #X connect 0 0 26 0;
 #X connect 1 0 40 0;
