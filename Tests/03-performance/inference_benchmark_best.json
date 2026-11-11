@@ -1,0 +1,101 @@
+{
+  "aggregation": "worst value per metric across all repetitions",
+  "configuration": {
+    "block_size": 64,
+    "fft_size": 2048,
+    "hop_size": 512
+  },
+  "method": "Cont 2010, section 8.2; first detection per event",
+  "pieces": {
+    "Canticos": {
+      "accuracy": {
+        "false_positives": 1,
+        "matched": 40,
+        "mean_absolute_offset_ms": 46.593925000000624,
+        "mean_signed_offset_ms": 45.35810833333375,
+        "missed": 1,
+        "precision_percent": 97.5609756097561,
+        "reference_events": 41,
+        "stddev_offset_ms": 37.9524024004912
+      },
+      "performance": {
+        "profile": {
+          "best_median_run_ms": 1361.786275,
+          "max_run_ms_at_best": 1422.181226,
+          "mean_run_ms_at_best": 1360.8740671,
+          "min_run_ms_at_best": 1324.311327,
+          "repetitions_at_best": 20
+        }
+      },
+      "sample_rate": 48000
+    },
+    "Miniatura1": {
+      "accuracy": {
+        "false_positives": 0,
+        "matched": 27,
+        "mean_absolute_offset_ms": 30.693407407407406,
+        "mean_signed_offset_ms": 24.432320987654244,
+        "missed": 0,
+        "precision_percent": 100.0,
+        "reference_events": 27,
+        "stddev_offset_ms": 40.66736497654671
+      },
+      "performance": {
+        "profile": {
+          "best_median_run_ms": 568.092025,
+          "max_run_ms_at_best": 583.0465350000001,
+          "mean_run_ms_at_best": 567.58430065,
+          "min_run_ms_at_best": 559.723883,
+          "repetitions_at_best": 20
+        }
+      },
+      "sample_rate": 48000
+    },
+    "Miniatura2": {
+      "accuracy": {
+        "false_positives": 0,
+        "matched": 65,
+        "mean_absolute_offset_ms": 32.79126153846128,
+        "mean_signed_offset_ms": 11.37689230769234,
+        "missed": 0,
+        "precision_percent": 100.0,
+        "reference_events": 65,
+        "stddev_offset_ms": 40.50943197715136
+      },
+      "performance": {
+        "profile": {
+          "best_median_run_ms": 1853.378465,
+          "max_run_ms_at_best": 1874.768245,
+          "mean_run_ms_at_best": 1854.84012445,
+          "min_run_ms_at_best": 1844.292503,
+          "repetitions_at_best": 20
+        }
+      },
+      "sample_rate": 48000
+    },
+    "Miniatura3": {
+      "accuracy": {
+        "false_positives": 5,
+        "matched": 57,
+        "mean_absolute_offset_ms": 6.076023391811566,
+        "mean_signed_offset_ms": 1.4678362573100836,
+        "missed": 5,
+        "precision_percent": 91.93548387096774,
+        "reference_events": 62,
+        "stddev_offset_ms": 9.821974736063131
+      },
+      "performance": {
+        "profile": {
+          "best_median_run_ms": 3184.270268,
+          "max_run_ms_at_best": 3318.646218,
+          "mean_run_ms_at_best": 3201.8998349500002,
+          "min_run_ms_at_best": 3155.164585,
+          "repetitions_at_best": 20
+        }
+      },
+      "sample_rate": 48000
+    }
+  },
+  "schema_version": 1,
+  "tolerance_ms": 250.0
+}
