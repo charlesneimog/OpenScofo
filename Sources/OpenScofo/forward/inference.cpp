@@ -358,8 +358,16 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
 
     const int maxU = static_cast<int>(occ_cache.size()) - 1;
     const int observedHistory = std::min(m_Tau, maxU);
+    const int MaxAge = std::min(m_Tau + 1, maxU);
+    const bool IsLeftRight = StateJ.MicroTopologyType == LEFT_RIGHT;
 
-    PrepareSegmentLikelihoods(StateJ, std::min(m_Tau + 1, maxU));
+    if (IsLeftRight) {
+        PrepareSegmentLikelihoods(StateJ, MaxAge);
+    } else {
+        m_SegmentLogLikelihoods.assign(static_cast<size_t>(MaxAge + 1), LogZero);
+        m_SegmentProbabilityFloor = 0.0;
+        PrepareOrdinarySegmentLikelihoods(StateJ, MaxAge);
+    }
 
     // Precompute the only two possible predecessor transitions.
     const int Prev1 = j - 1;
@@ -370,11 +378,13 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
 
     double FTildeJ = 0.0;
     double FTildeJo = 0.0;
-    const bool IsLeftRight = StateJ.MicroTopologyType == LEFT_RIGHT;
 
-    // This is a optimization, once that we
+    int EntryBuf = m_CircularBufferIndex - 1;
+    if (EntryBuf < 0) {
+        EntryBuf = m_BufferSize - 1;
+    }
+
     for (int u = 1; u <= observedHistory; ++u) {
-        const int EntryBuf = ((m_Tau - u) % m_BufferSize + m_BufferSize) % m_BufferSize;
         double Incoming = 0.0;
 
         if (P2 != 0.0) {
@@ -385,12 +395,22 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
             Incoming += P1 * m_States[Prev1].ExitProb[EntryBuf];
         }
 
-        const double segment = GetSegmentLikelihood(u, Incoming);
+        double segment;
+        if (IsLeftRight) {
+            const double LogIncoming = LogProbability(Incoming);
+            segment = std::exp(m_SegmentLogLikelihoods[u] + LogIncoming);
+            m_SegmentLogForwardWeights[u] = LogProbability(surv_cache[u]) + LogIncoming;
+        } else {
+            segment = GetSegmentLikelihood(u, Incoming);
+        }
+
         FTildeJ += surv_cache[u] * segment;
         FTildeJo += occ_cache[u] * segment;
 
-        if (IsLeftRight) {
-            m_SegmentLogForwardWeights[u] = LogMultiply(LogProbability(surv_cache[u]), LogProbability(Incoming));
+        if (EntryBuf == 0) {
+            EntryBuf = m_BufferSize - 1;
+        } else {
+            --EntryBuf;
         }
     }
 
@@ -399,14 +419,17 @@ void OnlineForward::SemiMarkov(ScoreState &StateJ, int j) {
     const int InitDur = m_Tau + 1;
 
     if (InitDur <= maxU) {
-        const double segment = GetSegmentLikelihood(InitDur, StateJ.InitProb);
+        double segment;
+        if (IsLeftRight) {
+            const double LogInitProb = LogProbability(StateJ.InitProb);
+            segment = std::exp(m_SegmentLogLikelihoods[InitDur] + LogInitProb);
+            m_SegmentLogForwardWeights[InitDur] = LogProbability(surv_cache[InitDur]) + LogInitProb;
+        } else {
+            segment = GetSegmentLikelihood(InitDur, StateJ.InitProb);
+        }
+
         FTildeJ += surv_cache[InitDur] * segment;
         FTildeJo += occ_cache[InitDur] * segment;
-
-        if (IsLeftRight) {
-            m_SegmentLogForwardWeights[InitDur] =
-                LogMultiply(LogProbability(surv_cache[InitDur]), LogProbability(StateJ.InitProb));
-        }
     }
 
     StateJ.Forward[m_CircularBufferIndex] = FTildeJ + m_SegmentProbabilityFloor;
@@ -455,11 +478,17 @@ int OnlineForward::GetAlphaT() {
 
     // Apply Normalization
     const double logN = std::log(N);
+    const double InvN = 1.0 / N;
+
     for (int j = m_WinStart; j <= m_WinEnd; ++j) {
-        m_States[j].Forward[m_CircularBufferIndex] /= N;
+        m_States[j].Forward[m_CircularBufferIndex] *= InvN;
         m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
-        m_States[j].ExitProb[m_CircularBufferIndex] /= N;
+        m_States[j].ExitProb[m_CircularBufferIndex] *= InvN;
         m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+        // m_States[j].Forward[m_CircularBufferIndex] /= N;
+        // m_States[j].Forward[m_CircularBufferIndex] += std::numeric_limits<double>::min();
+        // m_States[j].ExitProb[m_CircularBufferIndex] /= N;
+        // m_States[j].ExitProb[m_CircularBufferIndex] += std::numeric_limits<double>::min();
 
         if (m_States[j].MicroTopologyType == LEFT_RIGHT) {
             // Shared score-level scaling: each path retains the normalization
