@@ -53,6 +53,12 @@ if(NOT APPLE
     openscofo_add_test(onnx_tests test_onnx.cpp Onnx)
     openscofo_add_test(inference_tests test_benchmark.cpp Inference)
 
+    add_executable(inference_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/inference_benchmark.cpp")
+    target_link_libraries(inference_benchmark PRIVATE OpenScofo AudioFile)
+    target_include_directories(inference_benchmark SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
+    target_include_directories(inference_benchmark SYSTEM PRIVATE "${audiofile_SOURCE_DIR}")
+    target_compile_definitions(inference_benchmark PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
+
     get_property(TestTargets GLOBAL PROPERTY OPENSCOFO_TEST_TARGETS)
     if(OPENSCOFO_RUN_TESTS_ON_BUILD)
         set(CheckAll ALL)

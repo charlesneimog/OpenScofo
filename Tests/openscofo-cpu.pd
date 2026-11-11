@@ -1,4 +1,4 @@
-#N canvas 0 0 560 568 10;
+#N canvas 0 0 466 568 10;
 #X declare -lib xlab;
 #X declare -path ./../build/Sources/Wrappers/PureData;
 #X obj 16 324 x.cpuuse;
