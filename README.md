@@ -8,6 +8,9 @@
 ## Download
 
 * Check the [Releases](https://github.com/charlesneimog/OpenScofo/releases/latest) Page.
+* For Pure Data use Deken;
+* For Python use `pip install OpenScofo`;
+* For Max/MSP, SuperCollider and CSound use the download page;
 
 ## Examples
 
