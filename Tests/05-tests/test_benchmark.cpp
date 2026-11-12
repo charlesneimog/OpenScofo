@@ -136,7 +136,7 @@ TEST(Inference, Miniatura1) {
 
     std::cout << "Miniatura I: " << Percentage << "%\n";
 
-    EXPECT_GE(Percentage, 14.81);
+    EXPECT_GE(Percentage, 100);
 }
 
 // ─────────────────────────────────────

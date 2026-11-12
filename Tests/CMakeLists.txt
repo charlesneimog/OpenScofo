@@ -53,11 +53,19 @@ if(NOT APPLE
     openscofo_add_test(onnx_tests test_onnx.cpp Onnx)
     openscofo_add_test(inference_tests test_benchmark.cpp Inference)
 
-    add_executable(inference_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/inference_benchmark.cpp")
+    openscofo_add_test(librosa_test test_librosa.cpp Librosa)
+    openscofo_add_test(essencia_test test_essentia.cpp Essentia)
+
+    # Inference Benchmark
+    add_executable(inference_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_inference.cpp")
     target_link_libraries(inference_benchmark PRIVATE OpenScofo AudioFile)
     target_include_directories(inference_benchmark SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
     target_include_directories(inference_benchmark SYSTEM PRIVATE "${audiofile_SOURCE_DIR}")
     target_compile_definitions(inference_benchmark PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
+
+    # mir
+    add_executable(mir_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_mir.cpp")
+    target_link_libraries(mir_benchmark PRIVATE OpenScofo)
 
     get_property(TestTargets GLOBAL PROPERTY OPENSCOFO_TEST_TARGETS)
     if(OPENSCOFO_RUN_TESTS_ON_BUILD)
@@ -74,14 +82,8 @@ if(NOT APPLE
         COMMENT "Running OpenScofo tests"
         VERBATIM)
 
-    add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/performance.cpp")
+    add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_performance.cpp")
     target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
     target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow -Wno-unused-variable)
-
-    #
-    add_executable(openscofo_perf_folder "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/performance-folder.cpp")
-    target_link_libraries(openscofo_perf_folder PRIVATE OpenScofo AudioFile)
-    target_compile_options(openscofo_perf_folder PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow
-                                                         -Wno-unused-variable)
 
 endif()

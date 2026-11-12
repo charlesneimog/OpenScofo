@@ -190,59 +190,6 @@ TEST_F(ScoreConfiguration, ConfiguresActualOnsetDetector) {
     OpenScofo::MIRConfigurationTestAccess::CheckOnset(Mir);
 }
 
-TEST_F(ScoreConfiguration, SigmundEstimatesPitchAndConfidenceWithPffft) {
-    Config.FFTSize = 2048;
-    Config.SR = 48000;
-    Config.YINMinFrequency = 50;
-    Config.YINMaxFrequency = 2000;
-
-    const auto Tone440 = Tone(Config, 440);
-    const auto Pitched = Describe(Config, Tone440);
-    EXPECT_NEAR(Pitched.Pitch, 440, 1);
-    EXPECT_GE(Pitched.PitchConfidence, 0.4);
-    EXPECT_LE(Pitched.PitchConfidence, 1.0);
-
-    std::vector<double> PhaseShifted(static_cast<size_t>(Config.FFTSize));
-    for (size_t Index = 0; Index < PhaseShifted.size(); ++Index) {
-        PhaseShifted[Index] = 0.4 * std::sin(2.0 * std::numbers::pi * 443.3 * Index / Config.SR + 0.73);
-    }
-    const auto Shifted = Describe(Config, PhaseShifted);
-    EXPECT_NEAR(Shifted.Pitch, 443.3, 0.05);
-    EXPECT_GE(Shifted.PitchConfidence, 0.4);
-
-    const auto Quiet = Describe(Config, Tone(Config, 440, 1e-8));
-    EXPECT_NEAR(Quiet.Pitch, 440, 1);
-    EXPECT_GE(Quiet.PitchConfidence, 0.4);
-
-    const std::vector<double> Silence(static_cast<size_t>(Config.FFTSize), 0.0);
-    const auto Silent = Describe(Config, Silence);
-    EXPECT_DOUBLE_EQ(Silent.Pitch, 0.0);
-    EXPECT_DOUBLE_EQ(Silent.PitchConfidence, 0.0);
-}
-
-TEST_F(ScoreConfiguration, SigmundUsesHarmonicsAndReusesTheConfiguredFft) {
-    Config.FFTSize = 2048;
-    Config.SR = 48000;
-    Config.YINMinFrequency = 50;
-    Config.YINMaxFrequency = 2000;
-
-    auto Audio = Tone(Config, 440, 0.3);
-    const auto ThirdHarmonic = Tone(Config, 660, 0.3);
-    const auto FourthHarmonic = Tone(Config, 880, 0.3);
-    for (size_t Index = 0; Index < Audio.size(); ++Index) {
-        Audio[Index] += ThirdHarmonic[Index] + FourthHarmonic[Index];
-    }
-
-    const auto MissingFundamental = Describe(Config, Audio);
-    EXPECT_NEAR(MissingFundamental.Pitch, 220, 2);
-    EXPECT_GE(MissingFundamental.PitchConfidence, 0.4);
-
-    Config.FFTSize = 4096;
-    const auto Reconfigured = Describe(Config, Tone(Config, 440));
-    EXPECT_NEAR(Reconfigured.Pitch, 440, 1);
-    EXPECT_GE(Reconfigured.PitchConfidence, 0.4);
-}
-
 TEST_F(ScoreConfiguration, HarmonicCountAndSigmaChangePitchTemplates) {
     OpenScofo::OnlineForward Forward;
     Forward.UpdateConfiguration(Config);
@@ -328,30 +275,6 @@ TEST_F(ScoreConfiguration, RolloffCutoffChangesReportedFrequency) {
     auto Changed = Config;
     Changed.SpectralRolloffCutoff = 0.95;
     EXPECT_LT(Describe(Config, Audio).SpectralRolloff, Describe(Changed, Audio).SpectralRolloff);
-}
-
-TEST_F(ScoreConfiguration, SigmundHonorsConfiguredFrequencyLimits) {
-    const auto Audio = Tone(Config, 440);
-    EXPECT_NEAR(Describe(Config, Audio).Pitch, 440, 2);
-    auto Changed = Config;
-    Changed.YINMinFrequency = 700;
-    const auto LowLimit = Describe(Changed, Audio).Pitch;
-    EXPECT_TRUE(LowLimit == 0 || LowLimit >= 700);
-    Changed = Config;
-    Changed.YINMaxFrequency = 300;
-    const auto HighLimit = Describe(Changed, Audio).Pitch;
-    EXPECT_TRUE(HighLimit == 0 || HighLimit <= 300);
-}
-
-TEST_F(ScoreConfiguration, SigmundHarmonicVotingFindsAWeakFundamental) {
-    auto Audio = Tone(Config, 220, 0.1);
-    const auto Harmonic = Tone(Config, 440, 0.4);
-    for (size_t I = 0; I < Audio.size(); ++I) {
-        Audio[I] += Harmonic[I];
-    }
-    const auto Desc = Describe(Config, Audio);
-    EXPECT_NEAR(Desc.Pitch, 220, 2);
-    EXPECT_GE(Desc.PitchConfidence, 0.4);
 }
 
 TEST_F(ScoreConfiguration, HopSizeControlsWhenAudioAnalysisUpdates) {

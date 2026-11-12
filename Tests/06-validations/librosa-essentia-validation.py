@@ -23,7 +23,7 @@ scofo = OpenScofo.OpenScofo(sr, n_fft, analysis_hop)
 scofo.activate_all_descriptors()
 
 y, sr = librosa.load(
-    "./01-benchmark/real/bwv-1013.wav",
+    "./../01-benchmark/real/bwv-1013.wav",
     sr=sr,
 )
 
