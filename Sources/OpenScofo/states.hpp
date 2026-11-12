@@ -322,8 +322,9 @@ struct SpectralAccumulators {
     double sumIndex = 0.0, sumIndex2 = 0.0;
     double sumFreq = 0.0, sumFreqSq = 0.0;
     double maxMag = 0.0;
-    float sumMagCrest = 0.0f;
-    float maxMagCrest = 0.0f;
+    double sumMagCrest = 0.0f;
+    double maxMagCrest = 0.0f;
+    double weightedLogPower = 0.0f;
 };
 
 } // namespace OpenScofo

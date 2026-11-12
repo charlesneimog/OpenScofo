@@ -153,9 +153,8 @@ void MIR::ComputeSpectrum(Description &Desc, SpectralAccumulators &Sums, int Bin
         Desc.SpectralMagnitudeNorm[i] = normalizedMagnitude;
         Desc.MaxAmp = std::max(Desc.MaxAmp, normalizedMagnitude);
 
-        const float crestMagnitude = static_cast<float>(magnitude);
-        Sums.sumMagCrest += crestMagnitude;
-        Sums.maxMagCrest = std::max(Sums.maxMagCrest, crestMagnitude);
+        Sums.sumMagCrest += magnitude;
+        Sums.maxMagCrest = std::max(Sums.maxMagCrest, magnitude);
 
         const double frequency = i * binWidth;
         const double frequencySquared = frequency * frequency;
