@@ -3,7 +3,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
 project(
     OpenScofo
-    VERSION 0.3.0
+    VERSION 0.3.1
     LANGUAGES C CXX
     HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
     DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
@@ -298,7 +298,7 @@ add_library(
 add_library(
     openscofo_mir STATIC
     Sources/OpenScofo/mir/mir.cpp Sources/OpenScofo/mir/spectral.cpp Sources/OpenScofo/mir/pitch.cpp
-    Sources/OpenScofo/mir/sigmund.cpp Sources/OpenScofo/mir/features.cpp Sources/OpenScofo/mir/classification.cpp)
+    Sources/OpenScofo/mir/features.cpp Sources/OpenScofo/mir/classification.cpp)
 
 add_library(
     openscofo_score STATIC
