@@ -89,10 +89,15 @@ class MIR {
     void InitITURFilters(void);
     void GetSignalPower(const std::vector<double> &In, Description &Desc);
     void GetSpectralFlux(Description &Desc);
-    void YINInit();
-    void YINExec(const std::vector<double> &In, Description &Desc);
-    void SigmundInit();
-    void SigmundExec(Description &Desc);
+
+    void YinInit();
+    void YinExec(const std::vector<double> &In, Description &Desc);
+
+    void YinFastInit();
+    void YinFastExec(Description &Desc);
+
+    // void SigmundInit();
+    // void SigmundExec(Description &Desc);
 
   private:
     // FFT
@@ -141,8 +146,12 @@ class MIR {
     // Audio
     std::vector<double> m_PreviousSpectralMagnitude;
     std::vector<double> m_SpectralPrefix;
+
     std::vector<double> m_YINDifference;
     std::vector<double> m_YINCMNDF;
+
+    float *m_YinKernel = nullptr;
+    float *m_YinSpectrum = nullptr;
 
     // Sigmund reuses the current Hann-windowed spectrum from the main FFT.
     std::vector<double> m_SigmundMask;

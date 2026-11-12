@@ -27,7 +27,7 @@ namespace OpenScofo {
  *
  * @note Sizes the arrays from half the configured FFT window plus interpolation padding.
  */
-void MIR::YINInit() {
+void MIR::YinInit() {
     const size_t frameSize = static_cast<size_t>(std::max(2.0f, m_Config.FFTSize));
     const size_t half = frameSize / 2;
     const size_t allocSize = half + 2;
@@ -46,7 +46,7 @@ void MIR::YINInit() {
  * confidence.
  * @warning Initialize YIN scratch arrays and use a positive sample rate and valid positive frequency bounds.
  */
-void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
+void MIR::YinExec(const std::vector<double> &In, Description &Desc) {
     const size_t frame = In.size();
 
     if (frame < 2) {
@@ -194,6 +194,174 @@ void MIR::YINExec(const std::vector<double> &In, Description &Desc) {
 
     Desc.Pitch = Pitch;
     Desc.PitchConfidence = Confidence;
+}
+
+// ─────────────────────────────────────
+
+void MIR::YinFastInit() {
+    YinInit();
+
+    if (m_YinKernel)
+        pffft_aligned_free(m_YinKernel);
+    if (m_YinSpectrum)
+        pffft_aligned_free(m_YinSpectrum);
+
+    const size_t bytes = static_cast<size_t>(m_Config.FFTSize) * sizeof(float);
+    m_YinKernel = static_cast<float *>(pffft_aligned_malloc(bytes));
+    m_YinSpectrum = static_cast<float *>(pffft_aligned_malloc(bytes));
+
+    if (!m_YinKernel || !m_YinSpectrum) {
+        if (m_YinKernel)
+            pffft_aligned_free(m_YinKernel);
+        if (m_YinSpectrum)
+            pffft_aligned_free(m_YinSpectrum);
+
+        m_YinKernel = nullptr;
+        m_YinSpectrum = nullptr;
+        spdlog::critical("YinFast allocation failed");
+    }
+}
+
+// ─────────────────────────────────────
+
+void MIR::YinFastExec(Description &Desc) {
+    Desc.Pitch = 0.0;
+    Desc.PitchConfidence = 0.0;
+
+    if (!m_YinKernel || !m_YinSpectrum || !m_FullFFTSetup)
+        return;
+
+    if (m_Config.YINMinFrequency <= 0.0 || m_Config.YINMaxFrequency <= 0.0)
+        return;
+
+    const int N = static_cast<int>(m_Config.FFTSize);
+    const int W = N / 2;
+    const double SR = m_Config.SR;
+    const int minTau = std::max(1, static_cast<int>(SR / m_Config.YINMaxFrequency));
+    const int maxTau = std::min(W, static_cast<int>(std::ceil(SR / m_Config.YINMinFrequency)));
+
+    if (maxTau <= minTau)
+        return;
+
+    const float *samples = m_FullFFTIn;
+    const float *spectrum = m_FullFFTOut;
+
+    // 1. Build reversed kernel
+    std::fill_n(m_YinKernel, N, 0.0f);
+
+    for (int i = 0; i < W; ++i)
+        m_YinKernel[i + 1] = samples[W - 1 - i];
+
+    pffft_transform_ordered(m_FullFFTSetup, m_YinKernel, m_YinSpectrum, m_FullFFTWork, PFFFT_FORWARD);
+
+    // 3. Complex multiplication
+    // DC and Nyquist are stored at indices 0 and 1
+    m_YinSpectrum[0] *= spectrum[0];
+    m_YinSpectrum[1] *= spectrum[1];
+
+    for (int k = 1; k < W; ++k) {
+        const int idx = 2 * k;
+        const float ar = spectrum[idx];
+        const float ai = spectrum[idx + 1];
+        const float br = m_YinSpectrum[idx];
+        const float bi = m_YinSpectrum[idx + 1];
+        m_YinSpectrum[idx] = ar * br - ai * bi;
+        m_YinSpectrum[idx + 1] = ar * bi + ai * br;
+    }
+
+    // 4. IFFT: result is unnormalized
+    pffft_transform_ordered(m_FullFFTSetup, m_YinSpectrum, m_YinKernel, m_FullFFTWork, PFFFT_BACKWARD);
+    double energy0 = 0.0;
+    for (int i = 0; i < W; ++i) {
+        const double x = samples[i];
+        energy0 += x * x;
+    }
+
+    double energyShift = energy0;
+    double cumulative = 0.0;
+    const double invN = 1.0 / N;
+
+    double *diff = m_YINDifference.data();
+    double *cmndf = m_YINCMNDF.data();
+
+    diff[0] = 0.0;
+    cmndf[0] = 1.0;
+
+    // 6. Difference function and CMNDF
+    for (int tau = 1; tau <= maxTau; ++tau) {
+        const double leaving = samples[tau - 1];
+        const double entering = samples[W + tau - 1];
+
+        energyShift += entering * entering - leaving * leaving;
+
+        const int index = (tau == W) ? 0 : W + tau;
+        const double correlation = m_YinKernel[index] * invN;
+
+        const double difference = std::max(0.0, energy0 + energyShift - 2.0 * correlation);
+
+        diff[tau] = difference;
+        cumulative += difference;
+
+        cmndf[tau] = cumulative > 0.0 ? difference * tau / cumulative : 1.0;
+    }
+
+    // 7. Find first minimum below threshold
+    int bestTau = 0;
+    double bestValue = std::numeric_limits<double>::infinity();
+
+    for (int tau = minTau; tau <= maxTau; ++tau) {
+        if (cmndf[tau] < m_Config.YINThreshold) {
+            bestTau = tau;
+            bestValue = cmndf[tau];
+
+            while (tau < maxTau && cmndf[tau + 1] < bestValue) {
+                ++tau;
+                bestTau = tau;
+                bestValue = cmndf[tau];
+            }
+            break;
+        }
+    }
+
+    // Fallback to global minimum
+    if (bestTau == 0) {
+        for (int tau = minTau; tau <= maxTau; ++tau) {
+            if (cmndf[tau] < bestValue) {
+                bestTau = tau;
+                bestValue = cmndf[tau];
+            }
+        }
+    }
+
+    if (bestTau == 0 || !std::isfinite(bestValue))
+        return;
+
+    // 8. Parabolic interpolation
+    double refinedTau = static_cast<double>(bestTau);
+
+    if (bestTau > 1 && bestTau < maxTau) {
+        const double left = cmndf[bestTau - 1];
+        const double center = cmndf[bestTau];
+        const double right = cmndf[bestTau + 1];
+        const double denominator = left - 2.0 * center + right;
+        if (std::abs(denominator) > 1e-12) {
+            const double offset = 0.5 * (left - right) / denominator;
+            refinedTau += std::clamp(offset, -1.0, 1.0);
+        }
+    }
+
+    const double confidence = std::clamp(1.0 - bestValue, 0.0, 1.0);
+    if (refinedTau <= 0.0 || confidence <= 0.0) {
+        return;
+    }
+
+    const double pitch = SR / refinedTau;
+    if (pitch < m_Config.YINMinFrequency || pitch > m_Config.YINMaxFrequency) {
+        return;
+    }
+
+    Desc.Pitch = pitch;
+    Desc.PitchConfidence = confidence;
 }
 
 } // namespace OpenScofo

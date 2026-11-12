@@ -114,9 +114,10 @@ void MIR::UpdateConfiguration(const Configuration &Config) {
     }
     if (m_NeedYIN) {
 #if OPENSCOFO_USE_YIN
-        YINInit();
+        YinInit();
 #else
-        SigmundInit();
+        // SigmundInit();
+        YinFastInit();
 #endif
     }
     InitITURFilters();
@@ -230,7 +231,8 @@ void MIR::GetDescription(const std::vector<double> &In, Description &Desc) {
 
 #if !OPENSCOFO_USE_SIGMUND
     if (m_NeedYIN) {
-        SigmundExec(Desc);
+        // SigmundExec(Desc);
+        YinFastExec(Desc);
     }
 #endif
 

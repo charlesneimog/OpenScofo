@@ -50,7 +50,7 @@ void MIR::ONNXInit(fs::path path, std::vector<Descriptors> Descriptors) {
         ZeroCrossingRateInit();
     }
     if (m_NeedYIN) {
-        SigmundInit();
+        YinFastInit();
     }
 }
 

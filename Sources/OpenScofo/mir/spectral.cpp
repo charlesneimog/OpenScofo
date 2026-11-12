@@ -94,7 +94,11 @@ void MIR::ComputeSpectrum(Description &Desc, SpectralAccumulators &Sums, int Bin
     {
         const double real = static_cast<double>(m_FullFFTOut[0]);
         const double imaginary = 0.0;
-        const double power = real * real + imaginary * imaginary;
+        // const double power = real * real + imaginary * imaginary;
+        const float real32 = static_cast<float>(real);
+        const float imaginary32 = static_cast<float>(imaginary);
+        const float power32 = real32 * real32 + imaginary32 * imaginary32;
+        const double power = static_cast<double>(power32);
         const double magnitude = std::sqrt(power);
         const double normalizedMagnitude = magnitude * fftScale;
 
@@ -109,10 +113,16 @@ void MIR::ComputeSpectrum(Description &Desc, SpectralAccumulators &Sums, int Bin
         Sums.SumPower += normalizedMagnitude;
         Sums.irregularityDenominator += normalizedMagnitude * normalizedMagnitude;
 
-        const double flatnessPower = std::max(minimumPower, power);
+        const double flatnessPower = std::max(1e-10, power);
+        const double logPower = std::log(flatnessPower);
+
         Sums.logSumPower += std::log(flatnessPower);
         Sums.linSumPower += flatnessPower;
         Sums.spectralEnergySum += power;
+
+        if (power > 0.0) {
+            Sums.weightedLogPower += power * (power >= minimumPower ? logPower : std::log(power));
+        }
 
         const double fluxDifference = magnitude - m_PreviousSpectralMagnitude[0];
         Desc.SpectralFlux += fluxDifference * fluxDifference;
@@ -163,9 +173,15 @@ void MIR::ComputeSpectrum(Description &Desc, SpectralAccumulators &Sums, int Bin
         Sums.irregularityDenominator += normalizedMagnitude * normalizedMagnitude;
 
         const double flatnessPower = std::max(minimumPower, power);
-        Sums.logSumPower += std::log(flatnessPower);
+        const double logPower = std::log(flatnessPower);
+
+        Sums.logSumPower += logPower;
         Sums.linSumPower += flatnessPower;
         Sums.spectralEnergySum += power;
+
+        if (power > 0.0) {
+            Sums.weightedLogPower += power * (power >= minimumPower ? logPower : std::log(power));
+        }
 
         const double fluxDifference = magnitude - m_PreviousSpectralMagnitude[i];
         Desc.SpectralFlux += fluxDifference * fluxDifference;
@@ -233,10 +249,15 @@ void MIR::ComputeScalarFeatures(Description &Desc, const SpectralAccumulators &S
     Desc.SpectralSpreadVariance =
         Sums.SumPower > 0.0 ? (binIndexVariance * inverseBinIndexRange * inverseBinIndexRange) : 0.0;
 
-    const double spreadWithEpsilon = Desc.SpectralSpreadHz + 1e-12;
-    Desc.SpectralSkewness = thirdCentralMoment / (spreadWithEpsilon * spreadWithEpsilon * spreadWithEpsilon);
-    Desc.SpectralKurtosis =
-        fourthCentralMoment / (spreadWithEpsilon * spreadWithEpsilon * spreadWithEpsilon * spreadWithEpsilon) - 3.0;
+    Desc.SpectralSkewness = 0.0;
+    Desc.SpectralKurtosis = 0.0;
+
+    if (Desc.SpectralSpreadHz > 1e-9 && Sums.SumPower > 1e-12) {
+        const double spread = Desc.SpectralSpreadHz;
+        const double spreadSquared = spread * spread;
+        Desc.SpectralSkewness = thirdCentralMoment / (spreadSquared * spread);
+        Desc.SpectralKurtosis = fourthCentralMoment / (spreadSquared * spreadSquared) - 3.0;
+    }
 
     Desc.SpectralIrregularityJensen =
         Sums.irregularityDenominator > 0.0 ? (Sums.irregularityJensenNumerator / Sums.irregularityDenominator) : -1.0;
@@ -277,11 +298,11 @@ void MIR::NormalizeSpectrum(Description &Desc, const SpectralAccumulators &Sums,
     const double inverseMagnitudeSum = 1.0 / magnitudeSumWithEpsilon;
     const double meanNormalizedMagnitude = 1.0 / static_cast<double>(BinCount);
     const double inverseSpectralEnergy = Sums.spectralEnergySum > 0.0 ? (1.0 / Sums.spectralEnergySum) : 0.0;
-    const double rolloffCutoffPower = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * Sums.linSumPower;
+    const double rolloffCutoffPower = std::clamp(m_Config.SpectralRolloffCutoff, 0.0, 1.0) * Sums.spectralEnergySum;
 
     double normalizedMagnitudeVariance = 0.0;
     double cumulativePower = 0.0;
-    size_t rolloffBin = static_cast<size_t>(BinCount - 1);
+    size_t rolloffBin = 0;
     bool rolloffFound = false;
 
     Desc.SpectralEntropy = 0.0;
@@ -295,21 +316,20 @@ void MIR::NormalizeSpectrum(Description &Desc, const SpectralAccumulators &Sums,
         const double differenceFromMean = frameNormalizedMagnitude - meanNormalizedMagnitude;
         normalizedMagnitudeVariance += differenceFromMean * differenceFromMean;
 
-        const double currentPower = Desc.Power[i];
-        if (inverseSpectralEnergy > 0.0) {
-            const double probability = currentPower * inverseSpectralEnergy;
-            if (probability > 0.0) {
-                Desc.SpectralEntropy -= probability * std::log2(probability);
-            }
-        }
-
-        cumulativePower += currentPower;
+        cumulativePower += Desc.Power[i];
         m_SpectralPrefix[i + 1] = cumulativePower;
+
         if (!rolloffFound && cumulativePower >= rolloffCutoffPower) {
             rolloffBin = i;
             rolloffFound = true;
         }
     }
+
+    constexpr double invLn2 = 1.4426950408889634;
+
+    Desc.SpectralEntropy = Sums.spectralEnergySum > 0.0 ? std::log2(Sums.spectralEnergySum) -
+                                                              Sums.weightedLogPower * inverseSpectralEnergy * invLn2
+                                                        : 0.0;
 
     Desc.StdDev = std::sqrt(normalizedMagnitudeVariance * meanNormalizedMagnitude);
     const double frequencyPerBin = (m_Config.SR * 0.5) / std::max(1, BinCount - 1);
