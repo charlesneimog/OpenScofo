@@ -3,7 +3,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
 project(
     OpenScofo
-    VERSION 0.3.1
+    VERSION 0.3.0
     LANGUAGES C CXX
     HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
     DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
