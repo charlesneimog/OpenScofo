@@ -10,27 +10,6 @@ permissions:
 env:
     LIBNAME: openscofo~
 jobs:
-    create-release:
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        runs-on: ubuntu-latest
-        concurrency:
-            group: release-${{ github.ref }}
-            cancel-in-progress: false
-        steps:
-            - name: Publish release for tag
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  GH_REPO: ${{ github.repository }}
-                  RELEASE_TAG: ${{ github.ref_name }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-                    gh release edit "$RELEASE_TAG" --draft=false
-                  else
-                    gh release create "$RELEASE_TAG" --verify-tag \
-                      --title "$RELEASE_TAG" --generate-notes
-                  fi
     build:
         if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
         runs-on: ${{ matrix.os }}
@@ -76,6 +55,27 @@ jobs:
                   sudo apt install libboost-all-dev libgtest-dev protobuf-compiler protobuf-c-compiler -y
                   cargo install tree-sitter-cli --locked
                   pip install build scikit-build-core cibuildwheel twine nanobind
+            - name: Cache Qt Installer Framework (Linux)
+              if: runner.os == 'Linux'
+              id: cache-qtifw
+              uses: actions/cache@v4
+              with:
+                  path: ${{ runner.temp }}/QtIFW-4.8.1
+                  key: qtifw-linux-x64-4.8.1
+            - name: Install Qt Installer Framework (Linux)
+              if: runner.os == 'Linux' && steps.cache-qtifw.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  installer="$RUNNER_TEMP/QtInstallerFramework-linux-x64-4.8.1.run"
+                  curl --fail --location --retry 3 \
+                    --output "$installer" \
+                    https://download.qt.io/official_releases/qt-installer-framework/4.8.1/QtInstallerFramework-linux-x64-4.8.1.run
+                  chmod +x "$installer"
+                  "$installer" \
+                    --root "$RUNNER_TEMP/QtIFW-4.8.1" \
+                    --accept-licenses --default-answer --confirm-command install
+                  test -x "$RUNNER_TEMP/QtIFW-4.8.1/bin/binarycreator"
             # -----------------------
             # macOS dependencies
             # -----------------------
@@ -225,8 +225,73 @@ jobs:
                   python Resources/Packages/macos.py --version "$WHEEL_VERSION"
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
+              shell: bash
               run: |
-                  python Resources/Packages/linux.py --version "$WHEEL_VERSION"
+                  set -euo pipefail
+                  test -s build/Sources/Wrappers/CSound/OpenScofo.so
+                  test -s build/Sources/Wrappers/SuperCollider/OpenScofo.so
+                  test -s build/Sources/Wrappers/Vamp/OpenScofo.so
+                  pd_binary=""
+                  for candidate in \
+                    build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so \
+                    build/Sources/Wrappers/PureData/openscofo~.so; do
+                    if [[ -s "$candidate" ]]; then
+                      pd_binary="$candidate"
+                      break
+                    fi
+                  done
+                  if [[ -z "$pd_binary" ]]; then
+                    echo "ERROR: No Pure Data component binary was generated."
+                    find build/Sources/Wrappers/PureData -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  python Resources/Packages/build_openscofo_qt.py \
+                    --repo-root . \
+                    --version "$WHEEL_VERSION" \
+                    --binarycreator "$RUNNER_TEMP/QtIFW-4.8.1/bin/binarycreator" \
+                    --output OpenScofo-Linux.run \
+                    --strict
+                  test -s OpenScofo-Linux.run
+                  test -x OpenScofo-Linux.run
+            - name: Smoke test Linux installer
+              if: runner.os == 'Linux'
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  smoke_home="$RUNNER_TEMP/openscofo-installer-smoke-${GITHUB_RUN_ID}"
+                  install_root="$smoke_home/.local/share/openscofo-installer"
+                  mkdir -p "$smoke_home/.local/share/openscofo/examples" "$smoke_home/.vamp"
+                  cp LICENSE "$smoke_home/.local/share/openscofo/examples/canticos.scofo"
+                  cp README.md "$smoke_home/.vamp/unrelated-user-file.txt"
+                  sentinel_hash="$(sha256sum "$smoke_home/.local/share/openscofo/examples/canticos.scofo" | cut -d' ' -f1)"
+                  HOME="$smoke_home" QT_QPA_PLATFORM=offscreen ./OpenScofo-Linux.run \
+                    --root "$install_root" \
+                    --accept-licenses --default-answer --confirm-command install \
+                    io.github.openscofo.csound \
+                    io.github.openscofo.puredata \
+                    io.github.openscofo.supercollider \
+                    io.github.openscofo.vamp \
+                    io.github.openscofo.examples
+                  test -s "$smoke_home/.local/lib/csound/6.0/plugins64/OpenScofo.so"
+                  test -s "$smoke_home/Documents/Pd/externals/openscofo~/openscofo~.linux-amd64-32.so" \
+                    || test -s "$smoke_home/Documents/Pd/externals/openscofo~/openscofo~.so"
+                  test -s "$smoke_home/.local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so"
+                  test -s "$smoke_home/.vamp/OpenScofo.so"
+                  test -s "$smoke_home/.local/share/openscofo/examples/bwv-1013.scofo"
+                  test "$sentinel_hash" = "$(sha256sum "$smoke_home/.local/share/openscofo/examples/canticos.scofo" | cut -d' ' -f1)"
+                  test -x "$install_root/OpenScofoMaintenanceTool"
+                  HOME="$smoke_home" QT_QPA_PLATFORM=offscreen "$install_root/OpenScofoMaintenanceTool" \
+                    --accept-licenses --default-answer --confirm-command remove \
+                    io.github.openscofo.csound \
+                    io.github.openscofo.puredata \
+                    io.github.openscofo.supercollider \
+                    io.github.openscofo.vamp \
+                    io.github.openscofo.examples
+                  test ! -e "$smoke_home/.local/lib/csound/6.0/plugins64/OpenScofo.so"
+                  test ! -e "$smoke_home/.local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so"
+                  test ! -e "$smoke_home/.vamp/OpenScofo.so"
+                  test -s "$smoke_home/.local/share/openscofo/examples/canticos.scofo"
+                  test -s "$smoke_home/.vamp/unrelated-user-file.txt"
             - name: Generate Windows Component Installer
               if: runner.os == 'Windows'
               shell: pwsh
@@ -371,6 +436,8 @@ jobs:
                       *.pkg
                       *.msi
                       *.sh
+                      *.run
+                  if-no-files-found: error
             - name: Upload Python Wheel
               uses: actions/upload-artifact@v6
               with:
@@ -413,7 +480,7 @@ jobs:
                   python -m twine upload --skip-existing dist/*.whl
     publish-release:
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        needs: [build, create-release]
+        needs: [build]
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -484,6 +551,13 @@ jobs:
                     fi
                     (cd "$artifact_dir" && zip -r "../../release_assets/${name}.zip" .)
                   done
+                  linux_installer="$(find artifacts -type f -path '*/Installer-*-Linux/OpenScofo-Linux.run' -print -quit)"
+                  if [[ -z "$linux_installer" || ! -s "$linux_installer" ]]; then
+                    echo "ERROR: Missing or empty OpenScofo-Linux.run artifact."
+                    exit 1
+                  fi
+                  cp "$linux_installer" release_assets/OpenScofo-Linux.run
+                  test -s release_assets/OpenScofo-Linux.run
                   ls -1 release_assets
             - name: Create Max-only package zip
               shell: bash
@@ -608,13 +682,18 @@ jobs:
                     fi
                   } > release_notes.md
                   cat release_notes.md
-            - name: Update GitHub Release notes
+            - name: Create draft GitHub Release
               shell: bash
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
-                  gh release edit "$RELEASE_TAG" --notes-file release_notes.md --draft=false
+                  if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+                    echo "ERROR: Release $RELEASE_TAG already exists; refusing to overwrite it."
+                    exit 1
+                  fi
+                  gh release create "$RELEASE_TAG" --verify-tag --draft \
+                    --title "$RELEASE_TAG" --notes-file release_notes.md
 
             - name: Upload GitHub Release Assets
               shell: bash
@@ -624,9 +703,16 @@ jobs:
                   set -euo pipefail
                   release_tag="${{ steps.release_metadata.outputs.tag }}"
                   shopt -s nullglob
-                  release_files=(release_assets/*.zip)
+                  release_files=(release_assets/*)
                   if [[ "${#release_files[@]}" == "0" ]]; then
                     echo "ERROR: No release assets found in release_assets/"
                     exit 1
                   fi
-                  gh release upload "$release_tag" "${release_files[@]}" --clobber
+                  gh release upload "$release_tag" "${release_files[@]}"
+            - name: Publish GitHub Release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  gh release edit "${{ steps.release_metadata.outputs.tag }}" --draft=false
