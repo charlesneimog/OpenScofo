@@ -14,12 +14,10 @@
 
 #include "OpenScofo.hpp"
 #include <algorithm>
-#include <charconv>
 #include <cctype>
 #include <fstream>
 #include <iostream>
 #include <string_view>
-#include <system_error>
 #include <tree_sitter/api.h>
 
 namespace OpenScofo {
@@ -70,7 +68,7 @@ TSNode Score::GetField(TSNode Node, std::string s) {
  *
  * @return True if the complete text parses as float; false otherwise.
  *
- * @note Uses std::from_chars() and rejects empty text or trailing unparsed characters.
+ * @note Rejects empty text or trailing unparsed characters.
  */
 bool Score::isNumber(const std::string &str) {
     if (str.empty()) {
@@ -78,10 +76,7 @@ bool Score::isNumber(const std::string &str) {
     }
 
     float value = 0.0f;
-    const char *begin = str.data();
-    const char *end = begin + str.size();
-    auto [ptr, ec] = std::from_chars(begin, end, value);
-    return ec == std::errc{} && ptr == end;
+    return ParseFloat(str, value);
 }
 
 // ╭─────────────────────────────────────╮

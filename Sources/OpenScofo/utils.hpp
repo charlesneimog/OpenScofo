@@ -1,9 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cerrno>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
-#include <charconv>
 #include <string>
 
 namespace OpenScofo {
@@ -12,18 +14,26 @@ namespace OpenScofo {
 // │         String Manipulation         │
 // ╰─────────────────────────────────────╯
 inline bool ParseDouble(const std::string &text, double &value) {
-    const char *begin = text.data();
-    const char *end = begin + text.size();
-    auto [ptr, ec] = std::from_chars(begin, end, value);
-    return ec == std::errc{} && ptr == end;
+    if (text.empty() || std::isspace(static_cast<unsigned char>(text.front()))) {
+        return false;
+    }
+
+    char *end;
+    errno = 0;
+    value = std::strtod(text.c_str(), &end);
+    return errno != ERANGE && end == text.c_str() + text.size();
 }
 
 // ─────────────────────────────────────
-inline bool ParseFloat(std::string_view text, float &value) {
-    const char *begin = text.data();
-    const char *end = begin + text.size();
-    auto [ptr, ec] = std::from_chars(begin, end, value);
-    return ec == std::errc{} && ptr == end;
+inline bool ParseFloat(const std::string &text, float &value) {
+    if (text.empty() || std::isspace(static_cast<unsigned char>(text.front()))) {
+        return false;
+    }
+
+    char *end;
+    errno = 0;
+    value = std::strtof(text.c_str(), &end);
+    return errno != ERANGE && end == text.c_str() + text.size();
 }
 
 // ╭─────────────────────────────────────╮

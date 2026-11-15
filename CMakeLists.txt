@@ -277,6 +277,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 
 # libonnx
+set(BUILD_TESTS OFF)
 FetchContent_Declare(
     libonnx
     GIT_REPOSITORY https://github.com/charlesneimog/libonnx.git
