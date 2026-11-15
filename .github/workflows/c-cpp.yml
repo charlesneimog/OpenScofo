@@ -52,7 +52,7 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install puredata -y
-                  sudo apt install libboost-all-dev libgtest-dev libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
+                  sudo apt install libboost-all-dev libgtest-dev libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
                   cargo install tree-sitter-cli --locked
                   pip install build scikit-build-core cibuildwheel twine nanobind
             - name: Cache Qt Installer Framework (Linux)
