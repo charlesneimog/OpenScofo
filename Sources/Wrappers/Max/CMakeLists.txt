@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.25)
 project(max_openscofo)
 
-FetchContent_Declare(max-sdk GIT_REPOSITORY https://github.com/Cycling74/max-sdk.git GIT_TAG v8.2.0)
+FetchContent_Declare(
+    max-sdk
+    GIT_REPOSITORY https://github.com/Cycling74/max-sdk.git
+    GIT_TAG v8.2.0
+    EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(max-sdk)
 
 set(C74_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/max")
