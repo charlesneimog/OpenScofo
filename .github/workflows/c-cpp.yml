@@ -386,7 +386,7 @@ jobs:
                   cp Documentation/assets/icon.png "$package_root/"
                   cp Tests/flute.onnx "$package_root/"
                   cp Resources/Pieces/miniatura1.scofo "$package_root/"
-                  cp Resources/Pieces/miniatura1.wav "$package_root/"
+                  cp Tests/04-miniaturas/Audios/miniatura1.mp3 "$package_root/"
                   shopt -s nullglob
                   found_binary=0
                   for binary in build/Sources/Wrappers/PureData/openscofo~*; do
@@ -424,7 +424,7 @@ jobs:
                   Copy-Item 'Documentation/assets/icon.png' $packageRoot -Force
                   Copy-Item 'Tests/flute.onnx' $packageRoot -Force
                   Copy-Item 'Resources/Pieces/miniatura1.scofo' $packageRoot -Force
-                  Copy-Item 'Resources/Pieces/miniatura1.wav' $packageRoot -Force
+                  Copy-Item 'Tests/04-miniaturas/Audios/miniatura1.mp3' $packageRoot -Force
                   $pdBinaries = @()
                   if (Test-Path 'build/Sources/Wrappers/PureData') {
                     $pdBinaries += Get-ChildItem 'build/Sources/Wrappers/PureData' -File -Filter 'openscofo~*'
