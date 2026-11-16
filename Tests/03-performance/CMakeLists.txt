@@ -27,7 +27,10 @@ find_path(FFTW3_INCLUDE_DIR NAMES fftw3.h REQUIRED)
 # fftw3
 add_executable(bench_fftw3 benchmark_fftw3.cpp)
 target_include_directories(bench_fftw3 PRIVATE ${FFTW3_INCLUDE_DIR})
-target_link_libraries(bench_fftw3 PRIVATE ${FFTW3F_LIB} m)
+target_link_libraries(bench_fftw3 PRIVATE ${FFTW3F_LIB})
+if(NOT WIN32)
+    target_link_libraries(bench_fftw3 PRIVATE m)
+endif()
 
 # pffft
 include(ExternalProject)
@@ -37,6 +40,9 @@ ExternalProject_Add(mipp EXCLUDE_FROM_ALL TRUE GIT_REPOSITORY https://github.com
 ExternalProject_Get_Property(mipp source_dir)
 set(MIPP_INCLUDE_DIRS "${source_dir}/include")
 FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG master)
+if(WIN32)
+    set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
+endif()
 FetchContent_MakeAvailable(pffft)
 add_executable(bench_pffft benchmark_pffft.cpp)
 target_link_libraries(bench_pffft PRIVATE PFFFT::PFFFT)

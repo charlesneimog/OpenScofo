@@ -262,6 +262,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/marton78/pffft.git
     GIT_TAG ${PFFFT_VERSION}
     EXCLUDE_FROM_ALL)
+if(WIN32)
+    # clang targeting the MSVC ABI reports a Clang compiler ID, which makes
+    # PFFFT otherwise add the Unix-only libm dependency (m.lib on Windows).
+    set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
+endif()
 FetchContent_MakeAvailable(pffft)
 
 # onsetsds
