@@ -8,7 +8,7 @@ nchnls = 1
 
 instr 1
     ; audio input from file or real time audio input
-    a1 diskin2 "/home/neimog/Documents/Git/OpenScofo/Resources/Pieces/miniatura1.wav", 1, 0, 0
+    a1 diskin2 "miniatura1.wav", 1, 0, 0
 
     ; kEvent is the event index of the score, first note, second note, third note, etc (rest do not count as event).
     ; kBPM is the current kBPM that the player is play a given score.

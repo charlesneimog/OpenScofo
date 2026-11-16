@@ -772,7 +772,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 10.0, 196.0, 144.0, 22.0 ],
-                                    "text": "open miniatura1.mp3"
+                                    "text": "open miniatura1.wav"
                                 }
                             },
                             {
@@ -2911,7 +2911,7 @@
                                     "numoutlets": 1,
                                     "outlettype": [ "" ],
                                     "patching_rect": [ 17.0, 177.0, 144.0, 22.0 ],
-                                    "text": "open miniatura1.mp3"
+                                    "text": "open miniatura1.wav"
                                 }
                             },
                             {

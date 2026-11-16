@@ -2341,7 +2341,7 @@
 #X msg 103 202 start;
 #X msg 94 182 score miniatura1.scofo;
 #X obj 12 153 readsf~;
-#X msg 12 120 open miniatura1.mp3 \, 1;
+#X msg 12 120 open miniatura1.wav \, 1;
 #X obj 21 187 dac~;
 #X text 64 152 Replace with MIC.;
 #X obj 452 25 cnv 10 10 10 empty empty by\ Charles\ K.\ Neimog 0 15 2 12 #7c7c7c #e0e4dc 0;

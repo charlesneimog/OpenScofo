@@ -23,6 +23,23 @@ from typing import Iterable
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 
 
+# Keep this list in sync with Sources/Wrappers/PureData/CMakeLists.txt.  The
+# model and score are intentionally adjacent in the installed Pd package.
+PD_PACKAGE_DATA = [
+    Path("README.md"),
+    Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
+    Path("LICENSE"),
+    Path("Documentation/assets/icon.png"),
+    Path("Tests/flute.onnx"),
+    Path("build/OpenScofoPackageAssets/miniatura1.scofo"),
+    Path("build/OpenScofoPackageAssets/miniatura1.wav"),
+    Path("Resources/Train/py.o.train.pd_py"),
+    Path("Resources/Train/py.o.train-help.pd"),
+    Path("Sources/Wrappers/PureData/openscofo~.cpp"),
+    Path("Sources/Wrappers/PureData/pdlua.cpp"),
+]
+
+
 @dataclass
 class ComponentSpec:
     key: str
@@ -59,8 +76,9 @@ def component_specs() -> list[ComponentSpec]:
     shared_assets = [
         Path("Tests/01-benchmark/real/canticos.mp3"),
         Path("Tests/01-benchmark/real/canticos.scofo"),
-        Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
-        Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
+        Path("Tests/flute.onnx"),
+        Path("build/OpenScofoPackageAssets/miniatura1.wav"),
+        Path("build/OpenScofoPackageAssets/miniatura1.scofo"),
     ]
 
     return [
@@ -71,7 +89,7 @@ def component_specs() -> list[ComponentSpec]:
         ),
         ComponentSpec(
             key="puredata",
-            required=[Path("Sources/Wrappers/PureData/openscofo~-help.pd"), *shared_assets],
+            required=PD_PACKAGE_DATA,
             optional=[
                 Path("build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so"),
                 Path("build/Sources/Wrappers/PureData/openscofo~.so"),
@@ -107,8 +125,11 @@ def stage_component_payload(repo_root: Path, payload_root: Path, spec: Component
         copied += 1
 
     for rel in spec.required:
-        if copy_if_exists(repo_root, rel, dest_dir):
-            copied += 1
+        if not copy_if_exists(repo_root, rel, dest_dir):
+            raise FileNotFoundError(
+                f"Missing required {spec.key} package file: {repo_root / rel}"
+            )
+        copied += 1
 
     # Include extra optional assets if present (for naming differences across branches/platforms).
     for rel in spec.optional:

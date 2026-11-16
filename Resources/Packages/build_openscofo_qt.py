@@ -33,7 +33,21 @@ COMPONENTS = {
             "build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so",
             "build/Sources/Wrappers/PureData/openscofo~.so",
         ],
-        "required": ["Sources/Wrappers/PureData/openscofo~-help.pd"],
+        # Keep this list in sync with
+        # Sources/Wrappers/PureData/CMakeLists.txt.
+        "required": [
+            "README.md",
+            "Sources/Wrappers/PureData/openscofo~-help.pd",
+            "LICENSE",
+            "Documentation/assets/icon.png",
+            "Tests/flute.onnx",
+            "build/OpenScofoPackageAssets/miniatura1.scofo",
+            "build/OpenScofoPackageAssets/miniatura1.wav",
+            "Resources/Train/py.o.train.pd_py",
+            "Resources/Train/py.o.train-help.pd",
+            "Sources/Wrappers/PureData/openscofo~.cpp",
+            "Sources/Wrappers/PureData/pdlua.cpp",
+        ],
         "examples": [],
     },
     "supercollider": {
@@ -63,6 +77,8 @@ ASSETS = [
     "Tests/04-miniaturas/Audios/miniatura2.mp3",
     "Tests/04-miniaturas/Extras/miniatura2.scofo",
     "Tests/flute.onnx",
+    "build/OpenScofoPackageAssets/miniatura1.wav",
+    "build/OpenScofoPackageAssets/miniatura1.scofo",
 ]
 
 
@@ -217,7 +233,7 @@ def build(args):
             if path.is_file():
                 sources.append(path)
             else:
-                print(f"[skip] {key}: missing auxiliary file: {rel}")
+                raise RuntimeError(f"{key}: missing required package file: {rel}")
         # Examples stay separate from the plugin directories.
         if create_package(packages, key, spec["name"], spec["dest"],
                           args.version, sources):

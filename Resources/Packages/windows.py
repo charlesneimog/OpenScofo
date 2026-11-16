@@ -25,6 +25,30 @@ from xml.sax.saxutils import escape
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 
 
+# Keep this list in sync with Sources/Wrappers/PureData/CMakeLists.txt.  The
+# packaged score deliberately uses `ONNXMODEL flute.onnx`, so both files must
+# be installed into the same directory.
+PD_PACKAGE_DATA = [
+    Path("README.md"),
+    Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
+    Path("LICENSE"),
+    Path("Documentation/assets/icon.png"),
+    Path("Tests/flute.onnx"),
+    Path("build/OpenScofoPackageAssets/miniatura1.scofo"),
+    Path("build/OpenScofoPackageAssets/miniatura1.wav"),
+    Path("Resources/Train/py.o.train.pd_py"),
+    Path("Resources/Train/py.o.train-help.pd"),
+    Path("Sources/Wrappers/PureData/openscofo~.cpp"),
+    Path("Sources/Wrappers/PureData/pdlua.cpp"),
+]
+
+MODEL_EXAMPLE_DATA = [
+    Path("Tests/flute.onnx"),
+    Path("build/OpenScofoPackageAssets/miniatura1.scofo"),
+    Path("build/OpenScofoPackageAssets/miniatura1.wav"),
+]
+
+
 @dataclass
 class IntegrationSpec:
     key: str
@@ -124,6 +148,11 @@ def copy_item(src: Path, dest: Path) -> None:
 
 def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Path) -> int:
     max_root = repo_root / "Sources" / "Wrappers" / "Max"
+    generated_wav = build_dir / "OpenScofoPackageAssets" / "miniatura1.wav"
+    if not generated_wav.is_file():
+        raise FileNotFoundError(
+            f"Missing generated package asset: {generated_wav}. Configure the CMake build first."
+        )
     copied = 0
 
     package_root = max_root / "package"
@@ -148,7 +177,7 @@ def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Pa
         repo_root / "Tests" / "flute.onnx",
         repo_root / "Tests" / "01-benchmark" / "real" / "canticos.scofo",
         repo_root / "Tests" / "01-benchmark" / "real" / "canticos.mp3",
-        repo_root / "Tests" / "04-miniaturas" / "Audios" / "miniatura1.mp3",
+        build_dir / "OpenScofoPackageAssets" / "miniatura1.wav",
     ]
     for src in help_files:
         if src.exists():
@@ -205,7 +234,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Tests/flute.onnx"),
                 Path("Tests/01-benchmark/real/canticos.mp3"),
                 Path("Tests/01-benchmark/real/canticos.scofo"),
-                Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
+                Path("build/OpenScofoPackageAssets/miniatura1.wav"),
                 Path("Sources/Wrappers/Max/miniatura1-max.scofo"),
             ],
             optional=[
@@ -222,13 +251,7 @@ def component_specs() -> list[IntegrationSpec]:
             destination_root="PersonalFolder",
             destination_subdir="Pd/externals/openscofo~",
             destination_subdir_x64=None,
-            required=[
-                Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
-                Path("Tests/01-benchmark/real/canticos.mp3"),
-                Path("Tests/01-benchmark/real/canticos.scofo"),
-                Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
-                Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
-            ],
+            required=PD_PACKAGE_DATA,
             optional=pd_candidates,
         ),
         IntegrationSpec(
@@ -242,8 +265,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
                 Path("Tests/01-benchmark/real/canticos.mp3"),
                 Path("Tests/01-benchmark/real/canticos.scofo"),
-                Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
-                Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
+                *MODEL_EXAMPLE_DATA,
             ],
             optional=[
                 Path("build/Sources/Wrappers/CSound/OpenScofo.dll"),
@@ -262,8 +284,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/SuperCollider/examples/2-descriptors-input.scd"),
                 Path("Tests/01-benchmark/real/canticos.mp3"),
                 Path("Tests/01-benchmark/real/canticos.scofo"),
-                Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
-                Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
+                *MODEL_EXAMPLE_DATA,
             ],
             optional=[Path("build/Sources/Wrappers/SuperCollider/OpenScofo.scx")],
         ),
@@ -277,8 +298,7 @@ def component_specs() -> list[IntegrationSpec]:
             required=[
                 Path("Tests/01-benchmark/real/canticos.mp3"),
                 Path("Tests/01-benchmark/real/canticos.scofo"),
-                Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
-                Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
+                *MODEL_EXAMPLE_DATA,
             ],
             optional=[Path("build/Sources/Wrappers/Vamp/OpenScofo.dll")],
         ),
@@ -292,6 +312,12 @@ def stage_component_payload(repo_root: Path, build_dir: Path, work_dir: Path, sp
     if spec.key == "max":
         stage_max_package_payload(repo_root, build_dir, payload_root)
         return payload_root
+
+    missing = [repo_root / rel for rel in spec.required if not (repo_root / rel).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing required {spec.key} package files: {', '.join(str(path) for path in missing)}"
+        )
 
     binary = first_existing(repo_root / p for p in spec.optional)
     if binary is not None:

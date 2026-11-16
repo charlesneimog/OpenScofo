@@ -52,7 +52,7 @@ jobs:
               if: runner.os == 'Linux'
               run: |
                   sudo apt update
-                  sudo apt install puredata -y
+                  sudo apt install ffmpeg puredata -y
                   sudo apt install libboost-all-dev libgtest-dev libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
                   sudo apt-get install -y \
                     libxcb-image0 \
@@ -97,7 +97,7 @@ jobs:
             - name: Install dependencies (macOS)
               if: runner.os == 'macOS'
               run: |
-                  brew install pd nanobind tree-sitter boost protobuf protobuf-c
+                  brew install ffmpeg pd nanobind tree-sitter boost protobuf protobuf-c
                   npm install -g tree-sitter-cli
                   pip install build scikit-build-core cibuildwheel twine
             # -----------------------
@@ -112,7 +112,7 @@ jobs:
                   npm install -g tree-sitter-cli
                   winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
                   winget install -e --id MillerPuckette.PureData --accept-source-agreements
-                  choco install wixtoolset --no-progress -y
+                  choco install ffmpeg wixtoolset --no-progress -y
                   $wixBin = 'C:\Program Files (x86)\WiX Toolset v3.11\bin'
                   if (Test-Path $wixBin) {
                     "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -235,8 +235,15 @@ jobs:
                   echo "version=$version" >> "$GITHUB_OUTPUT"
             - name: Generate macOS Component Installer
               if: runner.os == 'macOS'
+              shell: bash
               run: |
+                  set -euo pipefail
                   python Resources/Packages/macos.py --version "$WHEEL_VERSION"
+                  pd_payload="Resources/Packages/out/payload/puredata"
+                  test -s "$pd_payload/flute.onnx"
+                  test -s "$pd_payload/miniatura1.scofo"
+                  test -s "$pd_payload/miniatura1.wav"
+                  grep -Eq '^ONNXMODEL[[:space:]]+flute\.onnx([[:space:]]|$)' "$pd_payload/miniatura1.scofo"
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
               shell: bash
@@ -289,6 +296,11 @@ jobs:
                   test -s "$smoke_home/.local/lib/csound/6.0/plugins64/OpenScofo.so"
                   test -s "$smoke_home/Documents/Pd/externals/openscofo~/openscofo~.linux-amd64-32.so" \
                     || test -s "$smoke_home/Documents/Pd/externals/openscofo~/openscofo~.so"
+                  test -s "$smoke_home/Documents/Pd/externals/openscofo~/flute.onnx"
+                  test -s "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.scofo"
+                  test -s "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.wav"
+                  grep -Eq '^ONNXMODEL[[:space:]]+flute\.onnx([[:space:]]|$)' \
+                    "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.scofo"
                   test -s "$smoke_home/.local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so"
                   test -s "$smoke_home/.vamp/OpenScofo.so"
                   test -s "$smoke_home/.local/share/openscofo/examples/bwv-1013.scofo"
@@ -327,6 +339,20 @@ jobs:
                     --output "OpenScofo-$($env:WHEEL_VERSION)-Win64.msi" `
                     --candle "$candlePath" `
                     --light "$lightPath"
+                  $pdPayload = 'Resources/Packages/out-win/payload/puredata'
+                  if (-not (Test-Path "$pdPayload/flute.onnx" -PathType Leaf)) {
+                    throw 'The Windows Pure Data installer payload is missing flute.onnx.'
+                  }
+                  $score = "$pdPayload/miniatura1.scofo"
+                  if (-not (Test-Path $score -PathType Leaf)) {
+                    throw 'The Windows Pure Data installer payload is missing miniatura1.scofo.'
+                  }
+                  if (-not (Test-Path "$pdPayload/miniatura1.wav" -PathType Leaf)) {
+                    throw 'The Windows Pure Data installer payload is missing miniatura1.wav.'
+                  }
+                  if (-not (Select-String -Path $score -Pattern '^ONNXMODEL\s+flute\.onnx(?:\s|$)' -Quiet)) {
+                    throw 'The Windows Pure Data score does not reference the adjacent flute.onnx model.'
+                  }
             - name: Stage Max package payload (macOS)
               if: runner.os == 'macOS'
               shell: bash
@@ -345,7 +371,7 @@ jobs:
                   cp Tests/flute.onnx "$package_root/help/"
                   cp Tests/01-benchmark/real/canticos.scofo "$package_root/help/"
                   cp Tests/01-benchmark/real/canticos.mp3 "$package_root/help/"
-                  cp Tests/04-miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
+                  cp build/OpenScofoPackageAssets/miniatura1.wav "$package_root/help/"
                   cp Sources/Wrappers/Max/miniatura1-max.scofo "$package_root/help/miniatura1.scofo"
                   cp -R max/openscofo~.mxo "$package_root/externals/"
                   test -f "$package_root/docs/openscofo~.maxref.xml"
@@ -356,6 +382,7 @@ jobs:
                   test -f "$package_root/help/canticos.scofo"
                   test -f "$package_root/help/flute.onnx"
                   test -f "$package_root/help/miniatura1.scofo"
+                  test -f "$package_root/help/miniatura1.wav"
                   test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
             - name: Stage Max package payload (Windows)
               if: runner.os == 'Windows'
@@ -385,8 +412,8 @@ jobs:
                   cp LICENSE "$package_root/"
                   cp Documentation/assets/icon.png "$package_root/"
                   cp Tests/flute.onnx "$package_root/"
-                  cp Resources/Pieces/miniatura1.scofo "$package_root/"
-                  cp Tests/04-miniaturas/Audios/miniatura1.mp3 "$package_root/"
+                  cp build/OpenScofoPackageAssets/miniatura1.scofo "$package_root/"
+                  cp build/OpenScofoPackageAssets/miniatura1.wav "$package_root/"
                   shopt -s nullglob
                   found_binary=0
                   for binary in build/Sources/Wrappers/PureData/openscofo~*; do
@@ -423,8 +450,8 @@ jobs:
                   Copy-Item 'LICENSE' $packageRoot -Force
                   Copy-Item 'Documentation/assets/icon.png' $packageRoot -Force
                   Copy-Item 'Tests/flute.onnx' $packageRoot -Force
-                  Copy-Item 'Resources/Pieces/miniatura1.scofo' $packageRoot -Force
-                  Copy-Item 'Tests/04-miniaturas/Audios/miniatura1.mp3' $packageRoot -Force
+                  Copy-Item 'build/OpenScofoPackageAssets/miniatura1.scofo' $packageRoot -Force
+                  Copy-Item 'build/OpenScofoPackageAssets/miniatura1.wav' $packageRoot -Force
                   $pdBinaries = @()
                   if (Test-Path 'build/Sources/Wrappers/PureData') {
                     $pdBinaries += Get-ChildItem 'build/Sources/Wrappers/PureData' -File -Filter 'openscofo~*'
