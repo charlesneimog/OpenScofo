@@ -19,4 +19,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_INCLUDES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MAX_SDK_MSP_INCLUDES})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX)
+endif()
+
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-posttarget.cmake")
