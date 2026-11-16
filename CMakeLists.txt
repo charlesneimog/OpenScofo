@@ -101,6 +101,7 @@ if(NOT EXISTS "${PDCMAKE_FILE}")
     endif()
 endif()
 
+set(PD_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 include("${PDCMAKE_FILE}")
 # ╭──────────────────────────────────────╮
 # │             CPM Package              │
@@ -118,7 +119,8 @@ include(${CPM_FILE})
 FetchContent_Declare(
     tree-sitter
     GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter.git
-    GIT_TAG ${TREE_SITTER_VERSION})
+    GIT_TAG ${TREE_SITTER_VERSION}
+    EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(tree-sitter)
 
 set(GRAMMAR_BUILD_DIR "${CMAKE_BINARY_DIR}/openscofo_grammar")
@@ -259,14 +261,16 @@ set(MIPP_INCLUDE_DIRS "${mipp_SOURCE_DIR}/include")
 FetchContent_Declare(
     pffft
     GIT_REPOSITORY https://github.com/marton78/pffft.git
-    GIT_TAG ${PFFFT_VERSION})
+    GIT_TAG ${PFFFT_VERSION}
+    EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(pffft)
 
 # onsetsds
 FetchContent_Declare(
     onsetsds_tilde
     GIT_REPOSITORY https://github.com/charlesneimog/onsetsds_tilde.git
-    GIT_TAG main)
+    GIT_TAG main
+    EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(onsetsds_tilde)
 
 # spdlog

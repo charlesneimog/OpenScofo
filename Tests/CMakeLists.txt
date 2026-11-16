@@ -15,14 +15,16 @@ if(NOT APPLE
         FetchContent_Declare(
             googletest
             GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG v1.17.0)
+            GIT_TAG v1.17.0
+            EXCLUDE_FROM_ALL)
         FetchContent_MakeAvailable(googletest)
     endif()
 
     FetchContent_Declare(
         AudioFile
         GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
-        GIT_TAG master)
+        GIT_TAG master
+        EXCLUDE_FROM_ALL)
     FetchContent_MakeAvailable(AudioFile)
 
     FetchContent_Declare(
