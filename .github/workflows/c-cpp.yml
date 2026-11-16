@@ -344,7 +344,7 @@ jobs:
                   cp Sources/Wrappers/Max/score_renderer.js "$package_root/help/"
                   cp Tests/miniaturas/Extras/ai-flute-model.onnx "$package_root/help/"
                   cp Tests/01-Score-Follower-Benchmarks/real/canticos.scofo "$package_root/help/"
-                  cp Tests/01-Score-Follower-Benchmarks/real/canticos.wav "$package_root/help/"
+                  cp Tests/01-Score-Follower-Benchmarks/real/canticos.mp3 "$package_root/help/"
                   cp Tests/miniaturas/Audios/miniatura1.mp3 "$package_root/help/"
                   cp Sources/Wrappers/Max/miniatura1-max.scofo "$package_root/help/miniatura1.scofo"
                   cp -R max/openscofo~.mxo "$package_root/externals/"
@@ -352,7 +352,7 @@ jobs:
                   test -f "$package_root/help/openscofo~.maxhelp"
                   test -f "$package_root/help/score-max.svg"
                   test -f "$package_root/help/score_renderer.js"
-                  test -f "$package_root/help/canticos.wav"
+                  test -f "$package_root/help/canticos.mp3"
                   test -f "$package_root/help/canticos.scofo"
                   test -f "$package_root/help/ai-flute-model.onnx"
                   test -f "$package_root/help/miniatura1.scofo"
@@ -591,7 +591,7 @@ jobs:
                   cp "$win_part/OpenScofo/externals/openscofo~.mxe64" max_release/OpenScofo/externals/
                   test -f max_release/OpenScofo/docs/openscofo~.maxref.xml
                   test -f max_release/OpenScofo/help/openscofo~.maxhelp
-                  test -f max_release/OpenScofo/help/canticos.wav
+                  test -f max_release/OpenScofo/help/canticos.mp3
                   test -f max_release/OpenScofo/help/canticos.scofo
                   test -f max_release/OpenScofo/help/ai-flute-model.onnx
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~

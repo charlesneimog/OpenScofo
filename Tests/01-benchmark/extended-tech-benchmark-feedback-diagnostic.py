@@ -58,7 +58,7 @@ TEST_FILES = [
         "annotations": "./real/miniatura2-events.json",
     },
     {
-        "audio": "./real/canticos.wav",
+        "audio": "./real/canticos.mp3",
         "score": "./real/canticos.scofo",
         "annotations": "./real/canticos.json",
     },

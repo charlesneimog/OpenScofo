@@ -57,7 +57,7 @@ COMPONENTS = {
 
 ASSETS = [
     "Tests/01-benchmark/real/bwv-1013.wav",
-    "Tests/01-benchmark/real/canticos.wav",
+    "Tests/01-benchmark/real/canticos.mp3",
     "Tests/01-benchmark/real/canticos.scofo",
     "Tests/01-benchmark/real/bwv-1013.scofo",
     "Tests/04-miniaturas/Audios/miniatura2.mp3",

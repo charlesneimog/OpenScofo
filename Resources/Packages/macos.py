@@ -120,7 +120,7 @@ def stage_max_package_payload(repo_root: Path, payload_root: Path) -> int:
         max_root / "score_renderer.js",
         repo_root / "Tests" / "miniaturas" / "Extras" / "ai-flute-model.onnx",
         repo_root / "Tests" / "01-Score-Follower-Benchmarks" / "real" / "canticos.scofo",
-        repo_root / "Tests" / "01-Score-Follower-Benchmarks" / "real" / "canticos.wav",
+        repo_root / "Tests" / "01-Score-Follower-Benchmarks" / "real" / "canticos.mp3",
         repo_root / "Tests" / "miniaturas" / "Audios" / "miniatura1.mp3",
     ]
     for src in help_files:
@@ -264,7 +264,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/Max/score-max.svg"),
                 Path("Sources/Wrappers/Max/score_renderer.js"),
                 Path("Tests/miniaturas/Extras/ai-flute-model.onnx"),
-                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.wav"),
+                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
                 Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
                 Path("Sources/Wrappers/Max/miniatura1-max.scofo"),
@@ -285,7 +285,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             user_destination="Documents/Pd/externals/openscofo~",
             required=[
                 Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
-                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.wav"),
+                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
                 Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
                 Path("Tests/miniaturas/Extras/miniatura1.scofo"),
@@ -303,7 +303,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             user_destination="Library/csound/6.0/plugins64",
             required=[
                 Path("Sources/Wrappers/CSound/examples/1-score-follow.csd"),
-                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.wav"),
+                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
                 Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
                 Path("Tests/miniaturas/Extras/miniatura1.scofo"),
@@ -322,7 +322,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/SuperCollider/OpenScofo.sc"),
                 Path("Sources/Wrappers/SuperCollider/examples/1-score-follow.scd"),
                 Path("Sources/Wrappers/SuperCollider/examples/2-descriptors-input.scd"),
-                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.wav"),
+                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
                 Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
                 Path("Tests/miniaturas/Extras/miniatura1.scofo"),
@@ -335,7 +335,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             identifier="org.openscofo.pkg.vamp",
             user_destination="/Library/Audio/Plug-Ins/Vamp",
             required=[
-                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.wav"),
+                Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
                 Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
                 Path("Tests/miniaturas/Audios/miniatura1.mp3"),
                 Path("Tests/miniaturas/Extras/miniatura1.scofo"),

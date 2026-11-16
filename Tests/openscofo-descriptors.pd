@@ -25,7 +25,7 @@
 #X obj 3 89 bng 18 250 50 0 empty empty empty 0 -9 0 10 #fcfcfc #000000 #000000;
 #X text 22 88 BWV-1013;
 #X obj 205 1 text define -k pieces;
-#A set ./04-miniaturas/Audios/miniatura1.mp3 ./04-miniaturas/Extras/miniatura1.scofo \; ./04-miniaturas/Audios/miniatura2.mp3 ./04-miniaturas/Extras/miniatura2.scofo \; ./04-miniaturas/Audios/miniatura3.mp3 ./04-miniaturas/Extras/miniatura3.scofo \; ./01-benchmark/real/canticos.wav ./01-benchmark/real/canticos.scofo \; ./01-benchmark/real/bwv-1013.wav ./01-benchmark/real/bwv-1013.scofo \; /home/neimog/Downloads/Melancolira.wav /home/neimog/Documents/Git/OpenScofo/Tests/07-pieces/melancolira.scofo \;;
+#A set ./04-miniaturas/Audios/miniatura1.mp3 ./04-miniaturas/Extras/miniatura1.scofo \; ./04-miniaturas/Audios/miniatura2.mp3 ./04-miniaturas/Extras/miniatura2.scofo \; ./04-miniaturas/Audios/miniatura3.mp3 ./04-miniaturas/Extras/miniatura3.scofo \; ./01-benchmark/real/canticos.mp3 ./01-benchmark/real/canticos.scofo \; ./01-benchmark/real/bwv-1013.wav ./01-benchmark/real/bwv-1013.scofo \; /home/neimog/Downloads/Melancolira.wav /home/neimog/Documents/Git/OpenScofo/Tests/07-pieces/melancolira.scofo \;;
 #X obj 5 443 text get pieces;
 #X msg 5 219 0;
 #X msg 12 238 1;

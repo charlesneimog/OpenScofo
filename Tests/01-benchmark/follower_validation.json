@@ -6,7 +6,7 @@
       "implementation": "impl_18dfe9be6c533aed",
       "protocol": "cont-8.2",
       "tolerance_ms": 250.0,
-      "audio_file": "./real/canticos.wav",
+      "audio_file": "./real/canticos.mp3",
       "score_file": "./real/canticos.scofo",
       "annotations_file": "./real/canticos.json",
       "metrics": {
@@ -12685,7 +12685,7 @@
       "implementation": "impl_18dfe9be6c533aed",
       "protocol": "cont-8.2",
       "tolerance_ms": 250.0,
-      "audio_file": "./real/canticos.wav",
+      "audio_file": "./real/canticos.mp3",
       "score_file": "./real/canticos.scofo",
       "annotations_file": "./real/canticos.json",
       "metrics": {
@@ -24014,7 +24014,7 @@
       },
       "pieces": [
         {
-          "audio_file": "./real/canticos.wav",
+          "audio_file": "./real/canticos.mp3",
           "score_file": "./real/canticos.scofo",
           "annotations_file": "./real/canticos.json"
         },
@@ -24284,7 +24284,7 @@
           "annotations_file": null
         },
         {
-          "audio_file": "./real/canticos.wav",
+          "audio_file": "./real/canticos.mp3",
           "score_file": "./real/canticos.scofo",
           "annotations_file": "./real/canticos.json"
         },
