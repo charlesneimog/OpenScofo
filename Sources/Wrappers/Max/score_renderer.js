@@ -1,13 +1,13 @@
 autowatch = 1;
 
-var scriptVersion = "score_renderer v3";
-
 mgraphics.init();
 mgraphics.relative_coords = 0;
 mgraphics.autofill = 0;
 
 var svgFilename = "score-max.svg";
 var svg = null;
+var svgWidth = 1;
+var svgHeight = 1;
 var currentEventNumber = 0;
 var maxEventNumber = 255;
 var zoomAmount = 1.0;
@@ -17,23 +17,70 @@ var margin = 10;
 var highlightColor = [1, 0, 0, 1];
 var blackColor = [0, 0, 0, 1];
 
-post(scriptVersion + " loaded\n");
 load_svg();
 
 function load_svg()
 {
-    svg = new MGraphicsSVG(svgFilename);
+    var dimensions = read_svg_dimensions(svgFilename);
+    if (!dimensions) {
+        svg = null;
+        post("score_renderer: could not load " + svgFilename + "\n");
+        return;
+    }
 
-    if (!svg || !svg.loaded) {
+    svgWidth = dimensions[0];
+    svgHeight = dimensions[1];
+
+    try {
+        svg = new MGraphicsSVG(svgFilename);
+    } catch (error) {
+        svg = null;
         post("score_renderer: could not load " + svgFilename + "\n");
     }
+}
+
+function read_svg_dimensions(filename)
+{
+    var file = new File(filename, "read");
+    if (!file.isopen) {
+        return null;
+    }
+
+    var header = file.readstring(Math.min(file.eof, 8192));
+    file.close();
+
+    var number = "([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)";
+    var viewBox = new RegExp(
+        "viewBox\\s*=\\s*[\\\"']\\s*" + number + "[\\s,]+" + number + "[\\s,]+" + number + "[\\s,]+" + number,
+        "i"
+    ).exec(header);
+
+    if (viewBox) {
+        var viewBoxWidth = Number(viewBox[3]);
+        var viewBoxHeight = Number(viewBox[4]);
+        if (isFinite(viewBoxWidth) && isFinite(viewBoxHeight) && viewBoxWidth > 0 && viewBoxHeight > 0) {
+            return [viewBoxWidth, viewBoxHeight];
+        }
+    }
+
+    var width = /<svg[\s\S]*?\bwidth\s*=\s*["']\s*([0-9]*\.?[0-9]+)/i.exec(header);
+    var height = /<svg[\s\S]*?\bheight\s*=\s*["']\s*([0-9]*\.?[0-9]+)/i.exec(header);
+    if (width && height) {
+        var documentWidth = Number(width[1]);
+        var documentHeight = Number(height[1]);
+        if (documentWidth > 0 && documentHeight > 0) {
+            return [documentWidth, documentHeight];
+        }
+    }
+
+    return null;
 }
 
 function paint()
 {
     clear_background();
 
-    if (!svg || !svg.loaded) {
+    if (!svg) {
         return;
     }
 
@@ -41,9 +88,6 @@ function paint()
 
     var width = box.rect[2] - box.rect[0];
     var height = box.rect[3] - box.rect[1];
-    var svgWidth = svg.size[0];
-    var svgHeight = svg.size[1];
-
     if (width <= 0 || height <= 0 || svgWidth <= 0 || svgHeight <= 0) {
         return;
     }
@@ -57,11 +101,7 @@ function paint()
     var x = ((width - drawWidth) * 0.5) + offsetX;
     var y = ((height - drawHeight) * 0.5) + offsetY;
 
-    mgraphics.save();
-    mgraphics.translate(x, y);
-    mgraphics.scale(scale, scale);
-    mgraphics.svg_render(svg);
-    mgraphics.restore();
+    mgraphics.svg_render(svg, x, y, drawWidth, drawHeight);
 }
 
 function apply_event_colors()
