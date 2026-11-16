@@ -642,14 +642,26 @@ jobs:
                       --user "$(id -u)" \
                       --volume "$(pwd):/deken" \
                       registry.git.iem.at/pd/deken \
-                      deken package --version "${RELEASE_VERSION}" "${LIBNAME}"
+                      deken package \
+                        --version "${RELEASE_VERSION}" \
+                        --default-floatsize 32 \
+                        "${LIBNAME}"
+                    dek_files=(./*.dek)
+                    if [[ "${dek_files[*]}" != *"(Darwin-"* ]]; then
+                      echo "ERROR: Deken package is missing the Darwin architecture."
+                      printf '%s\n' "${dek_files[@]}"
+                      exit 1
+                    fi
                     ls -lh ./*.dek
                     docker run --rm \
                       --user "$(id -u)" \
                       --volume "$(pwd):/deken" \
                       -e DEKEN_USERNAME -e DEKEN_PASSWORD \
                       registry.git.iem.at/pd/deken \
-                      deken upload -v "${RELEASE_VERSION}" ./*.dek
+                      deken upload \
+                        --no-source-error \
+                        -v "${RELEASE_VERSION}" \
+                        ./*.dek
                   )
             - name: Generate release notes
               shell: bash
