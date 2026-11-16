@@ -42,16 +42,28 @@ OpenScofo::~OpenScofo() {
  * @warning Invalidates all external references to this Lua state and cancels its pending callbacks.
  */
 void OpenScofo::CloseLuaModule() {
+    ClearLuaTimers();
     if (m_LuaState == nullptr) {
         return;
     }
-    for (const auto &[Key, Timer] : m_LuaTimers) {
-        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.CallbackRef);
-        luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.DataRef);
-    }
-    m_LuaTimers.clear();
+
     lua_close(m_LuaState);
     m_LuaState = nullptr;
+}
+
+// ─────────────────────────────────────
+/** Clear pending Lua callbacks and restart the processed-audio sample clock. */
+void OpenScofo::ClearLuaTimers() {
+    if (m_LuaState != nullptr) {
+        for (const auto &[Key, Timer] : m_LuaTimers) {
+            luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.CallbackRef);
+            luaL_unref(m_LuaState, LUA_REGISTRYINDEX, Timer.DataRef);
+        }
+    }
+
+    m_LuaTimers.clear();
+    m_LuaCurrentSample = 0;
+    m_LuaNextTimerId = 1;
 }
 
 // ─────────────────────────────────────

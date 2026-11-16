@@ -43,8 +43,8 @@ std::string Score::GetLuaCode() {
  *
  * @return True if the stored loaded flag is set; false otherwise.
  *
- * @note Set when Parse() reaches its final return; does not independently validate runtime readiness.
- * @warning The flag does not guarantee an error-free score and is not reset at the start of a subsequent parse.
+ * @note Reset when parsing begins and set only when Parse() reaches its successful final return.
+ * @warning The flag does not independently validate runtime readiness.
  */
 bool Score::ScoreIsLoaded() {
     return m_ScoreLoaded;
@@ -63,8 +63,21 @@ bool Score::ScoreIsLoaded() {
  * partial results.
  */
 std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
+    m_ScoreLoaded = false;
     m_ScoreStates.clear();
     m_LuaCode.clear();
+    m_CurrentBPM = -1;
+    m_Transpose = 0;
+    m_Tunning = 440;
+    m_TimeTolerance = 16;
+    m_LastOnset = 0;
+    m_LastPhase = 0;
+    m_PrevDuration = 0;
+    m_ScorePosition = 0;
+    m_MarkovIndex = 0;
+    m_CurrentSection.clear();
+    m_HasSection = false;
+    m_SectionStartPending = false;
     Configuration Config = Configuration();
 
     if (fs::exists(ScoreFilePath) == false) {
@@ -88,15 +101,6 @@ std::pair<Configuration, States> Score::Parse(fs::path ScoreFilePath) {
 
     // Proceed with parsing ScoreStr...
     m_LineCount = 0;
-    m_MarkovIndex = 0;
-    m_LastOnset = 0;
-    m_PrevDuration = 0;
-    m_CurrentBPM = -1;
-    m_Transpose = 0;
-    m_CurrentSection.clear();
-    m_HasSection = false;
-    m_SectionStartPending = false;
-    m_ScorePosition = 0;
     std::string Line;
 
     // read and process score

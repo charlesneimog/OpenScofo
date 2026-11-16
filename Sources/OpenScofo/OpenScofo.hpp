@@ -57,6 +57,7 @@ class OpenScofo {
     bool ScoreIsLoaded();
     template <OpenScofoPrecision T> bool ProcessBlock(const T *AudioBuffer, size_t n);
     void LoadONNXModel(fs::path Model, std::vector<Descriptors> Descriptors);
+    void ResetRuntimeState();
     void SetCurrentEvent(int Event);
     bool SetCurrentSection(const std::string &Section);
     void SetConfiguration(Configuration &Config);
@@ -120,6 +121,7 @@ class OpenScofo {
     std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
 #if defined(OPENSCOFO_LUA)
     void ProcessLuaTimers();
+    void ClearLuaTimers();
     void CloseLuaModule();
     using LuaTimerKey = std::pair<uint64_t, uint64_t>;
     struct LuaTimer {

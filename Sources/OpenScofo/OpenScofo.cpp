@@ -105,6 +105,25 @@ void OpenScofo::UpdateConfiguration(Configuration &Config) {
     m_Desc.Chroma.resize(m_Config.ChromaSize);
 }
 
+// ─────────────────────────────────────
+/**
+ * @brief Reset runtime analysis and decoding state while retaining the loaded score and ONNX model.
+ *
+ * @warning Rebuilds MIR resources; call only while audio processing is stopped or suspended.
+ */
+void OpenScofo::ResetRuntimeState() {
+    m_Desc = Description{};
+    Configuration config = m_Config;
+    UpdateConfiguration(config);
+    m_Forward.ResetDecoding();
+    m_CurrentScorePosition =
+        m_States.empty() ? -1 : m_States[static_cast<size_t>(m_Forward.GetCurrentStateIndex())].ScorePos;
+
+#if defined(OPENSCOFO_LUA)
+    ClearLuaTimers();
+#endif
+}
+
 // ╭─────────────────────────────────────╮
 // │               Errors                │
 // ╰─────────────────────────────────────╯
@@ -1115,7 +1134,8 @@ bool OpenScofo::LoadScore(fs::path ScorePath) {
     }
 
     if (m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical) {
-        return true;
+        ResetRuntimeState();
+        return m_HasErrors != spdlog::level::err && m_HasErrors != spdlog::level::critical;
     } else {
         return false;
     }
