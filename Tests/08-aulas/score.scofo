@@ -1,0 +1,18 @@
+BPM 80
+ONNXMODEL voice.onnx
+
+// measure 1
+NOTE C3 2
+	sendto freeze [1]
+UTECH sh 2
+
+// measure 2
+UTECH tu 0.5
+	sendto freeze [0]
+REST 1.5
+NOTE D3 2
+
+// measure 3
+UTECH sh 2
+UTECH tu 0.5
+REST 1.5
