@@ -1,7 +1,6 @@
 BPM 100
 
-ONNXMODEL ai-flute-model.onnx
-ONNXDESCRIPTORS mfcc logmel centroid flatness hfr flux zcr irregularity kurtosis
+ONNXMODEL flute.onnx
 
 // Measure number 1
 UTECH jet_whistle 1

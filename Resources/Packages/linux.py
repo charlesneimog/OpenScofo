@@ -57,10 +57,10 @@ def copy_if_exists(repo_root: Path, rel: Path, dest_dir: Path) -> bool:
 
 def component_specs() -> list[ComponentSpec]:
     shared_assets = [
-        Path("Tests/01-Score-Follower-Benchmarks/real/canticos.mp3"),
-        Path("Tests/01-Score-Follower-Benchmarks/real/canticos.scofo"),
-        Path("Tests/miniaturas/Audios/miniatura1.mp3"),
-        Path("Tests/miniaturas/Extras/miniatura1.scofo"),
+        Path("Tests/01-benchmark/real/canticos.mp3"),
+        Path("Tests/01-benchmark/real/canticos.scofo"),
+        Path("Tests/04-miniaturas/Audios/miniatura1.mp3"),
+        Path("Tests/04-miniaturas/Extras/miniatura1.scofo"),
     ]
 
     return [

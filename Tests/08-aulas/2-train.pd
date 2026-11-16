@@ -1,4 +1,4 @@
-#N canvas 0 0 935 568 10;
+#N canvas 0 0 466 568 10;
 #X declare -lib xlab;
 #X obj 2 3 declare -lib xlab;
 #N canvas 0 0 466 568 config 0;

@@ -1,5 +1,5 @@
 BPM 100
-ONNXMODEL ai-flute-model.onnx
+ONNXMODEL flute.onnx
 
  // ╭───────────────────────────────────────╮
  // │          Measure number 1             │
