@@ -644,7 +644,6 @@ jobs:
                       registry.git.iem.at/pd/deken \
                       deken package \
                         --version "${RELEASE_VERSION}" \
-                        --default-floatsize 32 \
                         "${LIBNAME}"
                     dek_files=(./*.dek)
                     if [[ "${dek_files[*]}" != *"(Darwin-"* ]]; then

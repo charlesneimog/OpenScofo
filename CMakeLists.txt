@@ -3,7 +3,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 
 project(
     OpenScofo
-    VERSION 0.3.0
+    VERSION 0.3.1
     LANGUAGES C CXX
     HOMEPAGE_URL "https://charlesneimog.github.io/OpenScofo/"
     DESCRIPTION "OpenScofo is a Open Source Score Follower designed for contemporary music")
@@ -263,9 +263,11 @@ FetchContent_Declare(
     GIT_TAG ${PFFFT_VERSION}
     EXCLUDE_FROM_ALL)
 if(WIN32)
-    # clang targeting the MSVC ABI reports a Clang compiler ID, which makes
-    # PFFFT otherwise add the Unix-only libm dependency (m.lib on Windows).
-    set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
+    # clang targeting the MSVC ABI reports a Clang compiler ID, which makes PFFFT otherwise add the Unix-only libm
+    # dependency (m.lib on Windows).
+    set(PFFFT_DISABLE_LINK_WITH_M
+        ON
+        CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
 endif()
 FetchContent_MakeAvailable(pffft)
 

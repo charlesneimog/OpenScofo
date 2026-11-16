@@ -672,7 +672,11 @@ static void openscofo_free(PdOpenScofo *x) {
 }
 
 // ─────────────────────────────────────
-extern "C" void openscofo_tilde_setup(void) {
+#ifdef _WIN32
+extern "C" __declspec(dllexport) void openscofo_tilde_setup(void) {
+#else
+extern "C" __attribute__((visibility("default"))) void openscofo_tilde_setup(void) {
+#endif
     OpenScofoObj = class_new(gensym("openscofo~"), (t_newmethod)openscofo_new, (t_method)openscofo_free,
                              sizeof(PdOpenScofo), CLASS_DEFAULT, A_GIMME, A_NULL);
 
@@ -690,7 +694,3 @@ extern "C" void openscofo_tilde_setup(void) {
     CLASS_MAINSIGNALIN(OpenScofoObj, PdOpenScofo, Sample);
     class_addmethod(OpenScofoObj, (t_method)openscofo_adddsp, gensym("dsp"), A_CANT, 0);
 }
-
-#ifdef __WIN64
-__declspec(dllexport) void openscofo_tilde_setup(void);
-#endif
