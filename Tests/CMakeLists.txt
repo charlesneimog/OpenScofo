@@ -1,10 +1,7 @@
 # Build GoogleTest with the target toolchain for universal macOS, Windows and WebAssembly. A native Linux installation
 # can be reused when available.
-if(NOT APPLE
-   AND NOT WIN32
-   AND NOT CMAKE_CROSSCOMPILING)
+if(NOT EMSCRIPTEN)
     find_package(GTest QUIET)
-
     if(NOT TARGET GTest::gtest_main)
         set(INSTALL_GTEST
             OFF
@@ -12,6 +9,7 @@ if(NOT APPLE
         set(BUILD_GMOCK
             OFF
             CACHE BOOL "" FORCE)
+
         FetchContent_Declare(
             googletest
             GIT_REPOSITORY https://github.com/google/googletest.git
@@ -19,6 +17,13 @@ if(NOT APPLE
             EXCLUDE_FROM_ALL)
         FetchContent_MakeAvailable(googletest)
     endif()
+
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.12.0
+        EXCLUDE_FROM_ALL)
+    FetchContent_MakeAvailable(nlohmann_json)
 
     FetchContent_Declare(
         AudioFile
@@ -35,7 +40,7 @@ if(NOT APPLE
 
     function(openscofo_add_test Target Source Name)
         add_executable(${Target} "${CMAKE_CURRENT_SOURCE_DIR}/05-tests/${Source}")
-        target_link_libraries(${Target} PRIVATE OpenScofo GTest::gtest_main)
+        target_link_libraries(${Target} PRIVATE OpenScofo GTest::gtest_main nlohmann_json)
         target_compile_definitions(${Target} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/02-score")
         add_test(NAME ${Name} COMMAND ${Target})
         set_tests_properties(${Name} PROPERTIES LABELS "openscofo" TIMEOUT 120)
@@ -60,14 +65,14 @@ if(NOT APPLE
 
     # Inference Benchmark
     add_executable(inference_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_inference.cpp")
-    target_link_libraries(inference_benchmark PRIVATE OpenScofo AudioFile)
+    target_link_libraries(inference_benchmark PRIVATE OpenScofo AudioFile nlohmann_json)
     target_include_directories(inference_benchmark SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
     target_include_directories(inference_benchmark SYSTEM PRIVATE "${audiofile_SOURCE_DIR}")
     target_compile_definitions(inference_benchmark PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 
     # mir
     add_executable(mir_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_mir.cpp")
-    target_link_libraries(mir_benchmark PRIVATE OpenScofo)
+    target_link_libraries(mir_benchmark PRIVATE OpenScofo nlohmann_json)
 
     get_property(TestTargets GLOBAL PROPERTY OPENSCOFO_TEST_TARGETS)
     if(OPENSCOFO_RUN_TESTS_ON_BUILD)
@@ -85,7 +90,7 @@ if(NOT APPLE
         VERBATIM)
 
     add_executable(openscofo_perf "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_performance.cpp")
-    target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile)
+    target_link_libraries(openscofo_perf PRIVATE OpenScofo AudioFile nlohmann_json)
     target_compile_options(openscofo_perf PRIVATE -O2 -g -fno-omit-frame-pointer -Wno-shadow -Wno-unused-variable)
 
 endif()

@@ -44,10 +44,6 @@ option(OPENSCOFO_BUILD_VAMP_PLUGIN "Build Vamp Plugin" OFF)
 option(OPENSCOFO_BUILD_TESTS "Build Tests" ON)
 option(OPENSCOFO_RUN_TESTS_ON_BUILD "Run tests as part of every build" ON)
 option(OPENSCOFO_BUILD_BENCHMARKS "Build performance benchmarks" OFF)
-if(OPENSCOFO_BUILD_TESTS)
-    # Must be enabled here so ctest --test-dir build discovers subdirectory tests.
-    enable_testing()
-endif()
 option(OPENSCOFO_BUILD_ALL "Build All OpenScofo Tests and Wrappers" ON)
 option(OPENSCOFO_BUILD_WITH_LUA "Build Lua Module embbeded on OpenScofo" ON)
 option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
@@ -57,10 +53,13 @@ option(OPENSCOFO_USE_YIN "Choose between Yin and Sigmund (sigmund~ pd object)" O
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
-# if(OPENSCOFO_ENABLE_IPO) include(CheckIPOSupported) check_ipo_supported(RESULT OPENSCOFO_IPO_SUPPORTED OUTPUT
-# OPENSCOFO_IPO_ERROR LANGUAGES C CXX) if(OPENSCOFO_IPO_SUPPORTED) set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) else()
-# message( WARNING "IPO/LTO disabled because the current toolchain does not support it: ${OPENSCOFO_IPO_ERROR}" )
-# endif() endif()
+# ╭──────────────────────────────────────╮
+# │                Tests                 │
+# ╰──────────────────────────────────────╯
+if(OPENSCOFO_BUILD_TESTS)
+    # Must be enabled here so ctest --test-dir build discovers subdirectory tests.
+    enable_testing()
+endif()
 
 if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -pthread -matomics -mbulk-memory -msimd128 -sUSE_BOOST_HEADERS=1")
