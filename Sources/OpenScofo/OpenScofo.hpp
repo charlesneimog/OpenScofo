@@ -141,7 +141,7 @@ class OpenScofo {
     std::vector<double> m_InputBuffer;
 
     // Errors
-    spdlog::level::level_enum m_HasErrors;
+    spdlog::level::level_enum m_HasErrors = spdlog::level::off;
     std::vector<std::string> m_Errors;
     std::function<void(const std::string &)> m_ErrorCallback = nullptr;
     std::vector<double> m_InBuffer;
