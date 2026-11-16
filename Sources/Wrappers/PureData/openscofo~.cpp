@@ -80,6 +80,21 @@ class PdOpenScofo {
     t_outlet *DescOut;
 };
 
+static void openscofo_clear_actions(PdOpenScofo *x) {
+    if (x->ClockActions)
+        clock_unset(x->ClockActions);
+    if (x->ClockEvent)
+        clock_unset(x->ClockEvent);
+    if (x->ClockInfo)
+        clock_unset(x->ClockInfo);
+
+    for (PdAction &action : x->Actions) {
+        delete[] action.MaxArgs;
+        action.MaxArgs = nullptr;
+    }
+    x->Actions.clear();
+}
+
 // ─────────────────────────────────────
 static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
     if (!s || s == &s_ || !s->s_name[0]) {
@@ -112,6 +127,10 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     std::string fullpath = std::string(realdir) + "/" + realname;
     int state = canvas_suspend_dsp();
+    x->Following = false;
+    x->Description = false;
+    openscofo_clear_actions(x);
+
     bool ok = x->OpenScofo->LoadScore(fullpath.c_str());
 
     if (!ok) {
@@ -122,18 +141,19 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
 
     logpost(x, 2, "[openscofo~] Score loaded");
     x->OpenScofo->SetCurrentEvent(0);
-    x->Description = false;
+    x->OpenScofo->ResetRuntimeState();
 
     x->Event = 0;
+    x->StateIndex = 0;
+    x->Tempo = x->OpenScofo->GetCurrentBPM();
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
-    outlet_float(x->EventOut, 0);
-    canvas_resume_dsp(state);
+    outlet_float(x->TempoOut, x->Tempo);
+    outlet_float(x->EventOut, x->Event);
 
     // update audio config
     x->FFTSize = x->OpenScofo->GetFFTSize();
     x->HopSize = x->OpenScofo->GetHopSize();
-    x->Following = 0;
+    canvas_resume_dsp(state);
 
 #ifdef OPENSCOFO_LUA
 
@@ -148,6 +168,8 @@ static void openscofo_score(PdOpenScofo *x, t_symbol *s) {
     }
 
 #endif
+
+    x->Following = false;
 }
 
 // ─────────────────────────────────────
@@ -156,11 +178,18 @@ static void openscofo_start(PdOpenScofo *x) {
         pd_error(x, "[openscofo~] Score not loaded");
         return;
     }
-    x->Actions.clear();
+    int state = canvas_suspend_dsp();
+    x->Following = false;
+    x->Description = false;
+    openscofo_clear_actions(x);
     x->OpenScofo->SetCurrentEvent(0);
+    x->OpenScofo->ResetRuntimeState();
     x->Event = 0;
+    x->StateIndex = 0;
+    x->Tempo = x->OpenScofo->GetCurrentBPM();
+    canvas_resume_dsp(state);
 
-    outlet_float(x->TempoOut, x->OpenScofo->GetCurrentBPM());
+    outlet_float(x->TempoOut, x->Tempo);
     outlet_float(x->EventOut, x->Event);
 
     x->Following = true;
@@ -454,8 +483,8 @@ static void openscofo_tickactions(PdOpenScofo *x) {
                 openscofo_luaexecute(x, CurAction.LuaCode);
             } else {
                 openscofo_pdsend(x, CurAction.Receiver, CurAction.PdArgsSize, CurAction.MaxArgs);
-                delete[] CurAction.MaxArgs;
             }
+            delete[] CurAction.MaxArgs;
             it = x->Actions.erase(it);
         } else {
             ++it;
@@ -590,6 +619,9 @@ static void *openscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->Event = -1;
     x->StateIndex = 0;
 
+    // The engine must exist before constructor arguments are converted to descriptor enums.
+    x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
+
     // Outlets
     x->EventOut = outlet_new(&x->PdObject, &s_float);
     x->TempoOut = outlet_new(&x->PdObject, &s_float);
@@ -612,7 +644,6 @@ static void *openscofo_new(t_symbol *s, int argc, t_atom *argv) {
     x->PatchDir = canvas_getdir(x->Canvas)->s_name;
 
     // OpenScofo Library
-    x->OpenScofo = new OpenScofo::OpenScofo((float)x->Sr, (float)x->FFTSize, (float)x->HopSize);
     x->OpenScofo->SetErrorCallback(openscofo_error_callback, static_cast<void *>(x));
     x->OpenScofo->SetRequestedDescriptors(x->RequestMIR);
 
@@ -633,6 +664,10 @@ static void *openscofo_new(t_symbol *s, int argc, t_atom *argv) {
 
 // ─────────────────────────────────────
 static void openscofo_free(PdOpenScofo *x) {
+    openscofo_clear_actions(x);
+    clock_free(x->ClockEvent);
+    clock_free(x->ClockActions);
+    clock_free(x->ClockInfo);
     delete x->OpenScofo;
 }
 
