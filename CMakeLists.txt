@@ -142,9 +142,15 @@ if(OPENSCOFO_UPDATE_LANGUAGE)
         NAMES tree-sitter
         DOC "tree-sitter CLI executable")
     if(NOT TREE_SITTER_EXECUTABLE)
-        message(FATAL_ERROR "tree-sitter CLI not found. Install it with: npm install -g tree-sitter-cli")
+        message(
+            WARNING
+                "tree-sitter CLI not found; using the committed OpenScofo parser without updating the language. "
+                "Install tree-sitter-cli to regenerate it.")
+        set(OPENSCOFO_UPDATE_LANGUAGE OFF)
     endif()
+endif()
 
+if(OPENSCOFO_UPDATE_LANGUAGE)
     add_custom_command(
         OUTPUT "${PARSER_GENERATED_OUTPUT}"
         BYPRODUCTS "${PARSER_BYPRODUCTS}" "${GRAMMAR_BUILD_DIR}/src/grammar.json"
@@ -172,8 +178,8 @@ if(OPENSCOFO_UPDATE_LANGUAGE)
     add_dependencies(score_parser generate_tree_sitter_parser)
 endif()
 
-# Custom command to generate the WASM file if it doesn't exist
-if(NOT EXISTS "${OPENSCOFO_ONLINE_EDITOR_WASM}" OR ${OPENSCOFO_UPDATE_LANGUAGE})
+# Keep the native and online-editor parsers in sync whenever the language is updated.
+if(OPENSCOFO_UPDATE_LANGUAGE)
     add_custom_command(
         OUTPUT "${OPENSCOFO_ONLINE_EDITOR_WASM}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${GRAMMAR_BUILD_DIR}" ${TREE_SITTER_EXECUTABLE} build --wasm

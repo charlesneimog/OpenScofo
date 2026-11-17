@@ -60,7 +60,7 @@ I invite composers, researchers and developers to contribute to the *OpenScofo* 
 * `OPENSCOFO_RUN_TESTS_ON_BUILD` (ON/OFF): Run the test suite during normal builds and fail the build if tests fail. Default: ON.
 * `OPENSCOFO_BUILD_BENCHMARKS` (ON/OFF): Build the optional performance executables alongside tests. Default: OFF.
 * `OPENSCOFO_BUILD_WITH_LUA` (ON/OFF): Build the Lua module embedded in OpenScofo. Default: ON.
-* `OPENSCOFO_UPDATE_LANGUAGE` (ON/OFF): Update the OpenScofo language grammar (`grammar.js`). Default: ON.
+* `OPENSCOFO_UPDATE_LANGUAGE` (ON/OFF): Update the OpenScofo language grammar (`grammar.js`). Default: ON; if the optional tree-sitter CLI is unavailable, the build uses the committed parser without updating the language.
 * `OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS` (ON/OFF): Enable native CPU optimizations. Default: ON.
 * `OPENSCOFO_ENABLE_IPO` (ON/OFF): Enable interprocedural optimization (IPO/LTO) when supported. Default: ON.
 * `OPENSCOFO_ENABLE_SANITIZERS` (ON/OFF): Enable AddressSanitizer and UndefinedBehaviorSanitizer. Default: OFF.
