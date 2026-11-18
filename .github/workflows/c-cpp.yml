@@ -364,6 +364,7 @@ jobs:
                   cp Sources/Wrappers/Max/package/Readme.md "$package_root/"
                   cp Sources/Wrappers/Max/package/icon.png "$package_root/"
                   cp Sources/Wrappers/Max/package/package-info.json "$package_root/"
+                  cp -R Sources/Wrappers/Max/package/extras "$package_root/"
                   cp Sources/Wrappers/Max/docs/openscofo~.maxref.xml "$package_root/docs/"
                   cp Sources/Wrappers/Max/openscofo~.maxhelp "$package_root/help/"
                   cp Sources/Wrappers/Max/score-max.svg "$package_root/help/"
@@ -383,6 +384,7 @@ jobs:
                   test -f "$package_root/help/flute.onnx"
                   test -f "$package_root/help/miniatura1.scofo"
                   test -f "$package_root/help/miniatura1.wav"
+                  test -f "$package_root/extras/OpenScofo.maxpat"
                   test -f "$package_root/externals/openscofo~.mxo/Contents/MacOS/openscofo~"
             - name: Stage Max package payload (Windows)
               if: runner.os == 'Windows'
@@ -392,8 +394,12 @@ jobs:
                   $packageRoot = 'max-package/OpenScofo'
                   New-Item -ItemType Directory -Force "$packageRoot/externals" | Out-Null
                   Copy-Item 'max/openscofo~.mxe64' "$packageRoot/externals/openscofo~.mxe64"
+                  Copy-Item 'Sources/Wrappers/Max/package/extras' "$packageRoot/extras" -Recurse -Force
                   if (-not (Test-Path "$packageRoot/externals/openscofo~.mxe64")) {
                     throw 'Max Windows external was not staged.'
+                  }
+                  if (-not (Test-Path "$packageRoot/extras/OpenScofo.maxpat")) {
+                    throw 'Max Windows extras patch was not staged.'
                   }
             - name: Stage Pure Data package payload (Linux/macOS)
               if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -621,6 +627,7 @@ jobs:
                   test -f max_release/OpenScofo/help/canticos.mp3
                   test -f max_release/OpenScofo/help/canticos.scofo
                   test -f max_release/OpenScofo/help/flute.onnx
+                  test -f max_release/OpenScofo/extras/OpenScofo.maxpat
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
                   test -f max_release/OpenScofo/externals/openscofo~.mxe64
                   (cd max_release && zip -r "../release_assets/Max-openscofo-${RELEASE_VERSION}.zip" OpenScofo)

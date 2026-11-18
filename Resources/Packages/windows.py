@@ -162,6 +162,13 @@ def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Pa
             copy_item(src, payload_root / filename)
             copied += 1
 
+    extras = package_root / "extras"
+    extras_patch = extras / "OpenScofo.maxpat"
+    if not extras_patch.is_file():
+        raise FileNotFoundError(f"Missing Max package extra: {extras_patch}")
+    copy_item(extras, payload_root / "extras")
+    copied += 1
+
     docs = [
         max_root / "docs" / "openscofo~.maxref.xml",
     ]
@@ -227,6 +234,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/Max/package/Readme.md"),
                 Path("Sources/Wrappers/Max/package/icon.png"),
                 Path("Sources/Wrappers/Max/package/package-info.json"),
+                Path("Sources/Wrappers/Max/package/extras/OpenScofo.maxpat"),
                 Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
                 Path("Sources/Wrappers/Max/score-max.svg"),
