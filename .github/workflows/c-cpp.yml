@@ -110,9 +110,51 @@ jobs:
               env:
                   VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
               run: |
+                  function Install-WingetPackage {
+                    param([Parameter(Mandatory)][string]$Id)
+
+                    for ($attempt = 1; $attempt -le 3; $attempt++) {
+                      winget install --exact --id $Id --silent --disable-interactivity --accept-source-agreements --accept-package-agreements
+                      if ($LASTEXITCODE -eq 0) {
+                        return
+                      }
+                      if ($attempt -lt 3) {
+                        Write-Warning "winget failed to install $Id (attempt $attempt/3); retrying."
+                        Start-Sleep -Seconds (10 * $attempt)
+                      }
+                    }
+
+                    throw "winget failed to install $Id after 3 attempts."
+                  }
+
                   npm install -g tree-sitter-cli
-                  winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements
-                  winget install -e --id MillerPuckette.PureData --accept-source-agreements
+                  Install-WingetPackage -Id 'LLVM.LLVM'
+                  try {
+                    Install-WingetPackage -Id 'MillerPuckette.PureData'
+                  } catch {
+                    # The upstream Pd host occasionally fails WinINet certificate validation.
+                    # The fallback is pinned and its SHA-256 is verified before execution.
+                    Write-Warning "$_ Falling back to the verified Pure Data installer."
+                    $pdInstallerUrl = 'https://msp.ucsd.edu/Software/pd-0.57-0.windows-installer.exe'
+                    $pdInstallerHash = '6C1DC1DE251A9D130B8229165EF5932B54F89672376A78ED5FD650C6945439A8'
+                    $pdInstaller = Join-Path $env:RUNNER_TEMP 'pd-windows-installer.exe'
+                    curl.exe --fail --location --retry 5 --retry-all-errors --output $pdInstaller $pdInstallerUrl
+                    if ($LASTEXITCODE -ne 0) {
+                      Write-Warning 'Retrying the hash-pinned installer download without TLS certificate validation.'
+                      curl.exe --insecure --fail --location --retry 5 --retry-all-errors --output $pdInstaller $pdInstallerUrl
+                    }
+                    if ($LASTEXITCODE -ne 0) {
+                      throw 'Failed to download the Pure Data fallback installer.'
+                    }
+                    $actualPdInstallerHash = (Get-FileHash -LiteralPath $pdInstaller -Algorithm SHA256).Hash
+                    if ($actualPdInstallerHash -ne $pdInstallerHash) {
+                      throw "Pure Data installer checksum mismatch: $actualPdInstallerHash"
+                    }
+                    $pdInstall = Start-Process -FilePath $pdInstaller -ArgumentList '/S', '/norestart' -Wait -PassThru
+                    if ($pdInstall.ExitCode -ne 0) {
+                      throw "Pure Data installer failed with exit code $($pdInstall.ExitCode)."
+                    }
+                  }
                   $pdSearchRoots = @(
                     $env:ProgramFiles
                     ${env:ProgramFiles(x86)}
