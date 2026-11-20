@@ -249,7 +249,9 @@ def build(args):
                 key = item
                 candidates = COMPONENTS[key]["binaries"]
             details.append(f"{item}: {', '.join(candidates)}")
-        raise RuntimeError(f"missing required component binaries: {details}")
+        raise RuntimeError(
+            f"missing required component binaries: {'; '.join(details)}"
+        )
 
     available = []
     for key, spec in COMPONENTS.items():
