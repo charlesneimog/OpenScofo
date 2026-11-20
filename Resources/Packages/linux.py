@@ -16,7 +16,7 @@ import shutil
 import stat
 import sys
 import tarfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -28,6 +28,7 @@ os.chdir(Path(__file__).resolve().parent.parent.parent)
 PD_PACKAGE_DATA = [
     Path("README.md"),
     Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
+    Path("Sources/Trainer/PureData/openscofo.train-help.pd"),
     Path("LICENSE"),
     Path("Documentation/assets/icon.png"),
     Path("Tests/flute.onnx"),
@@ -45,6 +46,7 @@ class ComponentSpec:
     key: str
     required: list[Path]
     optional: list[Path]
+    required_binaries: dict[str, list[Path]] = field(default_factory=dict)
 
 
 def copy_item(src: Path, dest: Path) -> None:
@@ -90,10 +92,21 @@ def component_specs() -> list[ComponentSpec]:
         ComponentSpec(
             key="puredata",
             required=PD_PACKAGE_DATA,
-            optional=[
-                Path("build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so"),
-                Path("build/Sources/Wrappers/PureData/openscofo~.so"),
-            ],
+            optional=[],
+            required_binaries={
+                "openscofo~": [
+                    Path("build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so"),
+                    Path("build/Sources/Wrappers/PureData/openscofo~.so"),
+                    Path("build/OpenScofo/openscofo~.linux-amd64-32.so"),
+                    Path("build/OpenScofo/openscofo~.so"),
+                ],
+                "openscofo.train": [
+                    Path("build/Sources/Trainer/openscofo.train.linux-amd64-32.so"),
+                    Path("build/Sources/Trainer/openscofo.train.so"),
+                    Path("build/OpenScofo/openscofo.train.linux-amd64-32.so"),
+                    Path("build/OpenScofo/openscofo.train.so"),
+                ],
+            },
         ),
         ComponentSpec(
             key="supercollider",
@@ -118,6 +131,16 @@ def stage_component_payload(repo_root: Path, payload_root: Path, spec: Component
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     copied = 0
+
+    for name, candidates in spec.required_binaries.items():
+        binary = first_existing(repo_root / rel for rel in candidates)
+        if binary is None:
+            checked = ", ".join(str(repo_root / rel) for rel in candidates)
+            raise FileNotFoundError(
+                f"Missing required {spec.key} {name} binary; checked: {checked}"
+            )
+        copy_item(binary, dest_dir / binary.name)
+        copied += 1
 
     binary = first_existing(repo_root / rel for rel in spec.optional)
     if binary is not None:

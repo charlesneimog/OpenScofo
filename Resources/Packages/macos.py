@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -27,6 +27,7 @@ os.chdir(Path(__file__).resolve().parent.parent.parent)
 PD_PACKAGE_DATA = [
     Path("README.md"),
     Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
+    Path("Sources/Trainer/PureData/openscofo.train-help.pd"),
     Path("LICENSE"),
     Path("Documentation/assets/icon.png"),
     Path("Tests/flute.onnx"),
@@ -53,6 +54,7 @@ class IntegrationSpec:
     user_destination: str
     required: list[Path]
     optional: list[Path]
+    required_binaries: dict[str, list[Path]] = field(default_factory=dict)
 
 
 def run(cmd: list[str]) -> None:
@@ -321,11 +323,25 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             identifier="org.openscofo.pkg.puredata",
             user_destination="Documents/Pd/externals/openscofo~",
             required=PD_PACKAGE_DATA,
-            optional=[
-                Path("build/Sources/Wrappers/PureData/openscofo~.pd_darwin"),
-                Path("build/Sources/Wrappers/PureData/openscofo~.darwin-fat-32.so"),
-                Path("build/Sources/Wrappers/PureData/openscofo~.so"),
-            ],
+            optional=[],
+            required_binaries={
+                "openscofo~": [
+                    Path("build/Sources/Wrappers/PureData/openscofo~.pd_darwin"),
+                    Path("build/Sources/Wrappers/PureData/openscofo~.darwin-fat-32.so"),
+                    Path("build/Sources/Wrappers/PureData/openscofo~.so"),
+                    Path("build/OpenScofo/openscofo~.pd_darwin"),
+                    Path("build/OpenScofo/openscofo~.darwin-fat-32.so"),
+                    Path("build/OpenScofo/openscofo~.so"),
+                ],
+                "openscofo.train": [
+                    Path("build/Sources/Trainer/openscofo.train.pd_darwin"),
+                    Path("build/Sources/Trainer/openscofo.train.darwin-fat-32.so"),
+                    Path("build/Sources/Trainer/openscofo.train.so"),
+                    Path("build/OpenScofo/openscofo.train.pd_darwin"),
+                    Path("build/OpenScofo/openscofo.train.darwin-fat-32.so"),
+                    Path("build/OpenScofo/openscofo.train.so"),
+                ],
+            },
         ),
         IntegrationSpec(
             key="csound",
@@ -388,6 +404,15 @@ def stage_component_payload(
         raise FileNotFoundError(
             f"Missing required {spec.key} package files: {', '.join(str(path) for path in missing)}"
         )
+
+    for name, candidates in spec.required_binaries.items():
+        binary = first_existing(repo_root / path for path in candidates)
+        if binary is None:
+            checked = ", ".join(str(repo_root / path) for path in candidates)
+            raise FileNotFoundError(
+                f"Missing required {spec.key} {name} binary; checked: {checked}"
+            )
+        copy_item(binary, payload_root / binary.name)
 
     binary = first_existing(repo_root / p for p in spec.optional)
     if binary is not None:

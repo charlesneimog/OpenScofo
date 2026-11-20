@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 from xml.sax.saxutils import escape
@@ -31,6 +31,7 @@ os.chdir(Path(__file__).resolve().parent.parent.parent)
 PD_PACKAGE_DATA = [
     Path("README.md"),
     Path("Sources/Wrappers/PureData/openscofo~-help.pd"),
+    Path("Sources/Trainer/PureData/openscofo.train-help.pd"),
     Path("LICENSE"),
     Path("Documentation/assets/icon.png"),
     Path("Tests/flute.onnx"),
@@ -59,6 +60,7 @@ class IntegrationSpec:
     destination_subdir_x64: str | None
     required: list[Path]
     optional: list[Path]
+    required_binaries: dict[str, list[Path]] = field(default_factory=dict)
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> None:
@@ -216,9 +218,19 @@ def build_destination(spec: IntegrationSpec, arch: str) -> tuple[str, list[str]]
 def component_specs() -> list[IntegrationSpec]:
 
     # check files ending with dll inside build/Sources/Wrappers/PureData/
-    pd_candidates = list((Path("build") / "Sources" / "Wrappers" / "PureData").glob("*.dll"))
+    pd_candidates = [
+        *sorted((Path("build") / "Sources" / "Wrappers" / "PureData").glob("openscofo~*.dll")),
+        *sorted((Path("build") / "OpenScofo").glob("openscofo~*.dll")),
+    ]
     if not pd_candidates:
         print("Warning: no Pure Data wrapper binary found in build directory. The Pure Data component will be skipped.")
+
+    trainer_candidates = [
+        *sorted((Path("build") / "Sources" / "Trainer").glob("openscofo.train*.dll")),
+        *sorted((Path("build") / "OpenScofo").glob("openscofo.train*.dll")),
+    ]
+    if not trainer_candidates:
+        print("Warning: no openscofo.train binary found in build directory.")
 
 
     return [
@@ -260,7 +272,11 @@ def component_specs() -> list[IntegrationSpec]:
             destination_subdir="Pd/externals/openscofo~",
             destination_subdir_x64=None,
             required=PD_PACKAGE_DATA,
-            optional=pd_candidates,
+            optional=[],
+            required_binaries={
+                "openscofo~": pd_candidates,
+                "openscofo.train": trainer_candidates,
+            },
         ),
         IntegrationSpec(
             key="csound",
@@ -326,6 +342,15 @@ def stage_component_payload(repo_root: Path, build_dir: Path, work_dir: Path, sp
         raise FileNotFoundError(
             f"Missing required {spec.key} package files: {', '.join(str(path) for path in missing)}"
         )
+
+    for name, candidates in spec.required_binaries.items():
+        binary = first_existing(repo_root / path for path in candidates)
+        if binary is None:
+            checked = ", ".join(str(repo_root / path) for path in candidates)
+            raise FileNotFoundError(
+                f"Missing required {spec.key} {name} binary; checked: {checked or '(none found)'}"
+            )
+        copy_item(binary, payload_root / binary.name)
 
     binary = first_existing(repo_root / p for p in spec.optional)
     if binary is not None:

@@ -32,12 +32,23 @@ COMPONENTS = {
         "binaries": [
             "build/Sources/Wrappers/PureData/openscofo~.linux-amd64-32.so",
             "build/Sources/Wrappers/PureData/openscofo~.so",
+            "build/OpenScofo/openscofo~.linux-amd64-32.so",
+            "build/OpenScofo/openscofo~.so",
         ],
+        "companions": {
+            "openscofo.train": [
+                "build/Sources/Trainer/openscofo.train.linux-amd64-32.so",
+                "build/Sources/Trainer/openscofo.train.so",
+                "build/OpenScofo/openscofo.train.linux-amd64-32.so",
+                "build/OpenScofo/openscofo.train.so",
+            ],
+        },
         # Keep this list in sync with
         # Sources/Wrappers/PureData/CMakeLists.txt.
         "required": [
             "README.md",
             "Sources/Wrappers/PureData/openscofo~-help.pd",
+            "Sources/Trainer/PureData/openscofo.train-help.pd",
             "LICENSE",
             "Documentation/assets/icon.png",
             "Tests/flute.onnx",
@@ -206,18 +217,38 @@ def build(args):
     (config / "config.xml").write_text(config_xml, encoding="utf-8")
 
     selected_binaries = {}
+    selected_companions = {}
     for key, spec in COMPONENTS.items():
         # 'binaries' are alternatives: one existing binary is sufficient.
         selected_binaries[key] = next(
             (repo / path for path in spec["binaries"] if (repo / path).is_file()),
             None,
         )
+        selected_companions[key] = {
+            name: next(
+                (repo / path for path in candidates if (repo / path).is_file()),
+                None,
+            )
+            for name, candidates in spec.get("companions", {}).items()
+        }
 
     missing = [key for key, binary in selected_binaries.items() if binary is None]
+    missing.extend(
+        f"{key}/{name}"
+        for key, companions in selected_companions.items()
+        for name, binary in companions.items()
+        if binary is None
+    )
     if args.strict and missing:
-        details = "; ".join(
-            f"{key}: {', '.join(COMPONENTS[key]['binaries'])}" for key in missing
-        )
+        details = []
+        for item in missing:
+            if "/" in item:
+                key, name = item.split("/", 1)
+                candidates = COMPONENTS[key]["companions"][name]
+            else:
+                key = item
+                candidates = COMPONENTS[key]["binaries"]
+            details.append(f"{item}: {', '.join(candidates)}")
         raise RuntimeError(f"missing required component binaries: {details}")
 
     available = []
@@ -228,6 +259,11 @@ def build(args):
             print("[skip]", message)
             continue
         sources = [binary]
+        sources.extend(
+            companion
+            for companion in selected_companions[key].values()
+            if companion is not None
+        )
         for rel in spec["required"]:
             path = repo / rel
             if path.is_file():
