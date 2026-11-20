@@ -756,6 +756,8 @@ Descriptors OpenScofo::GetDescriptorsEnum(const char *s) {
         return Descriptors::ENTROPY;
     } else if (strcmp(s, "rolloff") == 0) {
         return Descriptors::ROLLOFF;
+    } else if (strcmp(s, "centroid_velocity") == 0) {
+        return Descriptors::CENTROIDVEL;
     } else if (strcmp(s, "flux") == 0) {
         return Descriptors::FLUX;
     } else if (strcmp(s, "skewness") == 0) {
