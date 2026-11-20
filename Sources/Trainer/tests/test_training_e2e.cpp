@@ -5,8 +5,8 @@
 #include <gtest/gtest.h>
 #include <onnx.h>
 
-using OpenScofo::Training::Configuration;
-using OpenScofo::Training::Trainer;
+using Trainer = OpenScofo::Trainer;
+using Configuration = Trainer::Configuration;
 
 TEST(TrainingEndToEnd, ExtractsTrainsExportsAndRunsInOpenScofo) {
     TrainingTempDirectory directory;

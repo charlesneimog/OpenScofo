@@ -1,4 +1,3 @@
-#include "../Audio.hpp"
 #include "../Trainer.hpp"
 #include "TestData.hpp"
 
@@ -8,17 +7,12 @@
 #include <cmath>
 #include <set>
 
-using OpenScofo::Training::Configuration;
-using OpenScofo::Training::Dataset;
-using OpenScofo::Training::SampleOrigin;
-using OpenScofo::Training::Trainer;
-using OpenScofo::Training::Audio::AddGaussianNoise;
-using OpenScofo::Training::Audio::Convolve;
-using OpenScofo::Training::Audio::LoadMono;
-using OpenScofo::Training::Audio::PitchShift;
-using OpenScofo::Training::Audio::TimeStretch;
+using Trainer = OpenScofo::Trainer;
+using Configuration = Trainer::Configuration;
+using Dataset = Trainer::Dataset;
+using SampleOrigin = Trainer::SampleOrigin;
 
-static double EstimateFrequency(const std::vector<float> &samples, int sampleRate) {
+double EstimateFrequency(const std::vector<float> &samples, int sampleRate) {
     const std::size_t begin = samples.size() / 4;
     const std::size_t end = samples.size() * 3 / 4;
     std::size_t risingCrossings = 0;
@@ -31,6 +25,7 @@ static double EstimateFrequency(const std::vector<float> &samples, int sampleRat
 }
 
 TEST(TrainingAudio, LoadsWavAiffAndResamples) {
+    Trainer trainer;
     TrainingTempDirectory directory;
     const int sampleRate = 8000;
     const std::vector<float> tone = TestTone(sampleRate, 800, 440.0, 1);
@@ -38,19 +33,20 @@ TEST(TrainingAudio, LoadsWavAiffAndResamples) {
     WriteTestAudio(directory.Path / "tone.aiff", tone, sampleRate, true);
     WriteTestAudio(directory.Path / "tone.aif", tone, sampleRate, true);
 
-    EXPECT_EQ(LoadMono(directory.Path / "tone.wav", sampleRate).size(), tone.size());
-    EXPECT_EQ(LoadMono(directory.Path / "tone.aiff", sampleRate).size(), tone.size());
-    EXPECT_EQ(LoadMono(directory.Path / "tone.aif", sampleRate).size(), tone.size());
-    EXPECT_NEAR(LoadMono(directory.Path / "tone.wav", sampleRate * 2).size(), tone.size() * 2, 1);
-    EXPECT_THROW(LoadMono(directory.Path / "tone.mp3", sampleRate), std::invalid_argument);
+    EXPECT_EQ(trainer.LoadMono(directory.Path / "tone.wav", sampleRate).size(), tone.size());
+    EXPECT_EQ(trainer.LoadMono(directory.Path / "tone.aiff", sampleRate).size(), tone.size());
+    EXPECT_EQ(trainer.LoadMono(directory.Path / "tone.aif", sampleRate).size(), tone.size());
+    EXPECT_NEAR(trainer.LoadMono(directory.Path / "tone.wav", sampleRate * 2).size(), tone.size() * 2, 1);
+    EXPECT_THROW(trainer.LoadMono(directory.Path / "tone.mp3", sampleRate), std::invalid_argument);
 }
 
 TEST(TrainingAudio, AugmentationsPreserveExpectedDimensions) {
+    Trainer trainer;
     const std::vector<float> tone = TestTone(16000, 4096, 440.0, 2);
     std::mt19937 random(80);
-    const std::vector<float> noise = AddGaussianNoise(tone, 0.01, random);
-    const std::vector<float> stretched = TimeStretch(tone, 0.8, 512, 128);
-    const std::vector<float> reverberated = Convolve(tone, {1.0F, 0.5F, 0.25F});
+    const std::vector<float> noise = trainer.AddGaussianNoise(tone, 0.01, random);
+    const std::vector<float> stretched = trainer.TimeStretch(tone, 0.8, 512, 128);
+    const std::vector<float> reverberated = trainer.Convolve(tone, {1.0F, 0.5F, 0.25F});
 
     EXPECT_EQ(noise.size(), tone.size());
     EXPECT_NE(noise, tone);
@@ -59,8 +55,9 @@ TEST(TrainingAudio, AugmentationsPreserveExpectedDimensions) {
 }
 
 TEST(TrainingAudio, ConvolutionPreservesAUnitImpulseInput) {
+    Trainer trainer;
     const std::vector<float> input = {0.25F, -0.5F, 1.0F, 0.125F};
-    const std::vector<float> output = Convolve(input, {1.0F});
+    const std::vector<float> output = trainer.Convolve(input, {1.0F});
     ASSERT_EQ(output.size(), input.size());
     for (std::size_t i = 0; i < input.size(); ++i) {
         EXPECT_NEAR(output[i], input[i], 1.0e-5F);
@@ -68,9 +65,10 @@ TEST(TrainingAudio, ConvolutionPreservesAUnitImpulseInput) {
 }
 
 TEST(TrainingAudio, PitchShiftChangesPitchAndPreservesLength) {
+    Trainer trainer;
     const int sampleRate = 16000;
     const std::vector<float> tone = TestTone(sampleRate, 16000, 440.0, 3);
-    const std::vector<float> shifted = PitchShift(tone, 12.0, 1024, 256);
+    const std::vector<float> shifted = trainer.PitchShift(tone, 12.0, 1024, 256);
     ASSERT_EQ(shifted.size(), tone.size());
     EXPECT_NEAR(EstimateFrequency(shifted, sampleRate), 880.0, 35.0);
 }
