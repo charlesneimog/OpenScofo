@@ -4,7 +4,6 @@ set -euo pipefail
 
 RUNS=20
 
-BIN_FFTW3="./build/bench_fftw3"
 BIN_PFFFT="./build/bench_pffft"
 
 FFT_SIZES=(512 1024 2048 4096)
@@ -60,7 +59,6 @@ run_and_parse() {
     done
 }
 
-run_and_parse "$BIN_FFTW3" "FFTW3"
 run_and_parse "$BIN_PFFFT" "PFFFT"
 
 echo "==================================================="

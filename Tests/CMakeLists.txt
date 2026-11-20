@@ -26,13 +26,6 @@ if(NOT EMSCRIPTEN)
     FetchContent_MakeAvailable(nlohmann_json)
 
     FetchContent_Declare(
-        AudioFile
-        GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
-        GIT_TAG master
-        EXCLUDE_FROM_ALL)
-    FetchContent_MakeAvailable(AudioFile)
-
-    FetchContent_Declare(
         minimp3
         GIT_REPOSITORY https://github.com/lieff/minimp3.git
         GIT_TAG master)
@@ -48,7 +41,6 @@ if(NOT EMSCRIPTEN)
         target_compile_definitions(${Target} PRIVATE BENCHMARK_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
         target_link_libraries(${Target} PRIVATE AudioFile)
         target_include_directories(${Target} SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
-        target_include_directories(${Target} SYSTEM PRIVATE "${audiofile_SOURCE_DIR}")
     endfunction()
 
     openscofo_add_test(main_class test_openscofo.cpp OpenScofo)
@@ -67,7 +59,6 @@ if(NOT EMSCRIPTEN)
     add_executable(inference_benchmark "${CMAKE_CURRENT_SOURCE_DIR}/03-performance/benchmark_inference.cpp")
     target_link_libraries(inference_benchmark PRIVATE OpenScofo AudioFile nlohmann_json)
     target_include_directories(inference_benchmark SYSTEM PRIVATE "${minimp3_SOURCE_DIR}")
-    target_include_directories(inference_benchmark SYSTEM PRIVATE "${audiofile_SOURCE_DIR}")
     target_compile_definitions(inference_benchmark PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 
     # mir

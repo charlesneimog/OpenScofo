@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
-project(FFT_Performance_Validation C CXX)
+project(PFFFT_Performance_Validation C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(BUILD_SHARED_LIBS OFF)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
@@ -21,25 +22,9 @@ else()
     message(WARNING "Unknown architecture. Performance may be heavily degraded.")
 endif()
 
-find_library(FFTW3F_LIB NAMES fftw3f REQUIRED)
-find_path(FFTW3_INCLUDE_DIR NAMES fftw3.h REQUIRED)
-
-# fftw3
-add_executable(bench_fftw3 benchmark_fftw3.cpp)
-target_include_directories(bench_fftw3 PRIVATE ${FFTW3_INCLUDE_DIR})
-target_link_libraries(bench_fftw3 PRIVATE ${FFTW3F_LIB})
-if(NOT WIN32)
-    target_link_libraries(bench_fftw3 PRIVATE m)
-endif()
-
 # pffft
-include(ExternalProject)
-ExternalProject_Add(mipp EXCLUDE_FROM_ALL TRUE GIT_REPOSITORY https://github.com/aff3ct/MIPP.git
-                    GIT_TAG master)
-
-ExternalProject_Get_Property(mipp source_dir)
-set(MIPP_INCLUDE_DIRS "${source_dir}/include")
-FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG master)
+set(PFFFT_USE_TYPE_DOUBLE OFF CACHE BOOL "Build only the single-precision PFFFT library" FORCE)
+FetchContent_Declare(pffft GIT_REPOSITORY https://github.com/marton78/pffft.git GIT_TAG v1.1.0)
 if(WIN32)
     set(PFFFT_DISABLE_LINK_WITH_M ON CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
 endif()

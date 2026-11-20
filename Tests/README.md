@@ -75,8 +75,8 @@ corresponding GoogleTest case and the build. Equality passes. The comparison use
 the displayed percentage rounded to two decimal places, so a displayed 91.94%
 meets a 91.94 minimum. With the toggle off, low percentages never fail the build.
 
-Install the native development packages for **nlohmann_json** and **libsndfile**
-(1.1 or newer with MP3 support), then build and run:
+The test audio readers and JSON library are fetched by CMake; no system audio-file
+development package is required. Build and run with:
 
 ```sh
 cmake -S . -B build-tests -DOPENSCOFO_BUILD_ALL=OFF -DOPENSCOFO_BUILD_BENCHMARK_TESTS=ON

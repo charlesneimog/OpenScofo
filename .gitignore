@@ -142,3 +142,4 @@ Documentation/descriptors/testing/*.mp3
 !Documentation/assets/miniatura1.mp3
 /install/OpenScofo
 /Resources/Packages/__pycache__
+/build-training

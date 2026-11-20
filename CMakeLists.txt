@@ -27,6 +27,7 @@ set(BUILD_EXAMPLES OFF)
 # ╰──────────────────────────────────────╯
 set(TREE_SITTER_VERSION "v0.27.2")
 set(PFFFT_VERSION "v1.1.0")
+set(AUDIOFILE_VERSION "1.1.4")
 set(SPDLOG_VERSION "v1.17.0")
 set(MIPP_VERSION "")
 set(LUA_VERSION "v5.5.0")
@@ -50,6 +51,7 @@ option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
 option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supported" ON)
 option(OPENSCOFO_USE_YIN "Choose between Yin and Sigmund (sigmund~ pd object)" OFF)
+option(OPENSCOFO_TRAINING "Build the native OpenScofo training API and Pure Data external" OFF)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
@@ -75,6 +77,7 @@ if(OPENSCOFO_BUILD_ALL)
     set(OPENSCOFO_BUILD_MAX_OBJECT ON)
     set(OPENSCOFO_BUILD_VAMP_PLUGIN ON)
     set(OPENSCOFO_BUILD_SC_PLUGIN ON)
+    set(OPENSCOFO_TRAINING ON)
     if(NOT WIN32)
         set(OPENSCOFO_BUILD_CSOUND_PLUGIN ON)
     endif()
@@ -143,9 +146,8 @@ if(OPENSCOFO_UPDATE_LANGUAGE)
         DOC "tree-sitter CLI executable")
     if(NOT TREE_SITTER_EXECUTABLE)
         message(
-            WARNING
-                "tree-sitter CLI not found; using the committed OpenScofo parser without updating the language. "
-                "Install tree-sitter-cli to regenerate it.")
+            WARNING "tree-sitter CLI not found; using the committed OpenScofo parser without updating the language. "
+                    "Install tree-sitter-cli to regenerate it.")
         set(OPENSCOFO_UPDATE_LANGUAGE OFF)
     endif()
 endif()
@@ -276,6 +278,17 @@ if(WIN32)
         CACHE BOOL "Disable PFFFT's libm dependency on Windows" FORCE)
 endif()
 FetchContent_MakeAvailable(pffft)
+
+# AudioFile is a header-only WAV/AIFF reader. Keep the declaration above the trainer and test subdirectories so both
+# use the same dependency without requiring a system audio-codec development package.
+if((OPENSCOFO_TRAINING OR OPENSCOFO_BUILD_TESTS) AND NOT EMSCRIPTEN)
+    FetchContent_Declare(
+        AudioFile
+        GIT_REPOSITORY https://github.com/adamstark/AudioFile.git
+        GIT_TAG ${AUDIOFILE_VERSION}
+        EXCLUDE_FROM_ALL)
+    FetchContent_MakeAvailable(AudioFile)
+endif()
 
 # onsetsds
 FetchContent_Declare(
@@ -498,6 +511,12 @@ target_compile_options(openscofo_score PRIVATE "$<TARGET_PROPERTY:OpenScofo,COMP
 # ╰──────────────────────────────────────╯
 if(NOT EMSCRIPTEN)
     add_library(tree-sitter-openscofo SHARED "${PARSER_OUTPUT}")
+endif()
+
+# Native model training is intentionally isolated from the standard inference library.  In particular, CatBoost and the
+# audio-file/augmentation dependencies are only configured when this feature is explicitly enabled.
+if(OPENSCOFO_TRAINING AND NOT EMSCRIPTEN)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Trainer")
 endif()
 
 # ╭──────────────────────────────────────╮
