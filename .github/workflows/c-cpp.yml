@@ -11,13 +11,13 @@ env:
     LIBNAME: openscofo~
 jobs:
     build:
-        timeout-minutes: 25
+        timeout-minutes: 180
         if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
         runs-on: ${{ matrix.os }}
         env:
             SCCACHE_GHA_ENABLED: "true"
             SCCACHE_CACHE_SIZE: 2G
-            SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-v5
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-trainer-v1
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             matrix:
@@ -53,7 +53,7 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install ffmpeg puredata -y
-                  sudo apt install libboost-all-dev libgtest-dev libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
+                  sudo apt install clang lld libboost-all-dev libgtest-dev libssl-dev ragel swig yasm libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
                   sudo apt-get install -y \
                     libxcb-image0 \
                     libxcb-shape0 \
@@ -69,7 +69,7 @@ jobs:
                     libgl1 \
                     libopengl0
                   cargo install tree-sitter-cli --locked
-                  pip install build scikit-build-core cibuildwheel twine nanobind
+                  pip install build scikit-build-core cibuildwheel twine nanobind conan
             - name: Cache Qt Installer Framework (Linux)
               if: runner.os == 'Linux'
               id: cache-qtifw
@@ -97,9 +97,9 @@ jobs:
             - name: Install dependencies (macOS)
               if: runner.os == 'macOS'
               run: |
-                  brew install ffmpeg pd nanobind tree-sitter boost protobuf protobuf-c
+                  brew install ffmpeg pd nanobind tree-sitter boost protobuf protobuf-c openssl@3 ragel swig yasm
                   npm install -g tree-sitter-cli
-                  pip install build scikit-build-core cibuildwheel twine
+                  pip install build scikit-build-core cibuildwheel twine conan
             # -----------------------
             # Windows dependencies
             # -----------------------
@@ -118,7 +118,7 @@ jobs:
                     "$wixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
                   }
                   python -m pip install --upgrade pip
-                  python -m pip install build scikit-build-core cibuildwheel twine nanobind
+                  python -m pip install build scikit-build-core cibuildwheel twine nanobind conan
             # -----------------------
             - name: Build (MacOS)
               if: runner.os == 'macOS'
@@ -139,6 +139,7 @@ jobs:
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
+                    -Ccmake.define.OPENSCOFO_TRAINING=ON \
                     -Ccmake.args="-G Ninja"
             # -----------------------
             - name: Build (Linux)
@@ -148,14 +149,16 @@ jobs:
                     -Cbuild-dir=build \
                     -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
+                    -Ccmake.define.CMAKE_C_COMPILER=clang \
+                    -Ccmake.define.CMAKE_CXX_COMPILER=clang++ \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-                    -Ccmake.define.CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=ON \
                     -Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF \
                     -Ccmake.define.PD_LIB_DIR="${{ github.workspace }}/${{ env.LIBNAME }}" \
                     -Ccmake.define.CMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
                     -Ccmake.define.OPENSCOFO_BUILD_ALL=ON \
+                    -Ccmake.define.OPENSCOFO_TRAINING=ON \
                     -Ccmake.args="-G Ninja"
             # -----------------------
             # Configure (Windows)
@@ -178,11 +181,31 @@ jobs:
                     "-Ccmake.define.OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS=OFF"
                     "-Ccmake.define.PD_LIB_DIR=${{ github.workspace }}/${{ env.LIBNAME }}"
                     "-Ccmake.define.OPENSCOFO_BUILD_ALL=ON"
+                    "-Ccmake.define.OPENSCOFO_TRAINING=ON"
                     "-Ccmake.args=-G Ninja"
                   )
                   python -m build --wheel @buildArgs
             - name: Run native tests
-              run: ctest --test-dir build/Tests/ -C Release --output-on-failure --no-tests=error -L openscofo
+              run: ctest --test-dir build -C Release --output-on-failure --no-tests=error -L openscofo
+            - name: Verify native Pure Data trainer
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  case "$RUNNER_OS" in
+                    Linux) trainer_pattern='openscofo.train*.so' ;;
+                    macOS) trainer_pattern='openscofo.train*' ;;
+                    Windows) trainer_pattern='openscofo.train*.dll' ;;
+                    *) echo "ERROR: Unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+                  esac
+                  trainer_binary="$(find build/Sources/Trainer build/OpenScofo \
+                    -maxdepth 1 -type f -name "$trainer_pattern" ! -name '*.pd' \
+                    -print 2>/dev/null | sort | head -n 1)"
+                  if [[ -z "$trainer_binary" || ! -s "$trainer_binary" ]]; then
+                    echo "ERROR: The openscofo.train Pure Data external was not generated."
+                    find build/Sources/Trainer build/OpenScofo -maxdepth 1 -type f -print 2>/dev/null || true
+                    exit 1
+                  fi
+                  echo "Verified native trainer: $trainer_binary"
             - name: Repair Linux wheel
               if: runner.os == 'Linux'
               run: |
@@ -243,6 +266,9 @@ jobs:
                   test -s "$pd_payload/flute.onnx"
                   test -s "$pd_payload/miniatura1.scofo"
                   test -s "$pd_payload/miniatura1.wav"
+                  test -s "$pd_payload/openscofo.train-help.pd"
+                  find "$pd_payload" -maxdepth 1 -type f -name 'openscofo.train*' \
+                    ! -name '*.pd' -print -quit | grep -q .
                   grep -Eq '^ONNXMODEL[[:space:]]+flute\.onnx([[:space:]]|$)' "$pd_payload/miniatura1.scofo"
             - name: Generate Linux Component Installer
               if: runner.os == 'Linux'
@@ -264,6 +290,13 @@ jobs:
                   if [[ -z "$pd_binary" ]]; then
                     echo "ERROR: No Pure Data component binary was generated."
                     find build/Sources/Wrappers/PureData -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  trainer_binary="$(find build/Sources/Trainer build/OpenScofo \
+                    -maxdepth 1 -type f -name 'openscofo.train*.so' -print 2>/dev/null \
+                    | sort | head -n 1)"
+                  if [[ -z "$trainer_binary" || ! -s "$trainer_binary" ]]; then
+                    echo "ERROR: No openscofo.train Pure Data external was generated."
                     exit 1
                   fi
                   python Resources/Packages/build_openscofo_qt.py \
@@ -299,6 +332,9 @@ jobs:
                   test -s "$smoke_home/Documents/Pd/externals/openscofo~/flute.onnx"
                   test -s "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.scofo"
                   test -s "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.wav"
+                  test -s "$smoke_home/Documents/Pd/externals/openscofo~/openscofo.train-help.pd"
+                  find "$smoke_home/Documents/Pd/externals/openscofo~" -maxdepth 1 \
+                    -type f -name 'openscofo.train*.so' -print -quit | grep -q .
                   grep -Eq '^ONNXMODEL[[:space:]]+flute\.onnx([[:space:]]|$)' \
                     "$smoke_home/Documents/Pd/externals/openscofo~/miniatura1.scofo"
                   test -s "$smoke_home/.local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so"
@@ -314,6 +350,11 @@ jobs:
                     io.github.openscofo.vamp \
                     io.github.openscofo.examples
                   test ! -e "$smoke_home/.local/lib/csound/6.0/plugins64/OpenScofo.so"
+                  if find "$smoke_home/Documents/Pd/externals/openscofo~" -maxdepth 1 \
+                    -type f -name 'openscofo.train*.so' -print -quit | grep -q .; then
+                    echo "ERROR: openscofo.train was not removed with the Pure Data component."
+                    exit 1
+                  fi
                   test ! -e "$smoke_home/.local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so"
                   test ! -e "$smoke_home/.vamp/OpenScofo.so"
                   test -s "$smoke_home/.local/share/openscofo/examples/canticos.scofo"
@@ -349,6 +390,12 @@ jobs:
                   }
                   if (-not (Test-Path "$pdPayload/miniatura1.wav" -PathType Leaf)) {
                     throw 'The Windows Pure Data installer payload is missing miniatura1.wav.'
+                  }
+                  if (-not (Test-Path "$pdPayload/openscofo.train-help.pd" -PathType Leaf)) {
+                    throw 'The Windows Pure Data installer payload is missing openscofo.train-help.pd.'
+                  }
+                  if (-not (Get-ChildItem $pdPayload -File -Filter 'openscofo.train*.dll')) {
+                    throw 'The Windows Pure Data installer payload is missing openscofo.train.'
                   }
                   if (-not (Select-String -Path $score -Pattern '^ONNXMODEL\s+flute\.onnx(?:\s|$)' -Quiet)) {
                     throw 'The Windows Pure Data score does not reference the adjacent flute.onnx model.'
@@ -414,6 +461,7 @@ jobs:
                     cp -R "${LIBNAME}/." "$package_root/"
                   fi
                   cp Sources/Wrappers/PureData/openscofo~-help.pd "$package_root/"
+                  cp Sources/Trainer/PureData/openscofo.train-help.pd "$package_root/"
                   cp README.md "$package_root/"
                   cp LICENSE "$package_root/"
                   cp Documentation/assets/icon.png "$package_root/"
@@ -428,6 +476,13 @@ jobs:
                       found_binary=1
                     fi
                   done
+                  found_trainer=0
+                  for binary in build/Sources/Trainer/openscofo.train* build/OpenScofo/openscofo.train*; do
+                    if [[ -f "$binary" && "$binary" != *.pd ]]; then
+                      cp "$binary" "$package_root/"
+                      found_trainer=1
+                    fi
+                  done
                   for binary in "$package_root"/openscofo~*; do
                     if [[ -f "$binary" && "$binary" != *.pd ]]; then
                       found_binary=1
@@ -436,6 +491,11 @@ jobs:
                   if [[ "$found_binary" != "1" ]]; then
                     echo "ERROR: No Pure Data external binary was staged."
                     find build -path '*PureData*' -type f || true
+                    exit 1
+                  fi
+                  if [[ "$found_trainer" != "1" ]]; then
+                    echo "ERROR: No openscofo.train Pure Data external was staged."
+                    find build/Sources/Trainer build/OpenScofo -maxdepth 1 -type f -print 2>/dev/null || true
                     exit 1
                   fi
                   find "$package_root" -maxdepth 1 -type f -print | sort
@@ -452,6 +512,7 @@ jobs:
                     Copy-Item "$env:LIBNAME/*" $packageRoot -Recurse -Force
                   }
                   Copy-Item 'Sources/Wrappers/PureData/openscofo~-help.pd' $packageRoot -Force
+                  Copy-Item 'Sources/Trainer/PureData/openscofo.train-help.pd' $packageRoot -Force
                   Copy-Item 'README.md' $packageRoot -Force
                   Copy-Item 'LICENSE' $packageRoot -Force
                   Copy-Item 'Documentation/assets/icon.png' $packageRoot -Force
@@ -466,10 +527,23 @@ jobs:
                   foreach ($binary in $pdBinaries) {
                     Copy-Item $binary.FullName $packageRoot -Force
                   }
+                  $trainerBinaries = @()
+                  foreach ($trainerDir in @('build/Sources/Trainer', 'build/OpenScofo')) {
+                    if (Test-Path $trainerDir) {
+                      $trainerBinaries += Get-ChildItem $trainerDir -File -Filter 'openscofo.train*.dll'
+                    }
+                  }
+                  $trainerBinaries = $trainerBinaries | Sort-Object FullName -Unique
+                  foreach ($binary in $trainerBinaries) {
+                    Copy-Item $binary.FullName $packageRoot -Force
+                  }
                   $stagedBinaries = Get-ChildItem $packageRoot -File -Filter 'openscofo~*' | Where-Object { $_.Extension -ne '.pd' }
                   if (-not $stagedBinaries) {
                     Get-ChildItem build -Recurse -File | Where-Object { $_.FullName -match 'PureData' }
                     throw 'No Pure Data external binary was staged.'
+                  }
+                  if (-not (Get-ChildItem $packageRoot -File -Filter 'openscofo.train*.dll')) {
+                    throw 'No openscofo.train Pure Data external was staged.'
                   }
                   Get-ChildItem $packageRoot -File | Sort-Object Name
             # -----------------------
@@ -669,6 +743,18 @@ jobs:
                     find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
                     exit 1
                   fi
+                  staged_trainers=(deken_release/"${LIBNAME}"/openscofo.train*)
+                  found_trainer=0
+                  for trainer in "${staged_trainers[@]}"; do
+                    if [[ -f "$trainer" && "$trainer" != *.pd ]]; then
+                      found_trainer=1
+                    fi
+                  done
+                  if [[ "$found_trainer" != "1" ]]; then
+                    echo "ERROR: No openscofo.train binary found in merged Deken payload."
+                    find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
+                    exit 1
+                  fi
                   find "deken_release/${LIBNAME}" -maxdepth 1 -type f -print | sort
                   (
                     cd deken_release
@@ -686,6 +772,7 @@ jobs:
                       exit 1
                     fi
                     ls -lh ./*.dek
+                    cp ./*.dek ../release_assets/
                     docker run --rm \
                       --user "$(id -u)" \
                       --volume "$(pwd):/deken" \
