@@ -17,25 +17,26 @@
 #include <utility>
 #include <vector>
 
-extern "C" {
 #include <m_pd.h>
 #include <g_canvas.h>
-}
 
 namespace {
 
 enum class MessageType { Progress, Status, Accuracy, BalancedAccuracy, ClassAccuracy, Error, Log };
+enum class Job { Analyze, Train, Export, ClearData };
 
+// ─────────────────────────────────────
 struct Message {
     MessageType Type = MessageType::Status;
     std::string Text;
     double Value = 0.0;
 };
 
+// ─────────────────────────────────────
 class PdTrainerState {
   public:
-    OpenScofo::Training::Trainer Trainer;
-    OpenScofo::Training::Configuration Config;
+    OpenScofo::Trainer Trainer;
+    OpenScofo::Trainer::Configuration Config;
     std::mutex QueueMutex;
     std::vector<Message> Queue;
     std::thread Worker;
@@ -75,6 +76,9 @@ class PdTrainerState {
     }
 };
 
+t_class *TrainerClass = nullptr;
+
+// ─────────────────────────────────────
 struct PdTrainer {
     t_object Object;
     PdTrainerState *State;
@@ -84,21 +88,22 @@ struct PdTrainer {
     t_outlet *EvaluationOutlet;
 };
 
-static t_class *TrainerClass = nullptr;
-
-static void OutputSymbol(t_outlet *outlet, const char *selector, const std::string &value) {
+// ─────────────────────────────────────
+void OutputSymbol(t_outlet *outlet, const char *selector, const std::string &value) {
     t_atom atom;
     SETSYMBOL(&atom, gensym(value.c_str()));
     outlet_anything(outlet, gensym(selector), 1, &atom);
 }
 
-static void OutputFloat(t_outlet *outlet, const char *selector, double value) {
+// ─────────────────────────────────────
+void OutputFloat(t_outlet *outlet, const char *selector, double value) {
     t_atom atom;
     SETFLOAT(&atom, static_cast<t_float>(value));
     outlet_anything(outlet, gensym(selector), 1, &atom);
 }
 
-static void TrainerTick(PdTrainer *object) {
+// ─────────────────────────────────────
+void TrainerTick(PdTrainer *object) {
     PdTrainerState *state = object->State;
     for (const Message &message : state->TakeMessages()) {
         switch (message.Type) {
@@ -140,9 +145,9 @@ static void TrainerTick(PdTrainer *object) {
     }
 }
 
-enum class Job { Analyze, Train, Export, ClearData };
+// ─────────────────────────────────────
 
-static void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPath = {}) {
+void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPath = {}) {
     PdTrainerState *state = object->State;
     if (state->Running.load()) {
         OutputSymbol(object->StatusOutlet, "error", "openscofo.train is already busy");
@@ -169,7 +174,7 @@ static void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPat
                 state->Trainer.Analyze();
             } else if (job == Job::Train) {
                 state->Trainer.Train();
-                const OpenScofo::Training::Evaluation &evaluation = state->Trainer.GetEvaluation();
+                const OpenScofo::Trainer::Evaluation &evaluation = state->Trainer.GetEvaluation();
                 if (evaluation.TestedSamples != 0) {
                     state->Push({MessageType::Accuracy, {}, evaluation.Accuracy});
                     state->Push({MessageType::BalancedAccuracy, {}, evaluation.BalancedAccuracy});
@@ -196,7 +201,8 @@ static void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPat
     clock_delay(object->Clock, 0.0);
 }
 
-static bool CanConfigure(PdTrainer *object) {
+// ─────────────────────────────────────
+bool CanConfigure(PdTrainer *object) {
     if (object->State->Running.load()) {
         OutputSymbol(object->StatusOutlet, "error", "cannot change settings while a job is running");
         return false;
@@ -207,11 +213,13 @@ static bool CanConfigure(PdTrainer *object) {
     return true;
 }
 
-static void ApplyConfiguration(PdTrainer *object) {
+// ─────────────────────────────────────
+void ApplyConfiguration(PdTrainer *object) {
     object->State->Trainer.SetConfiguration(object->State->Config);
 }
 
-static bool RequireSymbol(PdTrainer *object, int argc, t_atom *argv, const char *message) {
+// ─────────────────────────────────────
+bool RequireSymbol(PdTrainer *object, int argc, t_atom *argv, const char *message) {
     if (argc != 1 || argv[0].a_type != A_SYMBOL) {
         OutputSymbol(object->StatusOutlet, "error", message);
         return false;
@@ -219,14 +227,16 @@ static bool RequireSymbol(PdTrainer *object, int argc, t_atom *argv, const char 
     return true;
 }
 
-static void SetFolder(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
+// ─────────────────────────────────────
+void SetFolder(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
     if (!CanConfigure(object) || !RequireSymbol(object, argc, argv, "folder requires one path"))
         return;
     object->State->Config.DatasetFolder = atom_getsymbol(argv)->s_name;
     ApplyConfiguration(object);
 }
 
-static void SetIRFolders(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
+// ─────────────────────────────────────
+void SetIRFolders(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
     if (!CanConfigure(object))
         return;
     object->State->Config.ImpulseResponseFolders.clear();
@@ -240,7 +250,8 @@ static void SetIRFolders(PdTrainer *object, t_symbol *, int argc, t_atom *argv) 
     ApplyConfiguration(object);
 }
 
-static void SetDescriptors(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
+// ─────────────────────────────────────
+void SetDescriptors(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
     if (!CanConfigure(object))
         return;
     if (argc == 0) {
@@ -258,7 +269,8 @@ static void SetDescriptors(PdTrainer *object, t_symbol *, int argc, t_atom *argv
     ApplyConfiguration(object);
 }
 
-static void SetTrainingSampleRates(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
+// ─────────────────────────────────────
+void SetTrainingSampleRates(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
     if (!CanConfigure(object))
         return;
     if (argc == 0) {
@@ -276,99 +288,114 @@ static void SetTrainingSampleRates(PdTrainer *object, t_symbol *, int argc, t_at
     ApplyConfiguration(object);
 }
 
-static void SetSampleRate(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetSampleRate(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.SampleRate = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetFFTSize(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetFFTSize(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.FFTSize = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetHopSize(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetHopSize(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.HopSize = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetMinDB(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetMinDB(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.MinDB = value;
     ApplyConfiguration(object);
 }
 
-static void SetMaxPitchConfidence(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetMaxPitchConfidence(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.MaxPitchConfidence = value;
     ApplyConfiguration(object);
 }
 
-static void SetAugmentationFactor(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetAugmentationFactor(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.AugmentationFactor = value;
     ApplyConfiguration(object);
 }
 
-static void SetTestFraction(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetTestFraction(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.TestFraction = value;
     ApplyConfiguration(object);
 }
 
-static void SetIterations(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetIterations(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.Iterations = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetLearningRate(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetLearningRate(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.LearningRate = value;
     ApplyConfiguration(object);
 }
 
-static void SetDepth(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetDepth(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.Depth = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetEarlyStopping(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetEarlyStopping(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.EarlyStoppingRounds = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void SetSeed(PdTrainer *object, t_float value) {
+// ─────────────────────────────────────
+void SetSeed(PdTrainer *object, t_float value) {
     if (!CanConfigure(object))
         return;
     object->State->Config.RandomSeed = static_cast<int>(value);
     ApplyConfiguration(object);
 }
 
-static void Analyze(PdTrainer *object) {
+// ─────────────────────────────────────
+void Analyze(PdTrainer *object) {
     StartJob(object, Job::Analyze);
 }
 
-static void Train(PdTrainer *object) {
+// ─────────────────────────────────────
+void Train(PdTrainer *object) {
     StartJob(object, Job::Train);
 }
 
-static void Export(PdTrainer *object, t_symbol *path) {
+// ─────────────────────────────────────
+void Export(PdTrainer *object, t_symbol *path) {
     if (path == nullptr || path == &s_ || path->s_name[0] == '\0') {
         OutputSymbol(object->StatusOutlet, "error", "export requires one model path");
         return;
@@ -376,11 +403,13 @@ static void Export(PdTrainer *object, t_symbol *path) {
     StartJob(object, Job::Export, path->s_name);
 }
 
-static void ClearData(PdTrainer *object) {
+// ─────────────────────────────────────
+void ClearData(PdTrainer *object) {
     StartJob(object, Job::ClearData);
 }
 
-static void Cancel(PdTrainer *object) {
+// ─────────────────────────────────────
+void Cancel(PdTrainer *object) {
     if (!object->State->Running.load()) {
         OutputSymbol(object->StatusOutlet, "status", "idle");
         return;
@@ -389,7 +418,8 @@ static void Cancel(PdTrainer *object) {
     OutputSymbol(object->StatusOutlet, "status", "cancelling");
 }
 
-static void *NewTrainer(t_symbol *, int, t_atom *) {
+// ─────────────────────────────────────
+void *NewTrainer(t_symbol *, int, t_atom *) {
     PdTrainer *object = reinterpret_cast<PdTrainer *>(pd_new(TrainerClass));
     if (object == nullptr) {
         return nullptr;
@@ -409,7 +439,8 @@ static void *NewTrainer(t_symbol *, int, t_atom *) {
     return object;
 }
 
-static void FreeTrainer(PdTrainer *object) {
+// ─────────────────────────────────────
+void FreeTrainer(PdTrainer *object) {
     if (object->Clock != nullptr) {
         clock_unset(object->Clock);
     }
@@ -423,6 +454,7 @@ static void FreeTrainer(PdTrainer *object) {
 
 } // namespace
 
+// ─────────────────────────────────────
 #ifdef _WIN32
 extern "C" __declspec(dllexport) void setup_openscofo0x2etrain(void) {
 #else
