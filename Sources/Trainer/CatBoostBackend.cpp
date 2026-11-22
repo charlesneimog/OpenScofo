@@ -20,6 +20,7 @@
 
 namespace OpenScofo {
 
+// ─────────────────────────────────────
 std::string Trainer::TrainingParameters(bool haveValidation) const {
     std::string json = "{";
     json += "\"iterations\":" + std::to_string(m_Config.Iterations);
@@ -45,6 +46,7 @@ std::string Trainer::TrainingParameters(bool haveValidation) const {
     return json;
 }
 
+// ─────────────────────────────────────
 std::string Trainer::JsonString(const std::string &value) const {
     std::string output = "\"";
     for (unsigned char character : value) {
@@ -65,6 +67,7 @@ std::string Trainer::JsonString(const std::string &value) const {
     return output;
 }
 
+// ─────────────────────────────────────
 std::string Trainer::JsonArray(const std::vector<std::string> &values) const {
     std::string output = "[";
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -77,6 +80,7 @@ std::string Trainer::JsonArray(const std::vector<std::string> &values) const {
     return output;
 }
 
+// ─────────────────────────────────────
 void Trainer::TrainModel() {
     if (m_Data.Train.Empty()) {
         throw std::runtime_error("No training samples found");
@@ -96,6 +100,7 @@ void Trainer::TrainModel() {
         std::atomic<bool> *Cancelled = nullptr;
         const ProgressCallback *Progress = nullptr;
     };
+
     CallbackState callbackState{&m_Cancelled, &m_Progress};
     const auto afterIteration = +[](void *data, std::size_t iteration, std::size_t iterations) -> int {
         CallbackState *state = static_cast<CallbackState *>(data);
@@ -139,6 +144,7 @@ void Trainer::TrainModel() {
     }
 }
 
+// ─────────────────────────────────────
 Trainer::Evaluation Trainer::EvaluateModel() const {
     Evaluation evaluation;
     if (m_Model == nullptr || m_Data.Test.Empty()) {
@@ -192,6 +198,7 @@ Trainer::Evaluation Trainer::EvaluateModel() const {
     return evaluation;
 }
 
+// ─────────────────────────────────────
 void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
     if (m_Model == nullptr) {
         throw std::runtime_error("No trained model to export. Call Train() first");
@@ -205,10 +212,9 @@ void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
 
     const std::array<const char *, 6> keys = {"openscofo.descriptors", "openscofo.labels",   "openscofo.sample_rate",
                                               "openscofo.fft_size",    "openscofo.hop_size", "openscofo.version"};
-    const std::array<std::string, 6> values = {
-        JsonArray(m_Data.Descriptors),       JsonArray(m_Data.Labels),
-        std::to_string(m_Config.SampleRate), std::to_string(m_Config.FFTSize),
-        std::to_string(m_Config.HopSize),    OPENSCOFO_VERSION};
+    const std::array<std::string, 6> values = {JsonArray(m_Data.Descriptors),       JsonArray(m_Data.Labels),
+                                               std::to_string(m_Config.SampleRate), std::to_string(m_Config.FFTSize),
+                                               std::to_string(m_Config.HopSize),    OPENSCOFO_VERSION};
     std::array<const char *, 6> valuePointers{};
     for (std::size_t i = 0; i < values.size(); ++i) {
         valuePointers[i] = values[i].c_str();
@@ -227,6 +233,7 @@ void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
     }
 }
 
+// ─────────────────────────────────────
 void Trainer::ClearModel() noexcept {
     OpenScofoCatBoostDestroy(m_Model);
     m_Model = nullptr;

@@ -25,18 +25,19 @@
 #include <util/generic/vector.h>
 #include <util/generic/yexception.h>
 
+// ─────────────────────────────────────
 struct OpenScofoCatBoostHandle {
     TFullModel *Model = nullptr;
 };
 
-namespace {
-
+// ─────────────────────────────────────
 struct CallbackState {
     OpenScofoCatBoostProgress Progress = nullptr;
     void *UserData = nullptr;
     std::size_t Iterations = 1;
 };
 
+// ─────────────────────────────────────
 void SetError(char *error, std::size_t errorSize, const TString &message) {
     if (error == nullptr || errorSize == 0) {
         return;
@@ -44,12 +45,14 @@ void SetError(char *error, std::size_t errorSize, const TString &message) {
     std::snprintf(error, errorSize, "%s", message.c_str());
 }
 
+// ─────────────────────────────────────
 void ClearError(char *error, std::size_t errorSize) {
     if (error != nullptr && errorSize != 0) {
         error[0] = '\0';
     }
 }
 
+// ─────────────────────────────────────
 bool AfterIteration(const TMetricsAndTimeLeftHistory &history, void *data) {
     CallbackState *state = static_cast<CallbackState *>(data);
     if (state->Progress == nullptr) {
@@ -58,6 +61,7 @@ bool AfterIteration(const TMetricsAndTimeLeftHistory &history, void *data) {
     return state->Progress(state->UserData, history.LearnMetricsHistory.size(), state->Iterations) != 0;
 }
 
+// ─────────────────────────────────────
 NCB::TDataProviderPtr MakeProvider(const OpenScofoCatBoostData &data, const char *const *labelNames,
                                    std::size_t labelCount, TVector<float> &features, TVector<TString> &targets) {
     if (data.Features == nullptr || data.Labels == nullptr || data.SampleCount == 0 || data.FeatureCount == 0) {
@@ -101,10 +105,6 @@ NCB::TDataProviderPtr MakeProvider(const OpenScofoCatBoostData &data, const char
     visitor->Finish();
     return builder->GetResult();
 }
-
-} // namespace
-
-extern "C" {
 
 int OpenScofoCatBoostTrain(const OpenScofoCatBoostData *train, const OpenScofoCatBoostData *validation,
                            const char *const *labelNames, std::size_t labelCount, const char *parameters,
@@ -231,5 +231,3 @@ void OpenScofoCatBoostDestroy(OpenScofoCatBoostHandle *handle) {
     delete handle->Model;
     delete handle;
 }
-
-} // extern "C"

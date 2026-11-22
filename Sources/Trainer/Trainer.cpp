@@ -27,6 +27,16 @@ namespace OpenScofo {
 namespace fs = std::filesystem;
 
 // ─────────────────────────────────────
+struct Trainer::DiscoveredData {
+    std::vector<std::string> Labels;
+    std::vector<Recording> Train;
+    std::vector<Recording> Validation;
+    std::vector<Recording> Test;
+    std::vector<fs::path> AudioFiles;
+    std::vector<fs::path> ImpulseResponses;
+};
+
+// ─────────────────────────────────────
 std::size_t Trainer::Partition::SampleCount() const {
     return Labels.size();
 }
@@ -63,16 +73,6 @@ struct Trainer::Recording {
     fs::path Path;
     std::size_t Label = 0;
     std::uint64_t Id = 0;
-};
-
-// ─────────────────────────────────────
-struct Trainer::DiscoveredData {
-    std::vector<std::string> Labels;
-    std::vector<Recording> Train;
-    std::vector<Recording> Validation;
-    std::vector<Recording> Test;
-    std::vector<fs::path> AudioFiles;
-    std::vector<fs::path> ImpulseResponses;
 };
 
 // ─────────────────────────────────────
@@ -224,16 +224,20 @@ Trainer::Partition Trainer::ReadPartition(std::istream &stream) const {
         (featureCount != 0 && sampleCount > std::numeric_limits<std::uint64_t>::max() / featureCount)) {
         throw std::runtime_error("OpenScofo dataset cache contains invalid dimensions");
     }
+
     partition.FeatureCount = static_cast<std::size_t>(featureCount);
     partition.Features.resize(static_cast<std::size_t>(featureCount * sampleCount));
     partition.Labels.resize(static_cast<std::size_t>(sampleCount));
     partition.Origins.resize(static_cast<std::size_t>(sampleCount));
+
     ReadBytes(stream, partition.Features.data(), partition.Features.size() * sizeof(float));
     ReadBytes(stream, partition.Labels.data(), partition.Labels.size() * sizeof(std::int32_t));
+
     for (SampleOrigin &origin : partition.Origins) {
         origin.Recording = ReadValue<std::uint64_t>(stream);
         origin.Augmented = ReadValue<std::uint8_t>(stream) != 0;
     }
+
     return partition;
 }
 
@@ -590,7 +594,7 @@ std::size_t Trainer::ProcessSignal(const std::vector<float> &signal, int sampleR
         CheckCancelled();
         std::copy_n(signal.begin() + static_cast<std::ptrdiff_t>(start), m_Config.FFTSize, window.begin());
         extractor.ProcessBlock(window.data(), window.size());
-        ::OpenScofo::Description description = extractor.GetDescription();
+        Description description = extractor.GetDescription();
         if (description.dB < m_Config.MinDB) {
             continue;
         }
@@ -598,7 +602,7 @@ std::size_t Trainer::ProcessSignal(const std::vector<float> &signal, int sampleR
             continue;
         }
         AppendSample(partition, Flatten(extractor, description, descriptors), recording.Label, recording.Id, augmented);
-        ++appended;
+        appended++;
         if (maximumSamples != 0 && appended >= maximumSamples) {
             break;
         }

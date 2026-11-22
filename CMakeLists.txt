@@ -32,6 +32,7 @@ set(SPDLOG_VERSION "v1.17.0")
 set(MIPP_VERSION "")
 set(LUA_VERSION "v5.5.0")
 set(PDCMAKE_VERSION "v2.0.19")
+set(CATBOOST_VERSION "v1.2.10")
 
 # ╭──────────────────────────────────────╮
 # │               Options                │

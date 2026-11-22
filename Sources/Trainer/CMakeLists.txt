@@ -1,4 +1,4 @@
-set(OPENSCOFO_CATBOOST_VERSION
+set(CATBOOST_VERSION
     "v1.2.10"
     CACHE STRING "CatBoost release used by the native trainer")
 set(OPENSCOFO_CATBOOST_SOURCE_DIR
@@ -44,7 +44,7 @@ else()
     FetchContent_Declare(
         openscofo_catboost
         GIT_REPOSITORY https://github.com/catboost/catboost.git
-        GIT_TAG "${OPENSCOFO_CATBOOST_VERSION}"
+        GIT_TAG "${CATBOOST_VERSION}"
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
         EXCLUDE_FROM_ALL
@@ -200,7 +200,7 @@ add_library(openscofo_catboost_bridge STATIC CatBoostBridge.cpp CatBoostVersion.
 target_compile_definitions(
     openscofo_catboost_bridge
     PUBLIC OPENSCOFO_CATBOOST_STATIC
-    PRIVATE "OPENSCOFO_CATBOOST_VERSION=\"${OPENSCOFO_CATBOOST_VERSION}\"")
+    PRIVATE "CATBOOST_VERSION=\"${CATBOOST_VERSION}\"")
 target_include_directories(
     openscofo_catboost_bridge
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" SYSTEM

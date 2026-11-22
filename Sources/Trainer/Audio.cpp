@@ -105,6 +105,7 @@ class Trainer::RealFft {
     Buffer m_Work;
 };
 
+// ─────────────────────────────────────
 Trainer::AudioBuffer Trainer::LoadAudio(const std::filesystem::path &path) const {
     const std::string pathString = path.string();
     const std::string extension = Lowercase(path.extension().string());
@@ -125,6 +126,7 @@ Trainer::AudioBuffer Trainer::LoadAudio(const std::filesystem::path &path) const
         sampleRate > static_cast<std::uint32_t>(std::numeric_limits<int>::max())) {
         throw std::runtime_error("Audio file has invalid dimensions: " + pathString);
     }
+
     for (const std::vector<float> &channel : file.samples) {
         if (channel.size() < static_cast<std::size_t>(frames)) {
             throw std::runtime_error("Audio file has inconsistent channel lengths: " + pathString);
@@ -134,17 +136,19 @@ Trainer::AudioBuffer Trainer::LoadAudio(const std::filesystem::path &path) const
     AudioBuffer result;
     result.SampleRate = static_cast<int>(sampleRate);
     result.Samples.resize(static_cast<std::size_t>(frames));
-    const float channelScale = 1.0F / static_cast<float>(channels);
+    const float channelScale = 1.0F / channels;
+
     for (std::size_t frame = 0; frame < result.Samples.size(); ++frame) {
         float sample = 0.0F;
         for (int channel = 0; channel < channels; ++channel) {
-            sample += file.samples[static_cast<std::size_t>(channel)][frame];
+            sample += file.samples[channel][frame];
         }
         result.Samples[frame] = sample * channelScale;
     }
     return result;
 }
 
+// ─────────────────────────────────────
 std::vector<float> Trainer::Resample(const std::vector<float> &input, std::size_t outputSize) const {
     if (input.empty() || outputSize == 0) {
         return {};
@@ -171,6 +175,7 @@ std::vector<float> Trainer::Resample(const std::vector<float> &input, std::size_
     return output;
 }
 
+// ─────────────────────────────────────
 std::vector<float> Trainer::LoadMono(const std::filesystem::path &path, int sampleRate) const {
     if (sampleRate <= 0) {
         throw std::invalid_argument("Training sample rates must be positive");
@@ -186,6 +191,7 @@ std::vector<float> Trainer::LoadMono(const std::filesystem::path &path, int samp
     return Resample(source.Samples, outputSize);
 }
 
+// ─────────────────────────────────────
 std::vector<float> Trainer::TimeStretch(const std::vector<float> &input, double rate, int fftSize, int hopSize) const {
     if (input.empty()) {
         return {};
@@ -216,6 +222,7 @@ std::vector<float> Trainer::TimeStretch(const std::vector<float> &input, double 
     return output;
 }
 
+// ─────────────────────────────────────
 std::vector<float> Trainer::PitchShift(const std::vector<float> &input, double semitones, int fftSize,
                                        int hopSize) const {
     if (input.empty()) {
@@ -244,6 +251,7 @@ std::vector<float> Trainer::PitchShift(const std::vector<float> &input, double s
     return output;
 }
 
+// ─────────────────────────────────────
 std::vector<float> Trainer::AddGaussianNoise(const std::vector<float> &input, double deviation,
                                              std::mt19937 &random) const {
     if (deviation < 0.0 || !std::isfinite(deviation)) {
@@ -257,8 +265,8 @@ std::vector<float> Trainer::AddGaussianNoise(const std::vector<float> &input, do
     return output;
 }
 
-std::vector<float> Trainer::Convolve(const std::vector<float> &input,
-                                     const std::vector<float> &impulseResponse) const {
+// ─────────────────────────────────────
+std::vector<float> Trainer::Convolve(const std::vector<float> &input, const std::vector<float> &impulseResponse) const {
     if (input.empty() || impulseResponse.empty()) {
         return input;
     }
