@@ -15,8 +15,21 @@ if(NOT WIN32 AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "CatBoost's native C++ training engine must be built with Clang on this platform. "
                         "Configure OpenScofo with -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++.")
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 20)
+    message(FATAL_ERROR "CatBoost's bundled libc++ requires Clang 20 or newer on Linux")
+endif()
 
 find_package(Threads REQUIRED)
+
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.12.0
+        GIT_SHALLOW TRUE
+        EXCLUDE_FROM_ALL)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
 
 if(NOT TARGET signalsmith-stretch)
     FetchContent_Declare(
@@ -83,7 +96,10 @@ function(openscofo_copy_catboost_tool tool)
         # Homebrew exposes these tools through relative symlinks. Copying the link into CatBoost's build tree leaves a
         # dangling link there, so resolve it first and copy the executable itself.
         file(REAL_PATH "${source}" resolved_source)
-        file(COPY "${resolved_source}" DESTINATION "${openscofo_catboost_BINARY_DIR}/bin" USE_SOURCE_PERMISSIONS)
+        file(
+            COPY "${resolved_source}"
+            DESTINATION "${openscofo_catboost_BINARY_DIR}/bin"
+            USE_SOURCE_PERMISSIONS)
     endif()
 endfunction()
 
@@ -196,6 +212,14 @@ if(NOT TARGET catboost-libs-train_lib)
     message(FATAL_ERROR "CatBoost's native C++ training target is unavailable on this platform")
 endif()
 
+# CatBoost's generated Darwin arm64 source list includes the generic ELF SME ABI implementation. Apple targets require
+# compiler-rt's separate Mach-O implementation, which CatBoost does not bundle and its CPU trainer does not use.
+if(APPLE AND TARGET libs-cxxsupp-builtins)
+    get_target_property(openscofo_catboost_builtin_sources libs-cxxsupp-builtins SOURCES)
+    list(FILTER openscofo_catboost_builtin_sources EXCLUDE REGEX "/aarch64/sme-abi(\\.S|-assert\\.c)$")
+    set_property(TARGET libs-cxxsupp-builtins PROPERTY SOURCES "${openscofo_catboost_builtin_sources}")
+endif()
+
 # CatBoost's generated build uses its own libc++ implementation. Keep that runtime behind a C ABI so OpenScofo and
 # clients of the public Trainer.hpp API continue to use the parent project's standard-library ABI. The bridge itself is
 # static so consumers such as the Pure Data external do not need a companion libopenscofo_catboost_training shared file.
@@ -246,12 +270,18 @@ target_include_directories(openscofo_training PUBLIC "${CMAKE_CURRENT_SOURCE_DIR
 target_link_libraries(
     openscofo_training
     PUBLIC OpenScofo
-    PRIVATE openscofo_catboost_bridge AudioFile PFFFT::PFFFT signalsmith-stretch Threads::Threads)
+    PRIVATE openscofo_catboost_bridge
+            AudioFile
+            PFFFT::PFFFT
+            signalsmith-stretch
+            Threads::Threads
+            nlohmann_json::nlohmann_json)
 set_target_properties(openscofo_training PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(OPENSCOFO_BUILD_PD_OBJECT)
     pd_add_external(openscofo.train "${CMAKE_CURRENT_SOURCE_DIR}/PureData/openscofo.train.cpp" TARGET openscofo_train
                     LINK_LIBRARIES openscofo_training)
+
     pd_add_datafile(openscofo_train "${CMAKE_CURRENT_SOURCE_DIR}/PureData/openscofo.train-help.pd")
     if(LINUX)
         target_link_options(openscofo_train PRIVATE -fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,-z,notext)
@@ -260,6 +290,20 @@ if(OPENSCOFO_BUILD_PD_OBJECT)
         target_compile_options(openscofo_train PRIVATE -fvisibility=hidden -Wno-cast-function-type-mismatch)
     endif()
     set_target_properties(openscofo_train PROPERTIES SKIP_BUILD_RPATH ON INSTALL_RPATH "")
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_options(openscofo_train PRIVATE -Os -ffunction-sections -fdata-sections -g0 -flto)
+
+        target_link_options(
+            openscofo_train
+            PRIVATE
+            -flto
+            -Wl,--gc-sections
+            -Wl,--as-needed
+            -Wl,--exclude-libs,ALL
+            -Wl,-s)
+    endif()
+
 endif()
 
 if(OPENSCOFO_BUILD_TESTS)
