@@ -11,9 +11,13 @@
 
 #include "CatBoostBridge.h"
 
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <array>
-#include <cctype>
+#include <cstdint>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -22,102 +26,49 @@ namespace OpenScofo {
 
 // ─────────────────────────────────────
 std::string Trainer::TrainingParameters(bool haveValidation) const {
-    std::string json = "{";
-    json += "\"iterations\":" + std::to_string(m_Config.Iterations);
-    json += ",\"learning_rate\":" + std::to_string(m_Config.LearningRate);
-    json += ",\"depth\":" + std::to_string(m_Config.Depth);
-    json += ",\"loss_function\":\"MultiClass\"";
-    json += ",\"random_seed\":" + std::to_string(m_Config.RandomSeed);
+    nlohmann::json parameters = {
+        {"iterations", m_Config.Iterations}, {"learning_rate", m_Config.LearningRate}, {"depth", m_Config.Depth},
+        {"loss_function", "MultiClass"},     {"random_seed", m_Config.RandomSeed},     {"allow_writing_files", false},
+        {"logging_level", "Silent"},         {"use_best_model", haveValidation},
+    };
     // CatBoost's native C++ option parser only accepts positive thread counts,
     // unlike the Python API where -1 means automatic/all available threads.
     if (m_Config.ThreadCount > 0) {
-        json += ",\"thread_count\":" + std::to_string(m_Config.ThreadCount);
+        parameters["thread_count"] = m_Config.ThreadCount;
     }
-    json += ",\"allow_writing_files\":false";
-    json += ",\"logging_level\":\"Silent\"";
     if (haveValidation) {
-        json += ",\"use_best_model\":true";
-        json += ",\"od_type\":\"Iter\"";
-        json += ",\"od_wait\":" + std::to_string(m_Config.EarlyStoppingRounds);
-    } else {
-        json += ",\"use_best_model\":false";
+        parameters["od_type"] = "Iter";
+        parameters["od_wait"] = m_Config.EarlyStoppingRounds;
     }
-    json += "}";
-    return json;
+    return parameters.dump();
 }
 
 // ─────────────────────────────────────
-std::string Trainer::JsonString(const std::string &value) const {
-    std::string output = "\"";
-    for (unsigned char character : value) {
-        if (character == '"' || character == '\\') {
-            output.push_back('\\');
-            output.push_back(static_cast<char>(character));
-        } else if (character == '\n') {
-            output += "\\n";
-        } else if (character == '\r') {
-            output += "\\r";
-        } else if (character == '\t') {
-            output += "\\t";
-        } else if (character >= 0x20) {
-            output.push_back(static_cast<char>(character));
-        }
+// Called by the CatBoost bridge after every boosting iteration. Exceptions must not cross the C bridge, so a failing
+// progress callback cancels the training instead of propagating.
+int Trainer::TrainingProgress(void *data, std::size_t iteration, std::size_t iterations) {
+    Trainer *trainer = static_cast<Trainer *>(data);
+    if (trainer->m_Cancelled.load()) {
+        return 0;
     }
-    output.push_back('"');
-    return output;
-}
-
-// ─────────────────────────────────────
-std::string Trainer::JsonArray(const std::vector<std::string> &values) const {
-    std::string output = "[";
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        if (i != 0) {
-            output.push_back(',');
-        }
-        output += JsonString(values[i]);
+    try {
+        trainer->Report("training", static_cast<double>(iteration) / static_cast<double>(iterations));
+    } catch (...) {
+        spdlog::error("Progress callback failed; cancelling training");
+        trainer->m_Cancelled.store(true);
+        return 0;
     }
-    output.push_back(']');
-    return output;
+    return trainer->m_Cancelled.load() ? 0 : 1;
 }
 
 // ─────────────────────────────────────
 void Trainer::TrainModel() {
-    if (m_Data.Train.Empty()) {
-        throw std::runtime_error("No training samples found");
-    }
-    if (m_Data.Labels.size() < 2) {
-        throw std::runtime_error("Training requires at least two classes");
-    }
-
     const OpenScofoCatBoostData train = {m_Data.Train.Features.data(), m_Data.Train.Labels.data(),
                                          m_Data.Train.SampleCount(), m_Data.Train.FeatureCount};
     const OpenScofoCatBoostData validation = {m_Data.Validation.Features.data(), m_Data.Validation.Labels.data(),
                                               m_Data.Validation.SampleCount(), m_Data.Validation.FeatureCount};
     const OpenScofoCatBoostData *validationPointer = m_Data.Validation.Empty() ? nullptr : &validation;
     const std::string parameters = TrainingParameters(validationPointer != nullptr);
-
-    struct CallbackState {
-        std::atomic<bool> *Cancelled = nullptr;
-        const ProgressCallback *Progress = nullptr;
-    };
-
-    CallbackState callbackState{&m_Cancelled, &m_Progress};
-    const auto afterIteration = +[](void *data, std::size_t iteration, std::size_t iterations) -> int {
-        CallbackState *state = static_cast<CallbackState *>(data);
-        if (state->Cancelled->load()) {
-            return 0;
-        }
-        try {
-            if (*state->Progress) {
-                const double value = std::min(1.0, static_cast<double>(iteration) / static_cast<double>(iterations));
-                (*state->Progress)("training", value);
-            }
-        } catch (...) {
-            state->Cancelled->store(true);
-            return 0;
-        }
-        return state->Cancelled->load() ? 0 : 1;
-    };
 
     std::vector<const char *> labelNames;
     labelNames.reserve(m_Data.Labels.size());
@@ -128,8 +79,8 @@ void Trainer::TrainModel() {
     std::array<char, 4096> error{};
     OpenScofoCatBoostHandle *model = nullptr;
     if (!OpenScofoCatBoostTrain(&train, validationPointer, labelNames.data(), labelNames.size(), parameters.c_str(),
-                                static_cast<std::size_t>(std::max(1, m_Config.Iterations)), afterIteration,
-                                &callbackState, &model, error.data(), error.size())) {
+                                static_cast<std::size_t>(m_Config.Iterations), TrainingProgress, this, &model,
+                                error.data(), error.size())) {
         throw std::runtime_error(error[0] == '\0' ? "CatBoost training failed" : error.data());
     }
     if (m_Cancelled.load()) {
@@ -139,15 +90,13 @@ void Trainer::TrainModel() {
 
     ClearModel();
     m_Model = model;
-    if (m_Progress) {
-        m_Progress("training", 1.0);
-    }
+    Report("training", 1.0);
 }
 
 // ─────────────────────────────────────
-Trainer::Evaluation Trainer::EvaluateModel() const {
+Evaluation Trainer::EvaluateModel() const {
     Evaluation evaluation;
-    if (m_Model == nullptr || m_Data.Test.Empty()) {
+    if (m_Data.Test.Empty()) {
         return evaluation;
     }
 
@@ -167,14 +116,10 @@ Trainer::Evaluation Trainer::EvaluateModel() const {
     std::vector<std::size_t> correct(m_Data.Labels.size(), 0);
     std::size_t allCorrect = 0;
     for (std::size_t sample = 0; sample < predictions.size(); ++sample) {
-        const std::int32_t expectedValue = m_Data.Test.Labels[sample];
-        if (expectedValue < 0 || static_cast<std::size_t>(expectedValue) >= m_Data.Labels.size()) {
-            throw std::runtime_error("Test partition contains an invalid class index");
-        }
-        const std::size_t expected = static_cast<std::size_t>(expectedValue);
-        ++totals[expected];
-        if (predictions[sample] == expectedValue) {
-            ++correct[expected];
+        const std::int32_t expected = m_Data.Test.Labels[sample];
+        ++totals[static_cast<std::size_t>(expected)];
+        if (predictions[sample] == expected) {
+            ++correct[static_cast<std::size_t>(expected)];
             ++allCorrect;
         }
     }
@@ -204,30 +149,35 @@ void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
         throw std::runtime_error("No trained model to export. Call Train() first");
     }
     if (path.empty()) {
-        throw std::invalid_argument("Model export path is empty");
+        throw std::runtime_error("Model export path is empty");
     }
     if (path.has_parent_path()) {
         std::filesystem::create_directories(path.parent_path());
     }
 
-    const std::array<const char *, 6> keys = {"openscofo.descriptors", "openscofo.labels",   "openscofo.sample_rate",
-                                              "openscofo.fft_size",    "openscofo.hop_size", "openscofo.version"};
-    const std::array<std::string, 6> values = {JsonArray(m_Data.Descriptors),       JsonArray(m_Data.Labels),
-                                               std::to_string(m_Config.SampleRate), std::to_string(m_Config.FFTSize),
-                                               std::to_string(m_Config.HopSize),    OPENSCOFO_VERSION};
-    std::array<const char *, 6> valuePointers{};
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        valuePointers[i] = values[i].c_str();
+    // CatBoost stores model metadata as string pairs. Descriptors and labels are JSON arrays kept inside those strings.
+    // Class folder names are not guaranteed to be UTF-8 (e.g. Windows code pages), so invalid bytes are replaced rather
+    // than letting dump() throw after the training has finished.
+    constexpr nlohmann::json::error_handler_t replaceInvalidUtf8 = nlohmann::json::error_handler_t::replace;
+    const std::map<std::string, std::string> metadata = {
+        {"openscofo.descriptors", nlohmann::json(m_Data.Descriptors).dump(-1, ' ', false, replaceInvalidUtf8)},
+        {"openscofo.labels", nlohmann::json(m_Data.Labels).dump(-1, ' ', false, replaceInvalidUtf8)},
+        {"openscofo.sample_rate", std::to_string(m_Config.SampleRate)},
+        {"openscofo.fft_size", std::to_string(m_Config.FFTSize)},
+        {"openscofo.hop_size", std::to_string(m_Config.HopSize)},
+        {"openscofo.version", OPENSCOFO_VERSION},
+    };
+    std::vector<const char *> keys;
+    std::vector<const char *> values;
+    for (const auto &[key, value] : metadata) {
+        keys.push_back(key.c_str());
+        values.push_back(value.c_str());
     }
 
-    std::string extension = path.extension().string();
-    for (char &character : extension) {
-        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-    }
-    const int onnx = extension == ".onnx" ? 1 : 0;
+    const int onnx = Lowercase(path.extension().string()) == ".onnx" ? 1 : 0;
     const std::string pathString = path.string();
     std::array<char, 4096> error{};
-    if (!OpenScofoCatBoostExport(m_Model, pathString.c_str(), onnx, keys.data(), valuePointers.data(), keys.size(),
+    if (!OpenScofoCatBoostExport(m_Model, pathString.c_str(), onnx, keys.data(), values.data(), keys.size(),
                                  error.data(), error.size())) {
         throw std::runtime_error(error[0] == '\0' ? "CatBoost model export failed" : error.data());
     }

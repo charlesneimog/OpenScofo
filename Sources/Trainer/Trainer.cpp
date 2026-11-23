@@ -9,17 +9,15 @@
 
 #include "Trainer.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <fstream>
-#include <limits>
 #include <random>
 #include <set>
-#include <sstream>
 #include <stdexcept>
-#include <system_error>
 #include <utility>
 
 namespace OpenScofo {
@@ -27,27 +25,17 @@ namespace OpenScofo {
 namespace fs = std::filesystem;
 
 // ─────────────────────────────────────
-struct Trainer::DiscoveredData {
-    std::vector<std::string> Labels;
-    std::vector<Recording> Train;
-    std::vector<Recording> Validation;
-    std::vector<Recording> Test;
-    std::vector<fs::path> AudioFiles;
-    std::vector<fs::path> ImpulseResponses;
-};
-
-// ─────────────────────────────────────
-std::size_t Trainer::Partition::SampleCount() const {
+std::size_t Partition::SampleCount() const {
     return Labels.size();
 }
 
 // ─────────────────────────────────────
-bool Trainer::Partition::Empty() const {
+bool Partition::Empty() const {
     return Labels.empty();
 }
 
 // ─────────────────────────────────────
-void Trainer::Partition::Clear() {
+void Partition::Clear() {
     Features.clear();
     Labels.clear();
     Origins.clear();
@@ -55,7 +43,7 @@ void Trainer::Partition::Clear() {
 }
 
 // ─────────────────────────────────────
-void Trainer::Dataset::Clear() {
+void Dataset::Clear() {
     Train.Clear();
     Validation.Clear();
     Test.Clear();
@@ -65,20 +53,13 @@ void Trainer::Dataset::Clear() {
     AugmentedTrainCounts.clear();
     ValidationCounts.clear();
     TestCounts.clear();
-    LoadedFromCache = false;
 }
 
 // ─────────────────────────────────────
-struct Trainer::Recording {
-    fs::path Path;
-    std::size_t Label = 0;
-    std::uint64_t Id = 0;
-};
-
-// ─────────────────────────────────────
 std::string Trainer::Lowercase(std::string text) const {
-    std::transform(text.begin(), text.end(), text.begin(),
-                   [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    for (char &character : text) {
+        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+    }
     return text;
 }
 
@@ -130,151 +111,9 @@ void Trainer::AppendSample(Partition &partition, const std::vector<float> &featu
 }
 
 // ─────────────────────────────────────
-void Trainer::WriteBytes(std::ostream &stream, const void *data, std::size_t size) const {
-    if (size == 0) {
-        return;
-    }
-    stream.write(static_cast<const char *>(data), static_cast<std::streamsize>(size));
-    if (!stream) {
-        throw std::runtime_error("Could not write the OpenScofo dataset cache");
-    }
-}
-
-// ─────────────────────────────────────
-void Trainer::ReadBytes(std::istream &stream, void *data, std::size_t size) const {
-    if (size == 0) {
-        return;
-    }
-    stream.read(static_cast<char *>(data), static_cast<std::streamsize>(size));
-    if (!stream) {
-        throw std::runtime_error("OpenScofo dataset cache is truncated");
-    }
-}
-
-// ─────────────────────────────────────
-template <typename T> void Trainer::WriteValue(std::ostream &stream, const T &value) const {
-    WriteBytes(stream, &value, sizeof(value));
-}
-
-// ─────────────────────────────────────
-template <typename T> T Trainer::ReadValue(std::istream &stream) const {
-    T value{};
-    ReadBytes(stream, &value, sizeof(value));
-    return value;
-}
-
-// ─────────────────────────────────────
-void Trainer::WriteString(std::ostream &stream, const std::string &value) const {
-    const std::uint64_t size = value.size();
-    WriteValue(stream, size);
-    WriteBytes(stream, value.data(), value.size());
-}
-
-// ─────────────────────────────────────
-std::string Trainer::ReadString(std::istream &stream) const {
-    const std::uint64_t size = ReadValue<std::uint64_t>(stream);
-    if (size > 16ULL * 1024ULL * 1024ULL) {
-        throw std::runtime_error("OpenScofo dataset cache contains an invalid string size");
-    }
-    std::string value(static_cast<std::size_t>(size), '\0');
-    ReadBytes(stream, value.data(), value.size());
-    return value;
-}
-
-// ─────────────────────────────────────
-void Trainer::WriteStrings(std::ostream &stream, const std::vector<std::string> &values) const {
-    WriteValue(stream, static_cast<std::uint64_t>(values.size()));
-    for (const std::string &value : values) {
-        WriteString(stream, value);
-    }
-}
-
-// ─────────────────────────────────────
-std::vector<std::string> Trainer::ReadStrings(std::istream &stream) const {
-    const std::uint64_t size = ReadValue<std::uint64_t>(stream);
-    if (size > 100000) {
-        throw std::runtime_error("OpenScofo dataset cache contains too many strings");
-    }
-    std::vector<std::string> values;
-    values.reserve(static_cast<std::size_t>(size));
-    for (std::uint64_t i = 0; i < size; ++i) {
-        values.push_back(ReadString(stream));
-    }
-    return values;
-}
-
-// ─────────────────────────────────────
-void Trainer::WritePartition(std::ostream &stream, const Partition &partition) const {
-    WriteValue(stream, static_cast<std::uint64_t>(partition.FeatureCount));
-    WriteValue(stream, static_cast<std::uint64_t>(partition.SampleCount()));
-    WriteBytes(stream, partition.Features.data(), partition.Features.size() * sizeof(float));
-    WriteBytes(stream, partition.Labels.data(), partition.Labels.size() * sizeof(std::int32_t));
-    for (const SampleOrigin &origin : partition.Origins) {
-        WriteValue(stream, origin.Recording);
-        WriteValue(stream, static_cast<std::uint8_t>(origin.Augmented ? 1 : 0));
-    }
-}
-
-// ─────────────────────────────────────
-Trainer::Partition Trainer::ReadPartition(std::istream &stream) const {
-    Partition partition;
-    const std::uint64_t featureCount = ReadValue<std::uint64_t>(stream);
-    const std::uint64_t sampleCount = ReadValue<std::uint64_t>(stream);
-    if (featureCount > 1000000 || sampleCount > 100000000 ||
-        (featureCount != 0 && sampleCount > std::numeric_limits<std::uint64_t>::max() / featureCount)) {
-        throw std::runtime_error("OpenScofo dataset cache contains invalid dimensions");
-    }
-
-    partition.FeatureCount = static_cast<std::size_t>(featureCount);
-    partition.Features.resize(static_cast<std::size_t>(featureCount * sampleCount));
-    partition.Labels.resize(static_cast<std::size_t>(sampleCount));
-    partition.Origins.resize(static_cast<std::size_t>(sampleCount));
-
-    ReadBytes(stream, partition.Features.data(), partition.Features.size() * sizeof(float));
-    ReadBytes(stream, partition.Labels.data(), partition.Labels.size() * sizeof(std::int32_t));
-
-    for (SampleOrigin &origin : partition.Origins) {
-        origin.Recording = ReadValue<std::uint64_t>(stream);
-        origin.Augmented = ReadValue<std::uint8_t>(stream) != 0;
-    }
-
-    return partition;
-}
-
-// ─────────────────────────────────────
-void Trainer::WriteCounts(std::ostream &stream, const std::map<std::string, std::size_t> &counts) const {
-    WriteValue(stream, static_cast<std::uint64_t>(counts.size()));
-    for (const auto &[label, count] : counts) {
-        WriteString(stream, label);
-        WriteValue(stream, static_cast<std::uint64_t>(count));
-    }
-}
-
-// ─────────────────────────────────────
-std::map<std::string, std::size_t> Trainer::ReadCounts(std::istream &stream) const {
-    const std::uint64_t size = ReadValue<std::uint64_t>(stream);
-    if (size > 100000) {
-        throw std::runtime_error("OpenScofo dataset cache contains too many class counts");
-    }
-    std::map<std::string, std::size_t> counts;
-    for (std::uint64_t i = 0; i < size; ++i) {
-        const std::string label = ReadString(stream);
-        counts[label] = static_cast<std::size_t>(ReadValue<std::uint64_t>(stream));
-    }
-    return counts;
-}
-
-// ─────────────────────────────────────
 void Trainer::Report(const std::string &status, double progress) const {
     if (m_Progress) {
         m_Progress(status, std::clamp(progress, 0.0, 1.0));
-    }
-}
-
-// ─────────────────────────────────────
-void Trainer::Print(const std::string &message) const {
-    if (m_Log) {
-        m_Log(message);
     }
 }
 
@@ -295,14 +134,6 @@ fs::path Trainer::BasePath() const {
 }
 
 // ─────────────────────────────────────
-fs::path Trainer::CacheFile() const {
-    if (m_Config.CachePath.empty()) {
-        return BasePath() / "dataset.openscofo-cache";
-    }
-    return ResolvePath(BasePath(), m_Config.CachePath);
-}
-
-// ─────────────────────────────────────
 std::vector<int> Trainer::SampleRates() const {
     std::vector<int> rates = m_Config.TrainingSampleRates;
     if (rates.empty()) {
@@ -310,9 +141,6 @@ std::vector<int> Trainer::SampleRates() const {
     }
     std::vector<int> unique;
     for (int rate : rates) {
-        if (rate <= 0) {
-            throw std::invalid_argument("Training sample rates must be positive");
-        }
         if (std::find(unique.begin(), unique.end(), rate) == unique.end()) {
             unique.push_back(rate);
         }
@@ -322,19 +150,22 @@ std::vector<int> Trainer::SampleRates() const {
 
 // ─────────────────────────────────────
 std::vector<Descriptors> Trainer::GetDescriptors(std::vector<std::string> &canonical) const {
+    canonical.clear();
     if (m_Config.Descriptors.empty()) {
-        throw std::invalid_argument("At least one OpenScofo descriptor is required");
+        spdlog::error("At least one OpenScofo descriptor is required");
+        return {};
     }
     ::OpenScofo::OpenScofo descriptorConverter(static_cast<float>(m_Config.SampleRate),
                                                static_cast<float>(m_Config.FFTSize),
                                                static_cast<float>(m_Config.HopSize));
     std::vector<::OpenScofo::Descriptors> descriptors;
-    canonical.clear();
     for (const std::string &name : m_Config.Descriptors) {
         const std::string normalized = Lowercase(name);
         const ::OpenScofo::Descriptors descriptor = descriptorConverter.GetDescriptorsEnum(normalized.c_str());
         if (descriptor == ::OpenScofo::INVALID || descriptor == ::OpenScofo::ONNX) {
-            throw std::invalid_argument("Unknown or unsupported training descriptor: " + name);
+            spdlog::error("Unknown or unsupported training descriptor: {}", name);
+            canonical.clear();
+            return {};
         }
         descriptors.push_back(descriptor);
         canonical.emplace_back(descriptorConverter.GetDescriptionId(descriptor));
@@ -343,32 +174,44 @@ std::vector<Descriptors> Trainer::GetDescriptors(std::vector<std::string> &canon
 }
 
 // ─────────────────────────────────────
-void Trainer::Validate() const {
+bool Trainer::Validate() const {
     if (m_Config.SampleRate <= 0 || m_Config.FFTSize < 512 || m_Config.HopSize <= 0 ||
         m_Config.HopSize > m_Config.FFTSize) {
-        throw std::invalid_argument("Invalid sample rate, FFT size, or hop size");
+        spdlog::error("Invalid sample rate, FFT size, or hop size");
+        return false;
+    }
+    for (int rate : m_Config.TrainingSampleRates) {
+        if (rate <= 0) {
+            spdlog::error("Training sample rates must be positive");
+            return false;
+        }
     }
     if (m_Config.TestFraction < 0.0 || m_Config.TestFraction >= 1.0) {
-        throw std::invalid_argument("Test fraction must be in the range [0, 1)");
+        spdlog::error("Test fraction must be in the range [0, 1)");
+        return false;
     }
     if (m_Config.MaxPitchConfidence < 0.0 || m_Config.MaxPitchConfidence > 1.0) {
-        throw std::invalid_argument("Maximum pitch confidence must be between 0 and 1");
+        spdlog::error("Maximum pitch confidence must be between 0 and 1");
+        return false;
     }
     if (m_Config.AugmentationFactor < 1.0) {
-        throw std::invalid_argument("Augmentation factor must be at least 1");
+        spdlog::error("Augmentation factor must be at least 1");
+        return false;
     }
     if (m_Config.MaxAugmentationLoops < 0) {
-        throw std::invalid_argument("Maximum augmentation loops cannot be negative");
+        spdlog::error("Maximum augmentation loops cannot be negative");
+        return false;
     }
     if (m_Config.Iterations <= 0 || m_Config.LearningRate <= 0.0 || m_Config.Depth <= 0 ||
         m_Config.EarlyStoppingRounds < 0 || m_Config.ThreadCount == 0 || m_Config.ThreadCount < -1) {
-        throw std::invalid_argument("Invalid CatBoost configuration");
+        spdlog::error("Invalid CatBoost configuration");
+        return false;
     }
-    (void)SampleRates();
+    return true;
 }
 
 // ─────────────────────────────────────
-Trainer::DiscoveredData Trainer::Discover() const {
+DiscoveredData Trainer::Discover() const {
     const fs::path datasetFolder = ResolvePath(BasePath(), m_Config.DatasetFolder);
     if (datasetFolder.empty() || !fs::is_directory(datasetFolder)) {
         throw std::runtime_error("Training folder is not a directory: " + datasetFolder.string());
@@ -390,19 +233,21 @@ Trainer::DiscoveredData Trainer::Discover() const {
     for (const fs::path &classFolder : classFolders) {
         const std::size_t label = discovered.Labels.size();
         discovered.Labels.push_back(classFolder.filename().string());
-        std::vector<Recording> recordings;
+
+        std::vector<fs::path> files;
         for (const fs::directory_entry &entry : fs::directory_iterator(classFolder)) {
-            if (!entry.is_regular_file() || !IsAudioFile(entry.path())) {
-                continue;
+            if (entry.is_regular_file() && IsAudioFile(entry.path())) {
+                files.push_back(fs::absolute(entry.path()).lexically_normal());
             }
-            const fs::path absolute = fs::absolute(entry.path()).lexically_normal();
-            recordings.push_back({absolute, label, HashText(absolute.generic_string())});
-            discovered.AudioFiles.push_back(absolute);
         }
-        std::sort(recordings.begin(), recordings.end(),
-                  [](const Recording &left, const Recording &right) { return left.Path < right.Path; });
-        if (recordings.empty()) {
+        if (files.empty()) {
             throw std::runtime_error("Class folder contains no WAV, AIFF, or AIF files: " + classFolder.string());
+        }
+        std::sort(files.begin(), files.end());
+
+        std::vector<Recording> recordings;
+        for (const fs::path &file : files) {
+            recordings.push_back({file, label, HashText(file.generic_string())});
         }
         std::shuffle(recordings.begin(), recordings.end(), random);
 
@@ -428,7 +273,6 @@ Trainer::DiscoveredData Trainer::Discover() const {
                                 recordings.begin() + static_cast<std::ptrdiff_t>(testCount + validationCount),
                                 recordings.end());
     }
-    std::sort(discovered.AudioFiles.begin(), discovered.AudioFiles.end());
 
     for (const fs::path &folderValue : m_Config.ImpulseResponseFolders) {
         const fs::path folder = ResolvePath(BasePath(), folderValue);
@@ -443,113 +287,6 @@ Trainer::DiscoveredData Trainer::Discover() const {
     }
     std::sort(discovered.ImpulseResponses.begin(), discovered.ImpulseResponses.end());
     return discovered;
-}
-
-// ─────────────────────────────────────
-std::string Trainer::Signature(const DiscoveredData &discovered, const std::vector<std::string> &descriptors) const {
-    std::ostringstream stream;
-    stream.precision(17);
-    stream << "cache=" << m_CacheVersion << '\n';
-    stream << "openscofo_version=" << OPENSCOFO_VERSION << '\n';
-    stream << "sample_rate=" << m_Config.SampleRate << '\n';
-    stream << "fft_size=" << m_Config.FFTSize << '\n';
-    stream << "hop_size=" << m_Config.HopSize << '\n';
-    stream << "min_db=" << m_Config.MinDB << '\n';
-    stream << "max_pitch_confidence=" << m_Config.MaxPitchConfidence << '\n';
-    stream << "test_fraction=" << m_Config.TestFraction << '\n';
-    stream << "augmentation_factor=" << m_Config.AugmentationFactor << '\n';
-    stream << "max_augmentation_loops=" << m_Config.MaxAugmentationLoops << '\n';
-    stream << "seed=" << m_Config.RandomSeed << '\n';
-    stream << "dataset=" << ResolvePath(BasePath(), m_Config.DatasetFolder).generic_string() << '\n';
-    for (int rate : SampleRates()) {
-        stream << "training_rate=" << rate << '\n';
-    }
-    for (const std::string &descriptor : descriptors) {
-        stream << "descriptor=" << descriptor << '\n';
-    }
-    for (const fs::path &file : discovered.AudioFiles) {
-        stream << "audio=" << file.generic_string() << ':' << fs::file_size(file) << ':'
-               << fs::last_write_time(file).time_since_epoch().count() << '\n';
-    }
-    for (const fs::path &file : discovered.ImpulseResponses) {
-        stream << "ir=" << file.generic_string() << ':' << fs::file_size(file) << ':'
-               << fs::last_write_time(file).time_since_epoch().count() << '\n';
-    }
-    return stream.str();
-}
-
-// ─────────────────────────────────────
-bool Trainer::LoadCache(const std::string &signature) {
-    const fs::path path = CacheFile();
-    std::ifstream stream(path, std::ios::binary);
-    if (!stream) {
-        return false;
-    }
-    try {
-        std::array<char, 8> magic{};
-        ReadBytes(stream, magic.data(), magic.size());
-        if (magic != m_CacheMagic) {
-            return false;
-        }
-        if (ReadValue<std::uint32_t>(stream) != m_CacheVersion || ReadString(stream) != signature) {
-            return false;
-        }
-
-        Dataset loaded;
-        loaded.Labels = ReadStrings(stream);
-        loaded.Descriptors = ReadStrings(stream);
-        loaded.Train = ReadPartition(stream);
-        loaded.Validation = ReadPartition(stream);
-        loaded.Test = ReadPartition(stream);
-        loaded.OriginalTrainCounts = ReadCounts(stream);
-        loaded.AugmentedTrainCounts = ReadCounts(stream);
-        loaded.ValidationCounts = ReadCounts(stream);
-        loaded.TestCounts = ReadCounts(stream);
-        loaded.LoadedFromCache = true;
-        m_Data = std::move(loaded);
-        Print("Loaded native dataset cache: " + path.string());
-        return true;
-    } catch (const std::exception &error) {
-        Print(std::string("Ignoring invalid dataset cache: ") + error.what());
-        return false;
-    }
-}
-
-// ─────────────────────────────────────
-void Trainer::SaveCache(const std::string &signature) const {
-    const fs::path path = CacheFile();
-    if (path.has_parent_path()) {
-        fs::create_directories(path.parent_path());
-    }
-    fs::path temporary = path;
-    temporary += ".tmp";
-    std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
-    if (!stream) {
-        throw std::runtime_error("Could not create dataset cache: " + temporary.string());
-    }
-    WriteBytes(stream, m_CacheMagic.data(), m_CacheMagic.size());
-    WriteValue(stream, m_CacheVersion);
-    WriteString(stream, signature);
-    WriteStrings(stream, m_Data.Labels);
-    WriteStrings(stream, m_Data.Descriptors);
-    WritePartition(stream, m_Data.Train);
-    WritePartition(stream, m_Data.Validation);
-    WritePartition(stream, m_Data.Test);
-    WriteCounts(stream, m_Data.OriginalTrainCounts);
-    WriteCounts(stream, m_Data.AugmentedTrainCounts);
-    WriteCounts(stream, m_Data.ValidationCounts);
-    WriteCounts(stream, m_Data.TestCounts);
-    stream.close();
-    if (!stream) {
-        throw std::runtime_error("Could not finish dataset cache: " + temporary.string());
-    }
-    std::error_code error;
-    fs::remove(path, error);
-    error.clear();
-    fs::rename(temporary, path, error);
-    if (error) {
-        throw std::runtime_error("Could not install dataset cache: " + error.message());
-    }
 }
 
 // ─────────────────────────────────────
@@ -689,18 +426,17 @@ void Trainer::AssertNoLeakage() const {
 // ─────────────────────────────────────
 void Trainer::Analyze() {
     m_Cancelled.store(false);
-    Validate();
+    if (!Validate()) {
+        throw std::runtime_error("Invalid training configuration");
+    }
     Report("analyzing", 0.0);
+
     std::vector<std::string> canonicalDescriptors;
     const std::vector<::OpenScofo::Descriptors> descriptors = GetDescriptors(canonicalDescriptors);
-    const DiscoveredData discovered = Discover();
-    const std::string signature = Signature(discovered, canonicalDescriptors);
-    if (LoadCache(signature)) {
-        ClearModel();
-        m_Results = {};
-        Report("analyzing", 1.0);
-        return;
+    if (descriptors.empty()) {
+        throw std::runtime_error("Invalid training descriptors");
     }
+    const DiscoveredData discovered = Discover();
 
     m_Data.Clear();
     m_Data.Labels = discovered.Labels;
@@ -708,8 +444,9 @@ void Trainer::Analyze() {
     ClearModel();
     m_Results = {};
 
+    const std::vector<int> rates = SampleRates();
     const std::size_t total = std::max<std::size_t>(
-        1, (discovered.Train.size() + discovered.Validation.size() + discovered.Test.size()) * SampleRates().size());
+        1, (discovered.Train.size() + discovered.Validation.size() + discovered.Test.size()) * rates.size());
     std::size_t completed = 0;
     ExtractRecordings(discovered.Test, m_Data.Test, descriptors, false, m_Data.TestCounts, completed, total);
     ExtractRecordings(discovered.Validation, m_Data.Validation, descriptors, true, m_Data.ValidationCounts, completed,
@@ -723,35 +460,35 @@ void Trainer::Analyze() {
     const std::size_t target =
         static_cast<std::size_t>(std::ceil(static_cast<double>(largestClass) * m_Config.AugmentationFactor));
     std::mt19937 random(static_cast<std::mt19937::result_type>(m_Config.RandomSeed));
-    const std::vector<int> rates = SampleRates();
     for (std::size_t label = 0; label < m_Data.Labels.size(); ++label) {
+        const std::string &name = m_Data.Labels[label];
+        const std::size_t original = m_Data.OriginalTrainCounts[name];
+        std::size_t &augmentedCount = m_Data.AugmentedTrainCounts[name];
+
         std::vector<Recording> sources;
         for (const Recording &recording : discovered.Train) {
             if (recording.Label == label) {
                 sources.push_back(recording);
             }
         }
-        const std::size_t original = m_Data.OriginalTrainCounts[m_Data.Labels[label]];
         const std::size_t maximumAttempts = static_cast<std::size_t>(m_Config.MaxAugmentationLoops) * sources.size();
         std::size_t attempts = 0;
-        while (original + m_Data.AugmentedTrainCounts[m_Data.Labels[label]] < target && attempts < maximumAttempts &&
-               !sources.empty()) {
+        while (original + augmentedCount < target && attempts < maximumAttempts) {
             CheckCancelled();
             const Recording &recording = sources[attempts % sources.size()];
             const int sampleRate = rates[attempts % rates.size()];
             const std::vector<float> source = LoadMono(recording.Path, sampleRate);
             const std::vector<float> augmented = Augment(source, sampleRate, discovered.ImpulseResponses, random);
-            const std::size_t remaining = target - original - m_Data.AugmentedTrainCounts[m_Data.Labels[label]];
-            m_Data.AugmentedTrainCounts[m_Data.Labels[label]] +=
+            const std::size_t remaining = target - original - augmentedCount;
+            augmentedCount +=
                 ProcessSignal(augmented, sampleRate, recording, m_Data.Train, descriptors, true, true, remaining);
             ++attempts;
-            const double classProgress =
-                maximumAttempts == 0 ? 1.0 : static_cast<double>(attempts) / static_cast<double>(maximumAttempts);
+            const double classProgress = static_cast<double>(attempts) / static_cast<double>(maximumAttempts);
             Report("analyzing", 0.7 + 0.25 * (static_cast<double>(label) + classProgress) /
                                           static_cast<double>(m_Data.Labels.size()));
         }
-        if (original + m_Data.AugmentedTrainCounts[m_Data.Labels[label]] < target) {
-            Print("Class " + m_Data.Labels[label] + " did not reach its balanced augmentation target");
+        if (original + augmentedCount < target) {
+            spdlog::warn("Class {} did not reach its balanced augmentation target", name);
         }
     }
 
@@ -762,19 +499,14 @@ void Trainer::Analyze() {
     }
     AssertNoLeakage();
     CheckCancelled();
-    SaveCache(signature);
+    spdlog::info("Dataset ready: {} classes, {} training, {} validation, {} test windows", m_Data.Labels.size(),
+                 m_Data.Train.SampleCount(), m_Data.Validation.SampleCount(), m_Data.Test.SampleCount());
     Report("analyzing", 1.0);
 }
 
 // ─────────────────────────────────────
-Trainer::Trainer() : Trainer(Configuration{}) {
-}
-
-// ─────────────────────────────────────
-Trainer::Trainer(const Configuration &configuration) : m_Config(configuration) {
-    if (m_Config.BasePath.empty()) {
-        m_Config.BasePath = fs::current_path();
-    }
+Trainer::Trainer(const CatConfiguration &configuration) {
+    SetConfiguration(configuration);
 }
 
 // ─────────────────────────────────────
@@ -785,7 +517,7 @@ Trainer::~Trainer() {
 // ─────────────────────────────────────
 Trainer::Trainer(Trainer &&other) noexcept
     : m_Config(std::move(other.m_Config)), m_Data(std::move(other.m_Data)), m_Results(std::move(other.m_Results)),
-      m_Progress(std::move(other.m_Progress)), m_Log(std::move(other.m_Log)), m_Cancelled(other.m_Cancelled.load()),
+      m_Progress(std::move(other.m_Progress)), m_Cancelled(other.m_Cancelled.load()),
       m_Model(std::exchange(other.m_Model, nullptr)) {
 }
 
@@ -797,7 +529,6 @@ Trainer &Trainer::operator=(Trainer &&other) noexcept {
         m_Data = std::move(other.m_Data);
         m_Results = std::move(other.m_Results);
         m_Progress = std::move(other.m_Progress);
-        m_Log = std::move(other.m_Log);
         m_Cancelled.store(other.m_Cancelled.load());
         m_Model = std::exchange(other.m_Model, nullptr);
     }
@@ -805,7 +536,7 @@ Trainer &Trainer::operator=(Trainer &&other) noexcept {
 }
 
 // ─────────────────────────────────────
-void Trainer::SetConfiguration(const Configuration &configuration) {
+void Trainer::SetConfiguration(const CatConfiguration &configuration) {
     m_Config = configuration;
     if (m_Config.BasePath.empty()) {
         m_Config.BasePath = fs::current_path();
@@ -816,18 +547,13 @@ void Trainer::SetConfiguration(const Configuration &configuration) {
 }
 
 // ─────────────────────────────────────
-const Trainer::Configuration &Trainer::GetConfiguration() const {
+const CatConfiguration &Trainer::GetConfiguration() const {
     return m_Config;
 }
 
 // ─────────────────────────────────────
-void Trainer::SetProgressCallback(ProgressCallback callback) {
+void Trainer::SetProgressCallback(std::function<void(const std::string &status, double progress)> callback) {
     m_Progress = std::move(callback);
-}
-
-// ─────────────────────────────────────
-void Trainer::SetLogCallback(LogCallback callback) {
-    m_Log = std::move(callback);
 }
 
 // ─────────────────────────────────────
@@ -840,7 +566,10 @@ void Trainer::Train() {
     TrainModel();
     m_Results = EvaluateModel();
     if (m_Results.TestedSamples == 0) {
-        Print("No independent test samples are available; test evaluation was skipped");
+        spdlog::warn("No independent test samples are available; test evaluation was skipped");
+    } else {
+        spdlog::info("Test accuracy {:.4f}, balanced accuracy {:.4f} ({} samples)", m_Results.Accuracy,
+                     m_Results.BalancedAccuracy, m_Results.TestedSamples);
     }
 }
 
@@ -855,15 +584,6 @@ void Trainer::ExportModel(const fs::path &path) {
 // ─────────────────────────────────────
 void Trainer::ClearData() {
     m_Cancelled.store(false);
-    const fs::path cache = CacheFile();
-    std::error_code error;
-    const bool removed = fs::remove(cache, error);
-    if (error) {
-        throw std::runtime_error("Could not remove dataset cache: " + error.message());
-    }
-    if (removed) {
-        Print("Deleted native dataset cache: " + cache.string());
-    }
     m_Data.Clear();
     m_Results = {};
     ClearModel();
@@ -885,12 +605,12 @@ bool Trainer::HasModel() const {
 }
 
 // ─────────────────────────────────────
-const Trainer::Dataset &Trainer::GetDataset() const {
+const Dataset &Trainer::GetDataset() const {
     return m_Data;
 }
 
 // ─────────────────────────────────────
-const Trainer::Evaluation &Trainer::GetEvaluation() const {
+const Evaluation &Trainer::GetEvaluation() const {
     return m_Results;
 }
 

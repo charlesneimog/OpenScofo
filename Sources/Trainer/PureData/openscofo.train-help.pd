@@ -1,4 +1,4 @@
-#N canvas 0 0 587 715 12;
+#N canvas 0 0 466 568 12;
 #X text 28 18 openscofo.train - native OpenScofo dataset analysis and CatBoost training;
 #X obj 7 387 openscofo.train, f 44;
 #X msg 31 158 sample_rate 48000;
@@ -7,7 +7,7 @@
 #X msg 132 270 analyze;
 #X msg 142 293 train;
 #X obj 7 445 print TRAIN-PROGRESS;
-#X obj 158 444 print TRAIN-STATUS;
+#X obj 159 444 print TRAIN-STATUS;
 #X obj 312 444 print TRAIN-EVALUATION;
 #X text 594 74 Dataset layout: one subdirectory per class.;
 #X text 594 107 WAV \, AIFF \, and AIF files are supported.;

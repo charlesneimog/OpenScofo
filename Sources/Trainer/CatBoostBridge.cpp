@@ -106,6 +106,7 @@ NCB::TDataProviderPtr MakeProvider(const OpenScofoCatBoostData &data, const char
     return builder->GetResult();
 }
 
+// ─────────────────────────────────────
 int OpenScofoCatBoostTrain(const OpenScofoCatBoostData *train, const OpenScofoCatBoostData *validation,
                            const char *const *labelNames, std::size_t labelCount, const char *parameters,
                            std::size_t iterations, OpenScofoCatBoostProgress progress, void *userData,
@@ -168,6 +169,7 @@ int OpenScofoCatBoostTrain(const OpenScofoCatBoostData *train, const OpenScofoCa
     }
 }
 
+// ─────────────────────────────────────
 int OpenScofoCatBoostPredict(const OpenScofoCatBoostHandle *handle, const float *features, std::size_t sampleCount,
                              std::size_t featureCount, int32_t *predictions, std::size_t *outputDimension, char *error,
                              std::size_t errorSize) {
@@ -199,6 +201,7 @@ int OpenScofoCatBoostPredict(const OpenScofoCatBoostHandle *handle, const float 
     }
 }
 
+// ─────────────────────────────────────
 int OpenScofoCatBoostExport(OpenScofoCatBoostHandle *handle, const char *path, int onnx,
                             const char *const *metadataKeys, const char *const *metadataValues,
                             std::size_t metadataCount, char *error, std::size_t errorSize) {
@@ -224,6 +227,7 @@ int OpenScofoCatBoostExport(OpenScofoCatBoostHandle *handle, const char *path, i
     }
 }
 
+// ─────────────────────────────────────
 void OpenScofoCatBoostDestroy(OpenScofoCatBoostHandle *handle) {
     if (handle == nullptr) {
         return;

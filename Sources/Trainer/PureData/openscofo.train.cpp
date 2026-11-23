@@ -36,7 +36,7 @@ struct Message {
 class PdTrainerState {
   public:
     OpenScofo::Trainer Trainer;
-    OpenScofo::Trainer::Configuration Config;
+    OpenScofo::CatConfiguration Config;
     std::mutex QueueMutex;
     std::vector<Message> Queue;
     std::thread Worker;
@@ -53,7 +53,7 @@ class PdTrainerState {
             }
             Push({MessageType::Progress, {}, progress});
         });
-        Trainer.SetLogCallback([this](const std::string &message) { Push({MessageType::Log, message, 0.0}); });
+        // Trainer.SetLogCallback([this](const std::string &message) { Push({MessageType::Log, message, 0.0}); });
     }
 
     ~PdTrainerState() {
@@ -174,7 +174,7 @@ void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPath = {})
                 state->Trainer.Analyze();
             } else if (job == Job::Train) {
                 state->Trainer.Train();
-                const OpenScofo::Trainer::Evaluation &evaluation = state->Trainer.GetEvaluation();
+                const OpenScofo::Evaluation &evaluation = state->Trainer.GetEvaluation();
                 if (evaluation.TestedSamples != 0) {
                     state->Push({MessageType::Accuracy, {}, evaluation.Accuracy});
                     state->Push({MessageType::BalancedAccuracy, {}, evaluation.BalancedAccuracy});

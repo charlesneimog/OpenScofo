@@ -6,7 +6,7 @@
 #include <onnx.h>
 
 using Trainer = OpenScofo::Trainer;
-using Configuration = Trainer::Configuration;
+using Configuration = OpenScofo::CatConfiguration;
 
 TEST(TrainingEndToEnd, ExtractsTrainsExportsAndRunsInOpenScofo) {
     TrainingTempDirectory directory;
