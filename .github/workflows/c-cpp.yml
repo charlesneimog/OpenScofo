@@ -54,7 +54,7 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install ffmpeg puredata -y
-                  sudo apt install clang lld libboost-all-dev libgtest-dev libssl-dev ragel swig yasm libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
+                  sudo apt install clang-15 lld libboost-all-dev libgtest-dev libssl-dev ragel swig yasm libxcb-icccm4 libxkbcommon-x11-0 protobuf-compiler protobuf-c-compiler -y
                   sudo apt-get install -y \
                     libxcb-image0 \
                     libxcb-shape0 \
@@ -136,7 +136,7 @@ jobs:
                     # The fallback is pinned and its SHA-256 is verified before execution.
                     Write-Warning "$_ Falling back to the verified Pure Data installer."
                     $pdInstallerUrl = 'https://msp.ucsd.edu/Software/pd-0.57-0.windows-installer.exe'
-                    $pdInstallerHash = '6C1DC1DE251A9D130B8229165EF5932B54F89672376A78ED5FD650C6945439A8'
+                    $pdInstallerHash = '6C1DC1DE251A9E130B8229165EF5932B54F89672376A78ED5FD650C6945439A8'
                     $pdInstaller = Join-Path $env:RUNNER_TEMP 'pd-windows-installer.exe'
                     curl.exe --fail --location --retry 5 --retry-all-errors --output $pdInstaller $pdInstallerUrl
                     if ($LASTEXITCODE -ne 0) {
@@ -223,8 +223,8 @@ jobs:
                     -Cbuild-dir=build \
                     -Ccmake.define.PD_FLOATSIZE=${{ matrix.precision }} \
                     -Ccmake.define.CMAKE_BUILD_TYPE=Release \
-                    -Ccmake.define.CMAKE_C_COMPILER=clang \
-                    -Ccmake.define.CMAKE_CXX_COMPILER=clang++ \
+                    -Ccmake.define.CMAKE_C_COMPILER=/usr/bin/clang-15 \
+                    -Ccmake.define.CMAKE_CXX_COMPILER=/usr/bin/clang++-15 \
                     -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=sccache \
                     -Ccmake.define.OPENSCOFO_BUILD_TESTS=ON \

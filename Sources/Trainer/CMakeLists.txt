@@ -80,7 +80,10 @@ function(openscofo_copy_catboost_tool tool)
         find_program(source NAMES "${tool}" NO_CACHE)
     endif()
     if(source)
-        file(COPY "${source}" DESTINATION "${openscofo_catboost_BINARY_DIR}/bin")
+        # Homebrew exposes these tools through relative symlinks. Copying the link into CatBoost's build tree leaves a
+        # dangling link there, so resolve it first and copy the executable itself.
+        file(REAL_PATH "${source}" resolved_source)
+        file(COPY "${resolved_source}" DESTINATION "${openscofo_catboost_BINARY_DIR}/bin" USE_SOURCE_PERMISSIONS)
     endif()
 endfunction()
 
