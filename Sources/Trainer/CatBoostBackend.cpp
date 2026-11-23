@@ -18,8 +18,8 @@
 #include <array>
 #include <cstdint>
 #include <map>
-#include <stdexcept>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace OpenScofo {
@@ -54,7 +54,7 @@ int Trainer::TrainingProgress(void *data, std::size_t iteration, std::size_t ite
     try {
         trainer->Report("training", static_cast<double>(iteration) / static_cast<double>(iterations));
     } catch (...) {
-        spdlog::error("Progress callback failed; cancelling training");
+        trainer->m_Logger->error("Progress callback failed; cancelling training");
         trainer->m_Cancelled.store(true);
         return 0;
     }
@@ -62,7 +62,7 @@ int Trainer::TrainingProgress(void *data, std::size_t iteration, std::size_t ite
 }
 
 // ─────────────────────────────────────
-void Trainer::TrainModel() {
+bool Trainer::TrainModel() {
     const OpenScofoCatBoostData train = {m_Data.Train.Features.data(), m_Data.Train.Labels.data(),
                                          m_Data.Train.SampleCount(), m_Data.Train.FeatureCount};
     const OpenScofoCatBoostData validation = {m_Data.Validation.Features.data(), m_Data.Validation.Labels.data(),
@@ -81,23 +81,25 @@ void Trainer::TrainModel() {
     if (!OpenScofoCatBoostTrain(&train, validationPointer, labelNames.data(), labelNames.size(), parameters.c_str(),
                                 static_cast<std::size_t>(m_Config.Iterations), TrainingProgress, this, &model,
                                 error.data(), error.size())) {
-        throw std::runtime_error(error[0] == '\0' ? "CatBoost training failed" : error.data());
+        m_Logger->error("{}", error[0] == '\0' ? "CatBoost training failed" : error.data());
+        return false;
     }
     if (m_Cancelled.load()) {
         OpenScofoCatBoostDestroy(model);
-        throw std::runtime_error("Training cancelled");
+        return false;
     }
 
     ClearModel();
     m_Model = model;
     Report("training", 1.0);
+    return true;
 }
 
 // ─────────────────────────────────────
-Evaluation Trainer::EvaluateModel() const {
-    Evaluation evaluation;
+bool Trainer::EvaluateModel(Evaluation &evaluation) const {
+    evaluation = {};
     if (m_Data.Test.Empty()) {
-        return evaluation;
+        return true;
     }
 
     std::vector<std::int32_t> predictions(m_Data.Test.SampleCount());
@@ -106,10 +108,12 @@ Evaluation Trainer::EvaluateModel() const {
     if (!OpenScofoCatBoostPredict(m_Model, m_Data.Test.Features.data(), m_Data.Test.SampleCount(),
                                   m_Data.Test.FeatureCount, predictions.data(), &dimensions, error.data(),
                                   error.size())) {
-        throw std::runtime_error(error[0] == '\0' ? "CatBoost prediction failed" : error.data());
+        m_Logger->error("{}", error[0] == '\0' ? "CatBoost prediction failed" : error.data());
+        return false;
     }
     if (dimensions != m_Data.Labels.size()) {
-        throw std::runtime_error("CatBoost output dimension does not match the OpenScofo class list");
+        m_Logger->error("CatBoost output dimension does not match the OpenScofo class list");
+        return false;
     }
 
     std::vector<std::size_t> totals(m_Data.Labels.size(), 0);
@@ -140,24 +144,32 @@ Evaluation Trainer::EvaluateModel() const {
     if (balancedClasses != 0) {
         evaluation.BalancedAccuracy = balancedTotal / static_cast<double>(balancedClasses);
     }
-    return evaluation;
+    return true;
 }
 
 // ─────────────────────────────────────
-void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
+bool Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
     if (m_Model == nullptr) {
-        throw std::runtime_error("No trained model to export. Call Train() first");
+        m_Logger->error("No trained model to export. Call Train() first");
+        return false;
     }
     if (path.empty()) {
-        throw std::runtime_error("Model export path is empty");
+        m_Logger->error("Model export path is empty");
+        return false;
     }
     if (path.has_parent_path()) {
-        std::filesystem::create_directories(path.parent_path());
+        std::error_code errorCode;
+        std::filesystem::create_directories(path.parent_path(), errorCode);
+        if (errorCode) {
+            m_Logger->error("Could not create model export directory '{}': {}", path.parent_path().string(),
+                            errorCode.message());
+            return false;
+        }
     }
 
     // CatBoost stores model metadata as string pairs. Descriptors and labels are JSON arrays kept inside those strings.
     // Class folder names are not guaranteed to be UTF-8 (e.g. Windows code pages), so invalid bytes are replaced rather
-    // than letting dump() throw after the training has finished.
+    // instead of rejecting the metadata after training has finished.
     constexpr nlohmann::json::error_handler_t replaceInvalidUtf8 = nlohmann::json::error_handler_t::replace;
     const std::map<std::string, std::string> metadata = {
         {"openscofo.descriptors", nlohmann::json(m_Data.Descriptors).dump(-1, ' ', false, replaceInvalidUtf8)},
@@ -179,8 +191,10 @@ void Trainer::ExportTrainedModel(const std::filesystem::path &path) const {
     std::array<char, 4096> error{};
     if (!OpenScofoCatBoostExport(m_Model, pathString.c_str(), onnx, keys.data(), values.data(), keys.size(),
                                  error.data(), error.size())) {
-        throw std::runtime_error(error[0] == '\0' ? "CatBoost model export failed" : error.data());
+        m_Logger->error("{}", error[0] == '\0' ? "CatBoost model export failed" : error.data());
+        return false;
     }
+    return true;
 }
 
 // ─────────────────────────────────────

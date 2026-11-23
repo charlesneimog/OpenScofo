@@ -30,7 +30,6 @@ wheel.packages = ["OpenScofo"]
 wheel.py-api = "cp312"
 cmake.args = [
   "-DPD_LIB_DIR=./OpenScofo",
-  "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15",
   "-DOPENSCOFO_RUN_TESTS_ON_BUILD=OFF",
   "-DOPENSCOFO_BUILD_TESTS=ON",
 ]

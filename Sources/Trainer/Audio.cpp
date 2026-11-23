@@ -17,18 +17,19 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
-#include <new>
-#include <stdexcept>
+#include <sstream>
 #include <string>
 
 namespace OpenScofo {
 
 // ─────────────────────────────────────
-RealFft::RealFft(int size)
-    : m_Size(size), m_Setup(pffft_new_setup(size, PFFFT_REAL), pffft_destroy_setup), m_Work(AllocateBuffer()) {
+RealFft::RealFft(int size, std::shared_ptr<spdlog::logger> logger)
+    : m_Size(size), m_Logger(std::move(logger)), m_Setup(pffft_new_setup(size, PFFFT_REAL), pffft_destroy_setup),
+      m_Work(AllocateBuffer()) {
     if (m_Setup == nullptr) {
-        throw std::runtime_error("PFFFT does not support FFT size " + std::to_string(size));
+        m_Logger->error("PFFFT does not support FFT size {}", size);
     }
 }
 
@@ -36,9 +37,14 @@ RealFft::RealFft(int size)
 std::unique_ptr<float, void (*)(void *)> RealFft::AllocateBuffer() const {
     float *buffer = static_cast<float *>(pffft_aligned_malloc(static_cast<std::size_t>(m_Size) * sizeof(float)));
     if (buffer == nullptr) {
-        throw std::bad_alloc();
+        m_Logger->critical("PFFFT could not allocate an aligned buffer of {} samples", m_Size);
     }
     return {buffer, pffft_aligned_free};
+}
+
+// ─────────────────────────────────────
+bool RealFft::IsValid() const {
+    return m_Setup != nullptr && m_Work != nullptr;
 }
 
 // ─────────────────────────────────────
@@ -60,14 +66,15 @@ void RealFft::Backward(const float *input, float *output) {
 AudioBuffer Trainer::LoadAudio(const std::filesystem::path &path) const {
     const std::string pathString = path.string();
     if (!IsAudioFile(path)) {
-        spdlog::error("Unsupported audio file format '{}': {}", path.extension().string(), pathString);
+        m_Logger->error("Unsupported audio file format '{}': {}", path.extension().string(), pathString);
         return {};
     }
 
     AudioFile<float> file;
     file.shouldLogErrorsToConsole(false);
     if (!file.load(pathString)) {
-        throw std::runtime_error("Could not read WAV/AIFF audio file: " + pathString);
+        m_Logger->error("Could not read WAV/AIFF audio file: {}", pathString);
+        return {};
     }
 
     const int channels = file.getNumChannels();
@@ -75,12 +82,14 @@ AudioBuffer Trainer::LoadAudio(const std::filesystem::path &path) const {
     const std::uint32_t sampleRate = file.getSampleRate();
     if (frames <= 0 || channels <= 0 || file.samples.size() != static_cast<std::size_t>(channels) || sampleRate == 0 ||
         sampleRate > static_cast<std::uint32_t>(std::numeric_limits<int>::max())) {
-        throw std::runtime_error("Audio file has invalid dimensions: " + pathString);
+        m_Logger->error("Audio file has invalid dimensions: {}", pathString);
+        return {};
     }
 
     for (const std::vector<float> &channel : file.samples) {
         if (channel.size() < static_cast<std::size_t>(frames)) {
-            throw std::runtime_error("Audio file has inconsistent channel lengths: " + pathString);
+            m_Logger->error("Audio file has inconsistent channel lengths: {}", pathString);
+            return {};
         }
     }
 
@@ -129,7 +138,7 @@ std::vector<float> Trainer::Resample(const std::vector<float> &input, std::size_
 // ─────────────────────────────────────
 std::vector<float> Trainer::LoadMono(const std::filesystem::path &path, int sampleRate) const {
     if (sampleRate <= 0) {
-        spdlog::error("Training sample rates must be positive");
+        m_Logger->error("Training sample rates must be positive");
         return {};
     }
     AudioBuffer source = LoadAudio(path);
@@ -147,23 +156,145 @@ std::vector<float> Trainer::LoadMono(const std::filesystem::path &path, int samp
 }
 
 // ─────────────────────────────────────
+std::optional<std::size_t> Trainer::Cut(const std::vector<float> &samples, int sampleRate,
+                                        const std::filesystem::path &label) {
+    constexpr int silenceMilliseconds = 100;
+    constexpr int preOnsetMilliseconds = 20;
+    constexpr int extraMilliseconds = 250;
+    constexpr std::size_t fadeSize = 64;
+
+    m_Cancelled.store(false);
+    if (label.empty()) {
+        m_Logger->error("A non-empty label is required when cutting audio");
+        return std::nullopt;
+    }
+    if (sampleRate <= 0 || m_Config.FFTSize < 512 || m_Config.HopSize <= 0 || m_Config.HopSize > m_Config.FFTSize) {
+        m_Logger->error("Invalid sample rate, FFT size, or hop size for cutting audio");
+        return std::nullopt;
+    }
+    if (samples.size() < static_cast<std::size_t>(m_Config.FFTSize)) {
+        m_Logger->error("Audio is too short to cut: {} samples", samples.size());
+        return std::nullopt;
+    }
+
+    const std::filesystem::path directory = ResolvePath(BasePath(), label);
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    if (error) {
+        m_Logger->error("Could not create label directory '{}': {}", directory.string(), error.message());
+        return std::nullopt;
+    }
+
+    ::OpenScofo::OpenScofo extractor(static_cast<float>(sampleRate), static_cast<float>(m_Config.FFTSize),
+                                     static_cast<float>(m_Config.HopSize));
+    extractor.RequestDescriptor(extractor.GetDescriptorsEnum("db"));
+    extractor.RequestDescriptor(extractor.GetDescriptorsEnum("onset"));
+
+    const std::size_t hopSize = static_cast<std::size_t>(m_Config.HopSize);
+    const std::size_t silenceRequired =
+        static_cast<std::size_t>(silenceMilliseconds) * static_cast<std::size_t>(sampleRate) / 1000U;
+    const std::size_t preOnset =
+        static_cast<std::size_t>(preOnsetMilliseconds) * static_cast<std::size_t>(sampleRate) / 1000U;
+    std::vector<std::pair<std::size_t, std::size_t>> segments;
+    bool active = false;
+    std::size_t begin = 0;
+    std::size_t silenceSamples = 0;
+
+    Report("cutting", 0.0);
+    for (std::size_t index = 0; index + hopSize <= samples.size(); index += hopSize) {
+        if (!CheckCancelled()) {
+            return std::nullopt;
+        }
+        if (!extractor.ProcessBlock(samples.data() + index, hopSize)) {
+            continue;
+        }
+        const ::OpenScofo::Description description = extractor.GetDescription();
+        if (!active) {
+            if (description.Onset && description.dB > m_Config.MinDB) {
+                begin = index > preOnset ? index - preOnset : 0;
+                active = true;
+                silenceSamples = 0;
+            }
+        } else if (description.dB < m_Config.MinDB) {
+            silenceSamples += hopSize;
+            if (silenceSamples >= silenceRequired) {
+                segments.emplace_back(begin, std::min(index + hopSize, samples.size()));
+                active = false;
+                silenceSamples = 0;
+            }
+        } else {
+            silenceSamples = 0;
+        }
+        Report("cutting", static_cast<double>(index + hopSize) / static_cast<double>(samples.size()));
+    }
+    if (active) {
+        segments.emplace_back(begin, samples.size());
+    }
+
+    const std::size_t extra =
+        static_cast<std::size_t>(extraMilliseconds) * static_cast<std::size_t>(sampleRate) / 1000U;
+    const std::string prefix = directory.filename().empty() ? "segment" : directory.filename().string();
+    std::size_t exported = 0;
+    for (std::size_t index = 0; index < segments.size(); ++index) {
+        auto [start, end] = segments[index];
+        const std::size_t nextStart = index + 1 < segments.size() ? segments[index + 1].first : samples.size();
+        end = std::min({end + extra, nextStart, samples.size()});
+        if (end <= start) {
+            continue;
+        }
+        if (end - start > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            m_Logger->error("Cut audio segment exceeds the WAV writer's supported size");
+            return std::nullopt;
+        }
+
+        std::vector<float> chunk(samples.begin() + static_cast<std::ptrdiff_t>(start),
+                                 samples.begin() + static_cast<std::ptrdiff_t>(end));
+        const std::size_t fade = std::min(fadeSize, chunk.size() / 2);
+        for (std::size_t sample = 0; sample < fade; ++sample) {
+            const float gain = fade > 1 ? static_cast<float>(sample) / static_cast<float>(fade - 1) : 0.0F;
+            chunk[sample] *= gain;
+            chunk[chunk.size() - 1 - sample] *= gain;
+        }
+
+        std::ostringstream filename;
+        filename << prefix << '_' << std::setw(4) << std::setfill('0') << index << ".wav";
+        AudioFile<float> output;
+        output.setSampleRate(static_cast<std::uint32_t>(sampleRate));
+        output.setBitDepth(16);
+        output.setNumChannels(1);
+        output.setNumSamplesPerChannel(static_cast<int>(chunk.size()));
+        output.samples.front() = std::move(chunk);
+        const std::filesystem::path outputPath = directory / filename.str();
+        if (!output.save(outputPath.string(), AudioFileFormat::Wave)) {
+            m_Logger->error("Could not write cut audio file: {}", outputPath.string());
+            return std::nullopt;
+        }
+        ++exported;
+    }
+
+    Report("cutting", 1.0);
+    m_Logger->info("Exported {} segment(s) to {}", exported, directory.string());
+    return exported;
+}
+
+// ─────────────────────────────────────
 std::vector<float> Trainer::TimeStretch(const std::vector<float> &input, double rate, int fftSize, int hopSize) const {
     if (input.empty()) {
         return {};
     }
     if (!std::isfinite(rate) || rate <= 0.0) {
-        spdlog::error("Time-stretch rate must be positive");
+        m_Logger->error("Time-stretch rate must be positive");
         return {};
     }
     if (fftSize < 32 || hopSize <= 0 || hopSize > fftSize) {
-        spdlog::error("Invalid FFT or hop size for time stretching");
+        m_Logger->error("Invalid FFT or hop size for time stretching");
         return {};
     }
 
     const double outputSizeValue = std::round(static_cast<double>(input.size()) / rate);
     if (outputSizeValue > static_cast<double>(std::numeric_limits<int>::max()) ||
         input.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        spdlog::error("Time-stretch input or output exceeds Signalsmith Stretch's supported size");
+        m_Logger->error("Time-stretch input or output exceeds Signalsmith Stretch's supported size");
         return {};
     }
 
@@ -175,7 +306,7 @@ std::vector<float> Trainer::TimeStretch(const std::vector<float> &input, double 
     signalsmith::stretch::SignalsmithStretch<float> stretch;
     stretch.configure(1, fftSize, hopSize);
     if (!stretch.exact(inputBuffers, static_cast<int>(input.size()), outputBuffers, static_cast<int>(output.size()))) {
-        spdlog::warn("Signalsmith Stretch could not time-stretch the signal; using linear resampling instead");
+        m_Logger->warn("Signalsmith Stretch could not time-stretch the signal; using linear resampling instead");
         return Resample(input, outputSize);
     }
     return output;
@@ -188,15 +319,15 @@ std::vector<float> Trainer::PitchShift(const std::vector<float> &input, double s
         return {};
     }
     if (!std::isfinite(semitones)) {
-        spdlog::error("Pitch-shift semitones must be finite");
+        m_Logger->error("Pitch-shift semitones must be finite");
         return {};
     }
     if (fftSize < 32 || hopSize <= 0 || hopSize > fftSize) {
-        spdlog::error("Invalid FFT or hop size for pitch shifting");
+        m_Logger->error("Invalid FFT or hop size for pitch shifting");
         return {};
     }
     if (input.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        spdlog::error("Pitch-shift input exceeds Signalsmith Stretch's supported size");
+        m_Logger->error("Pitch-shift input exceeds Signalsmith Stretch's supported size");
         return {};
     }
 
@@ -208,7 +339,7 @@ std::vector<float> Trainer::PitchShift(const std::vector<float> &input, double s
     stretch.configure(1, fftSize, hopSize);
     stretch.setTransposeSemitones(static_cast<float>(semitones));
     if (!stretch.exact(inputBuffers, static_cast<int>(input.size()), outputBuffers, static_cast<int>(output.size()))) {
-        spdlog::warn("Signalsmith Stretch could not pitch-shift the signal; returning it unchanged");
+        m_Logger->warn("Signalsmith Stretch could not pitch-shift the signal; returning it unchanged");
         return input;
     }
     return output;
@@ -218,7 +349,7 @@ std::vector<float> Trainer::PitchShift(const std::vector<float> &input, double s
 std::vector<float> Trainer::AddGaussianNoise(const std::vector<float> &input, double deviation,
                                              std::mt19937 &random) const {
     if (deviation < 0.0 || !std::isfinite(deviation)) {
-        spdlog::error("Noise deviation must be finite and non-negative");
+        m_Logger->error("Noise deviation must be finite and non-negative");
         return {};
     }
     std::normal_distribution<float> noise(0.0F, static_cast<float>(deviation));
@@ -249,14 +380,17 @@ std::vector<float> Trainer::Convolve(const std::vector<float> &input, const std:
         fftSize <<= 1U;
     }
     if (fftSize > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        spdlog::error("Convolution of {} samples exceeds PFFFT's supported FFT size", convolutionSize);
+        m_Logger->error("Convolution of {} samples exceeds PFFFT's supported FFT size", convolutionSize);
         return {};
     }
 
-    RealFft transform(static_cast<int>(fftSize));
+    RealFft transform(static_cast<int>(fftSize), m_Logger);
     auto time = transform.AllocateBuffer();
     auto firstSpectrum = transform.AllocateBuffer();
     auto secondSpectrum = transform.AllocateBuffer();
+    if (!transform.IsValid() || !time || !firstSpectrum || !secondSpectrum) {
+        return {};
+    }
 
     std::fill_n(time.get(), fftSize, 0.0F);
     std::copy(input.begin(), input.end(), time.get());

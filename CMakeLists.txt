@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.30)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum supported macOS version")
+endif()
+set(OPENSCOFO_MACOS_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
 
 project(
     OpenScofo
@@ -15,8 +18,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(BUILD_SHARED_LIBS OFF)
 
+if (LINUX)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
+endif()
 
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(SPDLOG_BUILD_SHARED OFF)
@@ -32,7 +37,6 @@ set(SPDLOG_VERSION "v1.17.0")
 set(MIPP_VERSION "")
 set(LUA_VERSION "v5.5.0")
 set(PDCMAKE_VERSION "v2.0.19")
-set(CATBOOST_VERSION "v1.2.10")
 
 # ╭──────────────────────────────────────╮
 # │               Options                │
@@ -52,7 +56,7 @@ option(OPENSCOFO_UPDATE_LANGUAGE "Update OpenScofo language grammar.js" ON)
 option(OPENSCOFO_ENABLE_NATIVE_OPTIMIZATIONS "Build with native CPU optimizations" ON)
 option(OPENSCOFO_ENABLE_IPO "Enable interprocedural optimization (LTO) when supported" ON)
 option(OPENSCOFO_USE_YIN "Choose between Yin and Sigmund (sigmund~ pd object)" OFF)
-option(OPENSCOFO_TRAINING "Build the native OpenScofo training API and Pure Data external" OFF)
+option(OPENSCOFO_TRAINING "Build the native OpenScofo training API and host externals" OFF)
 
 add_definitions(-DOPENSCOFO_VERSION="${PROJECT_VERSION}")
 
@@ -541,6 +545,14 @@ if(OPENSCOFO_BUILD_MAX_OBJECT
    AND NOT LINUX
    AND NOT EMSCRIPTEN)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Sources/Wrappers/Max")
+    if(APPLE)
+        # Max SDK 8.2 force-writes the shared cache entry to 10.11. Restore it in this parent directory as well as in the
+        # wrapper directory so targets generated from either scope retain OpenScofo's requested deployment target.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET
+            "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}"
+            CACHE STRING "Minimum supported macOS version" FORCE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}")
+    endif()
 endif()
 
 # ╭──────────────────────────────────────╮

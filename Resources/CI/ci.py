@@ -15,13 +15,13 @@ import platform
 import re
 import shlex
 import shutil
+import ssl
 import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
-
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER_TEMP = Path(os.environ.get("RUNNER_TEMP", ROOT / ".ci-tmp"))
@@ -39,7 +39,10 @@ def run(
 ) -> str:
     """Run a command, echoing it in a copy/paste-friendly form."""
     args = [str(part) for part in command]
-    print(f"+ {shlex.join(args)}", flush=True)
+    display_command = (
+        subprocess.list2cmdline(args) if SYSTEM == "windows" else shlex.join(args)
+    )
+    print(f"+ {display_command}", flush=True)
     result = subprocess.run(
         args,
         cwd=cwd or ROOT,
@@ -65,7 +68,9 @@ def require_file(path: Path, *, executable: bool = False) -> Path:
     return path
 
 
-def first_file(patterns: Iterable[str], *, exclude_suffix: str | None = None) -> Path | None:
+def first_file(
+    patterns: Iterable[str], *, exclude_suffix: str | None = None
+) -> Path | None:
     matches: list[Path] = []
     for pattern in patterns:
         matches.extend(ROOT.glob(pattern))
@@ -100,14 +105,35 @@ def append_github_file(variable: str, lines: Sequence[str]) -> None:
             stream.write(f"{line}\n")
 
 
-def download(url: str, destination: Path, attempts: int = 3) -> None:
+def download(
+    url: str,
+    destination: Path,
+    attempts: int = 3,
+    *,
+    sha256: str | None = None,
+    verify_tls: bool = True,
+) -> None:
+    if not verify_tls and not sha256:
+        raise ValueError(
+            "TLS verification may only be disabled for a hash-pinned download"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + ".part")
+    context = None if verify_tls else ssl._create_unverified_context()
     for attempt in range(1, attempts + 1):
         try:
             print(f"Downloading {url} -> {destination}", flush=True)
-            with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as output:
+            with (
+                urllib.request.urlopen(url, timeout=120, context=context) as response,
+                partial.open("wb") as output,
+            ):
                 shutil.copyfileobj(response, output)
+            if sha256:
+                digest = hashlib.sha256(partial.read_bytes()).hexdigest()
+                if digest.casefold() != sha256.casefold():
+                    raise RuntimeError(
+                        f"SHA-256 mismatch for {destination.name}: expected {sha256}, got {digest}"
+                    )
             partial.replace(destination)
             return
         except Exception:
@@ -122,6 +148,29 @@ def pip_install(*packages: str, upgrade: bool = False) -> None:
     if upgrade:
         command.append("--upgrade")
     run(*command, *packages)
+
+
+def npm_install_global(*packages: str) -> None:
+    if SYSTEM == "windows":
+        npm_command = shutil.which("npm.cmd")
+        node = shutil.which("node.exe")
+        if not npm_command:
+            raise FileNotFoundError("npm.cmd was not found on PATH")
+        if not node:
+            raise FileNotFoundError("node.exe was not found on PATH")
+        npm_cli_candidates = (
+            Path(npm_command).parent / "node_modules" / "npm" / "bin" / "npm-cli.js",
+            Path(node).parent / "node_modules" / "npm" / "bin" / "npm-cli.js",
+        )
+        npm_cli = next((path for path in npm_cli_candidates if path.is_file()), None)
+        if npm_cli is None:
+            raise FileNotFoundError(
+                "npm-cli.js was not found beside the Node.js installation"
+            )
+        require_file(npm_cli)
+        run(node, npm_cli, "install", "-g", *packages)
+        return
+    run("npm", "install", "-g", *packages)
 
 
 def reset_sccache() -> None:
@@ -171,7 +220,9 @@ def install_dependencies() -> None:
         llvm_installer.chmod(0o755)
         run("sudo", llvm_installer, "20")
         run("cargo", "install", "tree-sitter-cli", "--locked")
-        pip_install("build", "scikit-build-core", "cibuildwheel", "twine", "nanobind", "conan")
+        pip_install(
+            "build", "scikit-build-core", "cibuildwheel", "twine", "nanobind", "conan"
+        )
         return
 
     if SYSTEM == "macos":
@@ -190,31 +241,77 @@ def install_dependencies() -> None:
             "swig",
             "yasm",
         )
-        run("npm", "install", "-g", "tree-sitter-cli")
+        npm_install_global("tree-sitter-cli")
         pip_install("build", "scikit-build-core", "cibuildwheel", "twine", "conan")
         return
 
     if SYSTEM == "windows":
-        run("npm", "install", "-g", "tree-sitter-cli")
+        npm_install_global("tree-sitter-cli")
         winget_common = (
             "--silent",
             "--disable-interactivity",
             "--accept-source-agreements",
             "--accept-package-agreements",
         )
-        run("winget", "install", "--exact", "--id", "LLVM.LLVM", *winget_common)
+
+        # run("winget", "install", "--exact", "--id", "LLVM.LLVM", *winget_common)
+        # run(
+        #     "winget",
+        #     "install",
+        #     "--exact",
+        #     "--id",
+        #     "LLVM.LLVM",
+        #     "--version",
+        #     "21.1.8",
+        #     "--force",
+        #     *winget_common,
+        # )
         run(
-            "winget",
+            "choco",
             "install",
-            "--exact",
-            "--id",
-            "MillerPuckette.PureData",
-            "--version",
-            "0.57-0",
-            *winget_common,
+            "llvm",
+            "--version=21.1.8",
+            "--allow-downgrade",
+            "--force",
+            "-y",
+        )
+
+        pd_installer_url = (
+            "https://msp.ucsd.edu/Software/pd-0.57-0.windows-installer.exe"
+        )
+        pd_installer_sha256 = (
+            "6C1DC1DE251A9E130B8229165EF5932B54F89672376A78ED5FD650C6945439A8"
+        )
+        pd_installer = RUNNER_TEMP / "pd-0.57-0.windows-installer.exe"
+        try:
+            download(
+                pd_installer_url, pd_installer, attempts=1, sha256=pd_installer_sha256
+            )
+        except Exception as error:
+            print(
+                f"Verified TLS download failed ({error}); retrying the hash-pinned installer "
+                "without certificate validation.",
+                flush=True,
+            )
+            download(
+                pd_installer_url,
+                pd_installer,
+                sha256=pd_installer_sha256,
+                verify_tls=False,
+            )
+        run(pd_installer, "/S", "/norestart")
+
+        pd_root = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Pd"
+        require_file(pd_root / "src" / "m_pd.h")
+        require_file(pd_root / "bin" / "pd.lib")
+        append_github_file(
+            "GITHUB_ENV",
+            [f"PD_SOURCES_PATH={pd_root / 'src'}", f"PDBINDIR={pd_root / 'bin'}"],
         )
         pip_install("pip", upgrade=True)
-        pip_install("build", "scikit-build-core", "cibuildwheel", "twine", "nanobind", "conan")
+        pip_install(
+            "build", "scikit-build-core", "cibuildwheel", "twine", "nanobind", "conan"
+        )
         return
 
     raise RuntimeError(f"Unsupported operating system: {SYSTEM}")
@@ -270,18 +367,29 @@ def build(precision: int) -> None:
         command.insert(-3, f"-Ccmake.define.CMAKE_INSTALL_PREFIX={ROOT / 'install'}")
     elif SYSTEM == "macos":
         openssl = run("brew", "--prefix", "openssl@3", capture=True)
+        machine = platform.machine().lower()
+        macos_arch = "arm64" if machine in {"arm64", "aarch64"} else "x86_64"
+        deployment_target = "11.0" if macos_arch == "arm64" else "10.15"
         command[5:5] = [f"-Ccmake.define.OPENSSL_ROOT_DIR={openssl}"]
-        command.insert(-3, "-Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=10.15")
+        command.insert(-3, f"-Ccmake.define.CMAKE_OSX_ARCHITECTURES={macos_arch}")
+        command.insert(
+            -3, f"-Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET={deployment_target}"
+        )
         command.insert(-3, f"-Ccmake.define.CMAKE_INSTALL_PREFIX={ROOT / 'install'}")
-        env["MACOSX_DEPLOYMENT_TARGET"] = "10.15"
+        env["ARCHFLAGS"] = f"-arch {macos_arch}"
+        env["MACOSX_DEPLOYMENT_TARGET"] = deployment_target
     elif SYSTEM == "windows":
         tree_sitter = shutil.which("tree-sitter.cmd") or shutil.which("tree-sitter")
         if not tree_sitter:
             raise FileNotFoundError("tree-sitter executable was not found on PATH")
+        git_config_count = int(env.get("GIT_CONFIG_COUNT", "0"))
+        env["GIT_CONFIG_COUNT"] = str(git_config_count + 1)
+        env[f"GIT_CONFIG_KEY_{git_config_count}"] = "core.longpaths"
+        env[f"GIT_CONFIG_VALUE_{git_config_count}"] = "true"
         command[5:5] = [
             f"-Ccmake.define.TREE_SITTER_EXECUTABLE={tree_sitter}",
-            "-Ccmake.define.CMAKE_C_COMPILER=clang",
-            "-Ccmake.define.CMAKE_CXX_COMPILER=clang++",
+            "-Ccmake.define.CMAKE_C_COMPILER=clang-cl",
+            "-Ccmake.define.CMAKE_CXX_COMPILER=clang-cl",
             f"-Ccmake.define.PD_SOURCES_PATH={os.environ.get('PD_SOURCES_PATH', '')}",
             f"-Ccmake.define.PDBINDIR={os.environ.get('PDBINDIR', '')}",
         ]
@@ -307,7 +415,10 @@ def run_native_tests() -> None:
 
 def trainer_binary() -> Path | None:
     suffix = {"linux": ".so", "windows": ".dll"}.get(SYSTEM)
-    patterns = ["build/Sources/Trainer/openscofo.train*", "build/OpenScofo/openscofo.train*"]
+    patterns = [
+        "build/Sources/Trainer/openscofo.train*",
+        "build/OpenScofo/openscofo.train*",
+    ]
     for path in sorted(path for pattern in patterns for path in ROOT.glob(pattern)):
         if not path.is_file() or path.suffix == ".pd" or path.stat().st_size == 0:
             continue
@@ -389,7 +500,9 @@ def extract_wheel_version() -> None:
     if len(parts) < 2:
         raise ValueError(f"Invalid wheel filename: {wheels[0].name}")
     name, version = parts[:2]
-    print(f"Extracted WHEEL_NAME={name} and WHEEL_VERSION={version} from {wheels[0].name}")
+    print(
+        f"Extracted WHEEL_NAME={name} and WHEEL_VERSION={version} from {wheels[0].name}"
+    )
     append_github_file("GITHUB_ENV", [f"WHEEL_NAME={name}", f"WHEEL_VERSION={version}"])
     append_github_file("GITHUB_OUTPUT", [f"name={name}", f"version={version}"])
 
@@ -397,7 +510,9 @@ def extract_wheel_version() -> None:
 def wheel_version() -> str:
     value = os.environ.get("WHEEL_VERSION")
     if not value:
-        raise RuntimeError("WHEEL_VERSION is required; run --extract-wheel-version first")
+        raise RuntimeError(
+            "WHEEL_VERSION is required; run --extract-wheel-version first"
+        )
     return value
 
 
@@ -421,8 +536,18 @@ def files_test() -> None:
         verify_native_trainer()
         return
 
-    payload = ROOT / "Resources/Packages" / ("out" if SYSTEM == "macos" else "out-win") / "payload/puredata"
-    for filename in ("flute.onnx", "miniatura1.scofo", "miniatura1.wav", "openscofo.train-help.pd"):
+    payload = (
+        ROOT
+        / "Resources/Packages"
+        / ("out" if SYSTEM == "macos" else "out-win")
+        / "payload/puredata"
+    )
+    for filename in (
+        "flute.onnx",
+        "miniatura1.scofo",
+        "miniatura1.wav",
+        "openscofo.train-help.pd",
+    ):
         require_file(payload / filename)
     expected_suffix = ".dll" if SYSTEM == "windows" else None
     trainers = [
@@ -433,10 +558,14 @@ def files_test() -> None:
         and (expected_suffix is None or path.name.endswith(expected_suffix))
     ]
     if not trainers:
-        raise FileNotFoundError(f"The {SYSTEM} installer payload is missing openscofo.train")
+        raise FileNotFoundError(
+            f"The {SYSTEM} installer payload is missing openscofo.train"
+        )
     score = (payload / "miniatura1.scofo").read_text(encoding="utf-8")
     if not re.search(r"^ONNXMODEL\s+flute\.onnx(?:\s|$)", score, re.MULTILINE):
-        raise ValueError("miniatura1.scofo does not reference the adjacent flute.onnx model")
+        raise ValueError(
+            "miniatura1.scofo does not reference the adjacent flute.onnx model"
+        )
     print(f"Validated installer payload: {payload.relative_to(ROOT)}")
 
 
@@ -551,7 +680,9 @@ def smoke_test_installer() -> None:
         raise ValueError("Installed score does not reference flute.onnx")
     if sentinel_hash != sha256(examples / "canticos.scofo"):
         raise RuntimeError("Installer modified an existing example file")
-    maintenance_tool = require_file(install_root / "OpenScofoMaintenanceTool", executable=True)
+    maintenance_tool = require_file(
+        install_root / "OpenScofoMaintenanceTool", executable=True
+    )
     run(
         maintenance_tool,
         "--accept-licenses",
@@ -566,7 +697,9 @@ def smoke_test_installer() -> None:
         smoke_home / ".local/share/SuperCollider/Extensions/OpenScofo/OpenScofo.so",
         vamp / "OpenScofo.so",
     )
-    if any(path.exists() for path in removed) or any(pd_root.glob("openscofo.train*.so")):
+    if any(path.exists() for path in removed) or any(
+        pd_root.glob("openscofo.train*.so")
+    ):
         raise RuntimeError("The component uninstaller left installed binaries behind")
     require_file(examples / "canticos.scofo")
     require_file(vamp / "unrelated-user-file.txt")
@@ -577,9 +710,16 @@ def stage_max_package() -> None:
     package_root = ROOT / "max-package/OpenScofo"
     (package_root / "externals").mkdir(parents=True, exist_ok=True)
     if SYSTEM == "windows":
-        copy_file("max/openscofo~.mxe64", "max-package/OpenScofo/externals/openscofo~.mxe64")
+        copy_file(
+            "max/openscofo~.mxe64", "max-package/OpenScofo/externals/openscofo~.mxe64"
+        )
+        copy_file(
+            "max/openscofo.train.mxe64",
+            "max-package/OpenScofo/externals/openscofo.train.mxe64",
+        )
         copy_tree("Sources/Wrappers/Max/package/extras", "max-package/OpenScofo/extras")
         require_file(package_root / "externals/openscofo~.mxe64")
+        require_file(package_root / "externals/openscofo.train.mxe64")
         require_file(package_root / "extras/OpenScofo.maxpat")
         return
 
@@ -591,6 +731,7 @@ def stage_max_package() -> None:
     files = {
         "Sources/Wrappers/Max/docs/openscofo~.maxref.xml": "docs/openscofo~.maxref.xml",
         "Sources/Wrappers/Max/openscofo~.maxhelp": "help/openscofo~.maxhelp",
+        "Sources/Trainer/Max/openscofo.train.maxhelp": "help/openscofo.train.maxhelp",
         "Sources/Wrappers/Max/score-max.svg": "help/score-max.svg",
         "Sources/Wrappers/Max/score_renderer.js": "help/score_renderer.js",
         "Tests/flute.onnx": "help/flute.onnx",
@@ -602,7 +743,16 @@ def stage_max_package() -> None:
     for source, destination in files.items():
         copy_file(source, package_root / destination)
     copy_tree("max/openscofo~.mxo", "max-package/OpenScofo/externals/openscofo~.mxo")
-    for destination in (*files.values(), "extras/OpenScofo.maxpat", "externals/openscofo~.mxo/Contents/MacOS/openscofo~"):
+    copy_tree(
+        "max/openscofo.train.mxo",
+        "max-package/OpenScofo/externals/openscofo.train.mxo",
+    )
+    for destination in (
+        *files.values(),
+        "extras/OpenScofo.maxpat",
+        "externals/openscofo~.mxo/Contents/MacOS/openscofo~",
+        "externals/openscofo.train.mxo/Contents/MacOS/openscofo.train",
+    ):
         require_file(package_root / destination)
 
 
@@ -614,6 +764,11 @@ def stage_puredata_package() -> None:
         existing = ROOT / LIBNAME
     if existing.is_dir():
         shutil.copytree(existing, package_root, dirs_exist_ok=True)
+    for stale_cut in package_root.glob("openscofo.cut*"):
+        if stale_cut.is_dir():
+            shutil.rmtree(stale_cut)
+        else:
+            stale_cut.unlink()
     for source in (
         "Sources/Wrappers/PureData/openscofo~-help.pd",
         "Sources/Trainer/PureData/openscofo.train-help.pd",
@@ -645,8 +800,12 @@ def stage_puredata_package() -> None:
     ]
     for source in sorted(set(pd_binaries + trainers)):
         shutil.copy2(source, package_root / source.name)
-    staged_pd = [path for path in package_root.glob("openscofo~*") if path.suffix != ".pd"]
-    staged_trainers = [path for path in package_root.glob("openscofo.train*") if path.suffix != ".pd"]
+    staged_pd = [
+        path for path in package_root.glob("openscofo~*") if path.suffix != ".pd"
+    ]
+    staged_trainers = [
+        path for path in package_root.glob("openscofo.train*") if path.suffix != ".pd"
+    ]
     if not staged_pd:
         raise FileNotFoundError("No Pure Data external binary was staged")
     if not staged_trainers:
@@ -682,28 +841,78 @@ def parse_args() -> argparse.Namespace:
     actions = parser.add_mutually_exclusive_group(required=True)
     operations: tuple[tuple[tuple[str, ...], Action, str], ...] = (
         (("--reset-sccache",), no_args(reset_sccache), "Reset sccache statistics"),
-        (("--show-sccache-stats",), no_args(show_sccache_stats), "Print sccache statistics"),
-        (("--install-dependencies",), no_args(install_dependencies), "Install dependencies for this OS"),
+        (
+            ("--show-sccache-stats",),
+            no_args(show_sccache_stats),
+            "Print sccache statistics",
+        ),
+        (
+            ("--install-dependencies",),
+            no_args(install_dependencies),
+            "Install dependencies for this OS",
+        ),
         (
             ("--install-qt-framework", "--install-qtinstallframwork"),
             no_args(install_qt_framework),
             "Install Qt Installer Framework on Linux",
         ),
-        (("--build",), lambda args: build(args.precision), "Build the native wheel for this OS"),
+        (
+            ("--build",),
+            lambda args: build(args.precision),
+            "Build the native wheel for this OS",
+        ),
         (("--run-native-tests",), no_args(run_native_tests), "Run native CTest tests"),
-        (("--verify-native-trainer",), no_args(verify_native_trainer), "Verify the trainer binary"),
-        (("--repair-linux-wheel",), no_args(repair_linux_wheel), "Repair the Linux wheel"),
-        (("--build-emscripten",), no_args(build_emscripten), "Build the Emscripten target"),
-        (("--extract-wheel-version",), no_args(extract_wheel_version), "Export the wheel name and version"),
-        (("--generate-installer",), no_args(generate_installer), "Generate the installer for this OS"),
-        (("--files-test",), no_args(files_test), "Validate installer input or payload files"),
-        (("--smoke-test-installer",), no_args(smoke_test_installer), "Install and remove the Linux installer"),
-        (("--stage-max-package",), no_args(stage_max_package), "Stage the Max package for this OS"),
-        (("--stage-puredata-package",), no_args(stage_puredata_package), "Stage the Pure Data package"),
+        (
+            ("--verify-native-trainer",),
+            no_args(verify_native_trainer),
+            "Verify the trainer binary",
+        ),
+        (
+            ("--repair-linux-wheel",),
+            no_args(repair_linux_wheel),
+            "Repair the Linux wheel",
+        ),
+        (
+            ("--build-emscripten",),
+            no_args(build_emscripten),
+            "Build the Emscripten target",
+        ),
+        (
+            ("--extract-wheel-version",),
+            no_args(extract_wheel_version),
+            "Export the wheel name and version",
+        ),
+        (
+            ("--generate-installer",),
+            no_args(generate_installer),
+            "Generate the installer for this OS",
+        ),
+        (
+            ("--files-test",),
+            no_args(files_test),
+            "Validate installer input or payload files",
+        ),
+        (
+            ("--smoke-test-installer",),
+            no_args(smoke_test_installer),
+            "Install and remove the Linux installer",
+        ),
+        (
+            ("--stage-max-package",),
+            no_args(stage_max_package),
+            "Stage the Max package for this OS",
+        ),
+        (
+            ("--stage-puredata-package",),
+            no_args(stage_puredata_package),
+            "Stage the Pure Data package",
+        ),
         (("--publish-pypi",), no_args(publish_pypi), "Upload wheels to PyPI"),
     )
     for flags, function, help_text in operations:
-        actions.add_argument(*flags, dest="action", action="store_const", const=function, help=help_text)
+        actions.add_argument(
+            *flags, dest="action", action="store_const", const=function, help=help_text
+        )
     return parser.parse_args()
 
 

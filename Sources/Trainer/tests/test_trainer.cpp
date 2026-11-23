@@ -26,6 +26,15 @@ double EstimateFrequency(const std::vector<float> &samples, int sampleRate) {
 
 TEST(TrainingAudio, LoadsWavAiffAndResamples) {
     Trainer trainer;
+    std::vector<std::string> errors;
+    trainer.SetLogCallback(
+        [](const spdlog::details::log_msg &message, void *data) {
+            if (message.level == spdlog::level::err || message.level == spdlog::level::critical) {
+                static_cast<std::vector<std::string> *>(data)->emplace_back(message.payload.data(),
+                                                                            message.payload.size());
+            }
+        },
+        &errors);
     TrainingTempDirectory directory;
     const int sampleRate = 8000;
     const std::vector<float> tone = TestTone(sampleRate, 800, 440.0, 1);
@@ -37,7 +46,9 @@ TEST(TrainingAudio, LoadsWavAiffAndResamples) {
     EXPECT_EQ(trainer.LoadMono(directory.Path / "tone.aiff", sampleRate).size(), tone.size());
     EXPECT_EQ(trainer.LoadMono(directory.Path / "tone.aif", sampleRate).size(), tone.size());
     EXPECT_NEAR(trainer.LoadMono(directory.Path / "tone.wav", sampleRate * 2).size(), tone.size() * 2, 1);
-    EXPECT_THROW(trainer.LoadMono(directory.Path / "tone.mp3", sampleRate), std::invalid_argument);
+    EXPECT_TRUE(trainer.LoadMono(directory.Path / "tone.mp3", sampleRate).empty());
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors.front().find("Unsupported audio file format"), std::string::npos);
 }
 
 TEST(TrainingAudio, AugmentationsPreserveExpectedDimensions) {
@@ -73,6 +84,29 @@ TEST(TrainingAudio, PitchShiftChangesPitchAndPreservesLength) {
     EXPECT_NEAR(EstimateFrequency(shifted, sampleRate), 880.0, 35.0);
 }
 
+TEST(TrainingAudio, CutsOnsetsIntoLabelledWaveFiles) {
+    TrainingTempDirectory directory;
+    const int sampleRate = 8000;
+    Configuration configuration;
+    configuration.BasePath = directory.Path;
+    configuration.SampleRate = sampleRate;
+    configuration.FFTSize = 512;
+    configuration.HopSize = 256;
+    configuration.MinDB = -60.0;
+    Trainer trainer(configuration);
+
+    std::vector<float> samples(2048, 0.0F);
+    const std::vector<float> tone = TestTone(sampleRate, 4096, 440.0, 20);
+    samples.insert(samples.end(), tone.begin(), tone.end());
+    samples.insert(samples.end(), 2048, 0.0F);
+
+    const std::optional<std::size_t> exported = trainer.Cut(samples, sampleRate, "violin");
+    ASSERT_TRUE(exported.has_value());
+    ASSERT_GT(*exported, 0U);
+    EXPECT_TRUE(std::filesystem::is_regular_file(directory.Path / "violin/violin_0000.wav"));
+    EXPECT_FALSE(trainer.LoadAudio(directory.Path / "violin/violin_0000.wav").Samples.empty());
+}
+
 TEST(TrainingApi, UsesRecordingLevelPartitionsAndCache) {
     TrainingTempDirectory directory;
     const int sampleRate = 8000;
@@ -92,7 +126,7 @@ TEST(TrainingApi, UsesRecordingLevelPartitionsAndCache) {
     configuration.Descriptors = {"rms", "mfcc", "chroma"};
 
     Trainer trainer(configuration);
-    trainer.Analyze();
+    ASSERT_TRUE(trainer.Analyze());
     const Dataset &dataset = trainer.GetDataset();
     ASSERT_FALSE(dataset.Train.Empty());
     ASSERT_FALSE(dataset.Validation.Empty());
@@ -131,14 +165,14 @@ TEST(TrainingApi, UsesRecordingLevelPartitionsAndCache) {
         EXPECT_FALSE(test.contains(id));
 
     Trainer cached(configuration);
-    cached.Analyze();
+    ASSERT_TRUE(cached.Analyze());
     // EXPECT_TRUE(cached.GetDataset().LoadedFromCache);
     EXPECT_EQ(cached.GetDataset().Train.SampleCount(), dataset.Train.SampleCount());
 
     Configuration changed = configuration;
     changed.MinDB = -99.0;
     Trainer invalidated(changed);
-    invalidated.Analyze();
+    ASSERT_TRUE(invalidated.Analyze());
     // EXPECT_FALSE(invalidated.GetDataset().LoadedFromCache);
 
     invalidated.ClearData();

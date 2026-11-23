@@ -17,13 +17,13 @@ jobs:
         env:
             SCCACHE_GHA_ENABLED: "true"
             SCCACHE_CACHE_SIZE: 2G
-            SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-trainer-v1
+            SCCACHE_GHA_VERSION: ${{ matrix.os }}-pd${{ matrix.precision }}-trainer-v2
             SCCACHE_CACHE_MULTIARCH: "1"
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-22.04, macos-latest, windows-latest]
-                #os: [ubuntu-22.04]
+                os: [ubuntu-22.04, macos-latest, windows-2022]
+                # os: [windows-2022]
                 precision: [32]
         steps:
             - name: Checkout
@@ -31,19 +31,36 @@ jobs:
               with:
                   submodules: recursive
                   fetch-depth: 1
+
             - name: Setup Python
               uses: actions/setup-python@v6
               with:
                   python-version: "3.12"
+
             - name: Setup sccache
               uses: mozilla-actions/sccache-action@v0.0.9
+
             - name: Reset sccache stats
               run: python Resources/CI/ci.py --reset-sccache
+
+            - name: Install FFmpeg (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  choco install ffmpeg -y
+                  echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+
             - name: Setup Emscripten
               if: runner.os == 'Linux'
               uses: mymindstorm/setup-emsdk@v14
               with:
                   version: latest
+
+            - name: Setup MSVC environment
+              if: runner.os == 'Windows'
+              uses: ilammy/msvc-dev-cmd@v1
+              with:
+                  arch: x64
 
             - name: Install dependencies
               env:
@@ -56,21 +73,28 @@ jobs:
               with:
                   path: ${{ runner.temp }}/QtIFW-4.8.1
                   key: qtifw-linux-x64-4.8.1
+
             - name: Install Qt Installer Framework (Linux)
               if: runner.os == 'Linux' && steps.cache-qtifw.outputs.cache-hit != 'true'
               run: python Resources/CI/ci.py --install-qt-framework
+
             - name: Build
               run: python Resources/CI/ci.py --build --precision ${{ matrix.precision }}
+
             - name: Run native tests
               run: python Resources/CI/ci.py --run-native-tests
+
             - name: Verify native Pure Data trainer
               run: python Resources/CI/ci.py --verify-native-trainer
+
             - name: Repair Linux wheel
               if: runner.os == 'Linux'
               run: python Resources/CI/ci.py --repair-linux-wheel
+
             - name: Build Emscripten
               if: runner.os == 'Linux'
               run: python Resources/CI/ci.py --build-emscripten
+
             - name: Show sccache stats
               if: always()
               run: python Resources/CI/ci.py --show-sccache-stats
@@ -239,14 +263,18 @@ jobs:
                   cp -R "$mac_part/OpenScofo" max_release/
                   mkdir -p max_release/OpenScofo/externals
                   cp "$win_part/OpenScofo/externals/openscofo~.mxe64" max_release/OpenScofo/externals/
+                  cp "$win_part/OpenScofo/externals/openscofo.train.mxe64" max_release/OpenScofo/externals/
                   test -f max_release/OpenScofo/docs/openscofo~.maxref.xml
                   test -f max_release/OpenScofo/help/openscofo~.maxhelp
+                  test -f max_release/OpenScofo/help/openscofo.train.maxhelp
                   test -f max_release/OpenScofo/help/canticos.mp3
                   test -f max_release/OpenScofo/help/canticos.scofo
                   test -f max_release/OpenScofo/help/flute.onnx
                   test -f max_release/OpenScofo/extras/OpenScofo.maxpat
                   test -f max_release/OpenScofo/externals/openscofo~.mxo/Contents/MacOS/openscofo~
+                  test -f max_release/OpenScofo/externals/openscofo.train.mxo/Contents/MacOS/openscofo.train
                   test -f max_release/OpenScofo/externals/openscofo~.mxe64
+                  test -f max_release/OpenScofo/externals/openscofo.train.mxe64
                   (cd max_release && zip -r "../release_assets/Max-openscofo-${RELEASE_VERSION}.zip" OpenScofo)
                   ls -lh "release_assets/Max-openscofo-${RELEASE_VERSION}.zip"
             - name: Package and upload Pure Data release to Deken

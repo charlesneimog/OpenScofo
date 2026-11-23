@@ -114,26 +114,27 @@ def to_wix_path(path: Path) -> str:
     return str(path).replace("/", "\\")
 
 
-def ensure_max_binary(repo_root: Path, build_dir: Path) -> Path | None:
+def ensure_max_binary(repo_root: Path, build_dir: Path, name: str, target: str) -> Path | None:
     candidates = [
-        repo_root / "max" / "openscofo~.mxe64",
-        repo_root / "max" / "openscofo~.mxe",
-        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe64",
-        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo~.mxe",
+        repo_root / "max" / f"{name}.mxe64",
+        repo_root / "max" / f"{name}.mxe",
+        build_dir / "Sources" / "Wrappers" / "Max" / f"{name}.mxe64",
+        build_dir / "Sources" / "Wrappers" / "Max" / f"{name}.mxe",
+        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo_train" / f"{name}.mxe64",
+        build_dir / "Sources" / "Wrappers" / "Max" / "openscofo_train" / f"{name}.mxe",
     ]
     existing = first_existing(candidates)
     if existing is not None:
         return existing
 
     if build_dir.exists():
-        for target in ["Max", "max_o.scofo"]:
-            try:
-                run(["cmake", "--build", str(build_dir), "--target", target])
-                existing = first_existing(candidates)
-                if existing is not None:
-                    return existing
-            except subprocess.CalledProcessError:
-                continue
+        try:
+            run(["cmake", "--build", str(build_dir), "--target", target])
+            existing = first_existing(candidates)
+            if existing is not None:
+                return existing
+        except subprocess.CalledProcessError:
+            pass
 
     return None
 
@@ -179,8 +180,12 @@ def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Pa
             copy_item(src, payload_root / "docs" / src.name)
             copied += 1
 
+    trainer_help = repo_root / "Sources" / "Trainer" / "Max" / "openscofo.train.maxhelp"
+    if not trainer_help.is_file():
+        raise FileNotFoundError(f"Missing Max trainer help patch: {trainer_help}")
     help_files = [
         max_root / "openscofo~.maxhelp",
+        trainer_help,
         max_root / "score-max.svg",
         max_root / "score_renderer.js",
         repo_root / "Tests" / "flute.onnx",
@@ -198,8 +203,13 @@ def stage_max_package_payload(repo_root: Path, build_dir: Path, payload_root: Pa
         copy_item(max_score, payload_root / "help" / "miniatura1.scofo")
         copied += 1
 
-    binary = ensure_max_binary(repo_root, build_dir)
-    if binary is not None:
+    for name, target in (
+        ("openscofo~", "Max"),
+        ("openscofo.train", "max_openscofo_train"),
+    ):
+        binary = ensure_max_binary(repo_root, build_dir, name, target)
+        if binary is None:
+            raise FileNotFoundError(f"Missing required Max external: {name}.mxe64")
         copy_item(binary, payload_root / "externals" / binary.name)
         copied += 1
 
@@ -232,7 +242,6 @@ def component_specs() -> list[IntegrationSpec]:
     if not trainer_candidates:
         print("Warning: no openscofo.train binary found in build directory.")
 
-
     return [
         IntegrationSpec(
             key="max",
@@ -249,6 +258,7 @@ def component_specs() -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/Max/package/extras/OpenScofo.maxpat"),
                 Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
+                Path("Sources/Trainer/Max/openscofo.train.maxhelp"),
                 Path("Sources/Wrappers/Max/score-max.svg"),
                 Path("Sources/Wrappers/Max/score_renderer.js"),
                 Path("Tests/flute.onnx"),
@@ -260,8 +270,12 @@ def component_specs() -> list[IntegrationSpec]:
             optional=[
                 Path("max/openscofo~.mxe64"),
                 Path("max/openscofo~.mxe"),
+                Path("max/openscofo.train.mxe64"),
+                Path("max/openscofo.train.mxe"),
                 Path("build/Sources/Wrappers/Max/openscofo~.mxe64"),
                 Path("build/Sources/Wrappers/Max/openscofo~.mxe"),
+                Path("build/Sources/Wrappers/Max/openscofo_train/openscofo.train.mxe64"),
+                Path("build/Sources/Wrappers/Max/openscofo_train/openscofo.train.mxe"),
             ],
         ),
         IntegrationSpec(

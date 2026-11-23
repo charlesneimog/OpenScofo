@@ -69,38 +69,44 @@ def first_existing(paths: Iterable[Path]) -> Path | None:
     return None
 
 
-def max_bundle_candidates(repo_root: Path) -> list[Path]:
+def pd_binary_candidates(build_subdir: Path, name: str) -> list[Path]:
+    suffixes = [
+        "darwin-arm64-32.so",
+        "darwin-amd64-32.so",
+        "darwin-fat-32.so",
+        "pd_darwin",
+        "so",
+    ]
+    roots = [Path("build") / build_subdir, Path("build/OpenScofo")]
+    return [root / f"{name}.{suffix}" for root in roots for suffix in suffixes]
+
+
+def max_bundle_candidates(repo_root: Path, name: str) -> list[Path]:
+    roots = [
+        repo_root / "max",
+        repo_root / "build" / "Sources" / "Wrappers" / "Max",
+        repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo_train",
+    ]
+    bundle = f"{name}.mxo"
     return [
-        repo_root / "max" / "openscofo~.mxo",
-        repo_root / "max" / "openscofo~.mxo" / "Contents" / "MacOS" / "openscofo~",
-        repo_root / "build" / "Sources" / "Wrappers" / "Max" / "openscofo~.mxo",
-        repo_root
-        / "build"
-        / "Sources"
-        / "Wrappers"
-        / "Max"
-        / "openscofo~.mxo"
-        / "Contents"
-        / "MacOS"
-        / "openscofo~",
+        candidate
+        for root in roots
+        for candidate in (root / bundle, root / bundle / "Contents" / "MacOS" / name)
     ]
 
 
-def ensure_max_bundle(repo_root: Path) -> Path | None:
-    for candidate in max_bundle_candidates(repo_root):
+def ensure_max_bundle(repo_root: Path, name: str, target: str) -> Path | None:
+    for candidate in max_bundle_candidates(repo_root, name):
         if candidate.exists():
             return candidate if candidate.is_dir() else candidate.parent.parent.parent
 
     build_dir = repo_root / "build"
     if build_dir.exists():
-        for target in ["max_openscofo", "Max", "openscofo~", "openscofo~"]:
-            cmd = ["cmake", "--build", str(build_dir), "--target", target]
-            print("+", " ".join(cmd))
-            result = subprocess.run(cmd, check=False)
-            if result.returncode != 0:
-                continue
-
-            for candidate in max_bundle_candidates(repo_root):
+        cmd = ["cmake", "--build", str(build_dir), "--target", target]
+        print("+", " ".join(cmd))
+        result = subprocess.run(cmd, check=False)
+        if result.returncode == 0:
+            for candidate in max_bundle_candidates(repo_root, name):
                 if candidate.exists():
                     return candidate if candidate.is_dir() else candidate.parent.parent.parent
 
@@ -152,8 +158,12 @@ def stage_max_package_payload(repo_root: Path, payload_root: Path) -> int:
             copy_item(src, payload_root / "docs" / src.name)
             copied += 1
 
+    trainer_help = repo_root / "Sources" / "Trainer" / "Max" / "openscofo.train.maxhelp"
+    if not trainer_help.is_file():
+        raise FileNotFoundError(f"Missing Max trainer help patch: {trainer_help}")
     help_files = [
         max_root / "openscofo~.maxhelp",
+        trainer_help,
         max_root / "score-max.svg",
         max_root / "score_renderer.js",
         repo_root / "Tests" / "flute.onnx",
@@ -171,8 +181,13 @@ def stage_max_package_payload(repo_root: Path, payload_root: Path) -> int:
         copy_item(max_score, payload_root / "help" / "miniatura1.scofo")
         copied += 1
 
-    bundle = ensure_max_bundle(repo_root)
-    if bundle is not None:
+    for name, target in (
+        ("openscofo~", "Max"),
+        ("openscofo.train", "max_openscofo_train"),
+    ):
+        bundle = ensure_max_bundle(repo_root, name, target)
+        if bundle is None:
+            raise FileNotFoundError(f"Missing required Max external: {name}.mxo")
         copy_into_directory(bundle, payload_root / "externals")
         copied += 1
 
@@ -300,6 +315,7 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
                 Path("Sources/Wrappers/Max/package/extras/OpenScofo.maxpat"),
                 Path("Sources/Wrappers/Max/docs/openscofo~.maxref.xml"),
                 Path("Sources/Wrappers/Max/openscofo~.maxhelp"),
+                Path("Sources/Trainer/Max/openscofo.train.maxhelp"),
                 Path("Sources/Wrappers/Max/score-max.svg"),
                 Path("Sources/Wrappers/Max/score_renderer.js"),
                 Path("Tests/flute.onnx"),
@@ -311,9 +327,15 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             optional=[
                 Path("max/openscofo~.mxo"),
                 Path("max/openscofo~.mxo/Contents/MacOS/openscofo~"),
+                Path("max/openscofo.train.mxo"),
+                Path("max/openscofo.train.mxo/Contents/MacOS/openscofo.train"),
                 Path("build/Sources/Wrappers/Max/openscofo~.mxo"),
                 Path(
                     "build/Sources/Wrappers/Max/openscofo~.mxo/Contents/MacOS/openscofo~"
+                ),
+                Path("build/Sources/Wrappers/Max/openscofo_train/openscofo.train.mxo"),
+                Path(
+                    "build/Sources/Wrappers/Max/openscofo_train/openscofo.train.mxo/Contents/MacOS/openscofo.train"
                 ),
             ],
         ),
@@ -325,22 +347,12 @@ def component_specs(repo_root: Path) -> list[IntegrationSpec]:
             required=PD_PACKAGE_DATA,
             optional=[],
             required_binaries={
-                "openscofo~": [
-                    Path("build/Sources/Wrappers/PureData/openscofo~.pd_darwin"),
-                    Path("build/Sources/Wrappers/PureData/openscofo~.darwin-fat-32.so"),
-                    Path("build/Sources/Wrappers/PureData/openscofo~.so"),
-                    Path("build/OpenScofo/openscofo~.pd_darwin"),
-                    Path("build/OpenScofo/openscofo~.darwin-fat-32.so"),
-                    Path("build/OpenScofo/openscofo~.so"),
-                ],
-                "openscofo.train": [
-                    Path("build/Sources/Trainer/openscofo.train.pd_darwin"),
-                    Path("build/Sources/Trainer/openscofo.train.darwin-fat-32.so"),
-                    Path("build/Sources/Trainer/openscofo.train.so"),
-                    Path("build/OpenScofo/openscofo.train.pd_darwin"),
-                    Path("build/OpenScofo/openscofo.train.darwin-fat-32.so"),
-                    Path("build/OpenScofo/openscofo.train.so"),
-                ],
+                "openscofo~": pd_binary_candidates(
+                    Path("Sources/Wrappers/PureData"), "openscofo~"
+                ),
+                "openscofo.train": pd_binary_candidates(
+                    Path("Sources/Trainer"), "openscofo.train"
+                ),
             },
         ),
         IntegrationSpec(

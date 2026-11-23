@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <random>
 #include <set>
-#include <stdexcept>
 #include <utility>
 
 namespace OpenScofo {
@@ -97,17 +96,19 @@ bool Trainer::IsVectorDescriptor(Descriptors descriptor) const {
 }
 
 // ─────────────────────────────────────
-void Trainer::AppendSample(Partition &partition, const std::vector<float> &features, std::size_t label,
+bool Trainer::AppendSample(Partition &partition, const std::vector<float> &features, std::size_t label,
                            std::uint64_t recording, bool augmented) const {
     if (partition.FeatureCount == 0) {
         partition.FeatureCount = features.size();
     }
     if (features.size() != partition.FeatureCount) {
-        throw std::runtime_error("OpenScofo descriptor width changed while extracting the dataset");
+        m_Logger->error("OpenScofo descriptor width changed while extracting the dataset");
+        return false;
     }
     partition.Features.insert(partition.Features.end(), features.begin(), features.end());
     partition.Labels.push_back(static_cast<std::int32_t>(label));
     partition.Origins.push_back({recording, augmented});
+    return true;
 }
 
 // ─────────────────────────────────────
@@ -118,10 +119,8 @@ void Trainer::Report(const std::string &status, double progress) const {
 }
 
 // ─────────────────────────────────────
-void Trainer::CheckCancelled() const {
-    if (m_Cancelled.load()) {
-        throw std::runtime_error("Training cancelled");
-    }
+bool Trainer::CheckCancelled() const {
+    return !m_Cancelled.load();
 }
 
 // ─────────────────────────────────────
@@ -152,7 +151,7 @@ std::vector<int> Trainer::SampleRates() const {
 std::vector<Descriptors> Trainer::GetDescriptors(std::vector<std::string> &canonical) const {
     canonical.clear();
     if (m_Config.Descriptors.empty()) {
-        spdlog::error("At least one OpenScofo descriptor is required");
+        m_Logger->error("At least one OpenScofo descriptor is required");
         return {};
     }
     ::OpenScofo::OpenScofo descriptorConverter(static_cast<float>(m_Config.SampleRate),
@@ -163,7 +162,7 @@ std::vector<Descriptors> Trainer::GetDescriptors(std::vector<std::string> &canon
         const std::string normalized = Lowercase(name);
         const ::OpenScofo::Descriptors descriptor = descriptorConverter.GetDescriptorsEnum(normalized.c_str());
         if (descriptor == ::OpenScofo::INVALID || descriptor == ::OpenScofo::ONNX) {
-            spdlog::error("Unknown or unsupported training descriptor: {}", name);
+            m_Logger->error("Unknown or unsupported training descriptor: {}", name);
             canonical.clear();
             return {};
         }
@@ -177,44 +176,46 @@ std::vector<Descriptors> Trainer::GetDescriptors(std::vector<std::string> &canon
 bool Trainer::Validate() const {
     if (m_Config.SampleRate <= 0 || m_Config.FFTSize < 512 || m_Config.HopSize <= 0 ||
         m_Config.HopSize > m_Config.FFTSize) {
-        spdlog::error("Invalid sample rate, FFT size, or hop size");
+        m_Logger->error("Invalid sample rate, FFT size, or hop size");
         return false;
     }
     for (int rate : m_Config.TrainingSampleRates) {
         if (rate <= 0) {
-            spdlog::error("Training sample rates must be positive");
+            m_Logger->error("Training sample rates must be positive");
             return false;
         }
     }
     if (m_Config.TestFraction < 0.0 || m_Config.TestFraction >= 1.0) {
-        spdlog::error("Test fraction must be in the range [0, 1)");
+        m_Logger->error("Test fraction must be in the range [0, 1)");
         return false;
     }
     if (m_Config.MaxPitchConfidence < 0.0 || m_Config.MaxPitchConfidence > 1.0) {
-        spdlog::error("Maximum pitch confidence must be between 0 and 1");
+        m_Logger->error("Maximum pitch confidence must be between 0 and 1");
         return false;
     }
     if (m_Config.AugmentationFactor < 1.0) {
-        spdlog::error("Augmentation factor must be at least 1");
+        m_Logger->error("Augmentation factor must be at least 1");
         return false;
     }
     if (m_Config.MaxAugmentationLoops < 0) {
-        spdlog::error("Maximum augmentation loops cannot be negative");
+        m_Logger->error("Maximum augmentation loops cannot be negative");
         return false;
     }
     if (m_Config.Iterations <= 0 || m_Config.LearningRate <= 0.0 || m_Config.Depth <= 0 ||
         m_Config.EarlyStoppingRounds < 0 || m_Config.ThreadCount == 0 || m_Config.ThreadCount < -1) {
-        spdlog::error("Invalid CatBoost configuration");
+        m_Logger->error("Invalid CatBoost configuration");
         return false;
     }
     return true;
 }
 
 // ─────────────────────────────────────
-DiscoveredData Trainer::Discover() const {
+bool Trainer::Discover(DiscoveredData &discovered) const {
+    discovered = {};
     const fs::path datasetFolder = ResolvePath(BasePath(), m_Config.DatasetFolder);
     if (datasetFolder.empty() || !fs::is_directory(datasetFolder)) {
-        throw std::runtime_error("Training folder is not a directory: " + datasetFolder.string());
+        m_Logger->error("Training folder is not a directory: {}", datasetFolder.string());
+        return false;
     }
 
     std::vector<fs::path> classFolders;
@@ -225,10 +226,10 @@ DiscoveredData Trainer::Discover() const {
     }
     std::sort(classFolders.begin(), classFolders.end());
     if (classFolders.size() < 2) {
-        throw std::runtime_error("The training folder must contain at least two class subdirectories");
+        m_Logger->error("The training folder must contain at least two class subdirectories");
+        return false;
     }
 
-    DiscoveredData discovered;
     std::mt19937 random(static_cast<std::mt19937::result_type>(m_Config.RandomSeed));
     for (const fs::path &classFolder : classFolders) {
         const std::size_t label = discovered.Labels.size();
@@ -241,7 +242,8 @@ DiscoveredData Trainer::Discover() const {
             }
         }
         if (files.empty()) {
-            throw std::runtime_error("Class folder contains no WAV, AIFF, or AIF files: " + classFolder.string());
+            m_Logger->error("Class folder contains no WAV, AIFF, or AIF files: {}", classFolder.string());
+            return false;
         }
         std::sort(files.begin(), files.end());
 
@@ -277,7 +279,8 @@ DiscoveredData Trainer::Discover() const {
     for (const fs::path &folderValue : m_Config.ImpulseResponseFolders) {
         const fs::path folder = ResolvePath(BasePath(), folderValue);
         if (!fs::is_directory(folder)) {
-            throw std::runtime_error("Impulse-response folder is not a directory: " + folder.string());
+            m_Logger->error("Impulse-response folder is not a directory: {}", folder.string());
+            return false;
         }
         for (const fs::directory_entry &entry : fs::directory_iterator(folder)) {
             if (entry.is_regular_file() && IsAudioFile(entry.path())) {
@@ -286,7 +289,7 @@ DiscoveredData Trainer::Discover() const {
         }
     }
     std::sort(discovered.ImpulseResponses.begin(), discovered.ImpulseResponses.end());
-    return discovered;
+    return true;
 }
 
 // ─────────────────────────────────────
@@ -304,15 +307,16 @@ std::vector<float> Trainer::Flatten(::OpenScofo::OpenScofo &extractor, ::OpenSco
         }
     }
     if (values.empty()) {
-        throw std::runtime_error("The selected descriptors produced an empty feature vector");
+        m_Logger->error("The selected descriptors produced an empty feature vector");
     }
     return values;
 }
 
 // ─────────────────────────────────────
-std::size_t Trainer::ProcessSignal(const std::vector<float> &signal, int sampleRate, const Recording &recording,
-                                   Partition &partition, const std::vector<::OpenScofo::Descriptors> &descriptors,
-                                   bool pitchFilter, bool augmented, std::size_t maximumSamples) const {
+std::optional<std::size_t> Trainer::ProcessSignal(const std::vector<float> &signal, int sampleRate,
+                                                  const Recording &recording, Partition &partition,
+                                                  const std::vector<::OpenScofo::Descriptors> &descriptors,
+                                                  bool pitchFilter, bool augmented, std::size_t maximumSamples) const {
     if (signal.size() < static_cast<std::size_t>(m_Config.FFTSize)) {
         return 0;
     }
@@ -328,7 +332,9 @@ std::size_t Trainer::ProcessSignal(const std::vector<float> &signal, int sampleR
     std::vector<float> window(static_cast<std::size_t>(m_Config.FFTSize));
     for (std::size_t start = 0; start + static_cast<std::size_t>(m_Config.FFTSize) <= signal.size();
          start += static_cast<std::size_t>(m_Config.HopSize)) {
-        CheckCancelled();
+        if (!CheckCancelled()) {
+            return std::nullopt;
+        }
         std::copy_n(signal.begin() + static_cast<std::ptrdiff_t>(start), m_Config.FFTSize, window.begin());
         extractor.ProcessBlock(window.data(), window.size());
         Description description = extractor.GetDescription();
@@ -338,7 +344,10 @@ std::size_t Trainer::ProcessSignal(const std::vector<float> &signal, int sampleR
         if (pitchFilter && description.PitchConfidence >= m_Config.MaxPitchConfidence) {
             continue;
         }
-        AppendSample(partition, Flatten(extractor, description, descriptors), recording.Label, recording.Id, augmented);
+        const std::vector<float> features = Flatten(extractor, description, descriptors);
+        if (features.empty() || !AppendSample(partition, features, recording.Label, recording.Id, augmented)) {
+            return std::nullopt;
+        }
         appended++;
         if (maximumSamples != 0 && appended >= maximumSamples) {
             break;
@@ -372,7 +381,7 @@ std::vector<float> Trainer::Augment(const std::vector<float> &input, int sampleR
 }
 
 // ─────────────────────────────────────
-void Trainer::ExtractRecordings(const std::vector<Recording> &recordings, Partition &partition,
+bool Trainer::ExtractRecordings(const std::vector<Recording> &recordings, Partition &partition,
                                 const std::vector<::OpenScofo::Descriptors> &descriptors, bool pitchFilter,
                                 std::map<std::string, std::size_t> &counts, std::size_t &completed,
                                 std::size_t total) const {
@@ -380,19 +389,29 @@ void Trainer::ExtractRecordings(const std::vector<Recording> &recordings, Partit
     for (const Recording &recording : recordings) {
         std::size_t recordingSamples = 0;
         for (int sampleRate : rates) {
-            CheckCancelled();
+            if (!CheckCancelled()) {
+                return false;
+            }
             const std::vector<float> signal = LoadMono(recording.Path, sampleRate);
-            recordingSamples +=
+            if (signal.empty()) {
+                return false;
+            }
+            const std::optional<std::size_t> processed =
                 ProcessSignal(signal, sampleRate, recording, partition, descriptors, pitchFilter, false);
+            if (!processed) {
+                return false;
+            }
+            recordingSamples += *processed;
             ++completed;
             Report("analyzing", 0.7 * static_cast<double>(completed) / static_cast<double>(total));
         }
         counts[m_Data.Labels[recording.Label]] += recordingSamples;
     }
+    return true;
 }
 
 // ─────────────────────────────────────
-void Trainer::AssertNoLeakage() const {
+bool Trainer::AssertNoLeakage() const {
     std::set<std::uint64_t> train;
     std::set<std::uint64_t> validation;
     std::set<std::uint64_t> test;
@@ -401,42 +420,50 @@ void Trainer::AssertNoLeakage() const {
     }
     for (const SampleOrigin &origin : m_Data.Validation.Origins) {
         if (origin.Augmented) {
-            throw std::runtime_error("Augmented data entered the validation partition");
+            m_Logger->error("Augmented data entered the validation partition");
+            return false;
         }
         validation.insert(origin.Recording);
     }
     for (const SampleOrigin &origin : m_Data.Test.Origins) {
         if (origin.Augmented) {
-            throw std::runtime_error("Augmented data entered the test partition");
+            m_Logger->error("Augmented data entered the test partition");
+            return false;
         }
         test.insert(origin.Recording);
     }
     for (std::uint64_t id : train) {
         if (validation.contains(id) || test.contains(id)) {
-            throw std::runtime_error("A recording occurs in both training and evaluation partitions");
+            m_Logger->error("A recording occurs in both training and evaluation partitions");
+            return false;
         }
     }
     for (std::uint64_t id : validation) {
         if (test.contains(id)) {
-            throw std::runtime_error("A recording occurs in both validation and test partitions");
+            m_Logger->error("A recording occurs in both validation and test partitions");
+            return false;
         }
     }
+    return true;
 }
 
 // ─────────────────────────────────────
-void Trainer::Analyze() {
+bool Trainer::Analyze() {
     m_Cancelled.store(false);
     if (!Validate()) {
-        throw std::runtime_error("Invalid training configuration");
+        return false;
     }
     Report("analyzing", 0.0);
 
     std::vector<std::string> canonicalDescriptors;
     const std::vector<::OpenScofo::Descriptors> descriptors = GetDescriptors(canonicalDescriptors);
     if (descriptors.empty()) {
-        throw std::runtime_error("Invalid training descriptors");
+        return false;
     }
-    const DiscoveredData discovered = Discover();
+    DiscoveredData discovered;
+    if (!Discover(discovered)) {
+        return false;
+    }
 
     m_Data.Clear();
     m_Data.Labels = discovered.Labels;
@@ -448,10 +475,13 @@ void Trainer::Analyze() {
     const std::size_t total = std::max<std::size_t>(
         1, (discovered.Train.size() + discovered.Validation.size() + discovered.Test.size()) * rates.size());
     std::size_t completed = 0;
-    ExtractRecordings(discovered.Test, m_Data.Test, descriptors, false, m_Data.TestCounts, completed, total);
-    ExtractRecordings(discovered.Validation, m_Data.Validation, descriptors, true, m_Data.ValidationCounts, completed,
-                      total);
-    ExtractRecordings(discovered.Train, m_Data.Train, descriptors, true, m_Data.OriginalTrainCounts, completed, total);
+    if (!ExtractRecordings(discovered.Test, m_Data.Test, descriptors, false, m_Data.TestCounts, completed, total) ||
+        !ExtractRecordings(discovered.Validation, m_Data.Validation, descriptors, true, m_Data.ValidationCounts,
+                           completed, total) ||
+        !ExtractRecordings(discovered.Train, m_Data.Train, descriptors, true, m_Data.OriginalTrainCounts, completed,
+                           total)) {
+        return false;
+    }
 
     std::size_t largestClass = 0;
     for (const std::string &label : m_Data.Labels) {
@@ -474,65 +504,72 @@ void Trainer::Analyze() {
         const std::size_t maximumAttempts = static_cast<std::size_t>(m_Config.MaxAugmentationLoops) * sources.size();
         std::size_t attempts = 0;
         while (original + augmentedCount < target && attempts < maximumAttempts) {
-            CheckCancelled();
+            if (!CheckCancelled()) {
+                return false;
+            }
             const Recording &recording = sources[attempts % sources.size()];
             const int sampleRate = rates[attempts % rates.size()];
             const std::vector<float> source = LoadMono(recording.Path, sampleRate);
+            if (source.empty()) {
+                return false;
+            }
             const std::vector<float> augmented = Augment(source, sampleRate, discovered.ImpulseResponses, random);
+            if (augmented.empty()) {
+                return false;
+            }
             const std::size_t remaining = target - original - augmentedCount;
-            augmentedCount +=
+            const std::optional<std::size_t> processed =
                 ProcessSignal(augmented, sampleRate, recording, m_Data.Train, descriptors, true, true, remaining);
+            if (!processed) {
+                return false;
+            }
+            augmentedCount += *processed;
             ++attempts;
             const double classProgress = static_cast<double>(attempts) / static_cast<double>(maximumAttempts);
             Report("analyzing", 0.7 + 0.25 * (static_cast<double>(label) + classProgress) /
                                           static_cast<double>(m_Data.Labels.size()));
         }
         if (original + augmentedCount < target) {
-            spdlog::warn("Class {} did not reach its balanced augmentation target", name);
+            m_Logger->warn("Class {} did not reach its balanced augmentation target", name);
         }
     }
 
     for (const std::string &label : m_Data.Labels) {
         if (m_Data.OriginalTrainCounts[label] == 0) {
-            throw std::runtime_error("No training windows survived filtering for class: " + label);
+            m_Logger->error("No training windows survived filtering for class: {}", label);
+            return false;
         }
     }
-    AssertNoLeakage();
-    CheckCancelled();
-    spdlog::info("Dataset ready: {} classes, {} training, {} validation, {} test windows", m_Data.Labels.size(),
-                 m_Data.Train.SampleCount(), m_Data.Validation.SampleCount(), m_Data.Test.SampleCount());
+    if (!AssertNoLeakage() || !CheckCancelled()) {
+        return false;
+    }
+    m_Logger->info("Dataset ready: {} classes, {} training, {} validation, {} test windows", m_Data.Labels.size(),
+                   m_Data.Train.SampleCount(), m_Data.Validation.SampleCount(), m_Data.Test.SampleCount());
     Report("analyzing", 1.0);
+    return true;
 }
 
 // ─────────────────────────────────────
 Trainer::Trainer(const CatConfiguration &configuration) {
+    m_Log = std::make_shared<OpenScofoLog<std::mutex>>();
+    m_Log->SetCallback(nullptr, nullptr, &m_HasErrors);
+    m_Log->set_pattern("%v");
+    std::vector<spdlog::sink_ptr> sinks{m_Log};
+#ifndef NDEBUG
+    sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+#endif
+    m_Logger = std::make_shared<spdlog::logger>("OpenScofoTrainer", sinks.begin(), sinks.end());
+#if defined(NDEBUG)
+    m_Logger->set_level(spdlog::level::info);
+#else
+    m_Logger->set_level(spdlog::level::debug);
+#endif
     SetConfiguration(configuration);
 }
 
 // ─────────────────────────────────────
 Trainer::~Trainer() {
     ClearModel();
-}
-
-// ─────────────────────────────────────
-Trainer::Trainer(Trainer &&other) noexcept
-    : m_Config(std::move(other.m_Config)), m_Data(std::move(other.m_Data)), m_Results(std::move(other.m_Results)),
-      m_Progress(std::move(other.m_Progress)), m_Cancelled(other.m_Cancelled.load()),
-      m_Model(std::exchange(other.m_Model, nullptr)) {
-}
-
-// ─────────────────────────────────────
-Trainer &Trainer::operator=(Trainer &&other) noexcept {
-    if (this != &other) {
-        ClearModel();
-        m_Config = std::move(other.m_Config);
-        m_Data = std::move(other.m_Data);
-        m_Results = std::move(other.m_Results);
-        m_Progress = std::move(other.m_Progress);
-        m_Cancelled.store(other.m_Cancelled.load());
-        m_Model = std::exchange(other.m_Model, nullptr);
-    }
-    return *this;
 }
 
 // ─────────────────────────────────────
@@ -557,28 +594,45 @@ void Trainer::SetProgressCallback(std::function<void(const std::string &status, 
 }
 
 // ─────────────────────────────────────
-void Trainer::Train() {
-    m_Cancelled.store(false);
-    if (!HasDataset()) {
-        Analyze();
-    }
-    Report("training", 0.0);
-    TrainModel();
-    m_Results = EvaluateModel();
-    if (m_Results.TestedSamples == 0) {
-        spdlog::warn("No independent test samples are available; test evaluation was skipped");
-    } else {
-        spdlog::info("Test accuracy {:.4f}, balanced accuracy {:.4f} ({} samples)", m_Results.Accuracy,
-                     m_Results.BalancedAccuracy, m_Results.TestedSamples);
-    }
+void Trainer::SetLogCallback(std::function<void(const spdlog::details::log_msg &, void *data)> callback, void *data) {
+    m_Log->SetCallback(std::move(callback), data, &m_HasErrors);
 }
 
 // ─────────────────────────────────────
-void Trainer::ExportModel(const fs::path &path) {
-    CheckCancelled();
+void Trainer::SetLogLevel(spdlog::level::level_enum level) {
+    m_Logger->set_level(level);
+}
+
+// ─────────────────────────────────────
+bool Trainer::Train() {
+    m_Cancelled.store(false);
+    if (!HasDataset() && !Analyze()) {
+        return false;
+    }
+    Report("training", 0.0);
+    if (!TrainModel() || !EvaluateModel(m_Results)) {
+        return false;
+    }
+    if (m_Results.TestedSamples == 0) {
+        m_Logger->warn("No independent test samples are available; test evaluation was skipped");
+    } else {
+        m_Logger->info("Test accuracy {:.4f}, balanced accuracy {:.4f} ({} samples)", m_Results.Accuracy,
+                       m_Results.BalancedAccuracy, m_Results.TestedSamples);
+    }
+    return true;
+}
+
+// ─────────────────────────────────────
+bool Trainer::ExportModel(const fs::path &path) {
+    if (!CheckCancelled()) {
+        return false;
+    }
     Report("exporting", 0.0);
-    ExportTrainedModel(ResolvePath(BasePath(), path));
+    if (!ExportTrainedModel(ResolvePath(BasePath(), path))) {
+        return false;
+    }
     Report("exporting", 1.0);
+    return true;
 }
 
 // ─────────────────────────────────────
@@ -602,6 +656,11 @@ bool Trainer::HasDataset() const {
 // ─────────────────────────────────────
 bool Trainer::HasModel() const {
     return m_Model != nullptr;
+}
+
+// ─────────────────────────────────────
+bool Trainer::IsCancelled() const {
+    return m_Cancelled.load();
 }
 
 // ─────────────────────────────────────

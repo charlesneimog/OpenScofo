@@ -10,6 +10,8 @@
 #pragma once
 
 #include <OpenScofo.hpp>
+#include <spdlog/details/log_msg.h>
+#include <spdlog/logger.h>
 
 #include <atomic>
 #include <cstddef>
@@ -18,6 +20,8 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -112,15 +116,17 @@ struct DiscoveredData {
 // Owns a PFFFT real-FFT setup and its work buffer. Implemented in Audio.cpp.
 class RealFft {
   public:
-    RealFft(int size);
+    RealFft(int size, std::shared_ptr<spdlog::logger> logger);
 
     std::unique_ptr<float, void (*)(void *)> AllocateBuffer() const;
+    bool IsValid() const;
     PFFFT_Setup *GetSetup();
     void Forward(const float *input, float *output);
     void Backward(const float *input, float *output);
 
   private:
     int m_Size;
+    std::shared_ptr<spdlog::logger> m_Logger;
     std::unique_ptr<PFFFT_Setup, void (*)(PFFFT_Setup *)> m_Setup;
     std::unique_ptr<float, void (*)(void *)> m_Work;
 };
@@ -130,22 +136,28 @@ class Trainer {
     Trainer(const CatConfiguration &configuration = CatConfiguration());
     ~Trainer();
 
-    Trainer(Trainer &&other) noexcept;
-    Trainer &operator=(Trainer &&other) noexcept;
+    Trainer(Trainer &&other) = delete;
+    Trainer &operator=(Trainer &&other) = delete;
 
     void SetConfiguration(const CatConfiguration &configuration);
     const CatConfiguration &GetConfiguration() const;
 
     void SetProgressCallback(std::function<void(const std::string &status, double progress)> callback);
+    void SetLogCallback(std::function<void(const spdlog::details::log_msg &, void *data)> callback,
+                        void *data = nullptr);
+    void SetLogLevel(spdlog::level::level_enum level);
 
-    void Analyze();
-    void Train();
-    void ExportModel(const std::filesystem::path &path);
+    bool Analyze();
+    bool Train();
+    bool ExportModel(const std::filesystem::path &path);
+    std::optional<std::size_t> Cut(const std::vector<float> &samples, int sampleRate,
+                                   const std::filesystem::path &label);
     void ClearData();
     void Cancel();
 
     bool HasDataset() const;
     bool HasModel() const;
+    bool IsCancelled() const;
     const Dataset &GetDataset() const;
     const Evaluation &GetEvaluation() const;
 
@@ -163,33 +175,34 @@ class Trainer {
     std::uint64_t HashText(const std::string &text) const;
     std::filesystem::path ResolvePath(const std::filesystem::path &base, const std::filesystem::path &path) const;
     bool IsVectorDescriptor(Descriptors descriptor) const;
-    void AppendSample(Partition &partition, const std::vector<float> &features, std::size_t label,
+    bool AppendSample(Partition &partition, const std::vector<float> &features, std::size_t label,
                       std::uint64_t recording, bool augmented) const;
 
     void Report(const std::string &status, double progress) const;
-    void CheckCancelled() const;
+    bool CheckCancelled() const;
     std::filesystem::path BasePath() const;
     std::vector<int> SampleRates() const;
     std::vector<Descriptors> GetDescriptors(std::vector<std::string> &canonical) const;
     bool Validate() const;
-    DiscoveredData Discover() const;
+    bool Discover(DiscoveredData &discovered) const;
     std::vector<float> Flatten(OpenScofo &extractor, Description &description,
                                const std::vector<Descriptors> &descriptors) const;
-    std::size_t ProcessSignal(const std::vector<float> &signal, int sampleRate, const Recording &recording,
-                              Partition &partition, const std::vector<Descriptors> &descriptors, bool pitchFilter,
-                              bool augmented, std::size_t maximumSamples = 0) const;
+    std::optional<std::size_t> ProcessSignal(const std::vector<float> &signal, int sampleRate,
+                                             const Recording &recording, Partition &partition,
+                                             const std::vector<Descriptors> &descriptors, bool pitchFilter,
+                                             bool augmented, std::size_t maximumSamples = 0) const;
     std::vector<float> Augment(const std::vector<float> &input, int sampleRate,
                                const std::vector<std::filesystem::path> &impulseResponses, std::mt19937 &random) const;
-    void ExtractRecordings(const std::vector<Recording> &recordings, Partition &partition,
+    bool ExtractRecordings(const std::vector<Recording> &recordings, Partition &partition,
                            const std::vector<Descriptors> &descriptors, bool pitchFilter,
                            std::map<std::string, std::size_t> &counts, std::size_t &completed, std::size_t total) const;
-    void AssertNoLeakage() const;
+    bool AssertNoLeakage() const;
 
     std::string TrainingParameters(bool haveValidation) const;
     static int TrainingProgress(void *data, std::size_t iteration, std::size_t iterations);
-    void TrainModel();
-    Evaluation EvaluateModel() const;
-    void ExportTrainedModel(const std::filesystem::path &path) const;
+    bool TrainModel();
+    bool EvaluateModel(Evaluation &evaluation) const;
+    bool ExportTrainedModel(const std::filesystem::path &path) const;
     void ClearModel() noexcept;
 
     CatConfiguration m_Config;
@@ -197,6 +210,9 @@ class Trainer {
     Dataset m_Data;
     Evaluation m_Results;
     std::function<void(const std::string &status, double progress)> m_Progress;
+    std::shared_ptr<OpenScofoLog<std::mutex>> m_Log;
+    std::shared_ptr<spdlog::logger> m_Logger;
+    spdlog::level::level_enum m_HasErrors = spdlog::level::off;
     std::atomic<bool> m_Cancelled{false};
     OpenScofoCatBoostHandle *m_Model = nullptr;
 };

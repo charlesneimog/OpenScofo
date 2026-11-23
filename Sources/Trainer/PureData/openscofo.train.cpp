@@ -10,6 +10,7 @@
 #include <Trainer.hpp>
 
 #include <atomic>
+#include <exception>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -20,68 +21,88 @@
 #include <m_pd.h>
 #include <g_canvas.h>
 
-namespace {
-
-enum class MessageType { Progress, Status, Accuracy, BalancedAccuracy, ClassAccuracy, Error, Log };
-enum class Job { Analyze, Train, Export, ClearData };
+enum class OpenScofoTrainMessageType {
+    Progress,
+    Status,
+    Segments,
+    Accuracy,
+    BalancedAccuracy,
+    ClassAccuracy,
+    Error,
+    Log
+};
+enum class OpenScofoTrainJob { Analyze, Train, Export, Cut, ClearData };
 
 // ─────────────────────────────────────
-struct Message {
-    MessageType Type = MessageType::Status;
+struct OpenScofoTrainMessage {
+    OpenScofoTrainMessageType Type = OpenScofoTrainMessageType::Status;
     std::string Text;
     double Value = 0.0;
+    spdlog::level::level_enum Level = spdlog::level::info;
 };
 
+class OpenScofoTrainState;
+void openscofo_train_log_callback(const spdlog::details::log_msg &log, void *data);
+
 // ─────────────────────────────────────
-class PdTrainerState {
+class OpenScofoTrainState {
   public:
     OpenScofo::Trainer Trainer;
     OpenScofo::CatConfiguration Config;
     std::mutex QueueMutex;
-    std::vector<Message> Queue;
+    std::vector<OpenScofoTrainMessage> Queue;
     std::thread Worker;
     std::atomic<bool> Running{false};
     std::string WorkerStatus;
 
-    explicit PdTrainerState(const std::filesystem::path &patchDirectory) {
+    explicit OpenScofoTrainState(const std::filesystem::path &patchDirectory) {
         Config.BasePath = patchDirectory;
         Trainer.SetConfiguration(Config);
         Trainer.SetProgressCallback([this](const std::string &status, double progress) {
             if (status != WorkerStatus) {
                 WorkerStatus = status;
-                Push({MessageType::Status, status, 0.0});
+                Push({OpenScofoTrainMessageType::Status, status, 0.0});
             }
-            Push({MessageType::Progress, {}, progress});
+            Push({OpenScofoTrainMessageType::Progress, {}, progress});
         });
-        // Trainer.SetLogCallback([this](const std::string &message) { Push({MessageType::Log, message, 0.0}); });
+        Trainer.SetLogCallback(openscofo_train_log_callback, this);
     }
 
-    ~PdTrainerState() {
+    ~OpenScofoTrainState() {
         Trainer.Cancel();
         if (Worker.joinable()) {
             Worker.join();
         }
     }
 
-    void Push(Message message) {
+    void Push(OpenScofoTrainMessage message) {
         std::lock_guard<std::mutex> lock(QueueMutex);
         Queue.push_back(std::move(message));
     }
 
-    std::vector<Message> TakeMessages() {
-        std::vector<Message> messages;
+    std::vector<OpenScofoTrainMessage> TakeMessages() {
+        std::vector<OpenScofoTrainMessage> messages;
         std::lock_guard<std::mutex> lock(QueueMutex);
         messages.swap(Queue);
         return messages;
     }
 };
 
-t_class *TrainerClass = nullptr;
+// ─────────────────────────────────────
+void openscofo_train_log_callback(const spdlog::details::log_msg &log, void *data) {
+    auto *state = static_cast<OpenScofoTrainState *>(data);
+    if (state == nullptr) {
+        return;
+    }
+    state->Push({OpenScofoTrainMessageType::Log, std::string(log.payload.data(), log.payload.size()), 0.0, log.level});
+}
+
+t_class *openscofo_train_class = nullptr;
 
 // ─────────────────────────────────────
-struct PdTrainer {
+struct OpenScofoTrain {
     t_object Object;
-    PdTrainerState *State;
+    OpenScofoTrainState *State;
     t_clock *Clock;
     t_outlet *ProgressOutlet;
     t_outlet *StatusOutlet;
@@ -89,48 +110,57 @@ struct PdTrainer {
 };
 
 // ─────────────────────────────────────
-void OutputSymbol(t_outlet *outlet, const char *selector, const std::string &value) {
+void openscofo_train_output(t_outlet *outlet, const char *selector, const std::string &value) {
     t_atom atom;
     SETSYMBOL(&atom, gensym(value.c_str()));
     outlet_anything(outlet, gensym(selector), 1, &atom);
 }
 
 // ─────────────────────────────────────
-void OutputFloat(t_outlet *outlet, const char *selector, double value) {
+void openscofo_train_output(t_outlet *outlet, const char *selector, double value) {
     t_atom atom;
     SETFLOAT(&atom, static_cast<t_float>(value));
     outlet_anything(outlet, gensym(selector), 1, &atom);
 }
 
 // ─────────────────────────────────────
-void TrainerTick(PdTrainer *object) {
-    PdTrainerState *state = object->State;
-    for (const Message &message : state->TakeMessages()) {
+void openscofo_train_tick(OpenScofoTrain *object) {
+    OpenScofoTrainState *state = object->State;
+    for (const OpenScofoTrainMessage &message : state->TakeMessages()) {
         switch (message.Type) {
-        case MessageType::Progress:
-            OutputFloat(object->ProgressOutlet, "progress", message.Value);
+        case OpenScofoTrainMessageType::Progress:
+            openscofo_train_output(object->ProgressOutlet, "progress", message.Value);
             break;
-        case MessageType::Status:
-            OutputSymbol(object->StatusOutlet, "status", message.Text);
+        case OpenScofoTrainMessageType::Status:
+            openscofo_train_output(object->StatusOutlet, "status", message.Text);
             break;
-        case MessageType::Accuracy:
-            OutputFloat(object->EvaluationOutlet, "accuracy", message.Value);
+        case OpenScofoTrainMessageType::Segments:
+            openscofo_train_output(object->EvaluationOutlet, "segments", message.Value);
             break;
-        case MessageType::BalancedAccuracy:
-            OutputFloat(object->EvaluationOutlet, "balanced_accuracy", message.Value);
+        case OpenScofoTrainMessageType::Accuracy:
+            openscofo_train_output(object->EvaluationOutlet, "accuracy", message.Value);
             break;
-        case MessageType::ClassAccuracy: {
+        case OpenScofoTrainMessageType::BalancedAccuracy:
+            openscofo_train_output(object->EvaluationOutlet, "balanced_accuracy", message.Value);
+            break;
+        case OpenScofoTrainMessageType::ClassAccuracy: {
             t_atom atoms[2];
             SETSYMBOL(&atoms[0], gensym(message.Text.c_str()));
             SETFLOAT(&atoms[1], static_cast<t_float>(message.Value));
             outlet_anything(object->EvaluationOutlet, gensym("class_accuracy"), 2, atoms);
             break;
         }
-        case MessageType::Error:
-            OutputSymbol(object->StatusOutlet, "error", message.Text);
+        case OpenScofoTrainMessageType::Error:
+            openscofo_train_output(object->StatusOutlet, "error", message.Text);
             break;
-        case MessageType::Log:
-            logpost(object, PD_NORMAL, "[openscofo.train] %s", message.Text.c_str());
+        case OpenScofoTrainMessageType::Log:
+            if (message.Level == spdlog::level::err || message.Level == spdlog::level::critical) {
+                logpost(object, PD_ERROR, "[openscofo.train] %s", message.Text.c_str());
+            } else if (message.Level == spdlog::level::warn || message.Level == spdlog::level::info) {
+                logpost(object, PD_NORMAL, "[openscofo.train] %s", message.Text.c_str());
+            } else {
+                logpost(object, PD_DEBUG, "[openscofo.train] %s", message.Text.c_str());
+            }
             break;
         }
     }
@@ -146,11 +176,11 @@ void TrainerTick(PdTrainer *object) {
 }
 
 // ─────────────────────────────────────
-
-void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPath = {}) {
-    PdTrainerState *state = object->State;
+void openscofo_train_startjob(OpenScofoTrain *object, OpenScofoTrainJob job, std::filesystem::path path = {},
+                              std::vector<float> samples = {}, int sampleRate = 0) {
+    OpenScofoTrainState *state = object->State;
     if (state->Running.load()) {
-        OutputSymbol(object->StatusOutlet, "error", "openscofo.train is already busy");
+        openscofo_train_output(object->StatusOutlet, "error", "openscofo.train is already busy");
         return;
     }
     if (state->Worker.joinable()) {
@@ -158,53 +188,65 @@ void StartJob(PdTrainer *object, Job job, std::filesystem::path exportPath = {})
     }
 
     const char *initialStatus = "analyzing";
-    if (job == Job::Train)
+    if (job == OpenScofoTrainJob::Train)
         initialStatus = "training";
-    else if (job == Job::Export)
+    else if (job == OpenScofoTrainJob::Export)
         initialStatus = "exporting";
-    else if (job == Job::ClearData)
+    else if (job == OpenScofoTrainJob::Cut)
+        initialStatus = "cutting";
+    else if (job == OpenScofoTrainJob::ClearData)
         initialStatus = "clearing";
 
     state->WorkerStatus = initialStatus;
     state->Running.store(true);
-    OutputSymbol(object->StatusOutlet, "status", initialStatus);
-    state->Worker = std::thread([state, job, exportPath = std::move(exportPath)]() {
-        try {
-            if (job == Job::Analyze) {
-                state->Trainer.Analyze();
-            } else if (job == Job::Train) {
-                state->Trainer.Train();
-                const OpenScofo::Evaluation &evaluation = state->Trainer.GetEvaluation();
-                if (evaluation.TestedSamples != 0) {
-                    state->Push({MessageType::Accuracy, {}, evaluation.Accuracy});
-                    state->Push({MessageType::BalancedAccuracy, {}, evaluation.BalancedAccuracy});
-                    for (const auto &[label, accuracy] : evaluation.ClassAccuracy) {
-                        state->Push({MessageType::ClassAccuracy, label, accuracy});
+    openscofo_train_output(object->StatusOutlet, "status", initialStatus);
+    state->Worker =
+        std::thread([state, job, path = std::move(path), samples = std::move(samples), sampleRate]() mutable {
+            bool succeeded = false;
+            try {
+                if (job == OpenScofoTrainJob::Analyze) {
+                    succeeded = state->Trainer.Analyze();
+                } else if (job == OpenScofoTrainJob::Train) {
+                    succeeded = state->Trainer.Train();
+                    const OpenScofo::Evaluation &evaluation = state->Trainer.GetEvaluation();
+                    if (succeeded && evaluation.TestedSamples != 0) {
+                        state->Push({OpenScofoTrainMessageType::Accuracy, {}, evaluation.Accuracy});
+                        state->Push({OpenScofoTrainMessageType::BalancedAccuracy, {}, evaluation.BalancedAccuracy});
+                        for (const auto &[label, accuracy] : evaluation.ClassAccuracy) {
+                            state->Push({OpenScofoTrainMessageType::ClassAccuracy, label, accuracy});
+                        }
                     }
+                } else if (job == OpenScofoTrainJob::Export) {
+                    succeeded = state->Trainer.ExportModel(path);
+                } else if (job == OpenScofoTrainJob::Cut) {
+                    const std::optional<std::size_t> exported = state->Trainer.Cut(samples, sampleRate, path);
+                    succeeded = exported.has_value();
+                    if (exported) {
+                        state->Push({OpenScofoTrainMessageType::Segments, {}, static_cast<double>(*exported)});
+                    }
+                } else {
+                    state->Trainer.ClearData();
+                    succeeded = true;
                 }
-            } else if (job == Job::Export) {
-                state->Trainer.ExportModel(exportPath);
-            } else {
-                state->Trainer.ClearData();
+            } catch (const std::exception &error) {
+                state->Push({OpenScofoTrainMessageType::Error, error.what(), 0.0});
             }
-            state->Push({MessageType::Status, "done", 0.0});
-        } catch (const std::exception &error) {
-            const std::string message = error.what();
-            if (message == "Training cancelled") {
-                state->Push({MessageType::Status, "cancelled", 0.0});
+            if (succeeded) {
+                state->Push({OpenScofoTrainMessageType::Status, "done", 0.0});
+            } else if (state->Trainer.IsCancelled()) {
+                state->Push({OpenScofoTrainMessageType::Status, "cancelled", 0.0});
             } else {
-                state->Push({MessageType::Error, message, 0.0});
+                state->Push({OpenScofoTrainMessageType::Status, "failed", 0.0});
             }
-        }
-        state->Running.store(false);
-    });
+            state->Running.store(false);
+        });
     clock_delay(object->Clock, 0.0);
 }
 
 // ─────────────────────────────────────
-bool CanConfigure(PdTrainer *object) {
+bool openscofo_train_canconfigure(OpenScofoTrain *object) {
     if (object->State->Running.load()) {
-        OutputSymbol(object->StatusOutlet, "error", "cannot change settings while a job is running");
+        openscofo_train_output(object->StatusOutlet, "error", "cannot change settings while a job is running");
         return false;
     }
     if (object->State->Worker.joinable()) {
@@ -214,220 +256,253 @@ bool CanConfigure(PdTrainer *object) {
 }
 
 // ─────────────────────────────────────
-void ApplyConfiguration(PdTrainer *object) {
+void openscofo_train_applyconfiguration(OpenScofoTrain *object) {
     object->State->Trainer.SetConfiguration(object->State->Config);
 }
 
 // ─────────────────────────────────────
-bool RequireSymbol(PdTrainer *object, int argc, t_atom *argv, const char *message) {
+bool openscofo_train_requiresymbol(OpenScofoTrain *object, int argc, t_atom *argv, const char *message) {
     if (argc != 1 || argv[0].a_type != A_SYMBOL) {
-        OutputSymbol(object->StatusOutlet, "error", message);
+        openscofo_train_output(object->StatusOutlet, "error", message);
         return false;
     }
     return true;
 }
 
 // ─────────────────────────────────────
-void SetFolder(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
-    if (!CanConfigure(object) || !RequireSymbol(object, argc, argv, "folder requires one path"))
+void openscofo_train_setfolder(OpenScofoTrain *object, t_symbol *, int argc, t_atom *argv) {
+    if (!openscofo_train_canconfigure(object) ||
+        !openscofo_train_requiresymbol(object, argc, argv, "folder requires one path"))
         return;
     object->State->Config.DatasetFolder = atom_getsymbol(argv)->s_name;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetIRFolders(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
-    if (!CanConfigure(object))
+void openscofo_train_setirfolders(OpenScofoTrain *object, t_symbol *, int argc, t_atom *argv) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.ImpulseResponseFolders.clear();
     for (int i = 0; i < argc; ++i) {
         if (argv[i].a_type != A_SYMBOL) {
-            OutputSymbol(object->StatusOutlet, "error", "ir_folder paths must be symbols");
+            openscofo_train_output(object->StatusOutlet, "error", "ir_folder paths must be symbols");
             return;
         }
         object->State->Config.ImpulseResponseFolders.emplace_back(atom_getsymbol(argv + i)->s_name);
     }
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetDescriptors(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
-    if (!CanConfigure(object))
+void openscofo_train_setdescriptors(OpenScofoTrain *object, t_symbol *, int argc, t_atom *argv) {
+    if (!openscofo_train_canconfigure(object))
         return;
     if (argc == 0) {
-        OutputSymbol(object->StatusOutlet, "error", "descriptors requires at least one name");
+        openscofo_train_output(object->StatusOutlet, "error", "descriptors requires at least one name");
         return;
     }
     object->State->Config.Descriptors.clear();
     for (int i = 0; i < argc; ++i) {
         if (argv[i].a_type != A_SYMBOL) {
-            OutputSymbol(object->StatusOutlet, "error", "descriptor names must be symbols");
+            openscofo_train_output(object->StatusOutlet, "error", "descriptor names must be symbols");
             return;
         }
         object->State->Config.Descriptors.emplace_back(atom_getsymbol(argv + i)->s_name);
     }
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetTrainingSampleRates(PdTrainer *object, t_symbol *, int argc, t_atom *argv) {
-    if (!CanConfigure(object))
+void openscofo_train_settrainingsamplerates(OpenScofoTrain *object, t_symbol *, int argc, t_atom *argv) {
+    if (!openscofo_train_canconfigure(object))
         return;
     if (argc == 0) {
-        OutputSymbol(object->StatusOutlet, "error", "training_sample_rates requires at least one rate");
+        openscofo_train_output(object->StatusOutlet, "error", "training_sample_rates requires at least one rate");
         return;
     }
     object->State->Config.TrainingSampleRates.clear();
     for (int i = 0; i < argc; ++i) {
         if (argv[i].a_type != A_FLOAT) {
-            OutputSymbol(object->StatusOutlet, "error", "training sample rates must be numbers");
+            openscofo_train_output(object->StatusOutlet, "error", "training sample rates must be numbers");
             return;
         }
         object->State->Config.TrainingSampleRates.push_back(atom_getint(argv + i));
     }
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetSampleRate(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setsamplerate(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.SampleRate = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetFFTSize(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setfftsize(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.FFTSize = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetHopSize(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_sethopsize(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.HopSize = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetMinDB(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setmindb(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.MinDB = value;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetMaxPitchConfidence(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setmaxpitchconfidence(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.MaxPitchConfidence = value;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetAugmentationFactor(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setaugmentationfactor(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.AugmentationFactor = value;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetTestFraction(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_settestfraction(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.TestFraction = value;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetIterations(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setiterations(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.Iterations = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetLearningRate(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setlearningrate(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.LearningRate = value;
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetDepth(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setdepth(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.Depth = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetEarlyStopping(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setearlystopping(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.EarlyStoppingRounds = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void SetSeed(PdTrainer *object, t_float value) {
-    if (!CanConfigure(object))
+void openscofo_train_setseed(OpenScofoTrain *object, t_float value) {
+    if (!openscofo_train_canconfigure(object))
         return;
     object->State->Config.RandomSeed = static_cast<int>(value);
-    ApplyConfiguration(object);
+    openscofo_train_applyconfiguration(object);
 }
 
 // ─────────────────────────────────────
-void Analyze(PdTrainer *object) {
-    StartJob(object, Job::Analyze);
+void openscofo_train_analyze(OpenScofoTrain *object) {
+    openscofo_train_startjob(object, OpenScofoTrainJob::Analyze);
 }
 
 // ─────────────────────────────────────
-void Train(PdTrainer *object) {
-    StartJob(object, Job::Train);
+void openscofo_train_train(OpenScofoTrain *object) {
+    openscofo_train_startjob(object, OpenScofoTrainJob::Train);
 }
 
 // ─────────────────────────────────────
-void Export(PdTrainer *object, t_symbol *path) {
+void openscofo_train_export(OpenScofoTrain *object, t_symbol *path) {
     if (path == nullptr || path == &s_ || path->s_name[0] == '\0') {
-        OutputSymbol(object->StatusOutlet, "error", "export requires one model path");
+        openscofo_train_output(object->StatusOutlet, "error", "export requires one model path");
         return;
     }
-    StartJob(object, Job::Export, path->s_name);
+    openscofo_train_startjob(object, OpenScofoTrainJob::Export, path->s_name);
 }
 
 // ─────────────────────────────────────
-void ClearData(PdTrainer *object) {
-    StartJob(object, Job::ClearData);
+void openscofo_train_cut(OpenScofoTrain *object, t_symbol *, int argc, t_atom *argv) {
+    if (!openscofo_train_canconfigure(object)) {
+        return;
+    }
+    if (argc != 2 || argv[0].a_type != A_SYMBOL || argv[1].a_type != A_SYMBOL) {
+        openscofo_train_output(object->StatusOutlet, "error", "cut requires an array and a label");
+        return;
+    }
+
+    t_symbol *arrayName = atom_getsymbol(argv);
+    t_garray *array = reinterpret_cast<t_garray *>(pd_findbyclass(arrayName, garray_class));
+    if (array == nullptr) {
+        openscofo_train_output(object->StatusOutlet, "error", "array was not found");
+        return;
+    }
+    int size = 0;
+    t_word *words = nullptr;
+    if (!garray_getfloatwords(array, &size, &words) || size <= 0 || words == nullptr) {
+        openscofo_train_output(object->StatusOutlet, "error", "array does not contain float samples");
+        return;
+    }
+
+    std::vector<float> samples(static_cast<std::size_t>(size));
+    for (int index = 0; index < size; ++index) {
+        samples[static_cast<std::size_t>(index)] = words[index].w_float;
+    }
+    const int sampleRate = sys_getsr() > 0 ? static_cast<int>(sys_getsr()) : object->State->Config.SampleRate;
+    openscofo_train_startjob(object, OpenScofoTrainJob::Cut, atom_getsymbol(argv + 1)->s_name, std::move(samples),
+                             sampleRate);
 }
 
 // ─────────────────────────────────────
-void Cancel(PdTrainer *object) {
+void openscofo_train_cleardata(OpenScofoTrain *object) {
+    openscofo_train_startjob(object, OpenScofoTrainJob::ClearData);
+}
+
+// ─────────────────────────────────────
+void openscofo_train_cancel(OpenScofoTrain *object) {
     if (!object->State->Running.load()) {
-        OutputSymbol(object->StatusOutlet, "status", "idle");
+        openscofo_train_output(object->StatusOutlet, "status", "idle");
         return;
     }
     object->State->Trainer.Cancel();
-    OutputSymbol(object->StatusOutlet, "status", "cancelling");
+    openscofo_train_output(object->StatusOutlet, "status", "cancelling");
 }
 
 // ─────────────────────────────────────
-void *NewTrainer(t_symbol *, int, t_atom *) {
-    PdTrainer *object = reinterpret_cast<PdTrainer *>(pd_new(TrainerClass));
+void *openscofo_train_new(t_symbol *, int, t_atom *) {
+    auto *object = reinterpret_cast<OpenScofoTrain *>(pd_new(openscofo_train_class));
     if (object == nullptr) {
         return nullptr;
     }
     t_canvas *canvas = canvas_getcurrent();
     const std::filesystem::path patchDirectory = canvas_getdir(canvas)->s_name;
     try {
-        object->State = new PdTrainerState(patchDirectory);
+        object->State = new OpenScofoTrainState(patchDirectory);
     } catch (const std::exception &error) {
         pd_error(object, "[openscofo.train] %s", error.what());
         return nullptr;
@@ -435,12 +510,12 @@ void *NewTrainer(t_symbol *, int, t_atom *) {
     object->ProgressOutlet = outlet_new(&object->Object, &s_list);
     object->StatusOutlet = outlet_new(&object->Object, &s_list);
     object->EvaluationOutlet = outlet_new(&object->Object, &s_list);
-    object->Clock = clock_new(object, reinterpret_cast<t_method>(TrainerTick));
+    object->Clock = clock_new(object, reinterpret_cast<t_method>(openscofo_train_tick));
     return object;
 }
 
 // ─────────────────────────────────────
-void FreeTrainer(PdTrainer *object) {
+void openscofo_train_free(OpenScofoTrain *object) {
     if (object->Clock != nullptr) {
         clock_unset(object->Clock);
     }
@@ -452,42 +527,58 @@ void FreeTrainer(PdTrainer *object) {
     }
 }
 
-} // namespace
-
 // ─────────────────────────────────────
 #ifdef _WIN32
 extern "C" __declspec(dllexport) void setup_openscofo0x2etrain(void) {
 #else
 extern "C" __attribute__((visibility("default"))) void setup_openscofo0x2etrain(void) {
 #endif
-    TrainerClass = class_new(gensym("openscofo.train"), reinterpret_cast<t_newmethod>(NewTrainer),
-                             reinterpret_cast<t_method>(FreeTrainer), sizeof(PdTrainer), CLASS_DEFAULT, A_GIMME, 0);
+    openscofo_train_class =
+        class_new(gensym("openscofo.train"), reinterpret_cast<t_newmethod>(openscofo_train_new),
+                  reinterpret_cast<t_method>(openscofo_train_free), sizeof(OpenScofoTrain), CLASS_DEFAULT, A_GIMME, 0);
 
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetFolder), gensym("folder"), A_GIMME, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetIRFolders), gensym("ir_folder"), A_GIMME, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetDescriptors), gensym("descriptors"), A_GIMME, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetSampleRate), gensym("sample_rate"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetTrainingSampleRates), gensym("training_sample_rates"),
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setfolder), gensym("folder"),
                     A_GIMME, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetFFTSize), gensym("fft_size"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetHopSize), gensym("hop_size"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetMinDB), gensym("min_db"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetMaxPitchConfidence), gensym("max_pitch_confidence"),
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setirfolders),
+                    gensym("ir_folder"), A_GIMME, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setdescriptors),
+                    gensym("descriptors"), A_GIMME, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setsamplerate),
+                    gensym("sample_rate"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_settrainingsamplerates),
+                    gensym("training_sample_rates"), A_GIMME, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setfftsize), gensym("fft_size"),
                     A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetAugmentationFactor), gensym("augmentation_factor"),
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_sethopsize), gensym("hop_size"),
                     A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetTestFraction), gensym("test_fraction"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetIterations), gensym("iterations"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetLearningRate), gensym("learning_rate"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetDepth), gensym("depth"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetEarlyStopping), gensym("early_stopping_rounds"),
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setmindb), gensym("min_db"),
                     A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(SetSeed), gensym("seed"), A_FLOAT, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(Analyze), gensym("analyze"), A_NULL);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(Train), gensym("train"), A_NULL);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(Export), gensym("export"), A_SYMBOL, 0);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(ClearData), gensym("clear_data"), A_NULL);
-    class_addmethod(TrainerClass, reinterpret_cast<t_method>(Cancel), gensym("cancel"), A_NULL);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setmaxpitchconfidence),
+                    gensym("max_pitch_confidence"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setaugmentationfactor),
+                    gensym("augmentation_factor"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_settestfraction),
+                    gensym("test_fraction"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setiterations),
+                    gensym("iterations"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setlearningrate),
+                    gensym("learning_rate"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setdepth), gensym("depth"),
+                    A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setearlystopping),
+                    gensym("early_stopping_rounds"), A_FLOAT, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_setseed), gensym("seed"), A_FLOAT,
+                    0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_analyze), gensym("analyze"),
+                    A_NULL);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_train), gensym("train"), A_NULL);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_export), gensym("export"),
+                    A_SYMBOL, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_cut), gensym("cut"), A_GIMME, 0);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_cleardata), gensym("clear_data"),
+                    A_NULL);
+    class_addmethod(openscofo_train_class, reinterpret_cast<t_method>(openscofo_train_cancel), gensym("cancel"),
+                    A_NULL);
 
     logpost(nullptr, PD_NORMAL, "[openscofo.train] native trainer %s", OPENSCOFO_VERSION);
 }

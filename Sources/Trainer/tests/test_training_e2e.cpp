@@ -30,15 +30,15 @@ TEST(TrainingEndToEnd, ExtractsTrainsExportsAndRunsInOpenScofo) {
     configuration.ThreadCount = -1;
 
     Trainer trainer(configuration);
-    trainer.Analyze();
-    trainer.Train();
+    ASSERT_TRUE(trainer.Analyze());
+    ASSERT_TRUE(trainer.Train());
     ASSERT_TRUE(trainer.HasModel());
     EXPECT_GT(trainer.GetEvaluation().TestedSamples, 0U);
 
     const std::filesystem::path onnxPath = directory.Path / "model.onnx";
     const std::filesystem::path nativePath = directory.Path / "model.cbm";
-    trainer.ExportModel(onnxPath);
-    trainer.ExportModel(nativePath);
+    ASSERT_TRUE(trainer.ExportModel(onnxPath));
+    ASSERT_TRUE(trainer.ExportModel(nativePath));
     ASSERT_TRUE(std::filesystem::exists(onnxPath));
     ASSERT_TRUE(std::filesystem::exists(nativePath));
 

@@ -9,8 +9,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(max-sdk)
 
 set(C74_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/max")
-set(OPENSCOFO_MAX_MACOS_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-pretarget.cmake")
+if(APPLE)
+    # Max SDK 8.2 forces this cache entry to 10.11. Restore both forms of the variable before creating the Max target so
+    # it is not compiled against a macOS version where std::filesystem is unavailable.
+    set(CMAKE_OSX_DEPLOYMENT_TARGET
+        "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}"
+        CACHE STRING "Minimum supported macOS version" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${OPENSCOFO_MACOS_DEPLOYMENT_TARGET}")
+endif()
 set("${PROJECT_NAME}_EXTERN_OUTPUT_NAME" "openscofo~")
 
 add_library(${PROJECT_NAME} MODULE openscofo~.cpp maxlua.cpp)
@@ -24,3 +31,8 @@ if(WIN32)
 endif()
 
 include("${max-sdk_SOURCE_DIR}/source/max-sdk-base/script/max-posttarget.cmake")
+
+if(TARGET OpenScofo::Trainer)
+    add_subdirectory("${CMAKE_SOURCE_DIR}/Sources/Trainer/Max/max_openscofo_train"
+                     "${CMAKE_CURRENT_BINARY_DIR}/openscofo_train")
+endif()
